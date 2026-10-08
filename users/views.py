@@ -2816,6 +2816,28 @@ class UserViewSet(viewsets.ModelViewSet):
             request.user.theme_preference = theme
             updated_fields['theme_preference'] = theme
 
+        # Update chat theme preference if provided
+        if 'chat_theme_preference' in data:
+            chat_theme = data['chat_theme_preference']
+            valid_chat_themes = [
+                'default',
+                'ocean-wave',
+                'ocean-breeze',
+                'classic',
+                'sand-gradient',
+                'swahili-wave',
+                'midnight-coast',
+                'forest-glow',
+                'pwani-neon',
+            ]
+            if chat_theme not in valid_chat_themes:
+                return Response(
+                    {'error': f'Invalid chat theme preference. Must be one of: {", ".join(valid_chat_themes)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            request.user.chat_theme_preference = chat_theme
+            updated_fields['chat_theme_preference'] = chat_theme
+
         # Update font size preference if provided
         if 'font_size_preference' in data:
             font_size = data['font_size_preference']

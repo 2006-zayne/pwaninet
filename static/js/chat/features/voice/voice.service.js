@@ -567,7 +567,17 @@ export class VoiceService {
     const file = new File([this.audioBlob], filename, { type });
 
     const tempId = `temp_voice_${Date.now()}`;
-    const audioUrl = this.audioUrl || (this.audioBlob ? URL.createObjectURL(this.audioBlob) : '');
+
+    // Save sender voice note blob to local device storage (IndexedDB / Capacitor Filesystem)
+    let localUrl = '';
+    try {
+      const { deviceMediaStore } = await import('../../core/device-media-store.js');
+      localUrl = await deviceMediaStore.saveSenderMedia(tempId, this.audioBlob, filename);
+    } catch (saveErr) {
+      console.warn('[VOICE_SERVICE] Failed to save sender voice note locally:', saveErr);
+    }
+
+    const audioUrl = localUrl || this.audioUrl || (this.audioBlob ? URL.createObjectURL(this.audioBlob) : '');
 
     // Optimistically add voice note to UI immediately
     const optMsg = {

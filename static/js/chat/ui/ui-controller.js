@@ -6,7 +6,7 @@
 
 import { store } from '../core/store.js';
 import { messageService } from '../core/message-service.js';
-import { MessageRenderer } from './renderer.js';
+import { MessageRenderer } from './renderer.js?v=40';
 import { contextMenuService } from '../features/context-menu/context-menu.service.js';
 import { messageSoundManager } from '../shared/message-sound.js';
 import { eventBus } from '../core/event-bus.js';
@@ -34,6 +34,8 @@ export class UIController {
         // Initialize renderer with valid currentUserId
         this.renderer = new MessageRenderer();
         this.renderer.init(this.currentUserId);
+        window.uiController = this;
+        window.renderer = this.renderer;
         window.__store = store;
 
         // Setup read receipt observer
@@ -59,6 +61,10 @@ export class UIController {
      * @param {Object} state - Current state from store
      */
     _handleStateChange(state) {
+        if (!state) return;
+
+        const last = this.lastState;
+
         this._log('STATE_CHANGE_RECEIVED', {
             messagesCount: state.messages.length,
             connectionState: state.connectionState,
@@ -66,37 +72,62 @@ export class UIController {
             peerOnlineStatus: state.peerOnlineStatus.size
         });
 
-        // Only render if state actually changed
-        if (this._stateChanged(state, this.lastState)) {
-            // Update connection status in UI
+        // 1. Connection status change -> update connection status UI only
+        if (!last || state.connectionState !== last.connectionState) {
             this._updateConnectionStatus(state.connectionState);
+        }
 
-            // Update typing indicators and peer status
+        // 2. Typing indicators / Peer online status / Recording change -> update header status & typing indicator only (NEVER re-render messages!)
+        const typingListStr = Array.from(state.typingUsers || []).join(',');
+        const typingChanged = !last || (state.typingUsers.size !== last.typingUsersSize) || (typingListStr !== last.typingUsersList);
+        const recordingChanged = !last || ((state.recordingUsers?.size || 0) !== (last.recordingUsersSize || 0));
+        const peerChanged = !last || (state.peerOnlineStatus.size !== last.peerOnlineStatusSize);
+
+        if (typingChanged || peerChanged || recordingChanged) {
             this._updateTypingIndicators(state.typingUsers, state.peerOnlineStatus);
+        }
 
-            // Render messages (pure rendering)
-            this.renderer.render(state.messages);
+        // 3. UI State (loading, error, etc.)
+        if (!last || state.uiState !== last.uiState) {
+            this._updateUIState(state.uiState);
+        }
 
-            // Attach context menu listeners to newly rendered messages
+        // 4. Theme
+        if (state.currentTheme && (!last || JSON.stringify(state.currentTheme) !== JSON.stringify(last.currentTheme))) {
+            this._applyTheme(state.currentTheme, state.themeMode);
+        }
+
+        // 5. Messages: added, removed, status-changed, or initial load
+        const currentMessages = state.messages || [];
+        const prevLength = last?.messagesLength ?? -1;
+        const newChecksum = currentMessages.length > 0 ? this._computeMessagesChecksum(currentMessages) : null;
+        const prevChecksum = last?.messagesChecksum ?? null;
+
+        const countChanged = currentMessages.length !== prevLength;
+        const checksumChanged = newChecksum !== prevChecksum;
+
+        if (countChanged) {
+            // New message added, removed, or initial load -> Reconcile messages in DOM smoothly
+            this.renderer.render(currentMessages);
+
             setTimeout(() => {
                 contextMenuService.attachToMessages();
             }, 50);
 
-            // Observe received messages for read receipts (with small delay for DOM settling)
             setTimeout(() => {
                 this._observeReceivedMessages();
             }, 100);
+        } else if (checksumChanged) {
+            // ONLY status changed (sending -> sent -> delivered -> read)
+            // Update message status checkmarks / read receipt avatars in-place WITHOUT touching audio or video elements!
+            this.renderer.updateMessageStatuses(currentMessages);
 
-            // Update UI state
-            this._updateUIState(state.uiState);
-
-            // Update theme
-            if (state.currentTheme) {
-                this._applyTheme(state.currentTheme, state.themeMode);
-            }
-
-            this.lastState = this._createStateSnapshot(state);
+            setTimeout(() => {
+                this._observeReceivedMessages();
+            }, 100);
         }
+
+        this.lastState = this._createStateSnapshot(state);
     }
 
     /**
@@ -204,6 +235,30 @@ export class UIController {
         eventBus.on(EVENTS.CONTEXT_MENU_ACTION, (detail) => {
             this._handleContextMenuAction(detail);
         });
+
+        // History pagination on scroll-to-top
+        const messagesContainer = document.getElementById('messagesContainer');
+        if (messagesContainer) {
+            let scrollDebounceTimer = null;
+            messagesContainer.addEventListener('scroll', () => {
+                if (messagesContainer.scrollTop <= 80) {
+                    if (scrollDebounceTimer) return;
+                    scrollDebounceTimer = setTimeout(async () => {
+                        scrollDebounceTimer = null;
+                        if (store.hasMoreOlderMessages()) {
+                            const state = store.getState();
+                            if (state.conversationId && state.isInitialHistoryLoaded) {
+                                this.renderer.setPreserveScrollOnPrepend(true);
+                                const loaded = await messageService.loadOlderMessages(state.conversationId);
+                                if (loaded === 0) {
+                                    this.renderer.setPreserveScrollOnPrepend(false);
+                                }
+                            }
+                        }
+                    }, 150);
+                }
+            }, { passive: true });
+        }
 
 
 
@@ -466,18 +521,27 @@ export class UIController {
      */
     _updateConnectionStatus(connectionState) {
         const statusElement = document.getElementById('chatStatus');
-        if (statusElement) {
-            const statusMap = {
-                'connected': 'Active now',
-                'connecting': 'Connecting...',
-                'disconnected': 'Waiting for network...',
-                'reconnecting': 'Connecting...',
-                'error': 'Connection error'
-            };
-            if (connectionState !== 'connected') {
-                statusElement.textContent = statusMap[connectionState] || connectionState;
-                statusElement.className = `chat-status ${connectionState} text-muted`;
+        if (!statusElement) return;
+
+        const state = store.getState();
+        if (connectionState === 'connected') {
+            // Socket is connected: immediately reflect peer presence
+            this._updateTypingIndicators(state.typingUsers, state.peerOnlineStatus);
+        } else if (connectionState === 'connecting' || connectionState === 'reconnecting') {
+            statusElement.textContent = 'Connecting...';
+            statusElement.className = 'chat-status connecting text-muted';
+        } else if (connectionState === 'disconnected') {
+            // Only indicate waiting for network if client device is genuinely offline
+            if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                statusElement.textContent = 'Waiting for network...';
+                statusElement.className = 'chat-status disconnected text-muted';
+            } else {
+                statusElement.textContent = 'Connecting...';
+                statusElement.className = 'chat-status connecting text-muted';
             }
+        } else {
+            statusElement.textContent = 'Connecting...';
+            statusElement.className = 'chat-status text-muted';
         }
     }
 
@@ -492,7 +556,7 @@ export class UIController {
 
         if (!chatStatus) return;
 
-        const typingArray = Array.from(typingUsers.values());
+        const typingEntries = Array.from(typingUsers.entries());
         const peerArray = Array.from(peerOnlineStatus.entries());
         const state = store.getState();
         const recordingUsers = state.recordingUsers || new Map();
@@ -502,28 +566,31 @@ export class UIController {
         const isPeerOnline = peer ? peer.isOnline : false;
         const lastSeen = peer ? peer.lastSeen : null;
 
-        if (typingArray.length > 0) {
-            const username = typingArray[0];
-            this.renderer.showTypingIndicator(username);
-            chatStatus.textContent = 'typing...';
-            chatStatus.className = 'chat-status typing text-primary fw-semibold';
-            if (chatAvatar) chatAvatar.classList.remove('avatar-online');
-        } else if (recordingArray.length > 0) {
-            this.renderer.hideTypingIndicator();
-            chatStatus.textContent = 'recording voice note...';
-            chatStatus.className = 'chat-status text-danger fw-semibold';
-            if (chatAvatar) chatAvatar.classList.remove('avatar-online');
+        // 1. Manage chat stream typing and recording bubbles
+        if (recordingArray.length > 0) {
+            const recordingEntries = Array.from(recordingUsers.entries());
+            const [userId, username] = recordingEntries[0];
+            this.renderer.showRecordingIndicator(username, userId);
+        } else if (typingEntries.length > 0) {
+            const [userId, username] = typingEntries[0];
+            this.renderer.showTypingIndicator(username, userId);
         } else {
             this.renderer.hideTypingIndicator();
-            if (isPeerOnline) {
-                chatStatus.textContent = 'Active now';
-                chatStatus.className = 'chat-status text-success fw-semibold';
-                if (chatAvatar) chatAvatar.classList.add('avatar-online');
-            } else {
-                chatStatus.textContent = lastSeen ? this._formatLastSeen(lastSeen) : '';
-                chatStatus.className = 'chat-status text-muted';
-                if (chatAvatar) chatAvatar.classList.remove('avatar-online');
-            }
+        }
+
+        // 2. Header ALWAYS shows peer presence (Active now / Last seen) - NEVER overwritten by typing/recording
+        if (isPeerOnline) {
+            chatStatus.textContent = 'Active now';
+            chatStatus.className = 'chat-status text-success fw-semibold';
+            if (chatAvatar) chatAvatar.classList.add('avatar-online');
+        } else if (lastSeen) {
+            chatStatus.textContent = this._formatLastSeen(lastSeen);
+            chatStatus.className = 'chat-status text-muted';
+            if (chatAvatar) chatAvatar.classList.remove('avatar-online');
+        } else {
+            chatStatus.textContent = 'Offline';
+            chatStatus.className = 'chat-status text-muted';
+            if (chatAvatar) chatAvatar.classList.remove('avatar-online');
         }
     }
 
@@ -780,6 +847,7 @@ export class UIController {
         const changed = (
             newState.connectionState !== lastState.connectionState ||
             newState.typingUsers.size !== lastState.typingUsersSize ||
+            (newState.recordingUsers?.size || 0) !== (lastState.recordingUsersSize || 0) ||
             newState.peerOnlineStatus.size !== lastState.peerOnlineStatusSize ||
             newState.uiState !== lastState.uiState ||
             JSON.stringify(newState.currentTheme) !== JSON.stringify(lastState.currentTheme)
@@ -816,6 +884,8 @@ export class UIController {
                 : null,
             connectionState: state.connectionState,
             typingUsersSize: state.typingUsers.size,
+            typingUsersList: Array.from(state.typingUsers || []).join(','),
+            recordingUsersSize: state.recordingUsers?.size || 0,
             peerOnlineStatusSize: state.peerOnlineStatus.size,
             uiState: state.uiState,
             currentTheme: state.currentTheme ? JSON.parse(JSON.stringify(state.currentTheme)) : null

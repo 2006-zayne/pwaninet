@@ -87,6 +87,9 @@ export class AttachmentService {
     if (options.isVoiceNote || file.name.startsWith('voice_')) {
       formData.append('is_voice_note', 'true');
     }
+    if (options.tempId) {
+      formData.append('temp_id', options.tempId);
+    }
 
     const csrfToken = this.getCSRFToken();
     if (csrfToken) {
@@ -94,6 +97,14 @@ export class AttachmentService {
     }
 
     try {
+      // Save sender file locally to IndexedDB/Filesystem
+      if (file && options.tempId) {
+        try {
+          const { deviceMediaStore } = await import('../../core/device-media-store.js');
+          await deviceMediaStore.saveSenderMedia(options.tempId, file, file.name || 'attachment');
+        } catch (_) {}
+      }
+
       // Emit upload start event (QUEUED state)
       eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_START, { file, status: this.MESSAGE_STATES.QUEUED });
 
@@ -111,6 +122,15 @@ export class AttachmentService {
 
       if (response.ok) {
         const data = await response.json();
+
+        // Rekey local media store from tempId to permanent message id
+        if (options.tempId && data?.id) {
+          try {
+            const { deviceMediaStore } = await import('../../core/device-media-store.js');
+            await deviceMediaStore.rekeyMedia(options.tempId, data.id);
+          } catch (_) {}
+        }
+
         eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_SUCCESS, { ...data, status: this.MESSAGE_STATES.SENT });
         // Emit MESSAGE_UPLOAD_SUCCESS so MessageService immediately resolves optimistic message and updates store
         eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {

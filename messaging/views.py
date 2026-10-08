@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 from django.db import models
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import requests
@@ -201,6 +201,30 @@ class MessageViewSet(viewsets.ModelViewSet):
             return MessageUpdateSerializer
         return MessageSerializer
 
+    def list(self, request, *args, **kwargs):
+        """List messages with support for limit and before_id cursor pagination."""
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        limit_param = request.query_params.get('limit')
+        before_id = request.query_params.get('before_id')
+        
+        if limit_param:
+            try:
+                limit = max(1, min(100, int(limit_param)))
+                if before_id:
+                    queryset = queryset.filter(id__lt=before_id)
+                # Fetch the most recent messages up to limit in reverse chronological order
+                messages_slice = list(queryset.order_by('-created_at')[:limit])
+                # Reverse back to chronological order (oldest to newest)
+                messages_slice.reverse()
+                serializer = self.get_serializer(messages_slice, many=True)
+                return Response(serializer.data)
+            except (ValueError, TypeError):
+                pass
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         """Create a new message and broadcast via WebSocket with rate limiting."""
         # Handle conversation_id from FormData for file uploads
@@ -223,13 +247,18 @@ class MessageViewSet(viewsets.ModelViewSet):
         # Update conversation timestamp
         message.conversation.save()
         
-        # Broadcast message via WebSocket
+        # Broadcast message via WebSocket with temp_id preserved
+        temp_id = self.request.data.get('temp_id') or self.request.data.get('client_id')
+        msg_data = MessageSerializer(message).data
+        if temp_id:
+            msg_data['temp_id'] = temp_id
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"chat_{message.conversation.id}",
             {
                 'type': 'chat_message',
-                'message': MessageSerializer(message).data
+                'message': msg_data,
+                'temp_id': temp_id
             }
         )
         
@@ -832,18 +861,26 @@ def attachment_upload(request):
         # Update conversation timestamp
         conversation.save()
         
+        # Extract temp_id for seamless client reconciliation
+        temp_id = request.data.get('temp_id') or request.POST.get('temp_id')
+
         # Broadcast message via WebSocket
         channel_layer = get_channel_layer()
+        msg_payload = MessageSerializer(message).data
+        if temp_id:
+            msg_payload['temp_id'] = temp_id
+
         async_to_sync(channel_layer.group_send)(
             f"chat_{conversation.id}",
             {
                 'type': 'chat_message',
-                'message': MessageSerializer(message).data
+                'message': msg_payload,
+                'temp_id': temp_id
             }
         )
         
         return Response(
-            MessageSerializer(message).data,
+            msg_payload,
             status=status.HTTP_201_CREATED
         )
         
@@ -974,6 +1011,7 @@ def batch_attachment_upload(request):
         conversation_id = request.data.get('conversation_id')
         global_caption = request.data.get('global_caption', '')
         attachments_data = request.data.get('attachments_data')
+        temp_id = request.data.get('temp_id') or request.data.get('client_id')
         
         if not conversation_id:
             return Response(
@@ -1166,12 +1204,17 @@ def batch_attachment_upload(request):
 
         # Broadcast all created messages via WebSocket
         channel_layer = get_channel_layer()
-        for msg in created_messages:
+        for idx, msg in enumerate(created_messages):
+            msg_data = MessageSerializer(msg).data
+            # Attach temp_id to the primary message for seamless client reconciliation
+            if temp_id and idx == 0:
+                msg_data['temp_id'] = temp_id
             async_to_sync(channel_layer.group_send)(
                 f"chat_{conversation.id}",
                 {
                     'type': 'chat_message',
-                    'message': MessageSerializer(msg).data
+                    'message': msg_data,
+                    'temp_id': temp_id if idx == 0 else None
                 }
             )
 
@@ -1183,13 +1226,19 @@ def batch_attachment_upload(request):
 
         # Return single object if 1 message created, or array if multiple
         if len(created_messages) == 1:
+            resp_data = MessageSerializer(created_messages[0]).data
+            if temp_id:
+                resp_data['temp_id'] = temp_id
             return Response(
-                MessageSerializer(created_messages[0]).data,
+                resp_data,
                 status=status.HTTP_201_CREATED
             )
         else:
+            resp_data = MessageSerializer(created_messages, many=True).data
+            if temp_id and len(resp_data) > 0:
+                resp_data[0]['temp_id'] = temp_id
             return Response(
-                MessageSerializer(created_messages, many=True).data,
+                resp_data,
                 status=status.HTTP_201_CREATED
             )
         
@@ -1358,3 +1407,61 @@ def unread_message_count(request):
             </span>'''
     
     return HttpResponse(html)
+
+
+def proxy_chat_media(request):
+    """
+    Stream media attachments through same-origin for reliable client-side caching (IndexedDB/offline).
+    Avoids CORS ERR_FAILED when testing or accessing via LAN IPs or origins not in CDN's CORS policy.
+    Compatible with both WSGI and ASGI without event loop conflicts.
+    """
+    media_url = request.GET.get('url', '').strip()
+    if not media_url:
+        return HttpResponse('Missing url parameter', status=400)
+    
+    if media_url.startswith('/media/'):
+        from django.conf import settings
+        media_url = f"{settings.MEDIA_URL.rstrip('/')}/{media_url.lstrip('/media/')}"
+    
+    parsed = urlparse(media_url)
+    if parsed.scheme not in ('http', 'https'):
+        return HttpResponse('Invalid URL scheme', status=400)
+    
+    from django.conf import settings
+    allowed_domains = {settings.CDN_DOMAIN} if hasattr(settings, 'CDN_DOMAIN') and settings.CDN_DOMAIN else set()
+    allowed_domains.update(['cdn.pwaninet.app', 'pwaninet.app', 'localhost', '127.0.0.1'])
+    if parsed.hostname not in allowed_domains and not (parsed.hostname and parsed.hostname.endswith('.pwaninet.app')):
+        return HttpResponse('Domain not allowed for proxying', status=403)
+        
+    try:
+        req = requests.get(media_url, stream=True, timeout=25)
+        if req.status_code != 200:
+            return HttpResponse(f'Upstream error: {req.status_code}', status=req.status_code)
+            
+        content_type = req.headers.get('Content-Type', 'application/octet-stream')
+        
+        def stream_content():
+            try:
+                for chunk in req.iter_content(chunk_size=65536):
+                    if chunk:
+                        yield chunk
+            finally:
+                req.close()
+
+        response = StreamingHttpResponse(
+            stream_content(),
+            content_type=content_type,
+            status=200
+        )
+        # Note: Do NOT set Content-Length on StreamingHttpResponse; chunked transfer encoding is used in ASGI/HTTP.
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response['Access-Control-Allow-Headers'] = '*'
+        response['Cache-Control'] = 'public, max-age=604800'
+        return response
+    except Exception as e:
+        logger.warning(f'Failed to proxy media URL {media_url}: {e}')
+        return HttpResponse('Failed to fetch upstream media', status=502)
+
+
+

@@ -183,7 +183,12 @@ class DownloadStorage {
             tx.objectStore('metadata').delete(id);
             tx.objectStore('blobs').delete(id);
 
-            tx.oncomplete = () => resolve(true);
+            tx.oncomplete = () => {
+                try {
+                    window.dispatchEvent(new CustomEvent('pwaninet:download-deleted', { detail: { id } }));
+                } catch (_) {}
+                resolve(true);
+            };
             tx.onerror = () => reject(tx.error);
         });
     }

@@ -23,6 +23,18 @@ class ThemePreference(models.TextChoices):
     SYSTEM = 'system', 'System Default'
 
 
+class ChatThemePreference(models.TextChoices):
+    DEFAULT = 'default', 'Ocean Wave (Default)'
+    OCEAN_WAVE = 'ocean-wave', 'Ocean Wave'
+    OCEAN_BREEZE = 'ocean-breeze', 'Ocean Breeze'
+    CLASSIC = 'classic', 'Classic'
+    SAND_GRADIENT = 'sand-gradient', 'Sand Gradient'
+    SWAHILI_WAVE = 'swahili-wave', 'Swahili Wave'
+    MIDNIGHT_COAST = 'midnight-coast', 'Midnight Coast'
+    FOREST_GLOW = 'forest-glow', 'Forest Glow'
+    PWANI_NEON = 'pwani-neon', 'Pwani Neon'
+
+
 class FontSizePreference(models.TextChoices):
     TINY = 'tiny', 'Tiny'
     SMALL = 'small', 'Small'
@@ -195,6 +207,13 @@ class User(AbstractUser):
         max_length=10,
         choices=ThemePreference.choices,
         default=ThemePreference.SYSTEM
+    )
+
+    # Chat theme preference
+    chat_theme_preference = models.CharField(
+        max_length=30,
+        choices=ChatThemePreference.choices,
+        default=ChatThemePreference.DEFAULT
     )
 
     # Font size preference

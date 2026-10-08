@@ -157,17 +157,16 @@ export class MessageStatusRenderer {
 
     static _getSingleCheckIcon() {
         return `<svg class="check-marks sent" width="13" height="11" viewBox="0 0 13 11" fill="none" style="vertical-align: middle;">
-            <path d="M1.5 5.5L4.5 8.5L11.5 1.5" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M1.5 5.5L4.5 8.5L11.5 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>`;
     }
 
     static _getDoubleCheckIcon(color = 'grey') {
-        const strokeColor = color === 'blue' ? '#2563eb' : '#94a3b8';
         const label = color === 'blue' ? 'Read' : 'Delivered';
         const className = color === 'blue' ? 'check-marks read' : 'check-marks delivered';
         return `<svg class="${className}" width="17" height="11" viewBox="0 0 17 11" fill="none" aria-label="${label}" style="vertical-align: middle;">
-            <path d="M1 5.5L4 8.5L11 1.5" stroke="${strokeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M5.5 5.5L8.5 8.5L15.5 1.5" stroke="${strokeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M1 5.5L4 8.5L11 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5.5 5.5L8.5 8.5L15.5 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>`;
     }
 

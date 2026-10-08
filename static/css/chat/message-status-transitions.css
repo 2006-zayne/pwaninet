@@ -146,12 +146,52 @@
     transform: rotate(180deg);
 }
 
-/* Ensure all status indicators have consistent sizing */
+/* Status indicators sizing: preserve aspect ratios without squashing ticks */
+.message-read-receipt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    vertical-align: middle;
+}
+
 .message-read-receipt .check-circle,
-.message-read-receipt svg,
-.message-read-receipt img {
+.message-read-receipt svg.check-circle {
     width: 14px;
     height: 14px;
     min-width: 14px;
     min-height: 14px;
+    flex-shrink: 0;
+}
+
+.message-read-receipt svg.check-marks.sent {
+    width: 13px;
+    height: 11px;
+    min-width: 13px;
+    min-height: 11px;
+    flex-shrink: 0;
+}
+
+.message-read-receipt svg.check-marks.delivered,
+.message-read-receipt svg.check-marks.read {
+    width: 17px;
+    height: 11px;
+    min-width: 17px;
+    min-height: 11px;
+    flex-shrink: 0;
+}
+
+.message-read-receipt img,
+.message-read-receipt .read-avatar-img {
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px !important;
+    min-height: 14px !important;
+    max-width: 14px !important;
+    max-height: 14px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
 }

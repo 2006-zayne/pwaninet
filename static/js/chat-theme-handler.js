@@ -1,190 +1,341 @@
 /**
- * Simple Chat Theme Handler
- * Handles theme switching for chat conversations
+ * WhatsApp-Style Chat Theme & Appearance Handler
+ * Supports:
+ * 1. Curated Atmosphere Presets (7 complete harmonies)
+ * 2. Custom Gradients & Picture Wallpapers
+ * 3. Overlay Tint & Readability Dimming
+ * 4. Custom Bubble Styling & Radii
+ * 5. Per-Chat Theme Persistence with User Default Fallback
+ * 6. "Apply to all chats" Global Setting
+ * 7. Guaranteed Composer Contrast Engine
  */
 class ChatThemeHandler {
     constructor() {
         this.currentConversationId = null;
+        this.activeConfig = {
+            type: 'preset', // 'preset' or 'wallpaper'
+            preset: 'ocean-wave',
+            wallpaper: null,
+            customWallpaperData: null,
+            overlayEnabled: true,
+            overlayOpacity: 30,
+            overlayColor: '#ffffff',
+            bubbleStyle: 'default',
+            bubbleSentColor: '',
+            bubbleReceivedColor: ''
+        };
         this.init();
     }
 
     init() {
         this.setupEventListeners();
-        const conversationId = this.getConversationId();
-        if (conversationId) {
-            this.loadCurrentTheme();
-        } else {
-            const chatTarget = this.getChatTarget();
-            if (chatTarget) {
-                chatTarget.style.background = '';
-                chatTarget.style.backgroundImage = 'none';
+        this.loadCurrentTheme();
+        this.setupThemeModeObserver();
+    }
+
+    setupThemeModeObserver() {
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'attributes' && (mutation.attributeName === 'data-theme' || mutation.attributeName === 'data-bs-theme')) {
+                    // Re-apply current configuration to refresh contrast calculations for the new mode
+                    this.applyThemeConfig(this.activeConfig, false);
+                }
             }
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-bs-theme'] });
+    }
+
+    getChatTarget() {
+        return document.getElementById('chatMainArea') || document.querySelector('.chat-container') || document.getElementById('messagesContainer');
+    }
+
+    getConversationId() {
+        const chatContainer = document.getElementById('chatMainArea') || document.querySelector('.chat-container');
+        if (chatContainer && chatContainer.dataset.conversationId) {
+            return chatContainer.dataset.conversationId;
         }
+        return document.body.dataset.conversationId || null;
+    }
+
+    getDefaultTheme() {
+        const chatContainer = document.getElementById('chatMainArea');
+        const defaultFromDataset = chatContainer?.dataset?.defaultChatTheme;
+        return localStorage.getItem('default_chat_theme') || defaultFromDataset || 'ocean-wave';
     }
 
     setupEventListeners() {
-        // Theme button in dropdown
+        // Dropdown Theme Button trigger
         const themeBtn = document.getElementById('themeBtn');
         if (themeBtn) {
             themeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.showThemeModal();
+                this.showThemePanel();
             });
         }
 
-        // Close modal
-        const closeBtn = document.getElementById('closeThemeModal');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.hideThemeModal());
-        }
-
-        // Close on backdrop click
-        const modal = document.getElementById('themeModal');
-        if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    this.hideThemeModal();
-                }
+        // Close Panel Buttons
+        const closePanelBtn = document.getElementById('closeThemePanelBtn');
+        if (closePanelBtn) {
+            closePanelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.hideThemePanel();
             });
         }
+        const legacyCloseBtn = document.getElementById('closeThemeModal');
+        if (legacyCloseBtn) {
+            legacyCloseBtn.addEventListener('click', () => this.hideThemePanel());
+        }
 
-        // Theme tabs
-        document.querySelectorAll('.theme-tab').forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
+        // Save Theme Buttons
+        const saveThemeBtn = document.getElementById('saveThemeBtn');
+        if (saveThemeBtn) {
+            saveThemeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.saveTheme();
             });
-        });
-
-        // Theme options (backgrounds)
-        document.querySelectorAll('.theme-option').forEach(option => {
-            option.addEventListener('click', () => {
-                this.applyBackgroundTheme(option.dataset.theme);
-            });
-        });
-
-        // Apply background button
-        const applyBackgroundBtn = document.getElementById('applyBackgroundBtn');
-        if (applyBackgroundBtn) {
-            applyBackgroundBtn.addEventListener('click', () => {
+        }
+        const saveThemePanelBtn = document.getElementById('saveThemePanelBtn');
+        if (saveThemePanelBtn) {
+            saveThemePanelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
                 this.saveTheme();
             });
         }
 
-        // Overlay controls
+        // Reset Theme Button
+        const resetThemeBtn = document.getElementById('resetThemeBtn');
+        if (resetThemeBtn) {
+            resetThemeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.resetThemeToDefault();
+            });
+        }
+
+        // Tab Navigation
+        document.querySelectorAll('#chatThemeNavPills [data-theme-tab], .theme-tabs [data-tab]').forEach(tabBtn => {
+            tabBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabKey = tabBtn.dataset.themeTab || tabBtn.dataset.tab;
+                this.switchTab(tabKey);
+            });
+        });
+
+        // Atmosphere Presets (Curated)
+        document.querySelectorAll('.preset-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.preventDefault();
+                const preset = option.dataset.preset;
+                if (preset) {
+                    this.activeConfig.type = 'preset';
+                    this.activeConfig.preset = preset;
+                    this.activeConfig.wallpaper = null;
+                    this.activeConfig.customWallpaperData = null;
+                    this.applyThemeConfig(this.activeConfig, false);
+                    this.syncActiveUI();
+                }
+            });
+        });
+
+        // Wallpaper & Gradient options
+        document.querySelectorAll('.bg-option, .theme-option:not(.preset-option)').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.preventDefault();
+                const wp = option.dataset.wallpaper || option.dataset.theme;
+                if (wp) {
+                    this.activeConfig.type = 'wallpaper';
+                    this.activeConfig.wallpaper = wp;
+                    this.activeConfig.customWallpaperData = null;
+                    this.applyThemeConfig(this.activeConfig, false);
+                    this.syncActiveUI();
+                }
+            });
+        });
+
+        // Overlay Controls
         const overlayEnabled = document.getElementById('overlayEnabled');
+        if (overlayEnabled) {
+            overlayEnabled.addEventListener('change', (e) => {
+                this.activeConfig.overlayEnabled = e.target.checked;
+                this.applyOverlay();
+                this.updateLivePreview();
+            });
+        }
+
         const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
         const overlayOpacityValue = document.getElementById('overlayOpacityValue');
-        
-        if (overlayOpacitySlider && overlayOpacityValue) {
+        if (overlayOpacitySlider) {
             overlayOpacitySlider.addEventListener('input', (e) => {
-                overlayOpacityValue.textContent = e.target.value + '%';
-                this.updateOverlay();
+                this.activeConfig.overlayOpacity = Number(e.target.value);
+                if (overlayOpacityValue) overlayOpacityValue.textContent = e.target.value + '%';
+                this.applyOverlay();
+                this.updateLivePreview();
             });
         }
 
-        if (overlayEnabled) {
-            overlayEnabled.addEventListener('change', () => {
-                this.updateOverlay();
+        // Quick opacity chips
+        document.querySelectorAll('.preset-opacity-btn, .opacity-presets .preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const op = Number(btn.dataset.opacity);
+                this.activeConfig.overlayOpacity = op;
+                if (overlayOpacitySlider) overlayOpacitySlider.value = op;
+                if (overlayOpacityValue) overlayOpacityValue.textContent = op + '%';
+                document.querySelectorAll('.preset-opacity-btn, .opacity-presets .preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.applyOverlay();
+                this.updateLivePreview();
             });
-        }
+        });
 
-        // Overlay color
+        // Overlay Color Presets & Picker
+        document.querySelectorAll('.color-tint-preset, .color-presets .color-preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const color = btn.dataset.color;
+                if (color) {
+                    this.activeConfig.overlayColor = color;
+                    const picker = document.getElementById('overlayColorPicker');
+                    const hex = document.getElementById('overlayColorHex');
+                    if (picker) picker.value = color;
+                    if (hex) hex.textContent = color;
+                    this.applyOverlay();
+                    this.updateLivePreview();
+                }
+            });
+        });
+
         const overlayColorPicker = document.getElementById('overlayColorPicker');
         const overlayColorHex = document.getElementById('overlayColorHex');
-        
-        if (overlayColorPicker && overlayColorHex) {
+        if (overlayColorPicker) {
             overlayColorPicker.addEventListener('input', (e) => {
-                overlayColorHex.textContent = e.target.value;
-                this.updateOverlay();
+                this.activeConfig.overlayColor = e.target.value;
+                if (overlayColorHex) overlayColorHex.textContent = e.target.value;
+                this.applyOverlay();
+                this.updateLivePreview();
             });
         }
 
-        // Opacity presets
-        document.querySelectorAll('.preset-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                if (overlayOpacitySlider) {
-                    overlayOpacitySlider.value = btn.dataset.opacity;
-                    overlayOpacityValue.textContent = btn.dataset.opacity + '%';
+        // Bubble style selection
+        document.querySelectorAll('.bubble-style-card, .bubble-option').forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.preventDefault();
+                const style = card.dataset.bubbleStyle || card.dataset.bubble;
+                if (style) {
+                    this.activeConfig.bubbleStyle = style;
+                    document.querySelectorAll('.bubble-style-card, .bubble-option').forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    this.applyBubbleStyle(style);
+                    this.updateLivePreview();
                 }
-                this.updateOverlay();
             });
         });
 
-        // Color presets
-        document.querySelectorAll('.color-preset-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (overlayColorPicker) {
-                    overlayColorPicker.value = btn.dataset.color;
-                    overlayColorHex.textContent = btn.dataset.color;
-                }
-                this.updateOverlay();
+        // Bubble color pickers
+        const sentBubbleColor = document.getElementById('sentBubbleColor');
+        const sentBubbleHex = document.getElementById('sentBubbleHex');
+        if (sentBubbleColor) {
+            sentBubbleColor.addEventListener('input', (e) => {
+                this.activeConfig.bubbleSentColor = e.target.value;
+                if (sentBubbleHex) sentBubbleHex.textContent = e.target.value;
+                this.applyBubbleColors();
+                this.updateLivePreview();
             });
-        });
+        }
 
-        // Wallpaper upload button
+        const receivedBubbleColor = document.getElementById('receivedBubbleColor');
+        const receivedBubbleHex = document.getElementById('receivedBubbleHex');
+        if (receivedBubbleColor) {
+            receivedBubbleColor.addEventListener('input', (e) => {
+                this.activeConfig.bubbleReceivedColor = e.target.value;
+                if (receivedBubbleHex) receivedBubbleHex.textContent = e.target.value;
+                this.applyBubbleColors();
+                this.updateLivePreview();
+            });
+        }
+
+        // Custom Wallpaper Upload
         const uploadWallpaperBtn = document.getElementById('uploadWallpaperBtn');
         const wallpaperImageInput = document.getElementById('wallpaperImageInput');
-        
         if (uploadWallpaperBtn && wallpaperImageInput) {
-            uploadWallpaperBtn.addEventListener('click', () => {
+            uploadWallpaperBtn.addEventListener('click', (e) => {
+                e.preventDefault();
                 wallpaperImageInput.click();
             });
-            
             wallpaperImageInput.addEventListener('change', (e) => {
                 this.handleWallpaperUpload(e);
             });
         }
 
-        // Bubble options
-        document.querySelectorAll('.bubble-option').forEach(option => {
-            option.addEventListener('click', () => {
-                document.querySelectorAll('.bubble-option').forEach(o => o.classList.remove('active'));
-                option.classList.add('active');
-                this.previewBubbleStyle(option.dataset.bubble);
+        const removeWallpaperBtn = document.getElementById('removeWallpaperBtn');
+        if (removeWallpaperBtn) {
+            removeWallpaperBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.activeConfig.customWallpaperData = null;
+                this.activeConfig.wallpaper = null;
+                this.activeConfig.type = 'preset';
+                this.applyThemeConfig(this.activeConfig, false);
+                this.syncActiveUI();
+                removeWallpaperBtn.classList.add('d-none');
             });
+        }
+    }
+
+    switchTab(tabKey) {
+        // Map tabs
+        const tabAliases = {
+            'presets': 'presets',
+            'wallpapers': 'wallpapers',
+            'background': 'wallpapers',
+            'overlay': 'overlay',
+            'bubbles': 'bubbles'
+        };
+        const activeTab = tabAliases[tabKey] || 'presets';
+
+        // Update Nav buttons
+        document.querySelectorAll('#chatThemeNavPills .nav-link, .theme-tabs .theme-tab').forEach(btn => {
+            const bKey = btn.dataset.themeTab || btn.dataset.tab;
+            if (tabAliases[bKey] === activeTab) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
         });
 
-        // Apply bubbles button
-        const applyBubblesBtn = document.getElementById('applyBubblesBtn');
-        if (applyBubblesBtn) {
-            applyBubblesBtn.addEventListener('click', () => {
-                this.applyBubbleTheme();
-            });
-        }
+        // Update Tab Panes
+        document.querySelectorAll('.theme-panel-tab-pane, .theme-tab-content').forEach(pane => {
+            pane.classList.add('d-none');
+            pane.classList.remove('active');
+        });
 
-        // Bubble color pickers
-        const sentBubbleColor = document.getElementById('sentBubbleColor');
-        const sentBubbleHex = document.getElementById('sentBubbleHex');
-        const receivedBubbleColor = document.getElementById('receivedBubbleColor');
-        const receivedBubbleHex = document.getElementById('receivedBubbleHex');
-
-        if (sentBubbleColor && sentBubbleHex) {
-            sentBubbleColor.addEventListener('input', (e) => {
-                sentBubbleHex.textContent = e.target.value;
-                this.previewBubbleColors();
-            });
-        }
-
-        if (receivedBubbleColor && receivedBubbleHex) {
-            receivedBubbleColor.addEventListener('input', (e) => {
-                receivedBubbleHex.textContent = e.target.value;
-                this.previewBubbleColors();
-            });
+        const targetPane = document.getElementById(`pane-${activeTab}`) || document.getElementById(`${activeTab}-tab`);
+        if (targetPane) {
+            targetPane.classList.remove('d-none');
+            targetPane.classList.add('active');
         }
     }
 
-    showThemeModal() {
-        const modal = document.getElementById('themeModal');
-        if (modal) {
-            modal.classList.add('show');
-            document.body.style.overflow = 'hidden';
+    showThemePanel() {
+        const panel = document.getElementById('chatThemePanel');
+        if (panel) {
+            panel.classList.remove('d-none');
+            this.syncActiveUI();
+            this.updateLivePreview();
+        } else {
+            // Legacy modal fallback
+            const modal = document.getElementById('themeModal');
+            if (modal) {
+                modal.classList.add('show');
+                document.body.style.overflow = 'hidden';
+            }
         }
     }
 
-    hideThemeModal() {
+    hideThemePanel() {
+        const panel = document.getElementById('chatThemePanel');
+        if (panel) {
+            panel.classList.add('d-none');
+        }
         const modal = document.getElementById('themeModal');
         if (modal) {
             modal.classList.remove('show');
@@ -192,240 +343,224 @@ class ChatThemeHandler {
         }
     }
 
-    switchTab(tabName) {
-        // Update tabs
-        document.querySelectorAll('.theme-tab').forEach(tab => {
-            tab.classList.remove('active');
-            if (tab.dataset.tab === tabName) {
-                tab.classList.add('active');
+    // Alias for legacy calls
+    showThemeModal() {
+        this.showThemePanel();
+    }
+    hideThemeModal() {
+        this.hideThemePanel();
+    }
+
+    syncActiveUI() {
+        // Curated presets active check
+        document.querySelectorAll('.preset-option').forEach(opt => {
+            const p = opt.dataset.preset;
+            const currentP = this.activeConfig.preset;
+            const isMatch = (p === currentP) ||
+                ((p === 'ocean-wave' || p === 'ocean-breeze') && (currentP === 'ocean-wave' || currentP === 'ocean-breeze' || currentP === 'default'));
+            if (this.activeConfig.type === 'preset' && isMatch) {
+                opt.classList.add('active');
+            } else {
+                opt.classList.remove('active');
             }
         });
 
-        // Update content
-        document.querySelectorAll('.theme-tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        const activeContent = document.getElementById(tabName + '-tab');
-        if (activeContent) {
-            activeContent.classList.add('active');
-        }
-    }
-
-    getChatTarget() {
-        return document.getElementById('chatMainArea') || document.querySelector('.chat-container') || document.getElementById('messagesContainer');
-    }
-
-    applyBackgroundTheme(themeName) {
-        const chatTarget = this.getChatTarget();
-        const messagesArea = document.getElementById('messagesContainer');
-        if (!chatTarget) return;
-
-        // Ensure messagesArea remains transparent so wallpaper shows continuously behind messages and floating composer
-        if (messagesArea) {
-            messagesArea.style.background = 'transparent';
-            messagesArea.style.backgroundColor = 'transparent';
-            messagesArea.style.backgroundImage = 'none';
-        }
-
-        // Remove active class from all options
-        document.querySelectorAll('.theme-option').forEach(option => {
-            option.classList.remove('active');
-            if (option.dataset.theme === themeName) {
-                option.classList.add('active');
+        // Wallpaper active check
+        document.querySelectorAll('.bg-option').forEach(opt => {
+            const wp = opt.dataset.wallpaper || opt.dataset.theme;
+            if (this.activeConfig.type === 'wallpaper' && wp === this.activeConfig.wallpaper) {
+                opt.classList.add('active');
+            } else {
+                opt.classList.remove('active');
             }
         });
 
-        // Apply theme
-        const themeMap = {
-            'light': () => {
-                chatTarget.style.background = '#efeae2';
-                chatTarget.style.backgroundImage = 'none';
-            },
-            'dark': () => {
-                chatTarget.style.background = '#0b141a';
-                chatTarget.style.backgroundImage = 'none';
-            },
-            'wallpaper-1': () => {
-                chatTarget.style.background = '';
-                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            },
-            'wallpaper-2': () => {
-                chatTarget.style.background = '';
-                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-            },
-            'wallpaper-3': () => {
-                chatTarget.style.background = '';
-                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
-            },
-            'wallpaper-4': () => {
-                chatTarget.style.background = '';
-                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
-            },
-            'wallpaper-5': () => {
-                chatTarget.style.background = '';
-                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
-            },
-            'wallpaper-6': () => {
-                chatTarget.style.background = '';
-                chatTarget.style.backgroundImage = 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)';
-            }
-        };
-
-        if (themeMap[themeName]) {
-            themeMap[themeName]();
-            this.currentTheme = themeName;
-            chatTarget.style.backgroundSize = 'cover';
-            chatTarget.style.backgroundPosition = 'center';
-            chatTarget.style.backgroundRepeat = 'no-repeat';
-        }
-    }
-
-    updateOverlay() {
-        const chatTarget = this.getChatTarget();
-        if (!chatTarget) return;
-
+        // Overlay slider & controls
         const overlayEnabled = document.getElementById('overlayEnabled');
+        if (overlayEnabled) overlayEnabled.checked = this.activeConfig.overlayEnabled;
+
         const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
+        const overlayOpacityValue = document.getElementById('overlayOpacityValue');
+        if (overlayOpacitySlider) overlayOpacitySlider.value = this.activeConfig.overlayOpacity;
+        if (overlayOpacityValue) overlayOpacityValue.textContent = this.activeConfig.overlayOpacity + '%';
+
         const overlayColorPicker = document.getElementById('overlayColorPicker');
+        const overlayColorHex = document.getElementById('overlayColorHex');
+        if (overlayColorPicker) overlayColorPicker.value = this.activeConfig.overlayColor;
+        if (overlayColorHex) overlayColorHex.textContent = this.activeConfig.overlayColor;
 
-        // Clean up legacy inline overlays
-        const messagesArea = document.getElementById('messagesContainer');
-        if (messagesArea) {
-            const oldOverlay = messagesArea.querySelector('.chat-overlay');
-            if (oldOverlay) oldOverlay.remove();
-        }
-        let existingOverlay = chatTarget.querySelector(':scope > .chat-overlay');
-        if (existingOverlay) {
-            existingOverlay.remove();
+        // Custom Wallpaper Remove Button visibility
+        const removeWallpaperBtn = document.getElementById('removeWallpaperBtn');
+        if (removeWallpaperBtn) {
+            if (this.activeConfig.customWallpaperData) {
+                removeWallpaperBtn.classList.remove('d-none');
+            } else {
+                removeWallpaperBtn.classList.add('d-none');
+            }
         }
 
-        // Only add overlay if enabled AND opacity > 0
-        const isEnabled = overlayEnabled && overlayEnabled.checked;
-        const opacity = overlayOpacitySlider ? overlayOpacitySlider.value / 100 : 0.3;
-        const color = overlayColorPicker ? overlayColorPicker.value : '#ffffff';
-        const effectiveOpacity = isEnabled && opacity > 0 ? opacity : 0;
+        // Bubbles style
+        document.querySelectorAll('.bubble-style-card, .bubble-option').forEach(card => {
+            const style = card.dataset.bubbleStyle || card.dataset.bubble;
+            if (style === (this.activeConfig.bubbleStyle || 'default')) {
+                card.classList.add('active');
+            } else {
+                card.classList.remove('active');
+            }
+        });
+
+        this.updateLivePreview();
+    }
+
+    updateLivePreview() {
+        const previewCard = document.getElementById('themeLivePreviewCard');
+        if (!previewCard) return;
+
+        const overlayLayer = document.getElementById('themePreviewOverlay');
+        const receivedBubble = document.getElementById('previewReceivedBubble');
+        const sentBubble = document.getElementById('previewSentBubble');
+        const previewComposer = document.getElementById('themePreviewComposer');
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.getAttribute('data-bs-theme') === 'dark';
+
+        // 1. Wallpaper / Background in preview
+        if (this.activeConfig.type === 'wallpaper') {
+            if (this.activeConfig.customWallpaperData) {
+                previewCard.style.background = `url(${this.activeConfig.customWallpaperData})`;
+                previewCard.style.backgroundSize = 'cover';
+                previewCard.style.backgroundPosition = 'center';
+            } else if (this.activeConfig.wallpaper) {
+                const gradientMap = {
+                    'light': '#efeae2',
+                    'dark': '#0b141a',
+                    'wallpaper-1': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    'wallpaper-2': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                    'wallpaper-3': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                    'wallpaper-4': 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                    'wallpaper-5': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                    'wallpaper-6': 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)'
+                };
+                previewCard.style.background = gradientMap[this.activeConfig.wallpaper] || '#efeae2';
+            }
+        } else {
+            // Curated preset background
+            const presetBgMap = {
+                'default': isDark ? '#0c233c' : '#e0f2fe',
+                'ocean-wave': isDark ? '#0c233c' : '#e0f2fe',
+                'ocean-breeze': isDark ? '#0c233c' : '#e0f2fe',
+                'classic': isDark ? '#0b141a' : '#efeae2',
+                'sand-gradient': isDark ? '#26180e' : '#fef3c7',
+                'swahili-wave': isDark ? '#0b2b26' : '#ccfbf1',
+                'midnight-coast': isDark ? '#111a38' : '#e0e7ff',
+                'forest-glow': isDark ? '#0d281a' : '#dcfce7',
+                'pwani-neon': isDark ? '#1d1130' : '#f5f3ff'
+            };
+            previewCard.style.background = presetBgMap[this.activeConfig.preset || 'ocean-wave'] || '#e0f2fe';
+        }
+
+        // 2. Overlay in preview
+        if (overlayLayer) {
+            const isEnabled = this.activeConfig.overlayEnabled;
+            const opacity = isEnabled ? (Number(this.activeConfig.overlayOpacity || 30) / 100) : 0;
+            overlayLayer.style.backgroundColor = this.activeConfig.overlayColor || '#ffffff';
+            overlayLayer.style.opacity = opacity;
+        }
+
+        // 3. Bubbles & Corner Radius in preview
+        let bubbleRadius = '';
+        if (this.activeConfig.bubbleStyle === 'rounded') {
+            bubbleRadius = '20px';
+        } else if (this.activeConfig.bubbleStyle === 'square') {
+            bubbleRadius = '4px';
+        }
+
+        if (sentBubble) {
+            sentBubble.style.borderRadius = bubbleRadius;
+            if (this.activeConfig.bubbleSentColor) {
+                sentBubble.style.backgroundColor = this.activeConfig.bubbleSentColor;
+                sentBubble.style.color = this.getContrastColor(this.activeConfig.bubbleSentColor);
+            } else {
+                sentBubble.style.backgroundColor = '';
+                sentBubble.style.color = '';
+            }
+        }
+        if (receivedBubble) {
+            receivedBubble.style.borderRadius = bubbleRadius;
+            if (this.activeConfig.bubbleReceivedColor) {
+                receivedBubble.style.backgroundColor = this.activeConfig.bubbleReceivedColor;
+                receivedBubble.style.color = this.getContrastColor(this.activeConfig.bubbleReceivedColor);
+            } else {
+                receivedBubble.style.backgroundColor = '';
+                receivedBubble.style.color = '';
+            }
+        }
+
+        // 4. Composer mock contrast in preview
+        if (previewComposer) {
+            const composerBg = isDark ? '#202c33' : '#ffffff';
+            previewComposer.style.backgroundColor = composerBg;
+            previewComposer.style.color = isDark ? '#f8fafc' : '#0f172a';
+        }
+    }
+
+    applyOverlay() {
+        const chatTarget = this.getChatTarget();
+        if (!chatTarget) return;
+
+        const isEnabled = this.activeConfig.overlayEnabled;
+        const opacity = isEnabled ? (Number(this.activeConfig.overlayOpacity || 30) / 100) : 0;
+        const color = this.activeConfig.overlayColor || '#ffffff';
 
         chatTarget.style.setProperty('--chat-overlay-color', color);
-        chatTarget.style.setProperty('--chat-overlay-opacity', effectiveOpacity);
-
-        if (isEnabled && opacity > 0) {
-            const overlay = document.createElement('div');
-            overlay.className = 'chat-overlay';
-            overlay.style.cssText = `
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: ${color};
-                opacity: ${opacity};
-                pointer-events: none !important;
-                z-index: 0 !important;
-            `;
-            chatTarget.prepend(overlay);
-        }
+        chatTarget.style.setProperty('--chat-overlay-opacity', opacity);
     }
 
-    previewBubbleStyle(bubbleStyle) {
-        const demoArea = document.getElementById('demoMessageArea');
-        if (!demoArea) return;
-
-        document.querySelectorAll('.demo-bubble').forEach(bubble => {
-            switch(bubbleStyle) {
-                case 'rounded':
-                    bubble.style.borderRadius = '25px';
-                    break;
-                case 'square':
-                    bubble.style.borderRadius = '4px';
-                    break;
-                default:
-                    bubble.style.borderRadius = '';
-            }
-        });
-    }
-
-    previewBubbleColors() {
-        const sentColor = document.getElementById('sentBubbleColor').value;
-        const receivedColor = document.getElementById('receivedBubbleColor').value;
-
-        document.querySelectorAll('.demo-bubble.sent').forEach(bubble => {
-            bubble.style.backgroundColor = sentColor;
-            bubble.style.color = this.getContrastColor(sentColor);
-        });
-
-        document.querySelectorAll('.demo-bubble.received').forEach(bubble => {
-            bubble.style.backgroundColor = receivedColor;
-            bubble.style.color = this.getContrastColor(receivedColor);
-        });
-    }
-
-    applyBubbleTheme() {
+    applyBubbleStyle(style) {
         const messagesArea = document.getElementById('messagesContainer');
         if (!messagesArea) return;
 
-        const activeBubbleOption = document.querySelector('.bubble-option.active');
-        const bubbleStyle = activeBubbleOption ? activeBubbleOption.dataset.bubble : 'default';
-        const sentColor = document.getElementById('sentBubbleColor').value;
-        const receivedColor = document.getElementById('receivedBubbleColor').value;
-
-        // Apply to actual message bubbles directly (correct selector)
-        document.querySelectorAll('.message-bubble.sent').forEach(bubble => {
-            bubble.style.backgroundColor = sentColor;
-            bubble.style.color = this.getContrastColor(sentColor);
-            switch(bubbleStyle) {
-                case 'rounded':
-                    bubble.style.borderRadius = '25px';
-                    break;
-                case 'square':
-                    bubble.style.borderRadius = '4px';
-                    break;
-                default:
-                    bubble.style.borderRadius = '';
-            }
-        });
-
-        document.querySelectorAll('.message-bubble.received').forEach(bubble => {
-            bubble.style.backgroundColor = receivedColor;
-            bubble.style.color = this.getContrastColor(receivedColor);
-            switch(bubbleStyle) {
-                case 'rounded':
-                    bubble.style.borderRadius = '25px';
-                    break;
-                case 'square':
-                    bubble.style.borderRadius = '4px';
-                    break;
-                default:
-                    bubble.style.borderRadius = '';
-            }
-        });
-
-        this.hideThemeModal();
-        this.showNotification('Bubble theme applied!');
+        messagesArea.classList.remove('bubble-style-rounded', 'bubble-style-square');
+        if (style === 'rounded') {
+            messagesArea.classList.add('bubble-style-rounded');
+            document.querySelectorAll('.message-bubble').forEach(b => b.style.borderRadius = '24px');
+        } else if (style === 'square') {
+            messagesArea.classList.add('bubble-style-square');
+            document.querySelectorAll('.message-bubble').forEach(b => b.style.borderRadius = '4px');
+        } else {
+            document.querySelectorAll('.message-bubble').forEach(b => b.style.borderRadius = '');
+        }
     }
 
-    getContrastColor(hexColor) {
-        // Convert hex to RGB
-        const r = parseInt(hexColor.substr(1, 2), 16);
-        const g = parseInt(hexColor.substr(3, 2), 16);
-        const b = parseInt(hexColor.substr(5, 2), 16);
+    applyBubbleColors() {
+        const chatTarget = this.getChatTarget();
+        if (!chatTarget) return;
 
-        // Calculate luminance
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        if (this.activeConfig.bubbleSentColor) {
+            chatTarget.style.setProperty('--chat-bg-sent', this.activeConfig.bubbleSentColor);
+            chatTarget.style.setProperty('--chat-text-sent', this.getContrastColor(this.activeConfig.bubbleSentColor));
+        } else {
+            chatTarget.style.removeProperty('--chat-bg-sent');
+            chatTarget.style.removeProperty('--chat-text-sent');
+        }
 
-        return luminance > 0.5 ? '#000000' : '#ffffff';
+        if (this.activeConfig.bubbleReceivedColor) {
+            chatTarget.style.setProperty('--chat-bg-received', this.activeConfig.bubbleReceivedColor);
+            chatTarget.style.setProperty('--chat-text-received', this.getContrastColor(this.activeConfig.bubbleReceivedColor));
+        } else {
+            chatTarget.style.removeProperty('--chat-bg-received');
+            chatTarget.style.removeProperty('--chat-text-received');
+        }
     }
 
     handleWallpaperUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        // Validate file type
         if (!file.type.startsWith('image/')) {
             this.showNotification('Please select an image file', 'error');
             return;
         }
 
-        // Validate file size (5MB max)
         const maxSize = 5 * 1024 * 1024;
         if (file.size > maxSize) {
             this.showNotification('File size must be less than 5MB', 'error');
@@ -434,31 +569,12 @@ class ChatThemeHandler {
 
         const reader = new FileReader();
         reader.onload = (e) => {
-            const chatTarget = this.getChatTarget();
-            const messagesArea = document.getElementById('messagesContainer');
-            if (chatTarget) {
-                if (messagesArea) {
-                    messagesArea.style.background = 'transparent';
-                    messagesArea.style.backgroundColor = 'transparent';
-                    messagesArea.style.backgroundImage = 'none';
-                }
-                chatTarget.style.background = '';
-                chatTarget.style.backgroundImage = `url(${e.target.result})`;
-                chatTarget.style.backgroundSize = 'cover';
-                chatTarget.style.backgroundPosition = 'center';
-                chatTarget.style.backgroundRepeat = 'no-repeat';
-
-                // Store as custom wallpaper
-                this.currentTheme = 'custom-wallpaper';
-                this.customWallpaperData = e.target.result;
-
-                // Update active state
-                document.querySelectorAll('.theme-option').forEach(option => {
-                    option.classList.remove('active');
-                });
-
-                this.showNotification('Wallpaper uploaded successfully!');
-            }
+            this.activeConfig.type = 'wallpaper';
+            this.activeConfig.customWallpaperData = e.target.result;
+            this.activeConfig.wallpaper = 'custom';
+            this.applyThemeConfig(this.activeConfig, false);
+            this.syncActiveUI();
+            this.showNotification('Custom wallpaper loaded!');
         };
         reader.onerror = () => {
             this.showNotification('Failed to read image file', 'error');
@@ -466,140 +582,316 @@ class ChatThemeHandler {
         reader.readAsDataURL(file);
     }
 
-    saveTheme() {
-        // Save to localStorage
-        const themeData = {
-            background: this.currentTheme,
-            overlayEnabled: document.getElementById('overlayEnabled').checked,
-            overlayOpacity: document.getElementById('overlayOpacitySlider').value,
-            overlayColor: document.getElementById('overlayColorPicker').value
+    applyThemeConfig(config, notify = false) {
+        if (!config) return;
+        this.activeConfig = { ...this.activeConfig, ...config };
+
+        const chatTarget = this.getChatTarget();
+        const messagesArea = document.getElementById('messagesContainer');
+        const whatsappLayout = document.getElementById('whatsappLayout');
+
+        // Always ensure messagesArea background is transparent so chatMainArea wallpaper/color shines cleanly
+        if (messagesArea) {
+            messagesArea.style.background = 'transparent';
+            messagesArea.style.backgroundColor = 'transparent';
+            messagesArea.style.backgroundImage = 'none';
+        }
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.getAttribute('data-bs-theme') === 'dark';
+
+        if (config.type === 'wallpaper') {
+            // Apply custom gradient or image wallpaper via --chat-wallpaper so CSS !important respects it
+            let wallpaperCss = '';
+            if (config.customWallpaperData) {
+                wallpaperCss = `url(${config.customWallpaperData})`;
+            } else if (config.wallpaper) {
+                const gradientMap = {
+                    'light': '#efeae2',
+                    'dark': '#0b141a',
+                    'wallpaper-1': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    'wallpaper-2': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                    'wallpaper-3': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                    'wallpaper-4': 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                    'wallpaper-5': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                    'wallpaper-6': 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)'
+                };
+                wallpaperCss = gradientMap[config.wallpaper] || '#efeae2';
+            }
+
+            if (chatTarget) {
+                chatTarget.style.setProperty('--chat-wallpaper', wallpaperCss);
+            }
+            if (whatsappLayout) {
+                whatsappLayout.style.setProperty('--chat-wallpaper', wallpaperCss);
+            }
+
+            // Guaranteed Solid Composer & Contrast
+            this.ensureComposerContrast(isDark ? '#202c33' : '#ffffff');
+        } else {
+            // Curated Atmosphere Preset
+            const preset = config.preset || 'default';
+            if (chatTarget) {
+                chatTarget.style.removeProperty('--chat-wallpaper');
+                chatTarget.setAttribute('data-chat-theme', preset);
+            }
+            if (whatsappLayout) {
+                whatsappLayout.style.removeProperty('--chat-wallpaper');
+                whatsappLayout.setAttribute('data-chat-theme', preset);
+            }
+            document.documentElement.setAttribute('data-chat-theme', preset);
+
+            // Compute contrast for the preset's composer
+            const composerBg = isDark ? '#202c33' : '#ffffff';
+            this.ensureComposerContrast(composerBg);
+        }
+
+        // Apply Overlay
+        this.applyOverlay();
+
+        // Apply Bubble Style & Colors
+        if (config.bubbleStyle) this.applyBubbleStyle(config.bubbleStyle);
+        this.applyBubbleColors();
+
+        if (notify) {
+            const displayName = config.type === 'wallpaper' ? 'Wallpaper' : this.getPresetDisplayName(config.preset);
+            this.showNotification(`Theme set to ${displayName}!`);
+        }
+    }
+
+    // Alias for applying curated preset directly
+    applyChatPreset(preset, notify = true) {
+        this.activeConfig.type = 'preset';
+        this.activeConfig.preset = preset;
+        this.activeConfig.wallpaper = null;
+        this.activeConfig.customWallpaperData = null;
+        this.applyThemeConfig(this.activeConfig, notify);
+        this.syncActiveUI();
+    }
+
+    ensureComposerContrast(composerBgHex) {
+        const chatTarget = this.getChatTarget();
+        if (!chatTarget) return;
+
+        const textColor = this.getContrastColor(composerBgHex);
+        const placeholderColor = textColor === '#0f172a' ? '#64748b' : '#94a3b8';
+
+        chatTarget.style.setProperty('--chat-composer-bg', composerBgHex);
+        chatTarget.style.setProperty('--chat-composer-text', textColor);
+        chatTarget.style.setProperty('--chat-composer-placeholder', placeholderColor);
+        chatTarget.style.setProperty('--chat-composer-btn-color', placeholderColor);
+
+        // Also set on root element so floating composer inherits seamlessly
+        document.documentElement.style.setProperty('--chat-composer-text', textColor);
+        document.documentElement.style.setProperty('--chat-composer-placeholder', placeholderColor);
+    }
+
+    getContrastColor(hexOrRgb) {
+        if (!hexOrRgb) return '#0f172a';
+        let r = 255, g = 255, b = 255;
+        if (hexOrRgb.startsWith('#')) {
+            const hex = hexOrRgb.replace('#', '');
+            if (hex.length === 3) {
+                r = parseInt(hex[0] + hex[0], 16);
+                g = parseInt(hex[1] + hex[1], 16);
+                b = parseInt(hex[2] + hex[2], 16);
+            } else if (hex.length >= 6) {
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+            }
+        } else if (hexOrRgb.startsWith('rgb')) {
+            const parts = hexOrRgb.match(/\d+/g);
+            if (parts && parts.length >= 3) {
+                r = parseInt(parts[0], 10);
+                g = parseInt(parts[1], 10);
+                b = parseInt(parts[2], 10);
+            }
+        }
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.55 ? '#0f172a' : '#f8fafc';
+    }
+
+    getPresetDisplayName(preset) {
+        const names = {
+            'default': 'Ocean Wave',
+            'ocean-wave': 'Ocean Wave',
+            'ocean-breeze': 'Ocean Wave',
+            'classic': 'Classic',
+            'sand-gradient': 'Sand Gradient',
+            'swahili-wave': 'Swahili Wave',
+            'midnight-coast': 'Midnight Coast',
+            'forest-glow': 'Forest Glow',
+            'pwani-neon': 'Pwani Neon'
         };
-
-        // Include custom wallpaper data if present
-        if (this.currentTheme === 'custom-wallpaper' && this.customWallpaperData) {
-            themeData.customWallpaper = this.customWallpaperData;
-        }
-
-        const conversationId = this.getConversationId();
-        if (conversationId) {
-            localStorage.setItem(`chat_theme_${conversationId}`, JSON.stringify(themeData));
-        }
-
-        this.hideThemeModal();
-        this.showNotification('Theme saved!');
+        return names[preset] || preset;
     }
 
     loadCurrentTheme() {
         const conversationId = this.getConversationId();
-        if (!conversationId) return;
+        const defaultTheme = this.getDefaultTheme();
 
-        const savedTheme = localStorage.getItem(`chat_theme_${conversationId}`);
-        if (savedTheme) {
-            try {
-                const themeData = JSON.parse(savedTheme);
-                if (themeData.background) {
-                    // Handle custom wallpaper restoration
-                    if (themeData.background === 'custom-wallpaper' && themeData.customWallpaper) {
-                        this.customWallpaperData = themeData.customWallpaper;
-                        const chatTarget = this.getChatTarget();
-                        const messagesArea = document.getElementById('messagesContainer');
-                        if (chatTarget) {
-                            if (messagesArea) {
-                                messagesArea.style.background = 'transparent';
-                                messagesArea.style.backgroundColor = 'transparent';
-                                messagesArea.style.backgroundImage = 'none';
-                            }
-                            chatTarget.style.background = '';
-                            chatTarget.style.backgroundImage = `url(${themeData.customWallpaper})`;
-                            chatTarget.style.backgroundSize = 'cover';
-                            chatTarget.style.backgroundPosition = 'center';
-                            chatTarget.style.backgroundRepeat = 'no-repeat';
-                        }
-                    } else {
-                        this.applyBackgroundTheme(themeData.background);
-                    }
+        let targetConfig = {
+            type: 'preset',
+            preset: defaultTheme,
+            overlayEnabled: true,
+            overlayOpacity: 30,
+            overlayColor: '#ffffff'
+        };
+
+        // Check if there is a chat-specific theme for this conversation
+        if (conversationId) {
+            const savedChatTheme = localStorage.getItem(`chat_theme_${conversationId}`);
+            if (savedChatTheme) {
+                try {
+                    const parsed = JSON.parse(savedChatTheme);
+                    targetConfig = { ...targetConfig, ...parsed };
+                } catch (e) {
+                    console.error('Failed to parse saved chat theme:', e);
                 }
-                if (themeData.overlayEnabled !== undefined) {
-                    document.getElementById('overlayEnabled').checked = themeData.overlayEnabled;
-                }
-                if (themeData.overlayOpacity) {
-                    document.getElementById('overlayOpacitySlider').value = themeData.overlayOpacity;
-                    document.getElementById('overlayOpacityValue').textContent = themeData.overlayOpacity + '%';
-                }
-                if (themeData.overlayColor) {
-                    document.getElementById('overlayColorPicker').value = themeData.overlayColor;
-                    document.getElementById('overlayColorHex').textContent = themeData.overlayColor;
-                }
-                this.updateOverlay();
-            } catch (e) {
-                console.error('Failed to load theme:', e);
             }
         }
+
+        this.applyThemeConfig(targetConfig, false);
+        this.syncActiveUI();
     }
 
-    getConversationId() {
-        const chatContainer = document.querySelector('.chat-container');
-        if (chatContainer) {
-            return chatContainer.dataset.conversationId;
+    saveTheme() {
+        const conversationId = this.getConversationId();
+        const applyToAll = document.getElementById('themeApplyToAllChats')?.checked || false;
+
+        const themeDataToSave = {
+            type: this.activeConfig.type,
+            preset: this.activeConfig.preset,
+            wallpaper: this.activeConfig.wallpaper,
+            customWallpaperData: this.activeConfig.customWallpaperData,
+            overlayEnabled: this.activeConfig.overlayEnabled,
+            overlayOpacity: this.activeConfig.overlayOpacity,
+            overlayColor: this.activeConfig.overlayColor,
+            bubbleStyle: this.activeConfig.bubbleStyle,
+            bubbleSentColor: this.activeConfig.bubbleSentColor,
+            bubbleReceivedColor: this.activeConfig.bubbleReceivedColor
+        };
+
+        if (applyToAll) {
+            // 1. Set global user default in localStorage
+            const defaultThemeName = this.activeConfig.type === 'preset' ? this.activeConfig.preset : 'default';
+            localStorage.setItem('default_chat_theme', defaultThemeName);
+
+            // 2. Persist to backend user preference
+            this.saveChatThemePreference(defaultThemeName);
+
+            // 3. Clear conversation-specific override so this chat inherits the new global default
+            if (conversationId) {
+                localStorage.removeItem(`chat_theme_${conversationId}`);
+            }
+
+            this.showNotification('Default theme applied to all chats!');
+        } else {
+            // Per-chat persistence: sticks strictly to this conversation!
+            if (conversationId) {
+                localStorage.setItem(`chat_theme_${conversationId}`, JSON.stringify(themeDataToSave));
+                this.showNotification('Theme saved for this chat!');
+            } else {
+                this.showNotification('Theme applied!');
+            }
         }
-        return document.body.dataset.conversationId;
+
+        this.hideThemePanel();
     }
 
-    showNotification(message) {
+    resetThemeToDefault() {
+        const conversationId = this.getConversationId();
+        const defaultTheme = this.getDefaultTheme();
+
+        if (conversationId) {
+            localStorage.removeItem(`chat_theme_${conversationId}`);
+        }
+
+        this.activeConfig = {
+            type: 'preset',
+            preset: defaultTheme,
+            wallpaper: null,
+            customWallpaperData: null,
+            overlayEnabled: true,
+            overlayOpacity: 30,
+            overlayColor: '#ffffff',
+            bubbleStyle: 'default',
+            bubbleSentColor: '',
+            bubbleReceivedColor: ''
+        };
+
+        this.applyThemeConfig(this.activeConfig, false);
+        this.syncActiveUI();
+        this.showNotification('Reset to default theme for this chat!');
+        this.hideThemePanel();
+    }
+
+    saveChatThemePreference(preset) {
+        const getCSRFToken = () => {
+            const tokenInput = document.querySelector('[name="csrfmiddlewaretoken"]');
+            if (tokenInput && tokenInput.value) return tokenInput.value;
+            const metaTag = document.querySelector('meta[name="csrf-token"]');
+            if (metaTag && metaTag.content) return metaTag.content;
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, val] = cookie.trim().split('=');
+                if (name === 'csrftoken') return decodeURIComponent(val);
+            }
+            return '';
+        };
+
+        fetch('/users/api/users/update_preferences/', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({ chat_theme_preference: preset })
+        }).catch(err => console.error('Error saving chat theme preference:', err));
+    }
+
+    showNotification(message, type = 'success') {
         const notification = document.createElement('div');
         notification.className = 'theme-notification';
         notification.textContent = message;
         notification.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            background: var(--primary);
-            color: white;
-            border-radius: 8px;
+            top: 24px;
+            right: 24px;
+            padding: 12px 22px;
+            background: ${type === 'error' ? '#ef4444' : 'var(--brand, #008489)'};
+            color: #ffffff;
+            border-radius: 24px;
             z-index: 10001;
-            font-weight: 500;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideIn 0.3s ease;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+            animation: themeSlideIn 0.25s ease;
+            pointer-events: none;
         `;
-        
         document.body.appendChild(notification);
-        
         setTimeout(() => {
-            notification.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => notification.remove(), 300);
-        }, 2000);
+            notification.style.animation = 'themeSlideOut 0.25s ease forwards';
+            setTimeout(() => notification.remove(), 250);
+        }, 2200);
     }
 }
 
-// Initialize on DOM ready
+// Global initialization
 document.addEventListener('DOMContentLoaded', () => {
     window.chatThemeHandler = new ChatThemeHandler();
 });
 
-// Add animation styles
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
+// Animation Keyframes
+const themeStyleTag = document.createElement('style');
+themeStyleTag.textContent = `
+    @keyframes themeSlideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
     }
-    
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(100%);
-            opacity: 0;
-        }
+    @keyframes themeSlideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(themeStyleTag);

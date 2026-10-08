@@ -22,62 +22,123 @@
 
 .media-bubble {
     /* Media bubble has its own padding system */
-    padding: -2px;
-    overflow: hidden;
+    padding: 3px 3px 0 3px;
+    overflow: visible;
     background: transparent;
     box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
-    max-width: 400px;
+    max-width: min(400px, calc(100vw - 72px));
     position: relative;
     border-radius: var(--bubble-radius);
+    box-sizing: border-box;
 }
 
-/* Sent media bubble */
+.media-bubble.no-caption,
+.media-bubble:not(.has-caption),
+.media-bubble.single-media.no-caption,
+.media-bubble.single-media:not(.has-caption),
+.media-card-bubble.no-caption,
+.media-card-bubble:not(.has-caption),
+.messages-area .message-bubble.media-card-bubble.no-caption,
+.messages-area .message-bubble.media-card-bubble:not(.has-caption),
+.messages-area .message-bubble.media-bubble.no-caption,
+.messages-area .message-bubble.media-bubble:not(.has-caption),
+.messages-area .media-bubble.no-caption,
+.messages-area .media-bubble:not(.has-caption),
+.messages-area .media-card-bubble.no-caption,
+.messages-area .media-card-bubble:not(.has-caption),
+.single-media.no-caption,
+.single-media:not(.has-caption) {
+    padding: 3.5px 3.5px 3.5px 3.5px !important;
+}
+
+/* Sent media bubble - Driven by preset theme tokens with graceful dark fallback */
 .media-bubble.sent {
-    /* Media itself is the bubble - no background needed */
-    background-color: var(--chat-bg-sent, #d4f1c4) !important;
-    /*background: transparent;*/
+    background-color: var(--chat-bg-sent, #111827) !important;
+    color: var(--chat-text-sent, #f8fafc) !important;
 }
 
-/* Received media bubble */
+[data-theme="dark"] .media-bubble.sent,
+[data-bs-theme="dark"] .media-bubble.sent {
+    background-color: var(--chat-bg-sent, #111827) !important;
+    color: var(--chat-text-sent, #f8fafc) !important;
+}
+
+/* Received media bubble - Driven by preset theme tokens with graceful fallback */
 .media-bubble.received {
-    /* Media itself is the bubble - no background needed */
-    background-color: var(--chat-bg-received, #f0f0f0) !important;
-    /*background: transparent;*/
+    background-color: var(--chat-bg-received, #f1f5f9) !important;
+    color: var(--chat-text-received, #0f172a) !important;
 }
 
-/* Group position variants for media bubbles */
-.media-bubble.group-single {
-    border-radius: var(--bubble-radius);
+[data-theme="dark"] .media-bubble.received,
+[data-bs-theme="dark"] .media-bubble.received {
+    background-color: var(--chat-bg-received, #1e232d) !important;
+    color: var(--chat-text-received, #e2e8f0) !important;
 }
 
-.media-bubble.group-first {
-    border-radius: var(--bubble-radius) var(--bubble-radius) 5px var(--bubble-radius);
+/* Dynamic Modern Clustering Corners for Media Bubbles */
+.media-bubble.sent.group-single {
+    border-radius: var(--bubble-radius) var(--bubble-radius) 0px var(--bubble-radius) !important;
 }
 
-.media-bubble.group-middle {
-    border-radius: var(--bubble-radius) 5px 5px var(--bubble-radius);
+.media-bubble.sent.group-first {
+    border-radius: var(--bubble-radius) var(--bubble-radius) 4px var(--bubble-radius) !important;
 }
 
-.media-bubble.group-last {
-    border-radius: var(--bubble-radius) 5px var(--bubble-radius) var(--bubble-radius);
+.media-bubble.sent.group-middle {
+    border-radius: var(--bubble-radius) 4px 4px var(--bubble-radius) !important;
+}
+
+.media-bubble.sent.group-last {
+    border-radius: var(--bubble-radius) 4px 0px var(--bubble-radius) !important;
+}
+
+.media-bubble.received.group-single {
+    border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 0px !important;
+}
+
+.media-bubble.received.group-first {
+    border-radius: var(--bubble-radius) var(--bubble-radius) var(--bubble-radius) 4px !important;
+}
+
+.media-bubble.received.group-middle {
+    border-radius: 4px var(--bubble-radius) var(--bubble-radius) 4px !important;
+}
+
+.media-bubble.received.group-last {
+    border-radius: 4px var(--bubble-radius) var(--bubble-radius) 0px !important;
 }
 
 /* ==================== SINGLE MEDIA BUBBLE ==================== */
 /* Media itself becomes the bubble - no outer container */
 
 .media-bubble.single-media {
-    max-width: 300px;
-    max-height: 350px;
-    overflow: hidden;
+    width: fit-content !important;
+    max-width: min(340px, calc(100vw - 64px)) !important;
+    overflow: visible;
     border-radius: var(--bubble-radius);
+    box-sizing: border-box;
 }
 
-.media-bubble.single-media img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+.media-bubble.single-media.media-portrait {
+    max-width: min(280px, calc(100vw - 72px)) !important;
+}
+
+.media-bubble.single-media.media-landscape {
+    max-width: min(340px, calc(100vw - 64px)) !important;
+}
+
+.media-bubble.single-media.media-square {
+    max-width: min(280px, calc(100vw - 64px)) !important;
+}
+
+.media-bubble.single-media img:not(.read-avatar-img) {
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 380px;
+    object-fit: contain;
     display: block;
-    border-radius: inherit;
+    border-radius: 12px !important;
 }
 
 .media-bubble.single-media video {
@@ -85,8 +146,23 @@
     height: 100%;
     object-fit: cover;
     display: block;
-    border-radius: inherit;
+    border-radius: 12px !important;
     pointer-events: none; /* strictly prevent inline playback */
+}
+
+.media-bubble.single-media.video-bubble {
+    width: fit-content !important;
+    max-width: min(340px, calc(100vw - 64px)) !important;
+}
+
+.single-media-video-thumb,
+.tile-video-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: inherit;
+    transition: filter 0.3s ease, transform 0.3s ease;
 }
 
 /* Video play icon overlay */
@@ -122,10 +198,11 @@
 /* Dedicated media group bubble - not reusing text bubble */
 
 .media-bubble.media-group {
-    max-width: 400px;
-    padding: -2px;
+    max-width: min(340px, calc(100vw - 72px));
+    padding: 3px 3px 0 3px;
     border-radius: var(--bubble-radius);
-    overflow: hidden;
+    overflow: visible;
+    box-sizing: border-box;
 }
 
 /* ==================== TELEGRAM-STYLE CURATED GRID SYSTEM ==================== */
@@ -133,9 +210,9 @@
 
 .media-content {
     display: grid;
-    gap: 2px;
+    gap: 4px;
     overflow: hidden;
-    /*border-radius: inherit;*/
+    border-radius: 12px !important;
 }
 
 /* 1 MEDIA - Single large preview */
@@ -184,6 +261,7 @@
 .media-tile {
     position: relative;
     overflow: hidden;
+    border-radius: 8px !important;
     background: rgba(0, 0, 0, 0.05);
     aspect-ratio: 1;
     cursor: pointer;
@@ -194,6 +272,7 @@
     height: 100%;
     object-fit: cover;
     display: block;
+    border-radius: 8px !important;
 }
 
 .media-tile video {
@@ -201,6 +280,7 @@
     height: 100%;
     object-fit: cover;
     display: block;
+    border-radius: 8px !important;
     pointer-events: none; /* strictly prevent inline playback */
 }
 
@@ -250,26 +330,117 @@
     background: rgba(0, 0, 0, 0.8);
 }
 
-/* ==================== CAPTION SYSTEM ==================== */
+/* ==================== CAPTION & INSIDE META SYSTEM ==================== */
 /* Captions render INSIDE media bubble */
 
 .media-caption {
     width: 100%;
-    padding: 8px 12px 10px 12px;
-    font-size: 14px;
-    line-height: 1.25;
-    display: flex;
-    align-items: start;
-    color: var(--text-primary, #0f172a);
+    padding: 7px 12px 6px 12px;
+    font-size: 14.5px;
+    line-height: 1.35;
+    display: block;
+    color: inherit;
     word-break: normal;
     overflow-wrap: break-word;
     background: inherit;
-    /* Minimal padding - caption is integrated */
+    position: relative;
+    box-sizing: border-box;
 }
 
-/* Dark mode caption */
-[data-theme="dark"] .media-caption {
-    color: var(--text-primary, #e9edef);
+.media-bubble.sent .media-caption {
+    color: #f8fafc !important;
+}
+
+.media-bubble.received .media-caption {
+    color: #0f172a !important;
+}
+
+[data-theme="dark"] .media-bubble.received .media-caption {
+    color: #e2e8f0 !important;
+}
+
+.media-caption-text {
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+/* Frosted glass pill badge floating in bottom-right inside image/video */
+.media-meta-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    padding: 2.5px 7px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.68) !important;
+    backdrop-filter: blur(8px) saturate(1.2);
+    -webkit-backdrop-filter: blur(8px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #f8fafc !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    z-index: 5;
+    pointer-events: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3.5px;
+    font-size: 11px;
+    line-height: 1;
+}
+
+.media-meta-badge .timestamp {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-size: 10.5px;
+    letter-spacing: 0.1px;
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+}
+
+.media-meta-badge .check-marks path {
+    stroke: rgba(255, 255, 255, 0.85) !important;
+}
+
+.media-meta-badge .check-marks.read path {
+    stroke: var(--chat-read-tick, #38bdf8) !important;
+}
+
+.media-meta-badge svg.check-marks.sent {
+    width: 13px !important;
+    height: 11px !important;
+    min-width: 13px !important;
+    min-height: 11px !important;
+    flex-shrink: 0 !important;
+}
+
+.media-meta-badge svg.check-marks.delivered,
+.media-meta-badge svg.check-marks.read {
+    width: 17px !important;
+    height: 11px !important;
+    min-width: 17px !important;
+    min-height: 11px !important;
+    flex-shrink: 0 !important;
+}
+
+.media-meta-badge svg.check-circle {
+    width: 13px !important;
+    height: 13px !important;
+    min-width: 13px !important;
+    min-height: 13px !important;
+    flex-shrink: 0 !important;
+}
+
+.media-meta-badge .read-avatar-img,
+.media-bubble .read-avatar-img {
+    width: 14px !important;
+    height: 14px !important;
+    max-width: 14px !important;
+    max-height: 14px !important;
+    min-width: 14px !important;
+    min-height: 14px !important;
+    border-radius: 50% !important;
+    border: 1.5px solid #ffffff !important;
+    object-fit: cover !important;
+    display: inline-block !important;
+    flex-shrink: 0 !important;
+    box-sizing: border-box !important;
 }
 
 /* ==================== MEDIA BUBBLE SPACING ==================== */
@@ -289,12 +460,24 @@
 
 @media (max-width: 768px) {
     .media-bubble {
-        max-width: 280px;
+        max-width: min(300px, calc(100vw - 64px));
     }
 
     .media-bubble.single-media {
-        max-width: 250px;
-        max-height: 300px;
+        max-width: min(300px, calc(100vw - 64px));
+        max-height: none;
+    }
+
+    .media-bubble.single-media.media-portrait {
+        max-width: min(260px, calc(100vw - 72px)) !important;
+    }
+
+    .media-bubble.single-media.media-landscape {
+        max-width: min(300px, calc(100vw - 64px)) !important;
+    }
+
+    .media-bubble.single-media.media-square {
+        max-width: min(260px, calc(100vw - 64px)) !important;
     }
 
     .media-content.media-group--3 {
@@ -779,7 +962,7 @@
     cursor: pointer;
 }
 
-.media-bubble.not-downloaded img,
+.media-bubble.not-downloaded img:not(.read-avatar-img),
 .media-bubble.not-downloaded video {
     filter: blur(14px) brightness(0.68);
     transform: scale(1.08);
@@ -876,3 +1059,38 @@
 .dl-spinner-bar {
     stroke: #ffffff;
 }
+
+/* Media Image / Tile Placeholders when not downloaded */
+.media-image-placeholder {
+    width: 100%;
+    height: 200px;
+    max-width: 100%;
+    background: rgba(15, 23, 42, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(100, 116, 139, 0.6);
+    border-radius: inherit;
+}
+
+[data-theme="dark"] .media-image-placeholder {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.tile-placeholder-wrap {
+    width: 100%;
+    height: 100%;
+    min-height: 100px;
+    background: rgba(15, 23, 42, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(100, 116, 139, 0.6);
+}
+
+[data-theme="dark"] .tile-placeholder-wrap {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.4);
+}
+

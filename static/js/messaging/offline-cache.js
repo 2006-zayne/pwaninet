@@ -117,6 +117,12 @@ class OfflineCache {
         
         // Add cache timestamp
         message.cached_at = new Date().toISOString();
+        if (!message.conversation_id && message.conversation) {
+            message.conversation_id = message.conversation;
+        }
+        if (typeof message.conversation_id === 'string' && !isNaN(Number(message.conversation_id))) {
+            message.conversation_id = Number(message.conversation_id);
+        }
         
         return store.put(message);
     }
@@ -129,6 +135,12 @@ class OfflineCache {
         
         for (const message of messages) {
             message.cached_at = new Date().toISOString();
+            if (!message.conversation_id && message.conversation) {
+                message.conversation_id = message.conversation;
+            }
+            if (typeof message.conversation_id === 'string' && !isNaN(Number(message.conversation_id))) {
+                message.conversation_id = Number(message.conversation_id);
+            }
             store.put(message);
         }
         
@@ -138,12 +150,13 @@ class OfflineCache {
     async getMessages(conversationId, limit = 100, offset = 0) {
         if (!this.db) return [];
         
+        const targetId = (!isNaN(Number(conversationId))) ? Number(conversationId) : conversationId;
         const transaction = this.db.transaction(['messages'], 'readonly');
         const store = transaction.objectStore('messages');
         const index = store.index('conversation_id');
         
         return new Promise((resolve, reject) => {
-            const request = index.openCursor(IDBKeyRange.only(conversationId), 'prev');
+            const request = index.openCursor(IDBKeyRange.only(targetId), 'prev');
             const results = [];
             let skipped = 0;
             

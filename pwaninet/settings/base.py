@@ -378,6 +378,11 @@ _default_cors = [
 ]
 _env_cors = [c.strip() for c in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if c.strip()]
 CORS_ALLOWED_ORIGINS = list(set(_default_cors + _env_cors))
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https?://192\.168\.\d+\.\d+(:\d+)?$",
+    r"^https?://10\.\d+\.\d+\.\d+(:\d+)?$",
+    r"^https?://172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$",
+]
 CORS_ALLOW_CREDENTIALS = True
 
 # Proxy SSL header for reverse proxies and tunnels (Cloudflare Tunnel, Nginx)

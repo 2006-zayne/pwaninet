@@ -1,0 +1,415 @@
+/**
+ * PwaniNet Chat Appearance Presets
+ * Curated theme presets controlling chat atmosphere, bubbles, text, meta, and composer.
+ */
+
+/* ==========================================================================
+   DEFAULT / OCEAN WAVE PRESET (DEFAULT THEME)
+   ========================================================================== */
+:root:not([data-chat-theme]):not([data-theme="dark"]):not([data-bs-theme="dark"]),
+:root[data-chat-theme="default"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+:root[data-chat-theme="ocean-wave"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+:root[data-chat-theme="ocean-breeze"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+[data-chat-theme="default"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+[data-chat-theme="ocean-wave"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+[data-chat-theme="ocean-breeze"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+[data-theme="light"]:not([data-chat-theme]),
+[data-theme="light"][data-chat-theme="default"],
+[data-theme="light"][data-chat-theme="ocean-wave"],
+[data-theme="light"][data-chat-theme="ocean-breeze"],
+[data-theme="light"] [data-chat-theme="default"],
+[data-theme="light"] [data-chat-theme="ocean-wave"],
+[data-theme="light"] [data-chat-theme="ocean-breeze"],
+[data-bs-theme="light"]:not([data-chat-theme]),
+[data-bs-theme="light"][data-chat-theme="default"],
+[data-bs-theme="light"][data-chat-theme="ocean-wave"],
+[data-bs-theme="light"][data-chat-theme="ocean-breeze"],
+[data-bs-theme="light"] [data-chat-theme="default"],
+[data-bs-theme="light"] [data-chat-theme="ocean-wave"],
+[data-bs-theme="light"] [data-chat-theme="ocean-breeze"] {
+  --chat-bg: #e0f2fe !important;
+  --chat-bg-sent: #0284c7 !important;
+  --chat-text-sent: #ffffff !important;
+  --chat-meta-sent: rgba(255, 255, 255, 0.85) !important;
+  --chat-border-sent: rgba(2, 132, 199, 0.3) !important;
+  --chat-bg-received: #ffffff !important;
+  --chat-text-received: #0f172a !important;
+  --chat-meta-received: #64748b !important;
+  --chat-border-received: rgba(2, 132, 199, 0.18) !important;
+  --chat-composer-bg: #ffffff !important;
+  --chat-composer-border: #bae6fd !important;
+  --chat-composer-text: #0f172a !important;
+  --chat-composer-placeholder: #64748b !important;
+  --chat-composer-btn-color: #0284c7 !important;
+  --chat-read-tick: #7dd3fc !important;
+  --chat-accent: #0284c7 !important;
+}
+
+:root[data-theme="dark"]:not([data-chat-theme]),
+:root[data-bs-theme="dark"]:not([data-chat-theme]),
+[data-theme="dark"]:not([data-chat-theme]),
+[data-theme="dark"][data-chat-theme="default"],
+[data-theme="dark"][data-chat-theme="ocean-wave"],
+[data-theme="dark"][data-chat-theme="ocean-breeze"],
+[data-theme="dark"] [data-chat-theme="default"],
+[data-theme="dark"] [data-chat-theme="ocean-wave"],
+[data-theme="dark"] [data-chat-theme="ocean-breeze"],
+[data-bs-theme="dark"]:not([data-chat-theme]),
+[data-bs-theme="dark"][data-chat-theme="default"],
+[data-bs-theme="dark"][data-chat-theme="ocean-wave"],
+[data-bs-theme="dark"][data-chat-theme="ocean-breeze"],
+[data-bs-theme="dark"] [data-chat-theme="default"],
+[data-bs-theme="dark"] [data-chat-theme="ocean-wave"],
+[data-bs-theme="dark"] [data-chat-theme="ocean-breeze"] {
+  --chat-bg: #0c233c !important;
+  --chat-bg-sent: #0284c7 !important;
+  --chat-text-sent: #ffffff !important;
+  --chat-meta-sent: rgba(255, 255, 255, 0.85) !important;
+  --chat-border-sent: rgba(56, 189, 248, 0.3) !important;
+  --chat-bg-received: #173454 !important;
+  --chat-text-received: #f1f5f9 !important;
+  --chat-meta-received: #94a3b8 !important;
+  --chat-border-received: rgba(56, 189, 248, 0.2) !important;
+  --chat-composer-bg: #0c233c !important;
+  --chat-composer-border: #1e3a5f !important;
+  --chat-composer-text: #f1f5f9 !important;
+  --chat-composer-placeholder: #94a3b8 !important;
+  --chat-composer-btn-color: #38bdf8 !important;
+  --chat-read-tick: #38bdf8 !important;
+  --chat-accent: #38bdf8 !important;
+}
+
+/* Classic WhatsApp Preset */
+[data-chat-theme="classic"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+[data-theme="light"][data-chat-theme="classic"],
+[data-theme="light"] [data-chat-theme="classic"],
+[data-bs-theme="light"][data-chat-theme="classic"],
+[data-bs-theme="light"] [data-chat-theme="classic"] {
+  --chat-bg: #efeae2 !important;
+  --chat-bg-sent: #d9fdd3 !important;
+  --chat-bg-received: #ffffff !important;
+  --chat-text-sent: #111b21 !important;
+  --chat-text-received: #111b21 !important;
+  --chat-meta-sent: #667781 !important;
+  --chat-meta-received: #667781 !important;
+  --chat-border-sent: rgba(0, 0, 0, 0.05) !important;
+  --chat-border-received: rgba(0, 0, 0, 0.05) !important;
+  --chat-composer-bg: #ffffff !important;
+  --chat-composer-border: #e9edef !important;
+  --chat-composer-text: #111b21 !important;
+  --chat-composer-placeholder: #667781 !important;
+  --chat-composer-btn-color: #54656f !important;
+  --chat-read-tick: #53bdeb !important;
+  --chat-accent: #00a884 !important;
+}
+
+[data-theme="dark"][data-chat-theme="classic"],
+[data-theme="dark"] [data-chat-theme="classic"],
+[data-bs-theme="dark"][data-chat-theme="classic"],
+[data-bs-theme="dark"] [data-chat-theme="classic"] {
+  --chat-bg: #0b141a !important;
+  --chat-bg-sent: #005c4b !important;
+  --chat-bg-received: #202c33 !important;
+  --chat-text-sent: #e9edef !important;
+  --chat-text-received: #e9edef !important;
+  --chat-meta-sent: rgba(233, 237, 239, 0.6) !important;
+  --chat-meta-received: rgba(233, 237, 239, 0.6) !important;
+  --chat-border-sent: rgba(255, 255, 255, 0.05) !important;
+  --chat-border-received: rgba(255, 255, 255, 0.05) !important;
+  --chat-composer-bg: #202c33 !important;
+  --chat-composer-border: #2a3942 !important;
+  --chat-composer-text: #e9edef !important;
+  --chat-composer-placeholder: #8696a0 !important;
+  --chat-composer-btn-color: #8696a0 !important;
+  --chat-read-tick: #53bdeb !important;
+  --chat-accent: #00a884 !important;
+}
+
+/* ==========================================================================
+   ADDITIONAL LIGHT & DARK MODE PRESETS
+   ========================================================================== */
+
+/* 2. Sand Gradient */
+[data-chat-theme="sand-gradient"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+[data-theme="light"][data-chat-theme="sand-gradient"],
+[data-theme="light"] [data-chat-theme="sand-gradient"],
+[data-bs-theme="light"][data-chat-theme="sand-gradient"],
+[data-bs-theme="light"] [data-chat-theme="sand-gradient"] {
+  --chat-bg: #fef3c7 !important;
+  --chat-bg-sent: #d97706 !important;
+  --chat-text-sent: #ffffff !important;
+  --chat-meta-sent: rgba(255, 255, 255, 0.78) !important;
+  --chat-border-sent: rgba(217, 119, 6, 0.3) !important;
+  --chat-bg-received: #fffdfa !important;
+  --chat-text-received: #451a03 !important;
+  --chat-meta-received: #92400e !important;
+  --chat-border-received: rgba(217, 119, 6, 0.18) !important;
+  --chat-composer-bg: #fffdfa !important;
+  --chat-composer-border: #fde68a !important;
+  --chat-composer-text: #451a03 !important;
+  --chat-composer-placeholder: #92400e !important;
+  --chat-composer-btn-color: #d97706 !important;
+  --chat-read-tick: #fef08a !important;
+  --chat-accent: #d97706 !important;
+}
+
+[data-theme="dark"][data-chat-theme="sand-gradient"],
+[data-theme="dark"] [data-chat-theme="sand-gradient"],
+[data-bs-theme="dark"][data-chat-theme="sand-gradient"],
+[data-bs-theme="dark"] [data-chat-theme="sand-gradient"] {
+  --chat-bg: #26180e !important;
+  --chat-bg-sent: #b45309 !important;
+  --chat-text-sent: #fffbeb !important;
+  --chat-meta-sent: rgba(255, 251, 235, 0.75) !important;
+  --chat-border-sent: rgba(245, 158, 11, 0.3) !important;
+  --chat-bg-received: #3d2819 !important;
+  --chat-text-received: #fef3c7 !important;
+  --chat-meta-received: #fcd34d !important;
+  --chat-border-received: rgba(245, 158, 11, 0.2) !important;
+  --chat-composer-bg: #26180e !important;
+  --chat-composer-border: #3d2819 !important;
+  --chat-composer-text: #fef3c7 !important;
+  --chat-composer-placeholder: #d97706 !important;
+  --chat-composer-btn-color: #f59e0b !important;
+  --chat-read-tick: #f59e0b !important;
+  --chat-accent: #f59e0b !important;
+}
+
+/* 3. Swahili Wave */
+[data-chat-theme="swahili-wave"]:not([data-theme="dark"]):not([data-bs-theme="dark"]),
+[data-theme="light"][data-chat-theme="swahili-wave"],
+[data-theme="light"] [data-chat-theme="swahili-wave"],
+[data-bs-theme="light"][data-chat-theme="swahili-wave"],
+[data-bs-theme="light"] [data-chat-theme="swahili-wave"] {
+  --chat-bg: #ccfbf1 !important;
+  --chat-bg-sent: #0d9488 !important;
+  --chat-text-sent: #ffffff !important;
+  --chat-meta-sent: rgba(255, 255, 255, 0.78) !important;
+  --chat-border-sent: rgba(13, 148, 136, 0.3) !important;
+  --chat-bg-received: #ffffff !important;
+  --chat-text-received: #134e4a !important;
+  --chat-meta-received: #0f766e !important;
+  --chat-border-received: rgba(13, 148, 136, 0.18) !important;
+  --chat-composer-bg: #ffffff !important;
+  --chat-composer-border: #99f6e4 !important;
+  --chat-composer-text: #134e4a !important;
+  --chat-composer-placeholder: #0f766e !important;
+  --chat-composer-btn-color: #0d9488 !important;
+  --chat-read-tick: #99f6e4 !important;
+  --chat-accent: #0d9488 !important;
+}
+
+[data-theme="dark"][data-chat-theme="swahili-wave"],
+[data-theme="dark"] [data-chat-theme="swahili-wave"],
+[data-bs-theme="dark"][data-chat-theme="swahili-wave"],
+[data-bs-theme="dark"] [data-chat-theme="swahili-wave"] {
+  --chat-bg: #0b2b26 !important;
+  --chat-bg-sent: #0d9488 !important;
+  --chat-text-sent: #f0fdfa !important;
+  --chat-meta-sent: rgba(240, 253, 250, 0.75) !important;
+  --chat-border-sent: rgba(45, 212, 191, 0.3) !important;
+  --chat-bg-received: #153e37 !important;
+  --chat-text-received: #e6fffa !important;
+  --chat-meta-received: #5eead4 !important;
+  --chat-border-received: rgba(45, 212, 191, 0.2) !important;
+  --chat-composer-bg: #0b2b26 !important;
+  --chat-composer-border: #153e37 !important;
+  --chat-composer-text: #e6fffa !important;
+  --chat-composer-placeholder: #5eead4 !important;
+  --chat-composer-btn-color: #2dd4bf !important;
+  --chat-read-tick: #2dd4bf !important;
+  --chat-accent: #2dd4bf !important;
+}
+
+/* ==========================================================================
+   DARK MODE PRESETS (WITH LIGHT MODE COMPATIBILITY)
+   ========================================================================== */
+
+/* 4. Midnight Coast */
+[data-chat-theme="midnight-coast"]:not([data-theme="light"]):not([data-bs-theme="light"]),
+[data-theme="dark"][data-chat-theme="midnight-coast"],
+[data-theme="dark"] [data-chat-theme="midnight-coast"],
+[data-bs-theme="dark"][data-chat-theme="midnight-coast"],
+[data-bs-theme="dark"] [data-chat-theme="midnight-coast"] {
+  --chat-bg: #111a38 !important;
+  --chat-bg-sent: #2563eb !important;
+  --chat-text-sent: #eff6ff !important;
+  --chat-meta-sent: rgba(239, 246, 255, 0.75) !important;
+  --chat-border-sent: rgba(96, 165, 250, 0.3) !important;
+  --chat-bg-received: #1d2a52 !important;
+  --chat-text-received: #f1f5f9 !important;
+  --chat-meta-received: #93c5fd !important;
+  --chat-border-received: rgba(96, 165, 250, 0.2) !important;
+  --chat-composer-bg: #111a38 !important;
+  --chat-composer-border: #1e293b !important;
+  --chat-composer-text: #eff6ff !important;
+  --chat-composer-placeholder: #93c5fd !important;
+  --chat-composer-btn-color: #60a5fa !important;
+  --chat-read-tick: #60a5fa !important;
+  --chat-accent: #60a5fa !important;
+}
+
+[data-theme="light"][data-chat-theme="midnight-coast"],
+[data-theme="light"] [data-chat-theme="midnight-coast"],
+[data-bs-theme="light"][data-chat-theme="midnight-coast"],
+[data-bs-theme="light"] [data-chat-theme="midnight-coast"] {
+  --chat-bg: #e0e7ff !important;
+  --chat-bg-sent: #2563eb !important;
+  --chat-text-sent: #ffffff !important;
+  --chat-meta-sent: rgba(255, 255, 255, 0.75) !important;
+  --chat-border-sent: rgba(37, 99, 235, 0.3) !important;
+  --chat-bg-received: #ffffff !important;
+  --chat-text-received: #1e1b4b !important;
+  --chat-meta-received: #6366f1 !important;
+  --chat-border-received: rgba(37, 99, 235, 0.18) !important;
+  --chat-composer-bg: #ffffff !important;
+  --chat-composer-border: #c7d2fe !important;
+  --chat-composer-text: #1e1b4b !important;
+  --chat-composer-placeholder: #6366f1 !important;
+  --chat-composer-btn-color: #2563eb !important;
+  --chat-read-tick: #2563eb !important;
+  --chat-accent: #2563eb !important;
+}
+
+/* 5. Forest Glow */
+[data-chat-theme="forest-glow"]:not([data-theme="light"]):not([data-bs-theme="light"]),
+[data-theme="dark"][data-chat-theme="forest-glow"],
+[data-theme="dark"] [data-chat-theme="forest-glow"],
+[data-bs-theme="dark"][data-chat-theme="forest-glow"],
+[data-bs-theme="dark"] [data-chat-theme="forest-glow"] {
+  --chat-bg: #0d281a !important;
+  --chat-bg-sent: #059669 !important;
+  --chat-text-sent: #ecfdf5 !important;
+  --chat-meta-sent: rgba(236, 253, 245, 0.75) !important;
+  --chat-border-sent: rgba(52, 211, 153, 0.3) !important;
+  --chat-bg-received: #163b27 !important;
+  --chat-text-received: #f1f5f9 !important;
+  --chat-meta-received: #6ee7b7 !important;
+  --chat-border-received: rgba(52, 211, 153, 0.2) !important;
+  --chat-composer-bg: #0d281a !important;
+  --chat-composer-border: #1b3827 !important;
+  --chat-composer-text: #ecfdf5 !important;
+  --chat-composer-placeholder: #6ee7b7 !important;
+  --chat-composer-btn-color: #34d399 !important;
+  --chat-read-tick: #34d399 !important;
+  --chat-accent: #34d399 !important;
+}
+
+[data-theme="light"][data-chat-theme="forest-glow"],
+[data-theme="light"] [data-chat-theme="forest-glow"],
+[data-bs-theme="light"][data-chat-theme="forest-glow"],
+[data-bs-theme="light"] [data-chat-theme="forest-glow"] {
+  --chat-bg: #dcfce7 !important;
+  --chat-bg-sent: #059669 !important;
+  --chat-text-sent: #ffffff !important;
+  --chat-meta-sent: rgba(255, 255, 255, 0.78) !important;
+  --chat-border-sent: rgba(5, 150, 105, 0.3) !important;
+  --chat-bg-received: #ffffff !important;
+  --chat-text-received: #064e3b !important;
+  --chat-meta-received: #047857 !important;
+  --chat-border-received: rgba(5, 150, 105, 0.18) !important;
+  --chat-composer-bg: #ffffff !important;
+  --chat-composer-border: #bbf7d0 !important;
+  --chat-composer-text: #064e3b !important;
+  --chat-composer-placeholder: #047857 !important;
+  --chat-composer-btn-color: #059669 !important;
+  --chat-read-tick: #059669 !important;
+  --chat-accent: #059669 !important;
+}
+
+/* 6. Pwani Neon */
+[data-chat-theme="pwani-neon"]:not([data-theme="light"]):not([data-bs-theme="light"]),
+[data-theme="dark"][data-chat-theme="pwani-neon"],
+[data-theme="dark"] [data-chat-theme="pwani-neon"],
+[data-bs-theme="dark"][data-chat-theme="pwani-neon"],
+[data-bs-theme="dark"] [data-chat-theme="pwani-neon"] {
+  --chat-bg: #1d1130 !important;
+  --chat-bg-sent: #7c3aed !important;
+  --chat-text-sent: #faf5ff !important;
+  --chat-meta-sent: rgba(250, 245, 255, 0.75) !important;
+  --chat-border-sent: rgba(168, 85, 247, 0.3) !important;
+  --chat-bg-received: #311d4d !important;
+  --chat-text-received: #f3e8ff !important;
+  --chat-meta-received: #d8b4fe !important;
+  --chat-border-received: rgba(168, 85, 247, 0.2) !important;
+  --chat-composer-bg: #1d1130 !important;
+  --chat-composer-border: #311d4d !important;
+  --chat-composer-text: #faf5ff !important;
+  --chat-composer-placeholder: #d8b4fe !important;
+  --chat-composer-btn-color: #c084fc !important;
+  --chat-read-tick: #c084fc !important;
+  --chat-accent: #c084fc !important;
+}
+
+[data-theme="light"][data-chat-theme="pwani-neon"],
+[data-theme="light"] [data-chat-theme="pwani-neon"],
+[data-bs-theme="light"][data-chat-theme="pwani-neon"],
+[data-bs-theme="light"] [data-chat-theme="pwani-neon"] {
+  --chat-bg: #f5f3ff !important;
+  --chat-bg-sent: #7c3aed !important;
+  --chat-text-sent: #ffffff !important;
+  --chat-meta-sent: rgba(255, 255, 255, 0.75) !important;
+  --chat-border-sent: rgba(124, 58, 237, 0.3) !important;
+  --chat-bg-received: #ffffff !important;
+  --chat-text-received: #3b0764 !important;
+  --chat-meta-received: #7e22ce !important;
+  --chat-border-received: rgba(124, 58, 237, 0.18) !important;
+  --chat-composer-bg: #ffffff !important;
+  --chat-composer-border: #e9d5ff !important;
+  --chat-composer-text: #3b0764 !important;
+  --chat-composer-placeholder: #7e22ce !important;
+  --chat-composer-btn-color: #7c3aed !important;
+  --chat-read-tick: #7c3aed !important;
+  --chat-accent: #7c3aed !important;
+}
+
+/* ==========================================================================
+   DIRECT CHAT CONTAINER & MESSAGES AREA HOOK
+   Ensures the chat-container and messages-area inherit preset backgrounds
+   ========================================================================== */
+.chat-container[data-chat-theme],
+[data-chat-theme] .chat-container,
+#chatMainArea[data-chat-theme],
+[data-chat-theme] #chatMainArea {
+  background: var(--chat-wallpaper, var(--chat-bg)) !important;
+  background-color: var(--chat-bg) !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  transition: background-color 0.25s ease, background 0.25s ease;
+}
+
+.messages-area[data-chat-theme],
+[data-chat-theme] .messages-area,
+#messagesContainer[data-chat-theme],
+[data-chat-theme] #messagesContainer {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* ==========================================================================
+   MODAL PRESET SWATCH PREVIEWS (ADAPTIVE LIGHT / DARK)
+   ========================================================================== */
+.preset-option[data-preset="default"] .theme-preview { background-color: #efeae2 !important; }
+.preset-option[data-preset="ocean-breeze"] .theme-preview { background-color: #e0f2fe !important; }
+.preset-option[data-preset="sand-gradient"] .theme-preview { background-color: #fef3c7 !important; }
+.preset-option[data-preset="swahili-wave"] .theme-preview { background-color: #ccfbf1 !important; }
+.preset-option[data-preset="midnight-coast"] .theme-preview { background-color: #e0e7ff !important; }
+.preset-option[data-preset="forest-glow"] .theme-preview { background-color: #dcfce7 !important; }
+.preset-option[data-preset="pwani-neon"] .theme-preview { background-color: #f5f3ff !important; }
+
+[data-theme="dark"] .preset-option[data-preset="default"] .theme-preview,
+[data-bs-theme="dark"] .preset-option[data-preset="default"] .theme-preview { background-color: #0b141a !important; }
+[data-theme="dark"] .preset-option[data-preset="ocean-breeze"] .theme-preview,
+[data-bs-theme="dark"] .preset-option[data-preset="ocean-breeze"] .theme-preview { background-color: #0c233c !important; }
+[data-theme="dark"] .preset-option[data-preset="sand-gradient"] .theme-preview,
+[data-bs-theme="dark"] .preset-option[data-preset="sand-gradient"] .theme-preview { background-color: #26180e !important; }
+[data-theme="dark"] .preset-option[data-preset="swahili-wave"] .theme-preview,
+[data-bs-theme="dark"] .preset-option[data-preset="swahili-wave"] .theme-preview { background-color: #0b2b26 !important; }
+[data-theme="dark"] .preset-option[data-preset="midnight-coast"] .theme-preview,
+[data-bs-theme="dark"] .preset-option[data-preset="midnight-coast"] .theme-preview { background-color: #111a38 !important; }
+[data-theme="dark"] .preset-option[data-preset="forest-glow"] .theme-preview,
+[data-bs-theme="dark"] .preset-option[data-preset="forest-glow"] .theme-preview { background-color: #0d281a !important; }
+[data-theme="dark"] .preset-option[data-preset="pwani-neon"] .theme-preview,
+[data-bs-theme="dark"] .preset-option[data-preset="pwani-neon"] .theme-preview { background-color: #1d1130 !important; }

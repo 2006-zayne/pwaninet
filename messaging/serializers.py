@@ -103,9 +103,12 @@ class MessageSerializer(serializers.ModelSerializer):
         return None
 
     def get_attachment_url(self, obj):
-        """Get the URL of the attachment (legacy single attachment)."""
+        """Get the URL of the attachment (legacy single attachment, stickers, and GIFs)."""
         if obj.attachment:
             return obj.attachment.url
+        if (getattr(obj, 'attachment_type', None) in ('sticker', 'gif') or
+            getattr(obj, 'message_type', None) in ('sticker', 'gif')) and obj.link_image:
+            return obj.link_image
         return None
 
     def get_is_voice_note(self, obj):

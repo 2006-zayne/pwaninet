@@ -46,9 +46,13 @@ export class UploadQueue {
         this._emitOptimisticMessage(tempId, itemsWithPreviews, globalCaption);
 
         // Persist sender's original blobs to device storage (Capacitor flash storage or Web IndexedDB)
-        itemsWithPreviews.forEach(item => {
+        itemsWithPreviews.forEach((item, idx) => {
             if (item.file) {
-                deviceMediaStore.saveSenderMedia(tempId, item.file, item.file.name || 'media');
+                const itemKey = itemsWithPreviews.length > 1 ? `${tempId}_${idx}` : tempId;
+                deviceMediaStore.saveSenderMedia(itemKey, item.file, item.file.name || 'media');
+                if (idx === 0 && itemsWithPreviews.length > 1) {
+                    deviceMediaStore.saveSenderMedia(tempId, item.file, item.file.name || 'media');
+                }
             }
         });
 
@@ -75,6 +79,7 @@ export class UploadQueue {
             // 3. Prepare form data
             const formData = new FormData();
             formData.append('conversation_id', conversationId);
+            formData.append('temp_id', tempId);
             formData.append('global_caption', globalCaption || '');
             
             // Add files
@@ -138,11 +143,14 @@ export class UploadQueue {
             // Live progress tracking
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable && e.total > 0) {
-                    const percent = Math.min(99, Math.max(1, Math.round((e.loaded / e.total) * 100)));
-                    this._updateProgressUI(tempId, percent);
+                    const rawPercent = Math.round((e.loaded / e.total) * 100);
+                    const percent = Math.min(100, Math.max(1, rawPercent));
+                    const isProcessing = rawPercent >= 100;
+                    this._updateProgressUI(tempId, percent, isProcessing);
                     eventBus.emit(EVENTS.MESSAGE_UPLOAD_PROGRESS, {
                         tempId,
                         progress: percent,
+                        isProcessing,
                         loaded: e.loaded,
                         total: e.total
                     });
@@ -153,7 +161,7 @@ export class UploadQueue {
                 this.activeUploads.delete(tempId);
                 if (xhr.status >= 200 && xhr.status < 300) {
                     // Complete one full circle (100%)
-                    this._updateProgressUI(tempId, 100);
+                    this._updateProgressUI(tempId, 100, false);
 
                     setTimeout(() => {
                         try {
@@ -165,6 +173,13 @@ export class UploadQueue {
                                     const currentTempId = idx === 0 ? tempId : `${tempId}_${idx}`;
                                     if (serverMsg?.id) {
                                         deviceMediaStore.rekeyMedia(currentTempId, serverMsg.id);
+                                        if (serverMsg?.attachments && Array.isArray(serverMsg.attachments)) {
+                                            serverMsg.attachments.forEach((att, attIdx) => {
+                                                if (att?.id) {
+                                                    deviceMediaStore.rekeyMedia(`${currentTempId}_${attIdx}`, att.id);
+                                                }
+                                            });
+                                        }
                                     }
                                     eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
                                         tempId: currentTempId,
@@ -174,6 +189,14 @@ export class UploadQueue {
                             } else {
                                 if (data?.id) {
                                     deviceMediaStore.rekeyMedia(tempId, data.id);
+                                    if (data?.attachments && Array.isArray(data.attachments)) {
+                                        data.attachments.forEach((att, attIdx) => {
+                                            if (att?.id) {
+                                                deviceMediaStore.rekeyMedia(`${tempId}_${attIdx}`, att.id);
+                                                deviceMediaStore.rekeyMedia(`${data.id}_${attIdx}`, att.id);
+                                            }
+                                        });
+                                    }
                                 }
                                 eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
                                     tempId,
@@ -214,7 +237,7 @@ export class UploadQueue {
     /**
      * Update progress indicator directly in DOM for smooth 60fps rendering
      */
-    _updateProgressUI(tempId, percent) {
+    _updateProgressUI(tempId, percent, isProcessing = false) {
         const msgEl = document.querySelector(`[data-message-id="${tempId}"]`);
         if (!msgEl) return;
 
@@ -232,10 +255,15 @@ export class UploadQueue {
         }
 
         if (textEl) {
-            textEl.textContent = `${percent}%`;
+            if (isProcessing) {
+                textEl.textContent = '100%';
+                textEl.title = 'Processing media on server...';
+            } else {
+                textEl.textContent = `${percent}%`;
+            }
         }
 
-        if (percent >= 100) {
+        if (percent >= 100 && !isProcessing) {
             overlay.classList.add('upload-complete');
         }
     }

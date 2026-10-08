@@ -1850,7 +1850,7 @@ def klipy_media_proxy(request):
                 'Accept': 'application/json'
             }
         )
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read().decode('utf-8'))
             ttl = 3600 if action == 'categories' else (180 if action == 'search' else 600)
             cache.set(cache_key, data, ttl)
@@ -1862,10 +1862,14 @@ def klipy_media_proxy(request):
         except Exception:
             pass
         logger.warning(f"[KLIPY] HTTPError {he.code} fetching {url}: {err_body or he}")
-        return JsonResponse({'result': False, 'error': f"HTTP {he.code}: {err_body or str(he)}", 'data': {'data': []}}, status=200)
+        resp_data = {'result': False, 'error': f"HTTP {he.code}: {err_body or str(he)}", 'data': {'data': []}}
+        cache.set(cache_key, resp_data, 30)
+        return JsonResponse(resp_data, status=200)
     except Exception as e:
         logger.warning(f"[KLIPY] Proxy error fetching {url}: {e}")
-        return JsonResponse({'result': False, 'error': str(e), 'data': {'data': []}}, status=200)
+        resp_data = {'result': False, 'error': str(e), 'data': {'data': []}}
+        cache.set(cache_key, resp_data, 30)
+        return JsonResponse(resp_data, status=200)
 
 
 @api_view(['GET', 'POST'])

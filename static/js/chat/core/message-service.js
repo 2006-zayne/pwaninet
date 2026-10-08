@@ -21,6 +21,7 @@ export class MessageService {
         
         // Track message states by temp_id for transition validation
         this.messageStates = new Map();
+        this._isLoadingOlder = false;
     }
 
     /**
@@ -36,6 +37,19 @@ export class MessageService {
 
         // Setup optimistic messaging event listeners
         this._setupOptimisticMessagingListeners();
+
+        // Wire up direct media sending from media picker (stickers & GIFs)
+        window.chatSendDirectMedia = (media) => this.sendDirectMedia(media);
+        window.addEventListener('chatSendDirectMedia', (e) => {
+            if (e.detail) this.sendDirectMedia(e.detail);
+        });
+
+        // Wire up voice recording indicator events
+        eventBus.on(EVENTS.VOICE_START, () => this.sendRecordingIndicator(true));
+        eventBus.on(EVENTS.VOICE_STOP, () => this.sendRecordingIndicator(false));
+        eventBus.on(EVENTS.VOICE_DISCARD, () => this.sendRecordingIndicator(false));
+        eventBus.on(EVENTS.VOICE_ERROR, () => this.sendRecordingIndicator(false));
+        eventBus.on(EVENTS.VOICE_SEND, () => this.sendRecordingIndicator(false));
 
         this._log('MESSAGE_SERVICE_INITIALIZED');
         this.initialized = true;
@@ -136,19 +150,15 @@ export class MessageService {
             return;
         }
         
-        // Remove optimistic message
-        console.log('[MESSAGE_SERVICE] Removing optimistic message:', tempId);
-        store.removeMessage(tempId);
+        const serverMsg = Array.isArray(serverMessage) ? serverMessage[0] : serverMessage;
+        const normalizedMessage = this.normalizeServerMessage(serverMsg);
         
-        // Add server message(s)
-        console.log('[MESSAGE_SERVICE] Adding server message(s):', serverMessage);
-        if (Array.isArray(serverMessage)) {
-            serverMessage.forEach(msg => {
-                const normalizedMessage = this.normalizeServerMessage(msg);
-                store.addMessage(normalizedMessage);
-            });
-        } else {
-            const normalizedMessage = this.normalizeServerMessage(serverMessage);
+        if (store.getMessageById(tempId)) {
+            console.log('[MESSAGE_SERVICE] Rekeying optimistic message in-place:', tempId, '->', normalizedMessage.id);
+            store.updateMessageIdAndStatus(tempId, normalizedMessage.id, 'sent', normalizedMessage.timestamp);
+            store.updateMessage(normalizedMessage.id, normalizedMessage);
+        } else if (!store.getMessageById(normalizedMessage.id)) {
+            console.log('[MESSAGE_SERVICE] Adding server message to store:', normalizedMessage.id);
             store.addMessage(normalizedMessage);
         }
     }
@@ -205,7 +215,7 @@ export class MessageService {
     }
 
     mapType(type) {
-        const media = ['image', 'video', 'audio', 'voice', 'file'];
+        const media = ['image', 'video', 'audio', 'voice', 'file', 'sticker', 'gif'];
         if (media.includes(type)) return 'media';
         if (type === 'emoji') return 'emoji';
         if (type === 'system') return 'system';
@@ -257,6 +267,16 @@ export class MessageService {
         let messageType = this.mapType(raw.message_type || raw.type);
         if (raw.message_type === 'media_group') {
             messageType = 'media_group';
+        } else if (raw.attachment_type === 'sticker' || raw.message_type === 'sticker' || raw.metadata?.is_sticker || raw.metadata?.type === 'sticker') {
+            messageType = 'media';
+            metadata.type = 'sticker';
+            metadata.is_sticker = true;
+            metadata.url = raw.attachment_url || raw.link_image || raw.metadata?.url || metadata.url || '';
+        } else if (raw.attachment_type === 'gif' || raw.message_type === 'gif' || raw.metadata?.is_gif || raw.metadata?.type === 'gif') {
+            messageType = 'media';
+            metadata.type = 'gif';
+            metadata.is_gif = true;
+            metadata.url = raw.attachment_url || raw.link_image || raw.metadata?.url || metadata.url || '';
         } else if (metadata.is_voice_note || raw.attachment_type === 'voice_note' || raw.message_type === 'voice_note') {
             messageType = 'media';
             metadata.type = 'voice_note';
@@ -318,21 +338,39 @@ export class MessageService {
     async loadConversationHistory(conversationId) {
         console.log('[MESSAGE_SERVICE] Loading conversation history for:', conversationId);
         try {
+            // 1. Instant Paint from Offline Cache if available
+            if (window.offlineCache) {
+                try {
+                    if (!window.offlineCache.db) {
+                        await window.offlineCache.init();
+                    }
+                    const cachedMessages = await window.offlineCache.getMessages(conversationId, 40);
+                    if (cachedMessages && cachedMessages.length > 0) {
+                        console.log(`[MESSAGE_SERVICE] Instant paint: ${cachedMessages.length} messages from offlineCache`);
+                        const normalizedCache = cachedMessages.map(m => this.normalizeServerMessage(m));
+                        store.addMessages(normalizedCache);
+                    }
+                } catch (cacheErr) {
+                    console.warn('[MESSAGE_SERVICE] Error reading offline cache:', cacheErr);
+                }
+            }
+
             console.log('[MESSAGE_SERVICE] Fetching messages from API');
             
             // Use group chat API endpoint if IS_GROUP_CHAT is set, otherwise use direct chat endpoint
             const isGroupChat = window.IS_GROUP_CHAT || false;
+            const PAGE_LIMIT = 40;
             let apiUrl;
- let queryParams;
+            let queryParams;
             
             if (isGroupChat) {
                 // Group chat endpoint: /groups/api/groups/<group_id>/messages/
                 apiUrl = `/groups/api/groups/${conversationId}/messages/`;
-                queryParams = '';
+                queryParams = `?limit=${PAGE_LIMIT}`;
             } else {
-                // Direct chat endpoint: /messaging/v1/messages/?conversation=<conversation_id>
+                // Direct chat endpoint: /messaging/v1/messages/?conversation=<conversation_id>&limit=40
                 apiUrl = `/messaging/v1/messages/`;
-                queryParams = `?conversation=${conversationId}`;
+                queryParams = `?conversation=${conversationId}&limit=${PAGE_LIMIT}`;
             }
             
             const res = await fetch(`${apiUrl}${queryParams}`, {
@@ -351,9 +389,16 @@ export class MessageService {
             const messages = Array.isArray(data) ? data : (data.results || data.messages || []);
             console.log('[MESSAGE_SERVICE] Processing', messages.length, 'messages');
 
-            for (const raw of messages) {
-                store.addMessage(this.normalizeServerMessage(raw));
+            // Save server messages to offline cache
+            if (window.offlineCache && messages.length > 0) {
+                window.offlineCache.saveMessages(messages).catch(e => console.warn('[OFFLINE_CACHE] Error caching messages:', e));
             }
+
+            // Record if there are older messages remaining
+            store.setHasMoreOlderMessages(messages.length >= PAGE_LIMIT);
+
+            const normalizedList = messages.map(raw => this.normalizeServerMessage(raw));
+            store.addMessages(normalizedList);
             console.log('[MESSAGE_SERVICE] All messages added to store');
 
         }
@@ -365,6 +410,68 @@ export class MessageService {
         finally {
             store.setInitialHistoryLoaded(true);
             console.log('[MESSAGE_SERVICE] loadConversationHistory completed and marked loaded in store');
+        }
+    }
+
+    /**
+     * Load older messages for cursor pagination (scroll-to-top)
+     * @param {number|string} conversationId
+     * @returns {Promise<number>} Number of older messages loaded
+     */
+    async loadOlderMessages(conversationId) {
+        if (this._isLoadingOlder) return 0;
+        if (!store.hasMoreOlderMessages()) return 0;
+
+        const oldestId = store.getOldestMessageId();
+        if (!oldestId) return 0;
+
+        this._isLoadingOlder = true;
+        console.log('[MESSAGE_SERVICE] Loading older messages before id:', oldestId);
+
+        try {
+            const isGroupChat = window.IS_GROUP_CHAT || false;
+            const PAGE_LIMIT = 30;
+            let apiUrl;
+            let queryParams;
+
+            if (isGroupChat) {
+                apiUrl = `/groups/api/groups/${conversationId}/messages/`;
+                queryParams = `?limit=${PAGE_LIMIT}&before_id=${oldestId}`;
+            } else {
+                apiUrl = `/messaging/v1/messages/`;
+                queryParams = `?conversation=${conversationId}&limit=${PAGE_LIMIT}&before_id=${oldestId}`;
+            }
+
+            const res = await fetch(`${apiUrl}${queryParams}`, {
+                headers: {
+                    'X-CSRFToken': getCSRFToken()
+                }
+            });
+
+            if (!res.ok) throw new Error('HTTP error loading older messages');
+
+            const data = await res.json();
+            const messages = Array.isArray(data) ? data : (data.results || data.messages || []);
+            console.log('[MESSAGE_SERVICE] Received older messages count:', messages.length);
+
+            if (messages.length < PAGE_LIMIT) {
+                store.setHasMoreOlderMessages(false);
+            }
+
+            if (messages.length > 0) {
+                if (window.offlineCache) {
+                    window.offlineCache.saveMessages(messages).catch(e => console.warn('[OFFLINE_CACHE] Error caching messages:', e));
+                }
+                const normalizedList = messages.map(raw => this.normalizeServerMessage(raw));
+                store.addMessages(normalizedList);
+            }
+
+            return messages.length;
+        } catch (error) {
+            console.error('[MESSAGE_SERVICE] Failed to load older messages:', error);
+            return 0;
+        } finally {
+            this._isLoadingOlder = false;
         }
     }
 
@@ -476,6 +583,73 @@ export class MessageService {
     }
 
     /**
+     * Send direct media message (sticker or GIF) with 1-tap instant dispatch
+     * @param {Object} media - { type, url, previewUrl, meta }
+     */
+    async sendDirectMedia(media) {
+        if (!media || !media.url) return false;
+
+        const state = store.getState();
+        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const isSticker = media.type === 'sticker';
+        const isGif = media.type === 'gif';
+
+        const optimisticMessage = this._createCanonicalMessage({
+            id: tempId,
+            conversationId: state.conversationId,
+            senderId: state.currentUserId,
+            timestamp: new Date().toISOString(),
+            status: MESSAGE_STATE.SENDING,
+            content: '',
+            type: 'media',
+            metadata: {
+                type: media.type,
+                url: media.url,
+                preview_url: media.previewUrl || media.url,
+                title: media.meta?.title || media.title || '',
+                width: media.meta?.width,
+                height: media.meta?.height,
+                is_sticker: isSticker,
+                is_gif: isGif,
+                temp_id: tempId
+            },
+            isOptimistic: true,
+            sortOrder: Date.now()
+        });
+
+        // Add to store immediately (Telegram instant feel)
+        store.addMessage(optimisticMessage);
+
+        const messageData = {
+            type: 'chat_message',
+            temp_id: tempId,
+            content: '',
+            message_type: media.type,
+            attachment_type: media.type,
+            attachment_url: media.url,
+            metadata: {
+                type: media.type,
+                url: media.url,
+                preview_url: media.previewUrl || media.url,
+                title: media.meta?.title || media.title || '',
+                width: media.meta?.width,
+                height: media.meta?.height,
+                is_sticker: isSticker,
+                is_gif: isGif,
+                temp_id: tempId
+            }
+        };
+
+        const sent = await webSocketManager.send(messageData);
+        if (!sent) {
+            store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
+            return false;
+        }
+
+        return tempId;
+    }
+
+    /**
      * Process incoming WebSocket message (WebSocket → MessageService → Store)
      * @param {Object} data - WebSocket message data
      */
@@ -492,14 +666,41 @@ export class MessageService {
                 case 'chat_message':
                 case 'message':
                     const msgData = data.message || data.data || data;
-                    if (data.temp_id && store.getMessageById(data.temp_id)) {
-                        store.updateMessageIdAndStatus(data.temp_id, msgData.id, msgData.status || 'sent', msgData.created_at);
+                    let incomingTempId = data.temp_id || msgData?.temp_id || msgData?.metadata?.temp_id;
+                    const currentUserId = store.getState().currentUserId;
+                    const isOwnMessage = (msgData.sender && Number(msgData.sender.id) === Number(currentUserId)) ||
+                                          Number(msgData.sender_id) === Number(currentUserId) ||
+                                          Number(msgData.senderId) === Number(currentUserId);
+
+                    // Fallback reconciliation for own media/voice messages if temp_id is missing in WS payload
+                    if (!incomingTempId && isOwnMessage) {
+                        const existingMsgs = store.getState().messages;
+                        const matchingOpt = existingMsgs.find(m => 
+                            m.isOptimistic && (
+                                m.type === 'voice_note' || 
+                                m.metadata?.is_voice_note || 
+                                m.type === 'media' || 
+                                m.type === msgData.message_type
+                            )
+                        );
+                        if (matchingOpt) {
+                            incomingTempId = matchingOpt.id;
+                        }
+                    }
+
+                    if (incomingTempId && store.getMessageById(incomingTempId)) {
+                        store.updateMessageIdAndStatus(incomingTempId, msgData.id, msgData.status || 'sent', msgData.created_at);
+                        const canonical = this.normalizeServerMessage(msgData);
+                        store.updateMessage(String(msgData.id), canonical);
+                    } else if (store.getMessageById(String(msgData.id))) {
+                        // Already stored (e.g., from HTTP response), update in-place
+                        const canonical = this.normalizeServerMessage(msgData);
+                        store.updateMessage(String(msgData.id), canonical);
                     } else {
                         const canonical = this.normalizeServerMessage(msgData);
                         store.addMessage(canonical);
                         // If sent by peer, send delivery ACK & play audio
-                        const currentUserId = store.getState().currentUserId;
-                        if (canonical.senderId !== currentUserId) {
+                        if (Number(canonical.senderId) !== Number(currentUserId)) {
                             webSocketManager.send({
                                 type: 'message_delivered',
                                 message_id: canonical.id
@@ -528,11 +729,21 @@ export class MessageService {
                     break;
 
                 case 'typing':
-                    store.setTypingIndicator(data.user_id, data.username, data.is_typing);
+                case 'typing_indicator':
+                    const activeUserId = store.getState().currentUserId;
+                    if (Number(data.user_id) === Number(activeUserId)) {
+                        break;
+                    }
+                    const isTyping = data.is_typing !== undefined ? Boolean(data.is_typing) : Boolean(data.typing);
+                    store.setTypingIndicator(data.user_id, data.username, isTyping);
                     break;
 
                 case 'recording_audio':
-                    store.setRecordingIndicator(data.user_id, data.username, data.is_recording);
+                    const activeUserIdForRec = store.getState().currentUserId;
+                    if (Number(data.user_id) === Number(activeUserIdForRec)) {
+                        break;
+                    }
+                    store.setRecordingIndicator(data.user_id, data.username, Boolean(data.is_recording));
                     break;
 
                 case 'peer_status':
@@ -949,11 +1160,28 @@ export class MessageService {
 
         // Send via WebSocket (transport ONLY)
         const sent = webSocketManager.send({
-            type: 'typing_indicator',
-            is_typing: isTyping
+            type: 'typing',
+            is_typing: isTyping,
+            typing: isTyping
         });
 
         console.log('[MESSAGE_SERVICE] Typing indicator sent:', sent);
+    }
+
+    /**
+     * Send recording audio indicator to backend
+     * @param {boolean} isRecording - Whether user is recording audio
+     */
+    sendRecordingIndicator(isRecording) {
+        this._log('SEND_RECORDING_INDICATOR', { isRecording });
+        console.log('[MESSAGE_SERVICE] Sending recording indicator:', isRecording);
+
+        const sent = webSocketManager.send({
+            type: 'recording_audio',
+            is_recording: Boolean(isRecording)
+        });
+
+        console.log('[MESSAGE_SERVICE] Recording indicator sent:', sent);
     }
 
     /**

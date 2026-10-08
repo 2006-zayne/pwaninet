@@ -84,6 +84,18 @@
             }
         })();
 
+        // Set chat theme immediately to prevent flash
+        (function() {
+            try {
+                const userChatTheme = '{{ request.user.chat_theme_preference|default:"ocean-wave" }}';
+                const savedChatTheme = localStorage.getItem('chat_theme') || 'ocean-wave';
+                const chatTheme = (userChatTheme && userChatTheme !== 'default') ? userChatTheme : savedChatTheme;
+                document.documentElement.setAttribute('data-chat-theme', chatTheme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-chat-theme', 'ocean-wave');
+            }
+        })();
+
         // Set font scale immediately to prevent flash
         (function() {
             const userFontSizePreference = '{{ request.user.font_size_preference|default:"medium" }}';
@@ -878,7 +890,7 @@
     <script defer src="{% static 'js/comments/comment-api.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
     <script defer src="{% static 'js/comments/comment-renderer.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
     <script defer src="{% static 'js/comments/comment-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
-    <script defer src="{% static 'js/media-picker/media-picker.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
+    <script defer src="{% static 'js/media-picker/media-picker.js' %}?v={{ app_version }}-{{ app_build }}-20261008-direct2"></script>
 
     <script>
         // Synchronously detect standalone PWA mode early to prevent safe area layout shifts
@@ -4207,6 +4219,32 @@ window.addEventListener('beforeinstallprompt', (e) => {
                                 document.title = doc.title;
                             }
 
+                            // Sync html and body classes (e.g. in-conversation-active)
+                            if (doc.documentElement && doc.documentElement.className) {
+                                document.documentElement.className = doc.documentElement.className;
+                            }
+                            if (doc.body && doc.body.className) {
+                                document.body.className = doc.body.className;
+                            }
+
+                            // Sync app-shell-layout class (e.g. in-conversation-shell)
+                            const incomingShell = doc.getElementById('app-shell-layout');
+                            const currentShell = document.getElementById('app-shell-layout');
+                            if (incomingShell && currentShell) {
+                                currentShell.className = incomingShell.className;
+                            }
+
+                            // Sync any missing stylesheets from parsed document
+                            doc.querySelectorAll('link[rel="stylesheet"]').forEach(function(incomingLink) {
+                                const href = incomingLink.getAttribute('href');
+                                if (href && !document.querySelector('link[rel="stylesheet"][href="' + href + '"]')) {
+                                    const newLink = document.createElement('link');
+                                    newLink.rel = 'stylesheet';
+                                    newLink.href = href;
+                                    document.head.appendChild(newLink);
+                                }
+                            });
+
                             // Sync out-of-band floating actions if present
                             const incomingFloating = doc.getElementById('profile-floating-actions');
                             const currentFloating = document.getElementById('profile-floating-actions');
@@ -4343,8 +4381,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
             if (targetUrl.origin !== window.location.origin) return;
 
-            const pathname = targetUrl.pathname;
-            // Exclude static assets, media files, admin portal, binary downloads, auth session boundary URLs, and Pwanimate app
+            // Exclude static assets, media files, admin portal, binary downloads, auth session boundary URLs, messaging, and Pwanimate app
             if (pathname.startsWith('/admin/') || pathname.startsWith('/static/') ||
                 pathname.startsWith('/media/') || pathname.startsWith('/download/app/') || pathname.startsWith('/download/android/') ||
                 pathname.startsWith('/accounts/') || pathname.startsWith('/users/login') ||
@@ -4352,7 +4389,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 pathname.startsWith('/register') || pathname.startsWith('/login') ||
                 pathname.startsWith('/users/password') || pathname.startsWith('/users/reset') ||
                 pathname.startsWith('/users/verify-email') || pathname.startsWith('/auth/') ||
-                pathname.startsWith('/api/') || pathname.startsWith('/pwanimate')) {
+                pathname.startsWith('/api/') || pathname.startsWith('/pwanimate') ||
+                pathname.startsWith('/messages/') || pathname.startsWith('/messaging/')) {
                 return;
             }
 

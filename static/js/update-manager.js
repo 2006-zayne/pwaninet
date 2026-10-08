@@ -355,6 +355,17 @@
             return false;
         }
 
+        // Never reload while user is inside an active messaging conversation
+        if (pathname.includes('/messaging') || pathname.includes('/conversation') || document.querySelector('.chat-container, #messagesContainer, #chatMessages')) {
+            return false;
+        }
+
+        // Never reload while audio or video is actively playing
+        const isMediaPlaying = Array.from(document.querySelectorAll('audio, video')).some(el => !el.paused && el.currentTime > 0);
+        if (isMediaPlaying) {
+            return false;
+        }
+
         const active = document.activeElement;
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
             return false;

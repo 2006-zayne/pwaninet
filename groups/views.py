@@ -1107,6 +1107,31 @@ class GroupMessageViewSet(viewsets.ModelViewSet):
             return GroupMessageCreateSerializer
         return GroupMessageSerializer
 
+    def list(self, request, *args, **kwargs):
+        """List messages with support for limit and before_id cursor pagination."""
+        group_id = self.kwargs.get('group_id')
+        queryset = self.filter_queryset(self.get_queryset())
+        if group_id:
+            queryset = queryset.filter(group_id=group_id)
+
+        limit_param = request.query_params.get('limit')
+        before_id = request.query_params.get('before_id')
+
+        if limit_param:
+            try:
+                limit = max(1, min(100, int(limit_param)))
+                if before_id:
+                    queryset = queryset.filter(id__lt=before_id)
+                messages_slice = list(queryset.order_by('-created_at')[:limit])
+                messages_slice.reverse()
+                serializer = self.get_serializer(messages_slice, many=True)
+                return Response(serializer.data)
+            except (ValueError, TypeError):
+                pass
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         """Create a new message and broadcast via WebSocket"""
         group_id = self.kwargs.get('group_id')

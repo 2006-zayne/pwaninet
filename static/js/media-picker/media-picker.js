@@ -501,6 +501,13 @@
             return;
           }
 
+          const switchBuiltin = e.target.closest('[data-action="switch-to-builtin-stickers"]');
+          if (switchBuiltin) {
+            e.preventDefault();
+            this.switchStickerSubtab('builtin');
+            return;
+          }
+
           const retryGif = e.target.closest('[data-action="retry-gif-search"]');
           if (retryGif) {
             e.preventDefault();
@@ -823,6 +830,24 @@
     },
 
     attachMedia({ type, url, previewUrl, meta = {} }) {
+      // In chat conversation: tap to send immediately directly to chat stream!
+      const isChatContext = Boolean(
+        document.getElementById('messagesContainer') ||
+        (this.currentTargetInput && (this.currentTargetInput.id === 'messageInput' || this.currentTargetInput.closest('.chat-input-container')))
+      );
+
+      if (isChatContext && (type === 'sticker' || type === 'gif')) {
+        this.close();
+        if (typeof window.chatSendDirectMedia === 'function') {
+          window.chatSendDirectMedia({ type, url, previewUrl, meta });
+        } else {
+          window.dispatchEvent(new CustomEvent('chatSendDirectMedia', {
+            detail: { type, url, previewUrl, meta }
+          }));
+        }
+        return;
+      }
+
       const form = this.currentForm || (this.currentTargetInput ? (this.currentTargetInput.closest('form') || this.currentTargetInput.closest('.comment-composer')) : null);
       if (!form) {
         console.warn('[MediaPicker] No active comment form found for attachment');
@@ -1292,7 +1317,10 @@
               <div class="media-picker-empty">
                 <i class="bi bi-stickies text-muted"></i>
                 <span class="fw-semibold">${emptyMsg}</span>
-                <button type="button" class="media-picker-empty-action" data-action="clear-sticker-search"><i class="bi bi-arrow-clockwise me-1"></i>${isError ? 'Retry' : 'Browse Trending Stickers'}</button>
+                <div class="d-flex gap-2 justify-content-center mt-2 flex-wrap">
+                  ${isError ? '<button type="button" class="media-picker-empty-action" data-action="switch-to-builtin-stickers"><i class="bi bi-stars me-1"></i>Open Built-in Stickers</button>' : ''}
+                  <button type="button" class="media-picker-empty-action" data-action="clear-sticker-search"><i class="bi bi-arrow-clockwise me-1"></i>${isError ? 'Retry' : 'Browse Trending Stickers'}</button>
+                </div>
               </div>
             `;
           }

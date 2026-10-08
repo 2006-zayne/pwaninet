@@ -145,6 +145,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             PresenceService.record_heartbeat(self.user_id, self.connection_id)
             await self.send(text_data=json.dumps({'type': 'pong'}))
 
+        elif msg_type == 'get_peer_presence':
+            peer_status = await self._get_peer_presence()
+            if peer_status:
+                await self.send(text_data=json.dumps({
+                    'type': 'peer_status',
+                    **peer_status
+                }))
+
         elif msg_type == 'chat_message':
             await self._handle_chat_message(data)
 
@@ -154,7 +162,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         elif msg_type == 'read_receipt':
             await self._handle_read_receipt(data)
 
-        elif msg_type == 'typing':
+        elif msg_type in ('typing', 'typing_indicator'):
             await self._handle_typing(data)
 
         elif msg_type == 'recording_audio':
@@ -180,7 +188,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message_type = data.get('message_type', 'text')
         link_url = data.get('link_url')
 
-        if not content and not data.get('attachment_url') and not data.get('attachments'):
+        media_url = data.get('attachment_url') or data.get('metadata', {}).get('url') or data.get('metadata', {}).get('preview_url')
+
+        if not content and not media_url and not data.get('attachments'):
             return
 
         # Save to database
@@ -267,7 +277,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
 
     async def _handle_typing(self, data):
-        is_typing = bool(data.get('is_typing', False))
+        is_typing = bool(data.get('is_typing', data.get('typing', False)))
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -388,6 +398,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'is_recording': event['is_recording']
             }))
 
+    async def recording_audio(self, event):
+        await self.recording_audio_event(event)
+
     async def user_status_event(self, event):
         await self.send(text_data=json.dumps({
             'type': 'user_status',
@@ -465,18 +478,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if data.get('reply_to_id'):
                 reply_to = Message.objects.filter(id=data['reply_to_id'], conversation=conv).first()
 
+            media_url = data.get('attachment_url') or data.get('metadata', {}).get('url') or data.get('metadata', {}).get('preview_url')
+            attachment_type = data.get('attachment_type') or data.get('metadata', {}).get('type') or data.get('message_type')
+            is_sticker_or_gif = attachment_type in ('sticker', 'gif')
+
             msg = Message.objects.create(
                 conversation=conv,
                 sender=self.user,
                 content=data.get('content', ''),
                 reply_to=reply_to,
-                message_type=data.get('message_type', 'text'),
+                message_type=attachment_type if is_sticker_or_gif else data.get('message_type', 'text'),
+                attachment_type=attachment_type if is_sticker_or_gif else data.get('attachment_type'),
                 global_caption=data.get('global_caption', ''),
                 link_url=data.get('link_url'),
                 link_title=data.get('link_title'),
                 link_description=data.get('link_description'),
-                link_image=data.get('link_image'),
-                link_type=data.get('link_type', 'link'),
+                link_image=media_url if is_sticker_or_gif else data.get('link_image'),
+                link_type=attachment_type if is_sticker_or_gif else data.get('link_type', 'link'),
                 status='sent'
             )
 

@@ -78,8 +78,10 @@ document.addEventListener('DOMContentLoaded', () => {
     appController.init(config);
     console.log('✅ App controller initialized (orchestration)');
 
-    // Expose globally for debugging
+    // Expose globally for debugging and DOM reconciliation
     window.appController = appController;
+    window.uiController = uiController;
+    window.renderer = uiController.renderer;
     window.store = store;
     window.messageService = messageService;
     window.webSocketManager = webSocketManager;

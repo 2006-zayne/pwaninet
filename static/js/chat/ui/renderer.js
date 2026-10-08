@@ -19,6 +19,7 @@ export class MessageRenderer {
         this.isRendering = false;
         this.typingIndicatorElement = null;
         this.downloadedMediaIds = new Set();
+        this.preserveScrollOnPrepend = false;
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     }
 
@@ -41,6 +42,8 @@ export class MessageRenderer {
 
         this._attachEmptyStateListeners();
         this._setupDelegatedEventListeners();
+        this._setupEvictionListeners();
+        this._setupSingleMediaPlaybackCoordinator();
 
         // Listen for live upload progress updates
         eventBus.on(EVENTS.MESSAGE_UPLOAD_PROGRESS, (data) => {
@@ -50,6 +53,65 @@ export class MessageRenderer {
         });
 
         this._log('RENDERER_INITIALIZED');
+    }
+
+    /**
+     * Coordinate single media playback: guarantees only one audio or video can play at a time in the chat
+     */
+    _setupSingleMediaPlaybackCoordinator() {
+        if (this._singleMediaCoordinatorAttached) return;
+        this._singleMediaCoordinatorAttached = true;
+
+        document.addEventListener('play', (e) => {
+            const activeMedia = e.target;
+            if (!(activeMedia instanceof HTMLMediaElement)) return;
+
+            // Pause all other playing audio/video elements across document
+            document.querySelectorAll('audio, video').forEach(other => {
+                if (other !== activeMedia && !other.paused) {
+                    try {
+                        other.pause();
+                    } catch (_) {}
+
+                    const bubble = other.closest('.voice-note-bubble, .audio-track-bubble, .media-bubble');
+                    if (bubble) {
+                        const vnIcon = bubble.querySelector('.vn-play-icon');
+                        if (vnIcon) vnIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+                        const trackIcon = bubble.querySelector('.track-play-icon');
+                        if (trackIcon) trackIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+                    }
+                }
+            });
+        }, true); // Capture phase guarantees early interception
+    }
+
+    /**
+     * Setup eviction listeners to bring back the download overlay when media is deleted
+     */
+    _setupEvictionListeners() {
+        if (this._evictionListenersAttached) return;
+        this._evictionListenersAttached = true;
+
+        const handleEviction = (e) => {
+            const rawId = e.detail?.messageId || e.detail?.id;
+            if (!rawId || !this.container) return;
+            const messageId = String(rawId).replace(/^chat_/, '');
+            this.downloadedMediaIds.delete(messageId);
+            try {
+                localStorage.removeItem(`media_dl_${messageId}`);
+            } catch (_) {}
+
+            const msgEl = this.container.querySelector(`[data-message-id="${messageId}"]`);
+            if (msgEl) {
+                const bubble = msgEl.querySelector('.media-bubble, .voice-note-bubble, .audio-track-bubble') || msgEl;
+                if (bubble) {
+                    this._restoreDownloadOverlay({ id: messageId }, bubble);
+                }
+            }
+        };
+
+        window.addEventListener('pwaninet:media-evicted', handleEviction);
+        window.addEventListener('pwaninet:download-deleted', handleEviction);
     }
 
     /**
@@ -78,12 +140,21 @@ export class MessageRenderer {
                 return;
             }
 
-            // Play button handler delegation
+            // Play button handler delegation (Voice Note)
             const playBtn = e.target.closest('.vn-play-btn');
             if (playBtn) {
                 e.preventDefault();
                 e.stopPropagation();
                 const bubble = playBtn.closest('.voice-note-bubble');
+                const messageId = bubble?.getAttribute('data-message-id') || bubble?.closest('[data-message-id]')?.getAttribute('data-message-id');
+
+                if (bubble && bubble.classList.contains('not-downloaded')) {
+                    if (messageId) {
+                        this._handleMediaDownload(messageId, bubble);
+                    }
+                    return;
+                }
+
                 const audio = bubble?.querySelector('.vn-audio-el');
                 const playIcon = bubble?.querySelector('.vn-play-icon');
                 if (!audio) return;
@@ -113,16 +184,88 @@ export class MessageRenderer {
                 return;
             }
 
-            // Waveform scrubber delegation
+            // Waveform scrubber delegation (Voice Note)
             const waveform = e.target.closest('.vn-waveform');
             if (waveform) {
                 e.preventDefault();
                 e.stopPropagation();
                 const bubble = waveform.closest('.voice-note-bubble');
+                const messageId = bubble?.getAttribute('data-message-id') || bubble?.closest('[data-message-id]')?.getAttribute('data-message-id');
+
+                if (bubble && bubble.classList.contains('not-downloaded')) {
+                    if (messageId) {
+                        this._handleMediaDownload(messageId, bubble);
+                    }
+                    return;
+                }
+
                 const audio = bubble?.querySelector('.vn-audio-el');
                 if (!audio || !audio.duration) return;
 
                 const rect = waveform.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                audio.currentTime = ratio * audio.duration;
+                return;
+            }
+
+            // Audio track play button delegation
+            const trackPlayBtn = e.target.closest('.audio-track-play-btn');
+            if (trackPlayBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const bubble = trackPlayBtn.closest('.audio-track-bubble');
+                const messageId = bubble?.getAttribute('data-message-id') || bubble?.closest('[data-message-id]')?.getAttribute('data-message-id');
+
+                if (bubble && bubble.classList.contains('not-downloaded')) {
+                    if (messageId) {
+                        this._handleMediaDownload(messageId, bubble);
+                    }
+                    return;
+                }
+
+                const audio = bubble?.querySelector('.track-audio-el');
+                const playIcon = bubble?.querySelector('.track-play-icon');
+                if (!audio) return;
+
+                if (audio.paused) {
+                    document.querySelectorAll('.vn-audio-el, .track-audio-el').forEach(other => {
+                        if (other !== audio && !other.paused) {
+                            other.pause();
+                            other.currentTime = 0;
+                            const otherBubble = other.closest('.voice-note-bubble, .audio-track-bubble');
+                            otherBubble?.querySelector('.vn-play-icon, .track-play-icon')?.classList.replace('bi-pause-fill', 'bi-play-fill');
+                        }
+                    });
+
+                    audio.play().then(() => {
+                        playIcon?.classList.replace('bi-play-fill', 'bi-pause-fill');
+                    }).catch(err => console.warn('[AUDIO_TRACK] Delegated play blocked:', err));
+                } else {
+                    audio.pause();
+                    playIcon?.classList.replace('bi-pause-fill', 'bi-play-fill');
+                }
+                return;
+            }
+
+            // Audio track scrubber track delegation
+            const scrubberTrack = e.target.closest('.audio-track-scrubber-track');
+            if (scrubberTrack) {
+                e.preventDefault();
+                e.stopPropagation();
+                const bubble = scrubberTrack.closest('.audio-track-bubble');
+                const messageId = bubble?.getAttribute('data-message-id') || bubble?.closest('[data-message-id]')?.getAttribute('data-message-id');
+
+                if (bubble && bubble.classList.contains('not-downloaded')) {
+                    if (messageId) {
+                        this._handleMediaDownload(messageId, bubble);
+                    }
+                    return;
+                }
+
+                const audio = bubble?.querySelector('.track-audio-el');
+                if (!audio || !audio.duration) return;
+
+                const rect = scrubberTrack.getBoundingClientRect();
                 const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                 audio.currentTime = ratio * audio.duration;
                 return;
@@ -133,8 +276,8 @@ export class MessageRenderer {
             if (dlBtn) {
                 e.preventDefault();
                 e.stopPropagation();
-                const bubble = dlBtn.closest('.media-bubble');
-                const messageId = dlBtn.getAttribute('data-message-id') || bubble?.getAttribute('data-message-id');
+                const bubble = dlBtn.closest('.media-bubble, .voice-note-bubble, .audio-track-bubble');
+                const messageId = dlBtn.getAttribute('data-message-id') || bubble?.getAttribute('data-message-id') || bubble?.closest('[data-message-id]')?.getAttribute('data-message-id');
                 if (messageId && bubble) {
                     this._handleMediaDownload(messageId, bubble);
                 }
@@ -144,17 +287,12 @@ export class MessageRenderer {
     }
 
     /**
-     * Check if media is downloaded locally
+     * Check if media is downloaded locally in IndexedDB / Filesystem
      */
     _isMediaDownloaded(messageId) {
-        if (!messageId) return true;
+        if (!messageId) return false;
         if (this.downloadedMediaIds.has(String(messageId))) return true;
-        if (deviceMediaStore.hasMedia(messageId)) return true;
-        try {
-            return localStorage.getItem(`media_dl_${messageId}`) === 'true';
-        } catch (_) {
-            return false;
-        }
+        return deviceMediaStore.hasMedia(messageId);
     }
 
     /**
@@ -182,37 +320,312 @@ export class MessageRenderer {
     }
 
     /**
+     * Restore download overlay and not-downloaded state if media was deleted from IndexedDB/Filesystem
+     */
+    _restoreDownloadOverlay(message, bubble) {
+        if (!bubble || message?.isOwn || bubble.classList.contains('sent')) return;
+        const messageId = message?.id || bubble.getAttribute('data-message-id');
+        if (messageId) {
+            this.downloadedMediaIds.delete(String(messageId));
+            try {
+                localStorage.removeItem(`media_dl_${messageId}`);
+            } catch (_) {}
+        }
+
+        bubble.classList.add('not-downloaded');
+        bubble.classList.remove('is-downloading');
+        delete bubble.dataset.isDownloading;
+
+        const isVoiceNote = bubble.classList.contains('voice-note-bubble');
+        const isAudioTrack = bubble.classList.contains('audio-track-bubble');
+        const isMediaGroup = bubble.classList.contains('media-group');
+
+        if (isVoiceNote) {
+            const audio = bubble.querySelector('.vn-audio-el');
+            if (audio) {
+                const curSrc = audio.getAttribute('src');
+                if (curSrc && !curSrc.startsWith('blob:') && !audio.getAttribute('data-src')) {
+                    audio.setAttribute('data-src', curSrc);
+                }
+                audio.removeAttribute('src');
+                try { audio.pause(); audio.currentTime = 0; } catch (_) {}
+            }
+            const playBtn = bubble.querySelector('.vn-play-btn');
+            if (playBtn) {
+                playBtn.classList.add('vn-download-mode');
+                playBtn.setAttribute('aria-label', 'Download voice note');
+                playBtn.setAttribute('title', 'Download voice note');
+                playBtn.innerHTML = `<i class="bi bi-arrow-down vn-play-icon"></i>`;
+            }
+            const timer = bubble.querySelector('.vn-timer');
+            if (timer) timer.textContent = '0:00';
+            const bars = bubble.querySelectorAll('.vn-bar');
+            bars.forEach(b => b.classList.remove('is-played'));
+            return;
+        }
+
+        if (isAudioTrack) {
+            const audio = bubble.querySelector('.track-audio-el');
+            if (audio) {
+                const curSrc = audio.getAttribute('src');
+                if (curSrc && !curSrc.startsWith('blob:') && !audio.getAttribute('data-src')) {
+                    audio.setAttribute('data-src', curSrc);
+                }
+                audio.removeAttribute('src');
+                try { audio.pause(); audio.currentTime = 0; } catch (_) {}
+            }
+            const playBtn = bubble.querySelector('.audio-track-play-btn');
+            if (playBtn) {
+                playBtn.classList.add('audio-download-mode');
+                playBtn.setAttribute('aria-label', 'Download track');
+                playBtn.setAttribute('title', 'Download track');
+                playBtn.innerHTML = `<i class="bi bi-arrow-down track-play-icon"></i>`;
+            }
+            const fill = bubble.querySelector('.audio-track-scrubber-fill');
+            if (fill) fill.style.width = '0%';
+            const timer = bubble.querySelector('.audio-track-time');
+            if (timer) timer.textContent = '0:00';
+            const metaRow = bubble.querySelector('.audio-track-meta-row');
+            if (metaRow && !bubble.querySelector('.audio-track-status')) {
+                const statusSpan = document.createElement('span');
+                statusSpan.className = 'audio-track-status text-primary ms-1';
+                statusSpan.textContent = '• Tap to download';
+                metaRow.appendChild(statusSpan);
+            }
+            return;
+        }
+
+        if (isMediaGroup) {
+            bubble.querySelectorAll('.media-tile').forEach(tile => {
+                const img = tile.querySelector('img');
+                const vid = tile.querySelector('video');
+                if (img) {
+                    const curSrc = img.getAttribute('src');
+                    if (curSrc && !curSrc.startsWith('blob:') && !img.getAttribute('data-src')) {
+                        img.setAttribute('data-src', curSrc);
+                    }
+                    img.style.filter = 'blur(14px) brightness(0.72)';
+                    img.style.transform = 'scale(1.08)';
+                    img.style.borderRadius = '8px';
+                    img.classList.remove('d-none');
+                    tile.querySelector('.tile-placeholder-wrap')?.remove();
+                }
+                if (vid) {
+                    const curSrc = vid.getAttribute('src');
+                    if (curSrc && !curSrc.startsWith('blob:') && !vid.getAttribute('data-src')) {
+                        vid.setAttribute('data-src', curSrc);
+                    }
+                    const cleanSrc = vid.getAttribute('data-src') || curSrc;
+                    if (cleanSrc) {
+                        vid.src = `${cleanSrc.split('#')[0]}#t=0.001`;
+                    }
+                    vid.classList.remove('d-none');
+                    vid.style.filter = 'blur(14px) brightness(0.72)';
+                    vid.style.transform = 'scale(1.08)';
+                    vid.style.borderRadius = '8px';
+                    try { vid.pause(); } catch (_) {}
+                }
+            });
+
+            if (!bubble.querySelector('.group-download-overlay')) {
+                const downloadOverlay = document.createElement('div');
+                downloadOverlay.className = 'media-download-overlay group-download-overlay';
+                downloadOverlay.setAttribute('data-message-id', messageId);
+                downloadOverlay.innerHTML = `
+                    <button type="button" class="media-download-pill group-download-pill" title="Download bundle">
+                        <div class="download-icon-wrap">
+                            <svg class="dl-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <svg class="download-spinner d-none" width="22" height="22" viewBox="0 0 38 38">
+                                <circle cx="19" cy="19" r="15" stroke="rgba(255,255,255,0.3)" stroke-width="3" fill="none"/>
+                                <circle class="dl-spinner-bar" cx="19" cy="19" r="15" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="94.25" stroke-dashoffset="60"/>
+                            </svg>
+                        </div>
+                        <div class="group-dl-text">
+                            <span class="group-dl-label">Download all</span>
+                            <span class="media-download-size">Media</span>
+                        </div>
+                    </button>
+                `;
+                const targetFrame = bubble.querySelector('.media-card-frame') || bubble;
+                targetFrame.appendChild(downloadOverlay);
+            }
+            return;
+        }
+
+        // Single media (image/video)
+        const targetFrame = bubble.querySelector('.media-card-frame') || bubble;
+        const img = bubble.querySelector('img');
+        const vid = bubble.querySelector('video');
+        if (img) {
+            const curSrc = img.getAttribute('src');
+            if (curSrc && !curSrc.startsWith('blob:') && !img.getAttribute('data-src')) {
+                img.setAttribute('data-src', curSrc);
+            }
+            img.style.filter = 'blur(14px) brightness(0.72)';
+            img.style.transform = 'scale(1.04)';
+            img.style.borderRadius = '12px';
+            img.classList.remove('d-none');
+            targetFrame.querySelector('.media-image-placeholder')?.remove();
+        }
+        if (vid) {
+            const curSrc = vid.getAttribute('src');
+            if (curSrc && !curSrc.startsWith('blob:') && !vid.getAttribute('data-src')) {
+                vid.setAttribute('data-src', curSrc);
+            }
+            const cleanSrc = vid.getAttribute('data-src') || curSrc;
+            if (cleanSrc) {
+                vid.src = `${cleanSrc.split('#')[0]}#t=0.001`;
+            }
+            vid.classList.remove('d-none');
+            vid.style.filter = 'blur(14px) brightness(0.72)';
+            vid.style.transform = 'scale(1.08)';
+            vid.style.borderRadius = '12px';
+            try { vid.pause(); } catch (_) {}
+        }
+
+        if (!bubble.querySelector('.media-download-overlay')) {
+            const downloadOverlay = document.createElement('div');
+            downloadOverlay.className = 'media-download-overlay';
+            downloadOverlay.setAttribute('data-message-id', messageId);
+            downloadOverlay.innerHTML = `
+                <button type="button" class="media-download-pill" title="Download media">
+                    <div class="download-icon-wrap">
+                        <svg class="dl-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <svg class="download-spinner d-none" width="20" height="20" viewBox="0 0 38 38">
+                            <circle cx="19" cy="19" r="15" stroke="rgba(255,255,255,0.3)" stroke-width="3" fill="none"/>
+                            <circle class="dl-spinner-bar" cx="19" cy="19" r="15" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="94.25" stroke-dashoffset="60"/>
+                        </svg>
+                    </div>
+                    <span class="media-download-size">Download</span>
+                </button>
+            `;
+            targetFrame.appendChild(downloadOverlay);
+        }
+    }
+
+    /**
      * Handle on-demand download for received media
      */
     async _handleMediaDownload(messageId, bubble) {
         if (!bubble || bubble.dataset.isDownloading === 'true') return;
         bubble.dataset.isDownloading = 'true';
 
-        const pill = bubble.querySelector('.media-download-pill');
-        const dlIcon = pill?.querySelector('.dl-icon');
-        const spinner = pill?.querySelector('.download-spinner');
-        const sizeText = pill?.querySelector('.media-download-size');
+        const isVoiceNote = bubble.classList.contains('voice-note-bubble');
+        const isAudioTrack = bubble.classList.contains('audio-track-bubble');
 
-        if (dlIcon) dlIcon.classList.add('d-none');
-        if (spinner) spinner.classList.remove('d-none');
-        if (sizeText) sizeText.textContent = 'Saving...';
+        let pill = null;
+        let dlIcon = null;
+        let spinner = null;
+        let sizeText = null;
+
+        if (isVoiceNote) {
+            const playBtn = bubble.querySelector('.vn-play-btn');
+            if (playBtn) {
+                playBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem; border-width: 2px;"></span>`;
+            }
+            const timer = bubble.querySelector('.vn-timer');
+            if (timer) timer.textContent = 'Saving...';
+        } else if (isAudioTrack) {
+            const playBtn = bubble.querySelector('.audio-track-play-btn');
+            if (playBtn) {
+                playBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem; border-width: 2px;"></span>`;
+            }
+            const timeEl = bubble.querySelector('.audio-track-time');
+            if (timeEl) timeEl.textContent = 'Saving...';
+        } else {
+            pill = bubble.querySelector('.media-download-pill');
+            dlIcon = pill?.querySelector('.dl-icon');
+            spinner = pill?.querySelector('.download-spinner');
+            sizeText = pill?.querySelector('.media-download-size');
+
+            if (dlIcon) dlIcon.classList.add('d-none');
+            if (spinner) spinner.classList.remove('d-none');
+            if (sizeText) sizeText.textContent = '0%';
+        }
+
+        const onProgress = (percent) => {
+            if (sizeText) sizeText.textContent = `${percent}%`;
+            if (spinner) {
+                const spinnerBar = spinner.querySelector('.dl-spinner-bar');
+                if (spinnerBar) {
+                    const circumference = 94.25;
+                    const offset = circumference * (1 - percent / 100);
+                    spinnerBar.style.strokeDashoffset = Math.max(0, offset).toFixed(1);
+                }
+            }
+        };
 
         try {
-            const imgs = Array.from(bubble.querySelectorAll('img'));
+            const imgs = Array.from(bubble.querySelectorAll('img:not(.read-avatar-img)'));
             const vids = Array.from(bubble.querySelectorAll('video'));
-            const mediaEls = [...imgs, ...vids];
+            const auds = Array.from(bubble.querySelectorAll('audio'));
+            const mediaEls = [...imgs, ...vids, ...auds];
 
-            // Save all media elements permanently to device storage
-            for (const el of mediaEls) {
-                const src = el.getAttribute('src');
-                if (src && !src.startsWith('blob:') && !src.startsWith('capacitor:') && !src.startsWith('http://localhost/_capacitor_file_')) {
-                    const filename = src.split('/').pop()?.split('?')[0] || `media_${messageId}`;
-                    const localUrl = await deviceMediaStore.downloadMedia(messageId, src, filename);
-                    if (localUrl) {
-                        el.src = localUrl;
+            if (mediaEls.length === 0) {
+                throw new Error('No media elements found in bubble');
+            }
+
+            // Save all media elements permanently to IndexedDB / Capacitor storage
+            for (let i = 0; i < mediaEls.length; i++) {
+                const el = mediaEls[i];
+                const src = el.getAttribute('data-full-src') || el.getAttribute('data-src') || el.getAttribute('src');
+                if (!src) continue;
+
+                const cleanSrc = src.split('#')[0];
+                if (!cleanSrc.startsWith('blob:') && !cleanSrc.startsWith('capacitor:') && !cleanSrc.startsWith('http://localhost/_capacitor_file_')) {
+                    const filename = cleanSrc.split('/').pop()?.split('?')[0] || `media_${messageId}`;
+                    const mediaKey = mediaEls.length > 1 ? `${messageId}_${i}` : messageId;
+
+                    const localUrl = await deviceMediaStore.downloadMedia(mediaKey, cleanSrc, filename, onProgress);
+                    if (!localUrl) {
+                        throw new Error('Failed to obtain local media URL from IndexedDB');
+                    }
+
+                    el.src = localUrl;
+                    el.removeAttribute('data-full-src');
+                    el.removeAttribute('data-src');
+
+                    if (el.tagName === 'IMG') {
+                        el.style.filter = 'none';
+                        el.style.transform = 'none';
+                        el.classList.remove('not-downloaded-thumb');
+                        el.classList.remove('d-none');
+                        const placeholder = bubble.querySelector('.media-image-placeholder, .tile-placeholder-wrap');
+                        if (placeholder) placeholder.remove();
+                    }
+                    if (el.tagName === 'AUDIO') {
+                        el.load();
+                    }
+                    if (el.tagName === 'VIDEO') {
+                        el.classList.remove('d-none');
+                        el.style.filter = 'none';
+                        el.style.transform = 'none';
+                        el.load();
                     }
                 }
             }
+
+            // Clean up any remaining blurred thumbnail classes without duplicating elements
+            const thumbImgs = bubble.querySelectorAll('.not-downloaded-thumb, .tile-image-thumb, .single-media-video-thumb, .tile-video-thumb');
+            thumbImgs.forEach(t => {
+                t.style.filter = 'none';
+                t.style.transform = 'none';
+                t.classList.remove('not-downloaded-thumb');
+            });
+            const videoEls = bubble.querySelectorAll('video');
+            videoEls.forEach(v => {
+                v.classList.remove('d-none');
+                v.style.filter = 'none';
+                v.style.transform = 'none';
+            });
 
             // Mark as downloaded locally
             this.downloadedMediaIds.add(String(messageId));
@@ -220,43 +633,145 @@ export class MessageRenderer {
                 localStorage.setItem(`media_dl_${messageId}`, 'true');
             } catch (_) {}
 
+            // Remove download overlay immediately
+            const overlay = bubble.querySelector('.media-download-overlay, .group-download-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+
             // Smooth reveal
             bubble.classList.remove('not-downloaded');
             delete bubble.dataset.isDownloading;
 
-            const overlay = bubble.querySelector('.media-download-overlay');
-            if (overlay) {
-                overlay.style.opacity = '0';
-                setTimeout(() => overlay.remove(), 250);
+            if (isVoiceNote) {
+                const playBtn = bubble.querySelector('.vn-play-btn');
+                if (playBtn) {
+                    playBtn.classList.remove('vn-download-mode');
+                    playBtn.setAttribute('aria-label', 'Play voice note');
+                    playBtn.setAttribute('title', 'Play voice note');
+                    playBtn.innerHTML = `<i class="bi bi-play-fill vn-play-icon"></i>`;
+                }
+                const timer = bubble.querySelector('.vn-timer');
+                if (timer) timer.textContent = '0:00';
+                const sizeIndicator = bubble.querySelector('.vn-size-indicator');
+                const vnDot = bubble.querySelector('.vn-dot');
+                if (sizeIndicator) sizeIndicator.remove();
+                if (vnDot) vnDot.remove();
+
+                // Automatically start playback from IndexedDB
+                const audio = bubble.querySelector('.vn-audio-el');
+                if (audio) {
+                    try {
+                        const playIcon = playBtn?.querySelector('.vn-play-icon');
+                        audio.play().then(() => {
+                            playIcon?.classList.replace('bi-play-fill', 'bi-pause-fill');
+                        }).catch(e => console.warn('[VOICE_NOTE] Autoplay blocked after download:', e));
+                    } catch (_) {}
+                }
+            } else if (isAudioTrack) {
+                const playBtn = bubble.querySelector('.audio-track-play-btn');
+                if (playBtn) {
+                    playBtn.classList.remove('audio-download-mode');
+                    playBtn.setAttribute('aria-label', 'Play track');
+                    playBtn.setAttribute('title', 'Play track');
+                    playBtn.innerHTML = `<i class="bi bi-play-fill track-play-icon"></i>`;
+                }
+                const timeEl = bubble.querySelector('.audio-track-time');
+                if (timeEl) timeEl.textContent = '0:00';
+                const statusEl = bubble.querySelector('.audio-track-status');
+                if (statusEl) statusEl.remove();
+
+                // Automatically start playback from IndexedDB
+                const audio = bubble.querySelector('.track-audio-el');
+                if (audio) {
+                    try {
+                        const playIcon = playBtn?.querySelector('.track-play-icon');
+                        audio.play().then(() => {
+                            playIcon?.classList.replace('bi-play-fill', 'bi-pause-fill');
+                        }).catch(e => console.warn('[AUDIO_TRACK] Autoplay blocked after download:', e));
+                    } catch (_) {}
+                }
+            } else {
+                const overlay = bubble.querySelector('.media-download-overlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 250);
+                }
             }
         } catch (err) {
             console.error('[MEDIA_DOWNLOAD] Failed:', err);
             delete bubble.dataset.isDownloading;
-            if (dlIcon) dlIcon.classList.remove('d-none');
-            if (spinner) spinner.classList.add('d-none');
-            if (sizeText) sizeText.textContent = 'Retry';
+
+            if (isVoiceNote) {
+                const playBtn = bubble.querySelector('.vn-play-btn');
+                if (playBtn) {
+                    playBtn.innerHTML = `<i class="bi bi-arrow-down vn-play-icon"></i>`;
+                }
+                const timer = bubble.querySelector('.vn-timer');
+                if (timer) timer.textContent = 'Retry';
+            } else if (isAudioTrack) {
+                const playBtn = bubble.querySelector('.audio-track-play-btn');
+                if (playBtn) {
+                    playBtn.innerHTML = `<i class="bi bi-arrow-down track-play-icon"></i>`;
+                }
+                const timeEl = bubble.querySelector('.audio-track-time');
+                if (timeEl) timeEl.textContent = 'Retry';
+            } else {
+                if (dlIcon) dlIcon.classList.remove('d-none');
+                if (spinner) spinner.classList.add('d-none');
+                if (sizeText) sizeText.textContent = 'Retry';
+            }
         }
     }
 
     /**
-     * Show typing indicator (ghost bubble with animated dots)
+     * Show WhatsApp-style typing indicator bubble with avatar and pulsing dots
      * @param {string} username - Username of person typing
+     * @param {number|string} userId - User ID of person typing
      */
-    showTypingIndicator(username) {
-        this._log('SHOW_TYPING_INDICATOR', { username });
+    showTypingIndicator(username, userId = null) {
+        this._log('SHOW_TYPING_INDICATOR', { username, userId });
 
-        // Remove existing indicator if present
-        this.hideTypingIndicator();
+        if (!this.container) return;
 
-        // Create ghost bubble typing indicator
-        this.typingIndicatorElement = document.createElement('div');
-        this.typingIndicatorElement.className = 'message-wrapper received-wrapper';
-        this.typingIndicatorElement.id = 'typingIndicator';
+        // If indicator already exists in DOM, verify type or reuse
+        let existing = document.getElementById('typingIndicator');
+        if (existing) {
+            if (existing.querySelector('.typing-bubble')) {
+                this.typingIndicatorElement = existing;
+                if (this.container.lastElementChild !== existing) {
+                    this.container.appendChild(existing);
+                }
+                return;
+            }
+            // Was recording bubble, remove to replace with typing bubble
+            existing.remove();
+        }
+
+        // Create WhatsApp-style typing indicator wrapper
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.className = 'message-wrapper received-wrapper typing-indicator-wrapper';
+        wrapperDiv.id = 'typingIndicator';
+
+        // Avatar container matching received bubble architecture
+        const avatarContainer = document.createElement('div');
+        avatarContainer.className = 'message-avatar-container';
+        const avatarUrl = this._getSenderAvatar(userId);
+        const avatarImg = document.createElement('img');
+        avatarImg.className = 'message-avatar';
+        avatarImg.src = avatarUrl;
+        avatarImg.alt = username || 'Typing';
+        avatarContainer.appendChild(avatarImg);
+        wrapperDiv.appendChild(avatarContainer);
+
+        // Content wrapper containing typing bubble
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'message-content-wrapper';
 
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble received typing-bubble';
 
-        // Animated dots
+        // Three pulsing / bouncing WhatsApp dots
         bubble.innerHTML = `
             <div class="typing-dots">
                 <span class="typing-dot"></span>
@@ -265,13 +780,91 @@ export class MessageRenderer {
             </div>
         `;
 
-        this.typingIndicatorElement.appendChild(bubble);
+        contentWrapper.appendChild(bubble);
+        wrapperDiv.appendChild(contentWrapper);
 
-        // Add to container at the end (where new messages appear)
+        this.typingIndicatorElement = wrapperDiv;
+
+        // Add to container at the end
         this.container.appendChild(this.typingIndicatorElement);
 
-        // Scroll to bottom
-        this.container.scrollTop = this.container.scrollHeight;
+        // Auto-scroll if already near bottom
+        const threshold = 180;
+        const isNearBottom = (this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight) < threshold;
+        if (isNearBottom) {
+            this.container.scrollTop = this.container.scrollHeight;
+        }
+    }
+
+    /**
+     * Show WhatsApp-style recording indicator bubble with avatar, pulsing mic, and pulsing text
+     * @param {string} username - Username of person recording
+     * @param {number|string} userId - User ID of person recording
+     */
+    showRecordingIndicator(username, userId = null) {
+        this._log('SHOW_RECORDING_INDICATOR', { username, userId });
+
+        if (!this.container) return;
+
+        // If indicator already exists in DOM, verify type or reuse
+        let existing = document.getElementById('typingIndicator');
+        if (existing) {
+            if (existing.querySelector('.recording-bubble')) {
+                this.typingIndicatorElement = existing;
+                if (this.container.lastElementChild !== existing) {
+                    this.container.appendChild(existing);
+                }
+                return;
+            }
+            // Was typing bubble, remove to replace with recording bubble
+            existing.remove();
+        }
+
+        // Create WhatsApp-style recording indicator wrapper
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.className = 'message-wrapper received-wrapper typing-indicator-wrapper';
+        wrapperDiv.id = 'typingIndicator';
+
+        // Avatar container matching received bubble architecture
+        const avatarContainer = document.createElement('div');
+        avatarContainer.className = 'message-avatar-container';
+        const avatarUrl = this._getSenderAvatar(userId);
+        const avatarImg = document.createElement('img');
+        avatarImg.className = 'message-avatar';
+        avatarImg.src = avatarUrl;
+        avatarImg.alt = username || 'Recording';
+        avatarContainer.appendChild(avatarImg);
+        wrapperDiv.appendChild(avatarContainer);
+
+        // Content wrapper containing recording bubble
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'message-content-wrapper';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble received recording-bubble';
+
+        // Pulsing red mic + pulsing text
+        bubble.innerHTML = `
+            <div class="recording-indicator-content">
+                <span class="recording-mic-pulse"><i class="bi bi-mic-fill"></i></span>
+                <span class="recording-text-pulse">Recording voice note...</span>
+            </div>
+        `;
+
+        contentWrapper.appendChild(bubble);
+        wrapperDiv.appendChild(contentWrapper);
+
+        this.typingIndicatorElement = wrapperDiv;
+
+        // Add to container at the end
+        this.container.appendChild(this.typingIndicatorElement);
+
+        // Auto-scroll if already near bottom
+        const threshold = 180;
+        const isNearBottom = (this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight) < threshold;
+        if (isNearBottom) {
+            this.container.scrollTop = this.container.scrollHeight;
+        }
     }
 
     /**
@@ -326,46 +919,278 @@ export class MessageRenderer {
                 return;
             }
 
-            // Always FULL RENDER (no diffing inside renderer)
-            this.container.innerHTML = '';
+            // Remove empty state if present
+            const emptyEl = this.container.querySelector('.empty-chat-placeholder, .empty-state-container');
+            if (emptyEl) {
+                emptyEl.remove();
+            }
+
+            // Record scroll anchor metrics before DOM changes
+            const prevScrollHeight = this.container.scrollHeight;
+            const prevScrollTop = this.container.scrollTop;
 
             const viewItems = this._buildView(messages || []);
             console.log("[RENDERER] Built view items:", viewItems?.length);
 
-            for (const item of viewItems || []) {
-                const viewType = item?.viewType;
-                console.log("[RENDERER] Processing item viewType:", JSON.stringify(viewType), "id:", item?.id, "label:", item?.label);
-                
-                if (viewType === 'date') {
-                    console.log("[RENDERER] Creating date element:", item.label);
-                    this.container.appendChild(this._createDateElement(item.label));
-                } else if (viewType === 'time') {
-                    console.log("[RENDERER] Creating time element:", item.label);
-                    this.container.appendChild(this._createTimeElement(item.label, item.preciseLabel));
-                } else if (viewType === 'message') {
-                    console.log("[RENDERER] >>> CREATING MESSAGE ELEMENT for:", item.id);
-                    try {
-                        const msgEl = this._createMessageElement(item);
-                        console.log("[RENDERER] Message element created:", msgEl?.tagName, msgEl?.className);
-                        this.container.appendChild(msgEl);
-                        console.log("[RENDERER] Message appended successfully");
-                    } catch (err) {
-                        console.error("[RENDERER] ERROR creating message:", err, item);
-                    }
-                } else {
-                    console.warn("[RENDERER] UNKNOWN item viewType:", viewType, item);
+            // Index existing elements in container by their unique identity key
+            const existingElements = new Map();
+            for (const child of Array.from(this.container.children)) {
+                if (child.id === 'typingIndicator' || child.classList.contains('typing-indicator-container')) {
+                    continue; // Skip typing indicator, it's managed separately
+                }
+                const msgId = child.getAttribute('data-message-id');
+                if (msgId) {
+                    existingElements.set(`msg_${msgId}`, child);
+                } else if (child.classList.contains('date-separator')) {
+                    const label = child.querySelector('span')?.textContent?.trim() || child.textContent?.trim();
+                    if (label) existingElements.set(`date_${label}`, child);
+                } else if (child.classList.contains('time-separator')) {
+                    const label = child.querySelector('.time-label')?.textContent?.trim() || child.textContent?.trim();
+                    if (label) existingElements.set(`time_${label}`, child);
                 }
             }
-            console.log("[RENDERER] Render complete. Container children:", this.container?.children?.length);
 
+            const targetElements = [];
+            for (const item of viewItems || []) {
+                const viewType = item?.viewType;
+                let key = null;
+                if (viewType === 'date') {
+                    key = `date_${item.label}`;
+                } else if (viewType === 'time') {
+                    key = `time_${item.label}`;
+                } else if (viewType === 'message') {
+                    key = `msg_${item.id}`;
+                }
+
+                let el = key ? existingElements.get(key) : null;
+                if (el) {
+                    existingElements.delete(key);
+                    // Update existing element attributes/grouping in-place without rebuilding
+                    if (viewType === 'message') {
+                        this._updateExistingMessageElement(el, item);
+                    }
+                } else {
+                    // Create new element
+                    if (viewType === 'date') {
+                        el = this._createDateElement(item.label);
+                    } else if (viewType === 'time') {
+                        el = this._createTimeElement(item.label, item.preciseLabel);
+                    } else if (viewType === 'message') {
+                        try {
+                            el = this._createMessageElement(item);
+                        } catch (err) {
+                            console.error("[RENDERER] ERROR creating message:", err, item);
+                        }
+                    }
+                }
+
+                if (el) {
+                    targetElements.push(el);
+                }
+            }
+
+            // Remove elements that are no longer part of viewItems (e.g., deleted messages)
+            for (const [_, staleEl] of existingElements) {
+                staleEl.remove();
+            }
+
+            // Reconcile DOM child order with minimal mutations:
+            // Only move nodes if their current position in container differs!
+            let cursor = this.container.firstElementChild;
+            for (const targetEl of targetElements) {
+                while (cursor && (cursor.id === 'typingIndicator' || cursor.classList.contains('typing-indicator-container'))) {
+                    cursor = cursor.nextElementSibling;
+                }
+
+                if (cursor === targetEl) {
+                    cursor = cursor.nextElementSibling;
+                } else {
+                    this.container.insertBefore(targetEl, cursor);
+                }
+            }
+
+            console.log("[RENDERER] Reconciliation complete. Container children:", this.container?.children?.length);
+
+            // If typing indicator is present in DOM, ensure it stays at the very bottom
+            const typingEl = document.getElementById('typingIndicator');
+            if (typingEl && this.container.lastElementChild !== typingEl) {
+                this.container.appendChild(typingEl);
+            }
+
+            if (this.preserveScrollOnPrepend) {
+                const heightDiff = this.container.scrollHeight - prevScrollHeight;
+                this.container.scrollTop = prevScrollTop + heightDiff;
+                this.preserveScrollOnPrepend = false;
+            } else {
+                const isNewCount = messages.length > this.lastRenderedCount;
+                this._scrollToBottom(isNewCount);
+            }
             this.lastRenderedCount = messages.length;
-            this._scrollToBottom();
 
             // Add event listeners for retry buttons
             this._attachRetryButtonListeners();
 
         } finally {
             this.isRendering = false;
+        }
+    }
+
+    /**
+     * Enable scroll preservation anchor for older message prepending
+     * @param {boolean} preserve
+     */
+    setPreserveScrollOnPrepend(preserve = true) {
+        this.preserveScrollOnPrepend = preserve;
+    }
+
+    /**
+     * Update an existing message element in-place to avoid re-rendering and media playback interruption
+     */
+    _updateExistingMessageElement(wrapperEl, message) {
+        if (!wrapperEl || !message) return;
+
+        // Update status and group position attributes
+        if (wrapperEl.getAttribute('data-status') !== message.status) {
+            wrapperEl.setAttribute('data-status', message.status);
+        }
+        if (wrapperEl.getAttribute('data-group-position') !== message.groupPosition) {
+            wrapperEl.setAttribute('data-group-position', message.groupPosition);
+            wrapperEl.classList.remove('group-single', 'group-first', 'group-middle', 'group-last');
+            wrapperEl.classList.add(`group-${message.groupPosition}`);
+        }
+
+        const bubble = wrapperEl.querySelector('.message-bubble');
+        if (bubble) {
+            if (bubble.getAttribute('data-status') !== message.status) {
+                bubble.setAttribute('data-status', message.status);
+            }
+            if (bubble.getAttribute('data-group-position') !== message.groupPosition) {
+                bubble.setAttribute('data-group-position', message.groupPosition);
+                bubble.classList.remove('group-single', 'group-first', 'group-middle', 'group-last');
+                bubble.classList.add(`group-${message.groupPosition}`);
+            }
+        }
+
+        // Update avatar visibility on received messages
+        if (!message.isOwn) {
+            const avatarContainer = wrapperEl.querySelector('.message-avatar-container');
+            const shouldShowAvatar = message.groupPosition === 'single' || message.groupPosition === 'last';
+            if (avatarContainer) {
+                if (shouldShowAvatar && avatarContainer.classList.contains('hidden')) {
+                    avatarContainer.classList.remove('hidden');
+                    if (!avatarContainer.querySelector('.message-avatar')) {
+                        const avatarUrl = this._getSenderAvatar(message.senderId);
+                        const avatarImg = document.createElement('img');
+                        avatarImg.className = 'message-avatar';
+                        avatarImg.src = avatarUrl;
+                        avatarImg.alt = 'Avatar';
+                        avatarContainer.appendChild(avatarImg);
+                    }
+                } else if (!shouldShowAvatar && !avatarContainer.classList.contains('hidden')) {
+                    avatarContainer.classList.add('hidden');
+                }
+            }
+        }
+
+        // Update read receipt / tick icon on sent messages
+        const isOwn = message.isOwn || wrapperEl.classList.contains('sent-wrapper') || (this.currentUserId !== null && Number(message.senderId) === Number(this.currentUserId));
+        if (isOwn) {
+            const metaDiv = wrapperEl.querySelector('.message-meta, .jumboji-meta-pill, .sticker-meta-pill, .media-meta-overlay');
+            if (metaDiv) {
+                let receiptSpan = metaDiv.querySelector('.message-read-receipt');
+                const status = message.status || 'sent';
+                if (!receiptSpan) {
+                    receiptSpan = document.createElement('span');
+                    metaDiv.appendChild(receiptSpan);
+                }
+                receiptSpan.className = `message-read-receipt status-${status}`;
+                const receiverAvatar = document.body.dataset.receiverAvatar;
+                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                if (status === 'read' && (message.isLastRead || message.groupPosition === 'single' || message.groupPosition === 'last')) {
+                    receiptSpan.classList.add('read-avatar-only');
+                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                } else {
+                    receiptSpan.classList.remove('read-avatar-only');
+                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
+                }
+            }
+        }
+    }
+
+    /**
+     * Rekey an existing message element in DOM from temporary ID to canonical server ID
+     * Prevents DOM destruction, duplicates, and visual flicker.
+     */
+    rekeyMessageElement(tempId, actualId) {
+        if (!this.container || !tempId || !actualId) return;
+        const selector = `[data-message-id="${tempId}"]`;
+        const elements = this.container.querySelectorAll(selector);
+        elements.forEach(el => {
+            el.setAttribute('data-message-id', String(actualId));
+        });
+        const uploadOverlays = this.container.querySelectorAll(`[data-upload-id="${tempId}"]`);
+        uploadOverlays.forEach(el => {
+            el.setAttribute('data-upload-id', String(actualId));
+        });
+    }
+
+    /**
+     * Efficiently update message statuses (sent -> delivered -> read) in-place without touching bubbles or interrupting media
+     */
+    updateMessageStatuses(messages) {
+        if (!this.container || !messages) return;
+
+        for (const msg of messages) {
+            let wrapper = this.container.querySelector(`.message-wrapper[data-message-id="${msg.id}"]`);
+            if (!wrapper && msg.metadata?.temp_id) {
+                wrapper = this.container.querySelector(`.message-wrapper[data-message-id="${msg.metadata.temp_id}"]`);
+                if (wrapper) {
+                    this.rekeyMessageElement(msg.metadata.temp_id, msg.id);
+                }
+            }
+            if (!wrapper) continue;
+
+            const currentStatus = wrapper.getAttribute('data-status');
+            if (currentStatus !== msg.status) {
+                wrapper.setAttribute('data-status', msg.status);
+                const bubble = wrapper.querySelector('.message-bubble');
+                if (bubble) bubble.setAttribute('data-status', msg.status);
+
+                const isSent = wrapper.classList.contains('sent-wrapper') ||
+                    (this.currentUserId !== null && Number(msg.senderId) === Number(this.currentUserId)) ||
+                    String(msg.senderId) === String(this.currentUserId);
+
+                if (isSent) {
+                    const metaDiv = wrapper.querySelector('.message-meta');
+                    if (metaDiv) {
+                        let receiptSpan = metaDiv.querySelector('.message-read-receipt');
+                        if (!receiptSpan) {
+                            receiptSpan = document.createElement('span');
+                            metaDiv.appendChild(receiptSpan);
+                        }
+                        const status = msg.status || 'sent';
+                        receiptSpan.className = `message-read-receipt status-${status}`;
+                        const receiverAvatar = document.body.dataset.receiverAvatar;
+                        const avatarUrl = msg.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+                        if (status === 'read') {
+                            receiptSpan.classList.add('read-avatar-only');
+                            receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+                        } else {
+                            receiptSpan.classList.remove('read-avatar-only');
+                            receiptSpan.innerHTML = this._getStatusIcon(status, msg.id, msg);
+                        }
+
+                        const spacer = wrapper.querySelector('.bubble-meta-spacer');
+                        if (spacer) {
+                            if (status === 'read') {
+                                spacer.classList.add('has-receipt');
+                            } else {
+                                spacer.classList.remove('has-receipt');
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -434,7 +1259,7 @@ export class MessageRenderer {
         let lastTimestamp = null;
 
         const ownMessages = messages.filter(
-            m => m.senderId === this.currentUserId
+            m => m.isOwn || (this.currentUserId !== null && String(m.senderId) === String(this.currentUserId))
         );
 
         const lastOwnMessageId =
@@ -449,33 +1274,13 @@ export class MessageRenderer {
                 ? readMessages[readMessages.length - 1].id
                 : null;
 
-        // Find last message from receiver
-        const receiverMessages = messages.filter(m => m.senderId !== this.currentUserId);
-        const lastReceiverMessageId =
-            receiverMessages.length > 0
-                ? receiverMessages[receiverMessages.length - 1].id
-                : null;
-
-        // Determine if read receipt should float to receiver's last message
-        // This happens when receiver sent a message after reading
-        let floatingReadReceiptTargetId = null;
-        if (lastReadMessageId && lastReceiverMessageId) {
-            const lastReadMsg = messages.find(m => m.id === lastReadMessageId);
-            const lastReceiverMsg = messages.find(m => m.id === lastReceiverMessageId);
-            if (lastReadMsg && lastReceiverMsg) {
-                const readTimestamp = new Date(lastReadMsg.timestamp).getTime();
-                const receiverTimestamp = new Date(lastReceiverMsg.timestamp).getTime();
-                if (receiverTimestamp > readTimestamp) {
-                    floatingReadReceiptTargetId = lastReceiverMessageId;
-                }
-            }
-        }
-
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
             const messageDate = new Date(message.timestamp).toDateString();
             const messageTimestamp = new Date(message.timestamp).getTime();
-            const isOwn = message.senderId === this.currentUserId;
+            const isOwn = message.isOwn !== undefined
+                ? Boolean(message.isOwn)
+                : (this.currentUserId !== null && String(message.senderId) === String(this.currentUserId));
 
             if (messageDate !== lastDate) {
                 viewItems.push({
@@ -506,12 +1311,12 @@ export class MessageRenderer {
 
             // Check if messages should be grouped (same sender, within 5 minutes)
             let shouldGroup = false;
-            if (lastSenderId === message.senderId && lastTimestamp !== null) {
+            if (lastSenderId !== null && String(lastSenderId) === String(message.senderId) && lastTimestamp !== null) {
                 const timeGapMinutes = (messageTimestamp - lastTimestamp) / (1000 * 60);
                 shouldGroup = timeGapMinutes < 5;
             }
 
-            const isConsecutive = lastSenderId === message.senderId && shouldGroup;
+            const isConsecutive = lastSenderId !== null && String(lastSenderId) === String(message.senderId) && shouldGroup;
             lastSenderId = message.senderId;
             lastTimestamp = messageTimestamp;
 
@@ -525,7 +1330,7 @@ export class MessageRenderer {
                 const isNextSameDate = nextMessageDate === messageDate;
                 const timeGapToNextMinutes = (nextMessageTimestamp - messageTimestamp) / (1000 * 60);
                 isNextFromSameSender = isNextSameDate && 
-                                      nextMessage.senderId === message.senderId && 
+                                      String(nextMessage.senderId) === String(message.senderId) && 
                                       timeGapToNextMinutes < 5;
             }
 
@@ -539,13 +1344,6 @@ export class MessageRenderer {
             }
 
             const isLastRead = isOwn && message.id === lastReadMessageId;
-            const hasFloatingReadReceipt = message.id === floatingReadReceiptTargetId;
-            // Hide read receipt avatar on sender's message only when:
-            // 1. There's a floating receipt on receiver's message, AND
-            // 2. This is the sender's last message, AND
-            // 3. This message is actually READ (not sent/delivered)
-            // This ensures new unread messages show checkmarks, not hidden receipt
-            const hideReadReceipt = floatingReadReceiptTargetId && isOwn && message.id === lastOwnMessageId && message.status === 'read';
 
             viewItems.push({
                 viewType: 'message',
@@ -554,8 +1352,8 @@ export class MessageRenderer {
                 isConsecutive,
                 isLastSent: isOwn && message.id === lastOwnMessageId,
                 isLastRead,
-                hasFloatingReadReceipt,
-                hideReadReceipt,
+                hasFloatingReadReceipt: false,
+                hideReadReceipt: false,
                 groupPosition
             });
         }
@@ -602,11 +1400,28 @@ export class MessageRenderer {
         return this._createSystemMessage(message);
         }
 
+        // Check for 1 or 2 emojis (Jumboji) - floating without bubble background
+        const emojiInfo = this._getEmojiOnlyInfo(message.content);
+        if (emojiInfo) {
+            return this._createJumbojiMessage(message, emojiInfo);
+        }
+
         if (message.type === 'emoji') {
         return this._createEmojiMessage(message);
         }
 
-        if (message.type === 'media' || message.type === 'audio' || message.type === 'voice_note' || message.type === 'document') {
+        if (
+            message.type === 'media' ||
+            message.type === 'sticker' ||
+            message.type === 'gif' ||
+            message.type === 'audio' ||
+            message.type === 'voice_note' ||
+            message.type === 'document' ||
+            message.metadata?.is_sticker ||
+            message.metadata?.is_gif ||
+            message.attachment_type === 'sticker' ||
+            message.attachment_type === 'gif'
+        ) {
             return this._createMediaMessage(message);
         }
 
@@ -706,7 +1521,7 @@ export class MessageRenderer {
         // Bubble content
         messageDiv.innerHTML = `
             ${replyHtml}
-            <p class="message-content">${escapeHtml(message.content || '')}${editedHtml}</p>
+            <p class="message-content">${escapeHtml(message.content || '')}${editedHtml}${this._getSpacerHtml(message)}</p>
             ${reactionsHtml}
         `;
 
@@ -720,30 +1535,74 @@ export class MessageRenderer {
             }
         }
 
-        contentWrapper.appendChild(messageDiv);
+        // Meta (timestamp + receipt) inside bubble at bottom right
+        const metaDiv = this._createMetaElement(message, false);
+        messageDiv.appendChild(metaDiv);
 
-        // Always render meta (timestamp + receipt) on all messages
+        contentWrapper.appendChild(messageDiv);
+        wrapperDiv.appendChild(contentWrapper);
+        return wrapperDiv;
+    }
+
+    /**
+     * Get CSS class for bubble meta spacer based on whether an avatar read receipt is present
+     * @param {Object} message - Canonical message
+     * @returns {string} Spacer class name
+     */
+    _getSpacerClass(message) {
+        if (!message) return 'bubble-meta-spacer';
+        const hasAvatarReceipt = message.isOwn && message.status === 'read' && (message.isLastRead || message.groupPosition === 'single' || message.groupPosition === 'last');
+        return hasAvatarReceipt ? 'bubble-meta-spacer has-receipt' : 'bubble-meta-spacer';
+    }
+
+    /**
+     * Build the inline meta spacer. It carries the actual timestamp text (rendered
+     * invisibly via CSS ::before, so it's not copyable/selectable) so the reserved
+     * space matches the real timestamp width instead of a worst-case fixed width.
+     * @param {Object} message - Canonical message
+     * @returns {string} Spacer HTML
+     */
+    _getSpacerHtml(message) {
+        const time = message?.timestamp ? formatTime(message.timestamp) : '';
+        return `<span class="${this._getSpacerClass(message)}" data-time="${escapeHtml(time)}" aria-hidden="true"></span>`;
+    }
+
+    /**
+     * Create inside-bubble meta element (timestamp + status tick / read avatar)
+     * @param {Object} message - Canonical message
+     * @param {boolean} isMediaBadge - Whether this is a floating glass badge inside image/video
+     * @returns {HTMLElement} Meta element
+     */
+    _createMetaElement(message, isMediaBadge = false) {
         const metaDiv = document.createElement('div');
-        metaDiv.className = 'message-meta d-flex align-items-center justify-content-end';
-        metaDiv.style.gap = '4px';
+        metaDiv.className = isMediaBadge 
+            ? 'message-meta media-meta-badge' 
+            : 'message-meta';
 
         const timeSpan = document.createElement('span');
         timeSpan.className = 'timestamp';
         timeSpan.textContent = formatTime(message.timestamp);
         metaDiv.appendChild(timeSpan);
 
-        // WhatsApp-style status checkmarks for all sent messages
-        if (message.isOwn) {
+        const isOwn = message.isOwn ?? (this.currentUserId !== null && Number(message.senderId) === Number(this.currentUserId));
+        if (isOwn) {
+            const status = message.status || 'sent';
             const receiptSpan = document.createElement('span');
             receiptSpan.className = `message-read-receipt status-${status}`;
-            receiptSpan.innerHTML = this._getStatusIcon(status, message.id, null, message);
+
+            const receiverAvatar = document.body.dataset.receiverAvatar;
+            const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+
+            if (status === 'read' && (message.isLastRead || message.groupPosition === 'single' || message.groupPosition === 'last')) {
+                receiptSpan.classList.add('read-avatar-only');
+                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
+            } else {
+                receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
+            }
             metaDiv.appendChild(receiptSpan);
         }
 
-        contentWrapper.appendChild(metaDiv);
-
-        wrapperDiv.appendChild(contentWrapper);
-        return wrapperDiv;
+        return metaDiv;
     }
 
     /**
@@ -764,7 +1623,8 @@ export class MessageRenderer {
             }
         }
         
-        return renderMessageStatus(status, messageId, null, context);
+        const receiverAvatar = message?.metadata?.read_avatar || document.body?.dataset?.receiverAvatar || '/static/images/default_pic1.jpg';
+        return renderMessageStatus(status, messageId, receiverAvatar, context);
     }
 
     /**
@@ -790,6 +1650,111 @@ export class MessageRenderer {
         element.className = 'system-message';
         element.innerHTML = `<span class="system-text">${escapeHtml(message.content || '')}</span>`;
         return element;
+    }
+
+    /**
+     * Check if text consists exclusively of 1 or 2 emojis (Jumboji)
+     * @param {string} text - Message content
+     * @returns {Object|null} { count, sizeClass } or null
+     */
+    _getEmojiOnlyInfo(text) {
+        if (!text || typeof text !== 'string') return null;
+        const trimmed = text.trim();
+        if (!trimmed) return null;
+
+        // Split text into grapheme clusters using Intl.Segmenter if available
+        let clusters = [];
+        if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+            const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+            clusters = Array.from(segmenter.segment(trimmed), s => s.segment.trim()).filter(Boolean);
+        } else {
+            // Unicode-aware emoji cluster matching fallback
+            const emojiPattern = /(\p{Extended_Pictographic}(?:\u200D\p{Extended_Pictographic})*)/gu;
+            clusters = trimmed.match(emojiPattern) || [];
+            const remainder = trimmed.replace(emojiPattern, '').trim();
+            if (remainder.length > 0) return null;
+        }
+
+        if (clusters.length === 0 || clusters.length > 2) return null;
+
+        // Verify that every cluster starts with an emoji character (Extended_Pictographic or Regional_Indicator flags)
+        const emojiCheck = /^(\p{Extended_Pictographic}|\p{Regional_Indicator})/u;
+        const allAreEmojis = clusters.every(c => emojiCheck.test(c));
+        if (!allAreEmojis) return null;
+
+        // Verify there is no leftover non-whitespace text
+        let remaining = trimmed;
+        for (const c of clusters) {
+            remaining = remaining.replace(c, '');
+        }
+        if (remaining.trim().length > 0) return null;
+
+        if (clusters.length === 1) {
+            return { count: 1, sizeClass: 'jumboji-single' };
+        }
+        if (clusters.length === 2) {
+            return { count: 2, sizeClass: 'jumboji-double' };
+        }
+        return null;
+    }
+
+    /**
+     * Create floating Jumboji message (1 or 2 large emojis without bubble background, with frosted meta pill)
+     * @param {Object} message - Message object
+     * @param {Object} emojiInfo - { count, sizeClass }
+     * @returns {HTMLElement} Message wrapper element
+     */
+    _createJumbojiMessage(message, emojiInfo) {
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.className = `message-wrapper ${message.isOwn ? 'sent-wrapper' : 'received-wrapper'} jumboji-wrapper group-${message.groupPosition}`;
+        wrapperDiv.setAttribute('data-message-id', message.id);
+        wrapperDiv.setAttribute('data-sender-id', message.senderId);
+        wrapperDiv.setAttribute('data-status', message.status);
+        wrapperDiv.setAttribute('data-group-position', message.groupPosition);
+
+        // Add avatar for received messages (only on last/single in group)
+        if (!message.isOwn) {
+            const shouldShowAvatar = message.groupPosition === 'single' || message.groupPosition === 'last';
+            const avatarContainer = document.createElement('div');
+            avatarContainer.className = `message-avatar-container ${shouldShowAvatar ? '' : 'hidden'}`;
+            
+            if (shouldShowAvatar) {
+                const avatarUrl = this._getSenderAvatar(message.senderId);
+                const avatarImg = document.createElement('img');
+                avatarImg.className = 'message-avatar';
+                avatarImg.src = avatarUrl;
+                avatarImg.alt = 'Avatar';
+                avatarContainer.appendChild(avatarImg);
+            }
+            
+            wrapperDiv.appendChild(avatarContainer);
+        }
+
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'message-content-wrapper jumboji-content-wrapper';
+
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} jumboji-bubble ${emojiInfo.sizeClass} group-${message.groupPosition}`;
+        bubble.setAttribute('data-message-id', message.id);
+        bubble.setAttribute('data-sender-id', message.senderId);
+        bubble.setAttribute('data-status', message.status);
+        bubble.setAttribute('data-group-position', message.groupPosition);
+
+        const timeStr = this._formatMessageTime(message.timestamp);
+        const isOwn = message.isOwn || wrapperDiv.classList.contains('sent-wrapper') ||
+            (this.currentUserId !== null && Number(message.senderId) === Number(this.currentUserId));
+
+        bubble.innerHTML = `
+            <div class="jumboji-content">${escapeHtml(message.content || '')}</div>
+            <div class="jumboji-meta-pill">
+                <span class="message-time">${timeStr}</span>
+                ${isOwn ? `<span class="message-read-receipt status-${message.status || 'sent'}">${this._getStatusIcon(message.status, message.id, message)}</span>` : ''}
+            </div>
+        `;
+
+        contentWrapper.appendChild(bubble);
+        wrapperDiv.appendChild(contentWrapper);
+        return wrapperDiv;
     }
 
     /**
@@ -841,41 +1806,9 @@ export class MessageRenderer {
         contentWrapper.appendChild(emojiDiv);
 
         // Determine whether to render meta (timestamp + receipt): single messages or last in group
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
+        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last';
         if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
-
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                const status = message.status || 'sent';
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
+            const metaDiv = this._createMetaElement(message, false);
             contentWrapper.appendChild(metaDiv);
         }
 
@@ -900,7 +1833,7 @@ export class MessageRenderer {
         const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
 
         const bubble = document.createElement('div');
-        bubble.className = `media-bubble single-media ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
+        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-bubble single-media media-card-bubble group-${message.groupPosition}`;
         if (isNotDownloaded) {
             bubble.classList.add('not-downloaded');
         }
@@ -909,30 +1842,109 @@ export class MessageRenderer {
         bubble.setAttribute('data-status', message.status);
         bubble.setAttribute('data-group-position', message.groupPosition);
 
+        const mediaFrame = document.createElement('div');
+        mediaFrame.className = 'media-card-frame';
+
+        if (attachmentType === 'video') {
+            bubble.classList.add('video-bubble');
+            const isPortrait = metadata.width && metadata.height && metadata.height > metadata.width;
+            if (isPortrait) {
+                bubble.classList.add('media-portrait');
+            } else {
+                bubble.classList.add('media-landscape');
+            }
+            const aspect = (metadata.width && metadata.height)
+                ? `${metadata.width} / ${metadata.height}`
+                : '16 / 9';
+            mediaFrame.style.aspectRatio = aspect;
+            if (isPortrait) {
+                mediaFrame.style.width = 'min(260px, calc(100vw - 72px))';
+            } else {
+                mediaFrame.style.width = 'min(330px, calc(100vw - 72px))';
+            }
+        } else if (attachmentType === 'image') {
+            const w = metadata.width || metadata.file_width;
+            const h = metadata.height || metadata.file_height;
+            if (w && h) {
+                const isPortrait = h > w;
+                if (isPortrait) {
+                    bubble.classList.add('media-portrait');
+                } else if (w > h * 1.1) {
+                    bubble.classList.add('media-landscape');
+                } else {
+                    bubble.classList.add('media-square');
+                }
+                const aspect = `${w} / ${h}`;
+                mediaFrame.style.aspectRatio = aspect;
+                const MAX_MEDIA_HEIGHT = 380;
+                const baseWidth = isPortrait ? 260 : 330;
+                const fitWidth = Math.floor(Math.min(baseWidth, MAX_MEDIA_HEIGHT * w / h));
+                mediaFrame.style.width = `min(${fitWidth}px, calc(100vw - 72px))`;
+            }
+        }
+
         let mediaContent = '';
 
         if (attachmentType === 'image' && mediaUrl) {
-            mediaContent = `<img src="${escapeHtml(mediaUrl)}" alt="Image" loading="lazy">`;
+            if (isNotDownloaded) {
+                // When not downloaded: render blurred preview thumbnail underneath download overlay
+                const previewSrc = metadata.thumbnail || metadata.previewUrl || mediaUrl;
+                mediaContent = `
+                    <img src="${escapeHtml(previewSrc)}" data-full-src="${escapeHtml(mediaUrl)}" alt="Image preview" class="single-media-img not-downloaded-thumb" style="filter: blur(14px) brightness(0.72); transform: scale(1.04); display: block; width: 100%; height: auto; max-height: 380px; object-fit: cover; border-radius: 12px !important;">
+                `;
+            } else {
+                mediaContent = `<img src="${escapeHtml(mediaUrl)}" alt="Image" loading="lazy" class="single-media-img" style="border-radius: 12px !important;">`;
+            }
         } else if (attachmentType === 'video' && mediaUrl) {
-            mediaContent = `
-                <div class="video-play-overlay">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <polygon points="5,3 19,12 5,21"></polygon>
-                    </svg>
-                </div>
-                <video src="${escapeHtml(mediaUrl)}" muted preload="metadata" playsinline tabindex="-1" style="pointer-events: none;"></video>
-            `;
+            if (isNotDownloaded) {
+                // When not downloaded: render blurred video thumbnail underneath download overlay
+                const thumbUrl = metadata.thumbnail || metadata.previewUrl || '';
+                const videoSource = `${escapeHtml(mediaUrl)}#t=0.001`;
+
+                mediaContent = `
+                    <div class="video-play-overlay">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5,3 19,12 5,21"></polygon>
+                        </svg>
+                    </div>
+                    ${thumbUrl ? `
+                        <img src="${escapeHtml(thumbUrl)}" data-full-src="${escapeHtml(mediaUrl)}" alt="Video preview" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;">
+                    ` : `
+                        <video src="${videoSource}" preload="metadata" poster="${escapeHtml(thumbUrl)}" data-full-src="${escapeHtml(mediaUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;"></video>
+                    `}
+                `;
+            } else {
+                mediaContent = `
+                    <div class="video-play-overlay">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5,3 19,12 5,21"></polygon>
+                        </svg>
+                    </div>
+                    <video src="${escapeHtml(mediaUrl)}" preload="metadata" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 12px !important;"></video>
+                `;
+            }
         }
 
-        bubble.innerHTML = mediaContent;
+        mediaFrame.innerHTML = mediaContent;
+
+        // Strictly prevent inline playback in chat bubbles
+        mediaFrame.querySelectorAll('video').forEach(vid => {
+            vid.addEventListener('play', (e) => {
+                e.preventDefault();
+                try { vid.pause(); } catch (_) {}
+            });
+        });
 
         // Asynchronously check and use locally stored device media if available
         if (!isNotDownloaded && !isUploading) {
             deviceMediaStore.getLocalMediaUrl(message.id).then(localUrl => {
                 if (localUrl) {
-                    const el = bubble.querySelector('img, video');
+                    const el = mediaFrame.querySelector('img, video');
                     if (el && el.src !== localUrl) {
                         el.src = localUrl;
+                        el.removeAttribute('data-src');
+                        el.classList.remove('d-none');
+                        mediaFrame.querySelector('.media-image-placeholder')?.remove();
                     }
                 }
             }).catch(() => {});
@@ -955,7 +1967,7 @@ export class MessageRenderer {
                     <span class="upload-progress-text">${initialProgress}%</span>
                 </div>
             `;
-            bubble.appendChild(uploadOverlay);
+            mediaFrame.appendChild(uploadOverlay);
         }
 
         // 2. Receiver on-demand download overlay with actual file size
@@ -980,30 +1992,51 @@ export class MessageRenderer {
                     <span class="media-download-size">${fileSize || 'Download'}</span>
                 </button>
             `;
-            bubble.appendChild(downloadOverlay);
+            mediaFrame.appendChild(downloadOverlay);
         }
 
-        // Add caption if present (inside the bubble)
-        if (caption && caption.trim()) {
-            const captionDiv = document.createElement('div');
-            captionDiv.className = 'media-caption';
-            captionDiv.textContent = caption;
-            bubble.appendChild(captionDiv);
+        bubble.appendChild(mediaFrame);
+
+        // Footer / caption area: has timestamp on floating overlay if no caption, or caption text + timestamp if has caption
+        const hasCaption = Boolean(caption && caption.trim());
+        if (hasCaption) {
+            bubble.classList.add('has-caption');
+            const footerDiv = document.createElement('div');
+            footerDiv.className = 'media-card-footer has-caption';
+            footerDiv.innerHTML = `<p class="message-content">${escapeHtml(caption)}${this._getSpacerHtml(message)}</p>`;
+            const metaDiv = this._createMetaElement(message, false);
+            footerDiv.appendChild(metaDiv);
+            bubble.appendChild(footerDiv);
+        } else {
+            bubble.classList.add('no-caption');
+            const metaDiv = this._createMetaElement(message, true);
+            mediaFrame.appendChild(metaDiv);
         }
 
         // Click handler: if not downloaded, trigger download; if downloaded, open fullscreen viewer
-        bubble.addEventListener('click', (e) => {
+        bubble.addEventListener('click', async (e) => {
             if (bubble.classList.contains('not-downloaded')) {
                 e.stopPropagation();
                 this._handleMediaDownload(message.id, bubble);
                 return;
             }
             if (isUploading) return;
+            if (e.target.closest('.media-card-footer.has-caption')) {
+                return; // Let user select or click caption text
+            }
             console.log('[MEDIA_VIEWER] Opening attachment:', message.id);
+            let viewerUrl = mediaUrl;
+            try {
+                const localUrl = await deviceMediaStore.getLocalMediaUrl(message.id);
+                if (localUrl) {
+                    viewerUrl = localUrl;
+                }
+            } catch (_) {}
+
             this.renderFullscreenMediaViewer([{
                 id: message.id,
                 type: attachmentType,
-                url: mediaUrl,
+                url: viewerUrl,
                 caption: caption
             }], 0);
         });
@@ -1028,7 +2061,7 @@ export class MessageRenderer {
         const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
 
         const bubble = document.createElement('div');
-        bubble.className = `media-bubble media-group ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition}`;
+        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-bubble media-group media-card-bubble group-${message.groupPosition}`;
         if (isNotDownloaded) {
             bubble.classList.add('not-downloaded');
         }
@@ -1036,6 +2069,9 @@ export class MessageRenderer {
         bubble.setAttribute('data-sender-id', message.senderId);
         bubble.setAttribute('data-status', message.status);
         bubble.setAttribute('data-group-position', message.groupPosition);
+
+        const mediaFrame = document.createElement('div');
+        mediaFrame.className = 'media-card-frame';
 
         // Create media content grid
         const contentDiv = document.createElement('div');
@@ -1048,11 +2084,30 @@ export class MessageRenderer {
 
         // Render each media tile
         visibleAttachments.forEach((attachment, index) => {
-            const tile = this._renderMediaTile(attachment, index, attachmentCount, hiddenCount);
+            const tile = this._renderMediaTile(attachment, index, attachmentCount, hiddenCount, isNotDownloaded);
             contentDiv.appendChild(tile);
         });
 
-        bubble.appendChild(contentDiv);
+        mediaFrame.appendChild(contentDiv);
+
+        // Check and use local media URLs for tiles if already downloaded
+        if (!isNotDownloaded && !isUploading) {
+            Promise.all(attachments.map(async (att, idx) => {
+                const attKey = att?.id || `${message.id}_${idx}`;
+                const localUrl = await deviceMediaStore.getLocalMediaUrl(attKey) || await deviceMediaStore.getLocalMediaUrl(message.id);
+                if (localUrl) {
+                    const tiles = mediaFrame.querySelectorAll('.media-tile');
+                    const tile = tiles[idx];
+                    const el = tile?.querySelector('img, video');
+                    if (el && el.src !== localUrl) {
+                        el.src = localUrl;
+                        el.removeAttribute('data-src');
+                        el.classList.remove('d-none');
+                        tile.querySelector('.tile-placeholder-wrap')?.remove();
+                    }
+                }
+            })).catch(() => {});
+        }
 
         // 1. Sender optimistic upload progress overlay
         if (isUploading) {
@@ -1071,7 +2126,7 @@ export class MessageRenderer {
                     <span class="upload-progress-text">${initialProgress}%</span>
                 </div>
             `;
-            bubble.appendChild(uploadOverlay);
+            mediaFrame.appendChild(uploadOverlay);
         }
 
         // 2. Receiver bundle download overlay with combined bundle size
@@ -1100,25 +2155,38 @@ export class MessageRenderer {
                     </div>
                 </button>
             `;
-            bubble.appendChild(downloadOverlay);
+            mediaFrame.appendChild(downloadOverlay);
         }
 
-        // Add global caption if present (inside the bubble)
-        if (globalCaption && globalCaption.trim()) {
-            const captionDiv = document.createElement('div');
-            captionDiv.className = 'media-caption';
-            captionDiv.textContent = globalCaption;
-            bubble.appendChild(captionDiv);
+        bubble.appendChild(mediaFrame);
+
+        // Footer / caption area: has timestamp on floating overlay if no caption, or global caption text + timestamp if has caption
+        const hasGlobalCaption = Boolean(globalCaption && globalCaption.trim());
+        if (hasGlobalCaption) {
+            bubble.classList.add('has-caption');
+            const footerDiv = document.createElement('div');
+            footerDiv.className = 'media-card-footer has-caption';
+            footerDiv.innerHTML = `<p class="message-content">${escapeHtml(globalCaption)}${this._getSpacerHtml(message)}</p>`;
+            const metaDiv = this._createMetaElement(message, false);
+            footerDiv.appendChild(metaDiv);
+            bubble.appendChild(footerDiv);
+        } else {
+            bubble.classList.add('no-caption');
+            const metaDiv = this._createMetaElement(message, true);
+            mediaFrame.appendChild(metaDiv);
         }
 
         // Click handler: if not downloaded, trigger download; if downloaded, open fullscreen viewer
-        bubble.addEventListener('click', (e) => {
+        bubble.addEventListener('click', async (e) => {
             if (bubble.classList.contains('not-downloaded')) {
                 e.stopPropagation();
                 this._handleMediaDownload(message.id, bubble);
                 return;
             }
             if (isUploading) return;
+            if (e.target.closest('.media-card-footer.has-caption')) {
+                return; // Let user select or click caption text
+            }
             const clickedTile = e.target.closest('.media-tile');
             let startIndex = 0;
             if (clickedTile) {
@@ -1127,7 +2195,23 @@ export class MessageRenderer {
                 if (idx !== -1) startIndex = idx;
             }
             console.log('[MEDIA_VIEWER] Opening media group:', message.id, 'startIndex:', startIndex);
-            this.renderFullscreenMediaViewer(attachments, startIndex);
+
+            // Fetch local offline URLs for attachments if available
+            const preparedAttachments = await Promise.all(attachments.map(async (att, idx) => {
+                const attKey = att.id || `${message.id}_${idx}`;
+                let url = att.file_url || att.file || att.url || '';
+                try {
+                    const localUrl = await deviceMediaStore.getLocalMediaUrl(attKey) || await deviceMediaStore.getLocalMediaUrl(message.id);
+                    if (localUrl) url = localUrl;
+                } catch (_) {}
+                return {
+                    ...att,
+                    url: url,
+                    file_url: url
+                };
+            }));
+
+            this.renderFullscreenMediaViewer(preparedAttachments, startIndex);
         });
 
         console.log('[MEDIA_GROUP] Media group bubble created');
@@ -1140,9 +2224,10 @@ export class MessageRenderer {
      * @param {number} index - Attachment index
      * @param {number} total - Total attachments
      * @param {number} hiddenCount - Number of hidden attachments
+     * @param {boolean} isNotDownloaded - Whether bundle is pending download
      * @returns {HTMLElement} Media tile element
      */
-    _renderMediaTile(attachment, index, total, hiddenCount) {
+    _renderMediaTile(attachment, index, total, hiddenCount, isNotDownloaded = false) {
         console.log('[MEDIA_TILE] Rendering tile', index, 'of', total);
 
         const tile = document.createElement('div');
@@ -1161,23 +2246,66 @@ export class MessageRenderer {
 
         switch (fileType) {
             case 'image':
-                tileContent = `<img src="${escapeHtml(fileUrl)}" alt="Image" loading="lazy">`;
+                if (isNotDownloaded) {
+                    const tileThumb = attachment.thumbnail || attachment.previewUrl || fileUrl;
+                    tileContent = `
+                        ${tileThumb ? `
+                            <img src="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" alt="Image preview" class="tile-image-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;">
+                        ` : `
+                            <div class="tile-placeholder-wrap" style="border-radius: 8px !important;">
+                                <svg class="tile-placeholder-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                </svg>
+                            </div>
+                            <img data-full-src="${escapeHtml(fileUrl)}" alt="Image" class="d-none">
+                        `}
+                    `;
+                } else {
+                    tileContent = `<img src="${escapeHtml(fileUrl)}" alt="Image" loading="lazy" style="border-radius: 8px !important;">`;
+                }
                 break;
             case 'video':
-                tileContent = `
-                    <div class="tile-play-icon">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="5,3 19,12 5,21"></polygon>
-                        </svg>
-                    </div>
-                    <video src="${escapeHtml(fileUrl)}" muted preload="metadata" playsinline tabindex="-1" style="pointer-events: none;"></video>
-                `;
+                if (isNotDownloaded) {
+                    const tileThumb = attachment.thumbnail || attachment.previewUrl || '';
+                    const videoSrc = `${escapeHtml(fileUrl)}#t=0.001`;
+                    tileContent = `
+                        <div class="tile-play-icon">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5,3 19,12 5,21"></polygon>
+                            </svg>
+                        </div>
+                        ${tileThumb ? `
+                            <img src="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" alt="Video preview" class="tile-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;">
+                        ` : `
+                            <video src="${videoSrc}" preload="metadata" poster="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;"></video>
+                        `}
+                    `;
+                } else {
+                    tileContent = `
+                        <div class="tile-play-icon">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5,3 19,12 5,21"></polygon>
+                            </svg>
+                        </div>
+                        <video src="${escapeHtml(fileUrl)}" preload="metadata" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 8px !important;"></video>
+                    `;
+                }
                 break;
             default:
-                tileContent = `<div class="tile-placeholder">${fileType.toUpperCase()}</div>`;
+                tileContent = `<div class="tile-placeholder" style="border-radius: 8px !important;">${fileType.toUpperCase()}</div>`;
         }
 
         tile.innerHTML = tileContent;
+
+        // Strictly prevent inline playback in media tile
+        tile.querySelectorAll('video').forEach(vid => {
+            vid.addEventListener('play', (e) => {
+                e.preventDefault();
+                try { vid.pause(); } catch (_) {}
+            });
+        });
 
         // Add overlay count for last visible tile if there are hidden items
         if (hiddenCount > 0 && index === 3) {
@@ -1254,6 +2382,16 @@ export class MessageRenderer {
             }
         });
 
+        const closeViewer = () => {
+            const vids = overlay.querySelectorAll('video');
+            vids.forEach(v => {
+                try { v.pause(); v.src = ''; } catch (_) {}
+            });
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.remove(), 300);
+            document.removeEventListener('keydown', handleKeydown);
+        };
+
         const closeButton = document.createElement('button');
         closeButton.className = 'media-viewer-close';
         closeButton.innerHTML = `
@@ -1262,10 +2400,7 @@ export class MessageRenderer {
                 <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
         `;
-        closeButton.addEventListener('click', () => {
-            overlay.classList.remove('show');
-            setTimeout(() => overlay.remove(), 300);
-        });
+        closeButton.addEventListener('click', closeViewer);
 
         header.appendChild(downloadButton);
         header.appendChild(closeButton);
@@ -1341,7 +2476,7 @@ export class MessageRenderer {
 
             if (fileType === 'video') {
                 content.innerHTML = `
-                    <video class="media-viewer-video" controls autoplay>
+                    <video class="media-viewer-video" controls autoplay playsinline>
                         <source src="${escapeHtml(fileUrl)}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
@@ -1377,9 +2512,7 @@ export class MessageRenderer {
         // Keyboard navigation
         const handleKeydown = (e) => {
             if (e.key === 'Escape') {
-                overlay.classList.remove('show');
-                setTimeout(() => overlay.remove(), 300);
-                document.removeEventListener('keydown', handleKeydown);
+                closeViewer();
             } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
                 currentIndex--;
                 renderAttachment(currentIndex);
@@ -1439,50 +2572,11 @@ export class MessageRenderer {
         const contentWrapper = document.createElement('div');
         contentWrapper.className = 'message-content-wrapper';
 
-        // Use new Telegram-style media group bubble
+        // Use new Telegram-style media group bubble (meta is already inside)
         const mediaBubble = this.renderMediaGroupBubble(message);
         contentWrapper.appendChild(mediaBubble);
 
         console.log('[RENDERER] [MEDIA_GROUP] Message bubble created with Telegram-style architecture');
-
-        // Determine whether to render meta (timestamp + receipt): single messages or last in group
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
-        if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
-
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                const status = message.status || 'sent';
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
-            contentWrapper.appendChild(metaDiv);
-        }
 
         wrapperDiv.appendChild(contentWrapper);
         return wrapperDiv;
@@ -1530,9 +2624,19 @@ export class MessageRenderer {
         const contentWrapper = document.createElement('div');
         contentWrapper.className = 'message-content-wrapper';
 
-        // For images/videos, use new Telegram-style single media bubble
-        // For other types, use traditional bubble
-        if (isImageOrVideo && metadata.url) {
+        // For stickers, use floating transparent card
+        // For GIFs, use auto-playing looping video/img with GIF badge
+        // For images/videos, use Telegram-style single media bubble
+        // For other types, use dedicated bubble
+        if (metadata.is_sticker || metadata.type === 'sticker' || attachmentType === 'sticker' || message.type === 'sticker' || message.attachment_type === 'sticker') {
+            console.log('[RENDERER] [STICKER] Using Sticker bubble');
+            const stickerBubble = this.renderStickerBubble(message, metadata);
+            contentWrapper.appendChild(stickerBubble);
+        } else if (metadata.is_gif || metadata.type === 'gif' || attachmentType === 'gif' || message.type === 'gif' || message.attachment_type === 'gif' || (metadata.url && metadata.url.toLowerCase().includes('.gif'))) {
+            console.log('[RENDERER] [GIF] Using GIF autoplay bubble');
+            const gifBubble = this.renderGifBubble(message, metadata);
+            contentWrapper.appendChild(gifBubble);
+        } else if (isImageOrVideo && metadata.url) {
             console.log('[RENDERER] [MEDIA] Using Telegram-style single media bubble');
             const mediaBubble = this.renderSingleMediaBubble(message);
             contentWrapper.appendChild(mediaBubble);
@@ -1548,45 +2652,6 @@ export class MessageRenderer {
             console.log('[RENDERER] [DOC] Using Document card bubble');
             const docBubble = this.renderDocumentBubble(message, metadata);
             contentWrapper.appendChild(docBubble);
-        }
-
-        // Determine whether to render meta (timestamp + receipt)
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
-        if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
-
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                const status = message.status || 'sent';
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
-            contentWrapper.appendChild(metaDiv);
         }
 
         wrapperDiv.appendChild(contentWrapper);
@@ -1631,6 +2696,88 @@ export class MessageRenderer {
             </div>
         `;
 
+        const metaDiv = this._createMetaElement(message, false);
+        bubble.appendChild(metaDiv);
+        return bubble;
+    }
+
+    /**
+     * Render distinct sticker bubble (transparent, floating, borderless with frosted meta pill)
+     */
+    renderStickerBubble(message, metadata = {}) {
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} sticker-bubble group-${message.groupPosition}`;
+        bubble.setAttribute('data-message-id', message.id);
+        bubble.setAttribute('data-sender-id', message.senderId);
+        bubble.setAttribute('data-status', message.status);
+        bubble.setAttribute('data-group-position', message.groupPosition);
+
+        const stickerUrl = metadata.url || message.attachment_url || message.link_image || metadata.preview_url || '';
+        const timeStr = this._formatMessageTime(message.timestamp);
+        const isOwn = message.isOwn || (this.currentUserId !== null && Number(message.senderId) === Number(this.currentUserId));
+
+        bubble.innerHTML = `
+            <div class="sticker-media-container">
+                <img src="${escapeHtml(stickerUrl)}" alt="Sticker" class="sticker-img" loading="lazy" />
+            </div>
+            <div class="sticker-meta-pill">
+                <span class="message-time">${timeStr}</span>
+                ${isOwn ? `<span class="message-read-receipt status-${message.status || 'sent'}">${this._getStatusIcon(message.status, message.id, message)}</span>` : ''}
+            </div>
+        `;
+
+        return bubble;
+    }
+
+    /**
+     * Render distinct GIF bubble (auto-playing, looping, with persistent GIF badge & frosted meta)
+     */
+    renderGifBubble(message, metadata = {}) {
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} gif-bubble group-${message.groupPosition}`;
+        bubble.setAttribute('data-message-id', message.id);
+        bubble.setAttribute('data-sender-id', message.senderId);
+        bubble.setAttribute('data-status', message.status);
+        bubble.setAttribute('data-group-position', message.groupPosition);
+
+        const gifUrl = metadata.url || message.attachment_url || message.link_image || metadata.preview_url || '';
+        const timeStr = this._formatMessageTime(message.timestamp);
+        const isOwn = message.isOwn || (this.currentUserId !== null && Number(message.senderId) === Number(this.currentUserId));
+        const isVideo = gifUrl.toLowerCase().includes('.mp4') || gifUrl.toLowerCase().includes('.webm');
+
+        const w = Number(metadata.width || metadata.file_width || 0);
+        const h = Number(metadata.height || metadata.file_height || 0);
+        let containerStyle = 'width: min(280px, calc(100vw - 80px)); ';
+        if (w > 0 && h > 0) {
+            containerStyle += `aspect-ratio: ${w} / ${h}; `;
+        } else {
+            containerStyle += 'aspect-ratio: 4 / 3; ';
+        }
+
+        const mediaTag = isVideo
+            ? `<video src="${escapeHtml(gifUrl)}" class="gif-media" autoplay loop muted playsinline preload="auto" disablepictureinpicture onloadedmetadata="if(this.videoWidth && this.videoHeight && this.parentElement) { this.parentElement.style.aspectRatio = this.videoWidth + '/' + this.videoHeight; }"></video>`
+            : `<img src="${escapeHtml(gifUrl)}" alt="GIF" class="gif-media" loading="lazy" onload="if(this.naturalWidth && this.naturalHeight && this.parentElement) { this.parentElement.style.aspectRatio = this.naturalWidth + '/' + this.naturalHeight; }" />`;
+
+        bubble.innerHTML = `
+            <div class="gif-media-container" style="${containerStyle}">
+                ${mediaTag}
+                <span class="gif-badge">GIF</span>
+                <div class="media-meta-overlay">
+                    <span class="message-time">${timeStr}</span>
+                    ${isOwn ? `<span class="message-read-receipt status-${message.status || 'sent'}">${this._getStatusIcon(message.status, message.id, message)}</span>` : ''}
+                </div>
+            </div>
+        `;
+
+        bubble.addEventListener('click', () => {
+            this.renderFullscreenMediaViewer([{
+                id: message.id,
+                type: isVideo ? 'video' : 'image',
+                url: gifUrl,
+                caption: ''
+            }], 0);
+        });
+
         return bubble;
     }
 
@@ -1638,8 +2785,14 @@ export class MessageRenderer {
      * Render distinct voice note bubble with interactive waveform and speed toggle
      */
     renderVoiceNoteBubble(message, metadata = {}) {
+        const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
+        const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
+
         const bubble = document.createElement('div');
         bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} voice-note-bubble group-${message.groupPosition}`;
+        if (isNotDownloaded) {
+            bubble.classList.add('not-downloaded');
+        }
         bubble.setAttribute('data-message-id', message.id);
         bubble.setAttribute('data-sender-id', message.senderId);
         bubble.setAttribute('data-status', message.status);
@@ -1647,32 +2800,39 @@ export class MessageRenderer {
         this._applyBubbleStyle(bubble);
 
         const audioUrl = metadata.url || '';
+        const sizeStr = this._formatFileSize(metadata.size || message.file_size || 0);
 
         // Generate 26 balanced waveform bars
         const barHeights = [25, 45, 70, 50, 85, 60, 95, 75, 40, 70, 90, 35, 55, 80, 100, 65, 45, 85, 60, 75, 40, 65, 50, 80, 55, 30];
         const barsHtml = barHeights.map((h, i) => `<span class="vn-bar" data-idx="${i}" style="height: ${h}%;"></span>`).join('');
 
-        bubble.innerHTML = `
-            <div class="voice-note-inner">
-                <button type="button" class="vn-play-btn" aria-label="Play voice note">
-                    <i class="bi bi-play-fill vn-play-icon"></i>
-                </button>
-                <div class="vn-content">
-                    <div class="vn-waveform" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-                        ${barsHtml}
-                    </div>
-                    <div class="vn-meta-row">
-                        <span class="vn-timer">0:00</span>
-                        <span class="vn-dot">•</span>
-                        <span class="vn-mic-indicator"><i class="bi bi-mic-fill"></i> Voice Note</span>
-                    </div>
-                </div>
-                <button type="button" class="vn-speed-btn" title="Playback speed" data-speed="1">1x</button>
-                <audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none vn-audio-el"></audio>
-            </div>
-        `;
+        const playBtnClass = isNotDownloaded ? 'vn-play-btn vn-download-mode' : 'vn-play-btn';
+        const playIconHtml = isNotDownloaded
+            ? `<i class="bi bi-arrow-down vn-play-icon"></i>`
+            : `<i class="bi bi-play-fill vn-play-icon"></i>`;
+        const audioTag = isNotDownloaded
+            ? `<audio data-src="${escapeHtml(audioUrl)}" preload="none" class="d-none vn-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`
+            : `<audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none vn-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`;
+
+        bubble.innerHTML = `<div class="voice-note-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}" title="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}">${playIconHtml}</button><div class="vn-content"><div class="vn-waveform-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div class="vn-waveform">${barsHtml}</div><div class="vn-progress-track"><div class="vn-progress-fill"></div><div class="vn-progress-thumb"></div></div></div><div class="vn-meta-row"><span class="vn-timer">0:00</span>${isNotDownloaded && sizeStr ? `<span class="vn-dot">•</span><span class="vn-size-indicator">${sizeStr}</span>` : ''}</div></div><button type="button" class="vn-speed-btn" title="Playback speed" data-speed="1">1x</button></div>${audioTag}`;
 
         this._bindVoiceNoteEvents(bubble);
+
+        // Asynchronously check and use locally stored device media if already downloaded
+        if (!isNotDownloaded && !isUploading) {
+            deviceMediaStore.getLocalMediaUrl(message.id).then(localUrl => {
+                if (localUrl) {
+                    const audioEl = bubble.querySelector('.vn-audio-el');
+                    if (audioEl && audioEl.src !== localUrl) {
+                        audioEl.src = localUrl;
+                        audioEl.removeAttribute('data-src');
+                    }
+                }
+            }).catch(() => {});
+        }
+
+        const metaDiv = this._createMetaElement(message, false);
+        bubble.appendChild(metaDiv);
         return bubble;
     }
 
@@ -1685,13 +2845,23 @@ export class MessageRenderer {
         const audio = bubble.querySelector('.vn-audio-el');
         const timer = bubble.querySelector('.vn-timer');
         const speedBtn = bubble.querySelector('.vn-speed-btn');
-        const waveform = bubble.querySelector('.vn-waveform');
+        const waveformContainer = bubble.querySelector('.vn-waveform-container');
+        const progressFill = bubble.querySelector('.vn-progress-fill');
+        const progressThumb = bubble.querySelector('.vn-progress-thumb');
         const bars = bubble.querySelectorAll('.vn-bar');
 
         if (!playBtn || !audio) return;
 
         playBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (bubble.classList.contains('not-downloaded')) {
+                const messageId = bubble.getAttribute('data-message-id');
+                if (messageId) {
+                    this._handleMediaDownload(messageId, bubble);
+                }
+                return;
+            }
+
             if (audio.paused) {
                 // Pause all other playing audio on the page
                 document.querySelectorAll('.vn-audio-el, .track-audio-el').forEach(other => {
@@ -1735,17 +2905,17 @@ export class MessageRenderer {
             const pct = audio.currentTime / duration;
             const activeCount = Math.floor(pct * bars.length);
             bars.forEach((bar, idx) => {
-                if (idx <= activeCount) {
-                    bar.classList.add('is-played');
-                } else {
-                    bar.classList.remove('is-played');
-                }
+                bar.classList.toggle('is-played', idx <= activeCount);
             });
+            if (progressFill) progressFill.style.width = `${pct * 100}%`;
+            if (progressThumb) progressThumb.style.left = `${pct * 100}%`;
         });
 
         audio.addEventListener('ended', () => {
             playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
             bars.forEach(b => b.classList.remove('is-played'));
+            if (progressFill) progressFill.style.width = '0%';
+            if (progressThumb) progressThumb.style.left = '0%';
             if (timer) timer.textContent = '0:00';
             audio.currentTime = 0;
         });
@@ -1762,14 +2932,60 @@ export class MessageRenderer {
             });
         }
 
-        if (waveform) {
-            waveform.addEventListener('click', (e) => {
-                e.stopPropagation();
+        // Pointer Drag & Seeking support for waveform container
+        if (waveformContainer) {
+            let isDragging = false;
+
+            const updateScrub = (clientX) => {
+                const rect = waveformContainer.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                const pct = ratio * 100;
+                if (progressFill) progressFill.style.width = `${pct}%`;
+                if (progressThumb) progressThumb.style.left = `${pct}%`;
+                const activeCount = Math.floor(ratio * bars.length);
+                bars.forEach((bar, idx) => {
+                    bar.classList.toggle('is-played', idx <= activeCount);
+                });
+                if (timer && audio.duration) {
+                    timer.textContent = this._formatAudioDuration(ratio * audio.duration);
+                }
+                return ratio;
+            };
+
+            waveformContainer.addEventListener('pointerdown', (e) => {
+                if (bubble.classList.contains('not-downloaded')) {
+                    const messageId = bubble.getAttribute('data-message-id');
+                    if (messageId) this._handleMediaDownload(messageId, bubble);
+                    return;
+                }
                 if (!audio.duration) return;
-                const rect = waveform.getBoundingClientRect();
-                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                audio.currentTime = ratio * audio.duration;
+                e.preventDefault();
+                e.stopPropagation();
+                isDragging = true;
+                waveformContainer.classList.add('is-scrubbing');
+                try { waveformContainer.setPointerCapture(e.pointerId); } catch (_) {}
+                updateScrub(e.clientX);
             });
+
+            waveformContainer.addEventListener('pointermove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                updateScrub(e.clientX);
+            });
+
+            const onPointerUp = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                waveformContainer.classList.remove('is-scrubbing');
+                const ratio = updateScrub(e.clientX);
+                if (audio.duration && typeof ratio === 'number') {
+                    audio.currentTime = ratio * audio.duration;
+                }
+                try { waveformContainer.releasePointerCapture(e.pointerId); } catch (_) {}
+            };
+
+            waveformContainer.addEventListener('pointerup', onPointerUp);
+            waveformContainer.addEventListener('pointercancel', onPointerUp);
         }
     }
 
@@ -1777,8 +2993,14 @@ export class MessageRenderer {
      * Render distinct audio track card bubble
      */
     renderAudioTrackBubble(message, metadata = {}) {
+        const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
+        const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
+
         const bubble = document.createElement('div');
         bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} audio-track-bubble group-${message.groupPosition}`;
+        if (isNotDownloaded) {
+            bubble.classList.add('not-downloaded');
+        }
         bubble.setAttribute('data-message-id', message.id);
         bubble.setAttribute('data-sender-id', message.senderId);
         bubble.setAttribute('data-status', message.status);
@@ -1788,31 +3010,35 @@ export class MessageRenderer {
         const audioUrl = metadata.url || '';
         const rawName = metadata.file_name || message.content || 'Audio Track';
         const fileName = rawName.split('/').pop().split('\\').pop();
-        const sizeStr = this._formatFileSize(metadata.size);
+        const sizeStr = this._formatFileSize(metadata.size || message.file_size || 0);
 
-        bubble.innerHTML = `
-            <div class="audio-track-inner">
-                <button type="button" class="audio-track-play-btn" aria-label="Play track">
-                    <i class="bi bi-play-fill track-play-icon"></i>
-                </button>
-                <div class="audio-track-details">
-                    <div class="audio-track-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
-                    <div class="audio-track-scrubber-track">
-                        <div class="audio-track-scrubber-fill" style="width: 0%;"></div>
-                    </div>
-                    <div class="audio-track-meta-row">
-                        <span class="audio-track-time">0:00</span>
-                        ${sizeStr ? `<span class="audio-track-dot">•</span><span class="audio-track-size">${sizeStr}</span>` : ''}
-                    </div>
-                </div>
-                <div class="audio-track-badge">
-                    <i class="bi bi-music-note-beamed"></i>
-                </div>
-                <audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none track-audio-el"></audio>
-            </div>
-        `;
+        const playBtnClass = isNotDownloaded ? 'audio-track-play-btn audio-download-mode' : 'audio-track-play-btn';
+        const playIconHtml = isNotDownloaded
+            ? `<i class="bi bi-arrow-down track-play-icon"></i>`
+            : `<i class="bi bi-play-fill track-play-icon"></i>`;
+        const audioTag = isNotDownloaded
+            ? `<audio data-src="${escapeHtml(audioUrl)}" preload="none" class="d-none track-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`
+            : `<audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none track-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`;
+
+        bubble.innerHTML = `<div class="audio-track-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download track' : 'Play track'}" title="${isNotDownloaded ? 'Download track' : 'Play track'}">${playIconHtml}</button><div class="audio-track-details"><div class="audio-track-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div><div class="audio-track-scrubber-track"><div class="audio-track-scrubber-fill" style="width: 0%;"></div></div><div class="audio-track-meta-row"><span class="audio-track-time">0:00</span>${sizeStr ? `<span class="audio-track-dot">•</span><span class="audio-track-size">${sizeStr}</span>` : ''}${isNotDownloaded ? `<span class="audio-track-status opacity-75 ms-1">• Tap to download</span>` : ''}</div></div><div class="audio-track-badge"><i class="bi bi-music-note-beamed"></i></div></div>${audioTag}`;
 
         this._bindAudioTrackEvents(bubble);
+
+        // Asynchronously check and use locally stored device media if already downloaded
+        if (!isNotDownloaded && !isUploading) {
+            deviceMediaStore.getLocalMediaUrl(message.id).then(localUrl => {
+                if (localUrl) {
+                    const audioEl = bubble.querySelector('.track-audio-el');
+                    if (audioEl && audioEl.src !== localUrl) {
+                        audioEl.src = localUrl;
+                        audioEl.removeAttribute('data-src');
+                    }
+                }
+            }).catch(() => {});
+        }
+
+        const metaDiv = this._createMetaElement(message, false);
+        bubble.appendChild(metaDiv);
         return bubble;
     }
 
@@ -1831,6 +3057,14 @@ export class MessageRenderer {
 
         playBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (bubble.classList.contains('not-downloaded')) {
+                const messageId = bubble.getAttribute('data-message-id');
+                if (messageId) {
+                    this._handleMediaDownload(messageId, bubble);
+                }
+                return;
+            }
+
             if (audio.paused) {
                 // Pause all other audio
                 document.querySelectorAll('.vn-audio-el, .track-audio-el').forEach(other => {
@@ -1868,6 +3102,13 @@ export class MessageRenderer {
         if (track) {
             track.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (bubble.classList.contains('not-downloaded')) {
+                    const messageId = bubble.getAttribute('data-message-id');
+                    if (messageId) {
+                        this._handleMediaDownload(messageId, bubble);
+                    }
+                    return;
+                }
                 if (!audio.duration) return;
                 const rect = track.getBoundingClientRect();
                 const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -1889,6 +3130,15 @@ export class MessageRenderer {
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    }
+
+    _formatMessageTime(timestamp) {
+        if (!timestamp) return '';
+        try {
+            return formatTime(timestamp);
+        } catch (_) {
+            return '';
+        }
     }
 
     _getDocumentTypeInfo(ext) {
@@ -2014,50 +3264,17 @@ export class MessageRenderer {
         }
         
         // Add text content if present
-        const textContent = message.content ? `<p class="message-content">${escapeHtml(message.content)}</p>` : '';
+        const textContent = message.content 
+            ? `<p class="message-content">${escapeHtml(message.content)}${this._getSpacerHtml(message)}</p>` 
+            : '';
         
         messageDiv.innerHTML = textContent + linkContent;
+
+        // Inside-bubble meta
+        const metaDiv = this._createMetaElement(message, false);
+        messageDiv.appendChild(metaDiv);
+
         contentWrapper.appendChild(messageDiv);
-
-        // Determine whether to render meta (timestamp + receipt)
-        const shouldRenderMeta = message.groupPosition === 'single' || message.groupPosition === 'last' || !!message.hasFloatingReadReceipt;
-        if (shouldRenderMeta) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'timestamp';
-            timeSpan.textContent = formatTime(message.timestamp);
-            metaDiv.appendChild(timeSpan);
-
-            // Read receipt / status to appear next to timestamp
-            if (message.isOwn) {
-                const status = message.status || 'sent';
-                if (message.status === 'read' && message.isLastRead) {
-                    const receiverAvatar = document.body.dataset.receiverAvatar;
-                    const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = 'message-read-receipt read-avatar-only';
-                    receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                    metaDiv.appendChild(receiptSpan);
-                } else if (message.isLastSent && !message.hideReadReceipt) {
-                    const receiptSpan = document.createElement('span');
-                    receiptSpan.className = `message-read-receipt status-${status}`;
-                    receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
-                    metaDiv.appendChild(receiptSpan);
-                }
-            } else if (message.hasFloatingReadReceipt) {
-                const receiverAvatar = document.body.dataset.receiverAvatar;
-                const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                const receiptSpan = document.createElement('span');
-                receiptSpan.className = 'message-read-receipt floating-read-receipt';
-                receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
-                metaDiv.appendChild(receiptSpan);
-            }
-
-            contentWrapper.appendChild(metaDiv);
-        }
-
         wrapperDiv.appendChild(contentWrapper);
         return wrapperDiv;
     }
@@ -2140,8 +3357,11 @@ export class MessageRenderer {
     /**
      * Scroll to bottom of container (pure DOM manipulation)
      */
-    _scrollToBottom() {
-        if (this.container) {
+    _scrollToBottom(force = false) {
+        if (!this.container) return;
+        const threshold = 180;
+        const isNearBottom = (this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight) < threshold;
+        if (force || isNearBottom) {
             this.container.scrollTop = this.container.scrollHeight;
         }
     }
@@ -2188,8 +3408,13 @@ export class MessageRenderer {
     _getSenderAvatar(senderId) {
         // Try to get avatar from dataset (set by template)
         const receiverAvatar = document.body.dataset.receiverAvatar;
-        if (receiverAvatar) {
+        if (receiverAvatar && receiverAvatar !== 'undefined' && receiverAvatar !== 'null') {
             return receiverAvatar;
+        }
+        // Try avatar image from header trigger
+        const headerImg = document.querySelector('#headerProfileTrigger img.chat-avatar, .chat-avatar img, img.chat-avatar');
+        if (headerImg && headerImg.src) {
+            return headerImg.src;
         }
         // Fallback to default avatar
         return '/static/images/default_pic1.jpg';

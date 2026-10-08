@@ -60,6 +60,8 @@ export class AppController {
         // Update store connection state (ONLY store can mutate)
         if (isConnected) {
             store.setConnectionState('connected');
+            // Request peer presence immediately upon connection
+            webSocketManager.send({ type: 'get_peer_presence' });
             // Process queued messages through message service
             messageService.processMessageQueue();
             // Send any queued read receipts

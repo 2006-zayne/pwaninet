@@ -1275,12 +1275,36 @@
     // INTERSECTION OBSERVERS (FEED & FULLSCREEN)
     // ============================================================================
 
+    function isMessagingVideo(video) {
+        if (!video) return false;
+        if (video.dataset && (
+            video.dataset.chatMedia === 'true' ||
+            video.dataset.noInline === 'true' ||
+            video.dataset.messaging === 'true' ||
+            (video.dataset.autoplay === 'false' && video.closest('.media-bubble, .media-tile, #messagesContainer, .messages-area'))
+        )) {
+            return true;
+        }
+        if (video.closest('#messagesContainer, .messages-area, .media-bubble, .media-tile, .message-bubble, .message-wrapper, .conversation-container, #chatMessages, #chatAppContainer, .messaging-view, #mediaPreviewModal, .media-preview-modal, .media-composer-modal, .media-viewer-overlay')) {
+            return true;
+        }
+        return false;
+    }
+
     function handleFeedIntersection(entries) {
         if (state.isFullScreenActive) return; // Fullscreen overlay has priority
 
         // 1. Update intersection ratio cache on observed videos
         entries.forEach(entry => {
             const video = entry.target;
+            if (isMessagingVideo(video)) {
+                if (state.feedObserver) {
+                    try { state.feedObserver.unobserve(video); } catch (_) {}
+                }
+                video._feedIntersectionRatio = 0;
+                try { video.pause(); } catch (_) {}
+                return;
+            }
             video._feedIntersectionRatio = entry.isIntersecting ? entry.intersectionRatio : 0;
             // When video leaves the viewport substantially, reset manual pause intent
             if (!entry.isIntersecting || entry.intersectionRatio < 0.2) {
@@ -1290,6 +1314,10 @@
 
         // 2. Evaluate currently playing video
         const currentActive = state.currentPlayingVideo;
+        if (currentActive && isMessagingVideo(currentActive)) {
+            try { currentActive.pause(); } catch (_) {}
+            state.currentPlayingVideo = null;
+        }
         const currentActiveRatio = (currentActive && currentActive._feedIntersectionRatio !== undefined)
             ? currentActive._feedIntersectionRatio
             : 0;
@@ -1304,6 +1332,9 @@
         let bestRatio = 0;
 
         document.querySelectorAll('video').forEach(video => {
+            if (isMessagingVideo(video)) {
+                return;
+            }
             if (video.classList.contains('reels-carousel-video') ||
                 video.closest('.reels-carousel-shelf') ||
                 video.closest('#fullscreenReelsOverlay') ||
@@ -1531,7 +1562,7 @@
             try { state.feedObserver.disconnect(); } catch (_) {}
         }
         document.querySelectorAll('video').forEach(vid => {
-            if (vid.closest('#fullscreenReelsOverlay') || vid.closest('#reelsSnapViewport')) {
+            if (isMessagingVideo(vid) || vid.closest('#fullscreenReelsOverlay') || vid.closest('#reelsSnapViewport')) {
                 return;
             }
             try { vid.pause(); } catch (_) {}
@@ -1559,7 +1590,7 @@
         if (!state.isFullScreenActive) {
             createFeedObserver();
             document.querySelectorAll('video').forEach(vid => {
-                if (vid.closest('#fullscreenReelsOverlay') || vid.closest('#reelsSnapViewport')) {
+                if (isMessagingVideo(vid) || vid.closest('#fullscreenReelsOverlay') || vid.closest('#reelsSnapViewport')) {
                     return;
                 }
                 if (state.feedObserver && !vid.classList.contains('reels-carousel-video') && !vid.closest('.reels-carousel-shelf')) {
@@ -5763,6 +5794,13 @@
         }
 
         videos.forEach(video => {
+            if (isMessagingVideo(video)) {
+                video.autoplay = false;
+                video.removeAttribute('autoplay');
+                try { video.pause(); } catch (_) {}
+                return;
+            }
+
             // Attach buffering indicator and micro-scrubber listeners across feed & fullscreen
             const cardContainer = video.closest('.reel-card-container, .reel-post-card, .reel-stage-container, .reels-snap-item, .media-video-container, .landscape-video-container, .landscape-video-wrapper, .post-card, .post-media-wrapper');
             const postId = extractPostId(video) || (cardContainer ? extractPostId(cardContainer) : null);
@@ -5864,11 +5902,22 @@
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
-                        // Ignore mutations occurring inside fullscreen reels viewport or overlay to avoid document-wide re-scans
-                        if (node.closest && (node.closest('#reelsSnapViewport') || node.closest('#fullscreenReelsOverlay'))) {
+                        // Ignore mutations occurring inside fullscreen reels viewport or messaging containers to avoid document-wide re-scans
+                        if (node.closest && (
+                            node.closest('#reelsSnapViewport') || 
+                            node.closest('#fullscreenReelsOverlay') ||
+                            node.closest('#messagesContainer') ||
+                            node.closest('.messages-area') ||
+                            node.closest('.media-bubble') ||
+                            node.closest('#chatMessages') ||
+                            node.closest('#chatAppContainer')
+                        )) {
                             return;
                         }
-                        if (node.id === 'reelsSnapViewport' || node.id === 'fullscreenReelsOverlay') {
+                        if (node.id === 'reelsSnapViewport' || node.id === 'fullscreenReelsOverlay' || node.id === 'messagesContainer' || node.id === 'chatMessages') {
+                            return;
+                        }
+                        if (node.classList && (node.classList.contains('media-bubble') || node.classList.contains('message-wrapper') || node.classList.contains('messages-area'))) {
                             return;
                         }
                         if (node.tagName === 'VIDEO' || (node.querySelector && node.querySelector('video'))) {

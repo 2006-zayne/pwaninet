@@ -12,7 +12,8 @@ from .views import (
     attachment_upload,
     batch_attachment_upload,
     fetch_link_metadata,
-    unread_message_count
+    unread_message_count,
+    proxy_chat_media
 )
 
 router = DefaultRouter()
@@ -32,5 +33,6 @@ urlpatterns = [
     path('api/attachments/upload/', attachment_upload, name='attachment_upload'),
     path('api/attachments/batch-upload/', batch_attachment_upload, name='batch_attachment_upload'),
     path('api/links/fetch-metadata/', fetch_link_metadata, name='fetch_link_metadata'),
+    path('api/media-proxy/', proxy_chat_media, name='proxy_chat_media'),
     path('unread-count/', unread_message_count, name='unread_message_count'),
 ]

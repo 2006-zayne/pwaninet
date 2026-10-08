@@ -35,6 +35,7 @@ export class Store {
             messageOrder: [],   // Array of messageIds for ordering
             processedMessageIds: new Set(), // For deduplication
             isInitialHistoryLoaded: false,
+            hasMoreOlderMessages: true,
 
             // UI state
             uiState: UI_STATE.IDLE,
@@ -103,6 +104,7 @@ export class Store {
             processedMessageIds: new Set(this._state.processedMessageIds),
             uiState: this._state.uiState,
             typingUsers: new Map(this._state.typingUsers),
+            recordingUsers: new Map(this._state.recordingUsers || []),
             peerOnlineStatus: new Map(this._state.peerOnlineStatus),
             currentTheme: this._state.currentTheme,
             themeMode: this._state.themeMode
@@ -201,12 +203,74 @@ export class Store {
         console.log('[STORE] Message stored successfully:', validatedMessage.id);
         console.log('[STORE] Current message count after add:', this._state.messages.size);
 
+        // Clear typing indicator for this sender if they were typing
+        if (this._state.typingUsers.has(Number(validatedMessage.senderId)) || this._state.typingUsers.has(validatedMessage.senderId)) {
+            const sId = Number(validatedMessage.senderId);
+            if (this._typingTimeouts?.has(sId)) {
+                clearTimeout(this._typingTimeouts.get(sId));
+                this._typingTimeouts.delete(sId);
+            }
+            this._state.typingUsers.delete(sId);
+            this._state.typingUsers.delete(validatedMessage.senderId);
+        }
+
         // Update order array for deterministic sorting
         this._updateMessageOrder(validatedMessage);
 
         console.log('[STORE] Notifying subscribers...');
         this._notifySubscribers();
         console.log('[STORE] Subscribers notified');
+    }
+
+    /**
+     * Add multiple messages in a single batch (canonical schema validation)
+     * @param {Array<Object>} messages - Array of message objects
+     */
+    addMessages(messages) {
+        if (!Array.isArray(messages) || messages.length === 0) return;
+        this._logMutation('ADD_MESSAGES_BATCH', { count: messages.length });
+
+        let addedCount = 0;
+        for (const message of messages) {
+            const validated = this._validateCanonicalMessage(message);
+            if (!validated) continue;
+            if (this._state.processedMessageIds.has(validated.id)) continue;
+
+            this._state.processedMessageIds.add(validated.id);
+            this._state.messages.set(validated.id, validated);
+            this._updateMessageOrder(validated);
+            addedCount++;
+        }
+
+        if (addedCount > 0) {
+            console.log(`[STORE] Batch added ${addedCount} messages. Total:`, this._state.messages.size);
+            this._notifySubscribers();
+        }
+    }
+
+    /**
+     * Get the oldest message ID currently stored
+     * @returns {string|null} Oldest message ID
+     */
+    getOldestMessageId() {
+        if (this._state.messageOrder.length === 0) return null;
+        return this._state.messageOrder[0];
+    }
+
+    /**
+     * Check if there are more older messages available on server
+     * @returns {boolean}
+     */
+    hasMoreOlderMessages() {
+        return this._state.hasMoreOlderMessages !== false;
+    }
+
+    /**
+     * Set flag indicating if more older messages exist
+     * @param {boolean} hasMore
+     */
+    setHasMoreOlderMessages(hasMore) {
+        this._state.hasMoreOlderMessages = hasMore;
     }
 
     /**
@@ -358,9 +422,32 @@ export class Store {
     setTypingIndicator(userId, username, isTyping) {
         this._logMutation('SET_TYPING_INDICATOR', { userId, username, isTyping });
 
+        if (!this._typingTimeouts) {
+            this._typingTimeouts = new Map();
+        }
+
+        const numericUserId = Number(userId);
+
         if (isTyping) {
-            this._state.typingUsers.set(userId, username);
+            this._state.typingUsers.set(numericUserId, username);
+            if (this._typingTimeouts.has(numericUserId)) {
+                clearTimeout(this._typingTimeouts.get(numericUserId));
+            }
+            // Auto-clear after 4.5s if no stop/refresh received
+            const timeout = setTimeout(() => {
+                if (this._state.typingUsers.has(numericUserId)) {
+                    this._state.typingUsers.delete(numericUserId);
+                    this._typingTimeouts.delete(numericUserId);
+                    this._notifySubscribers();
+                }
+            }, 4500);
+            this._typingTimeouts.set(numericUserId, timeout);
         } else {
+            if (this._typingTimeouts.has(numericUserId)) {
+                clearTimeout(this._typingTimeouts.get(numericUserId));
+                this._typingTimeouts.delete(numericUserId);
+            }
+            this._state.typingUsers.delete(numericUserId);
             this._state.typingUsers.delete(userId);
         }
 
@@ -381,6 +468,16 @@ export class Store {
             lastSeen: lastSeen || Date.now()
         });
 
+        if (!isOnline) {
+            const numericUserId = Number(userId);
+            this._state.typingUsers.delete(numericUserId);
+            this._state.typingUsers.delete(userId);
+            if (this._state.recordingUsers) {
+                this._state.recordingUsers.delete(numericUserId);
+                this._state.recordingUsers.delete(userId);
+            }
+        }
+
         this._notifySubscribers();
     }
 
@@ -391,12 +488,37 @@ export class Store {
      * @param {boolean} isRecording - Is recording
      */
     setRecordingIndicator(userId, username, isRecording) {
+        this._logMutation('SET_RECORDING_INDICATOR', { userId, username, isRecording });
+
         if (!this._state.recordingUsers) {
             this._state.recordingUsers = new Map();
         }
+        if (!this._recordingTimeouts) {
+            this._recordingTimeouts = new Map();
+        }
+
+        const numericUserId = Number(userId);
+
         if (isRecording) {
-            this._state.recordingUsers.set(userId, username);
+            this._state.recordingUsers.set(numericUserId, username);
+            if (this._recordingTimeouts.has(numericUserId)) {
+                clearTimeout(this._recordingTimeouts.get(numericUserId));
+            }
+            // Auto-clear after 120s safety limit if peer disconnects
+            const timeout = setTimeout(() => {
+                if (this._state.recordingUsers.has(numericUserId)) {
+                    this._state.recordingUsers.delete(numericUserId);
+                    this._recordingTimeouts.delete(numericUserId);
+                    this._notifySubscribers();
+                }
+            }, 120000);
+            this._recordingTimeouts.set(numericUserId, timeout);
         } else {
+            if (this._recordingTimeouts.has(numericUserId)) {
+                clearTimeout(this._recordingTimeouts.get(numericUserId));
+                this._recordingTimeouts.delete(numericUserId);
+            }
+            this._state.recordingUsers.delete(numericUserId);
             this._state.recordingUsers.delete(userId);
         }
         this._notifySubscribers();
@@ -413,26 +535,40 @@ export class Store {
         const msg = this._state.messages.get(tempId);
         if (!msg) return;
 
-        this._state.messages.delete(tempId);
-        this._state.processedMessageIds.delete(tempId);
-        this._state.processedMessageIds.add(String(actualId));
+        const actualIdStr = String(actualId);
+        const tempIdStr = String(tempId);
+
+        this._state.messages.delete(tempIdStr);
+        this._state.processedMessageIds.delete(tempIdStr);
+        this._state.processedMessageIds.add(actualIdStr);
 
         const updated = {
             ...msg,
-            id: String(actualId),
+            id: actualIdStr,
             status: status,
             isOptimistic: false,
             timestamp: timestamp || msg.timestamp
         };
 
-        const tempIndex = this._state.messageOrder.indexOf(tempId);
+        const tempIndex = this._state.messageOrder.indexOf(tempIdStr);
         if (tempIndex !== -1) {
-            this._state.messageOrder[tempIndex] = String(actualId);
-        } else {
-            this._state.messageOrder.push(String(actualId));
+            this._state.messageOrder.splice(tempIndex, 1);
+        }
+        if (!this._state.messageOrder.includes(actualIdStr)) {
+            if (tempIndex !== -1) {
+                this._state.messageOrder.splice(tempIndex, 0, actualIdStr);
+            } else {
+                this._state.messageOrder.push(actualIdStr);
+            }
         }
 
-        this._state.messages.set(String(actualId), updated);
+        this._state.messages.set(actualIdStr, updated);
+
+        // Rekey DOM element in-place to avoid reconciliation re-creation flash
+        if (window.uiController?.renderer?.rekeyMessageElement) {
+            window.uiController.renderer.rekeyMessageElement(tempIdStr, actualIdStr);
+        }
+
         this._notifySubscribers();
     }
 
@@ -600,9 +736,13 @@ export class Store {
      */
     _getMessagesArray() {
         const orderedMessages = [];
+        const seenIds = new Set();
         
         for (const messageId of this._state.messageOrder) {
-            const message = this._state.messages.get(messageId);
+            const idStr = String(messageId);
+            if (seenIds.has(idStr)) continue;
+            seenIds.add(idStr);
+            const message = this._state.messages.get(idStr);
             if (message) {
                 orderedMessages.push({ ...message }); // Return copy
             }
