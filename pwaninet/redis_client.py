@@ -36,10 +36,13 @@ def get_redis_pool() -> redis.ConnectionPool:
         redis_port = int(os.environ.get('REDIS_PORT', 6379))
         redis_db = int(os.environ.get('REDIS_DB', 0))
         
+        redis_password = os.environ.get('REDIS_PASSWORD', None)
+        
         _redis_pool = redis.ConnectionPool(
             host=redis_host,
             port=redis_port,
             db=redis_db,
+            password=redis_password,
             decode_responses=True,
             max_connections=50,  # Limit concurrent connections
             socket_connect_timeout=5,
@@ -65,11 +68,11 @@ def check_redis_health(client: redis.Redis) -> bool:
     try:
         client.ping()
         return True
-    except (redis.ConnectionError, redis.TimeoutError, socket.timeout) as e:
+    except (redis.ConnectionError, redis.TimeoutError, redis.RedisError, socket.timeout) as e:
         logger.warning(f"Redis health check failed: {e}")
         return False
     except Exception as e:
-        logger.error(f"Unexpected error during Redis health check: {e}")
+        logger.error(f"Unexpected error during Redis health check: {type(e).__name__}")
         return False
 
 
