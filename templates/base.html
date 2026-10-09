@@ -87,10 +87,48 @@
         // Set chat theme immediately to prevent flash
         (function() {
             try {
-                const userChatTheme = '{{ request.user.chat_theme_preference|default:"ocean-wave" }}';
-                const savedChatTheme = localStorage.getItem('chat_theme') || 'ocean-wave';
-                const chatTheme = (userChatTheme && userChatTheme !== 'default') ? userChatTheme : savedChatTheme;
-                document.documentElement.setAttribute('data-chat-theme', chatTheme);
+                let resolvedChatTheme = null;
+                // 1. Check conversation-specific theme from URL path (/messaging/conversation/<id>/)
+                const convMatch = window.location.pathname.match(/\/messaging\/conversation\/(\d+)/);
+                if (convMatch && convMatch[1]) {
+                    const convId = convMatch[1];
+                    const savedConvTheme = localStorage.getItem('chat_theme_' + convId);
+                    if (savedConvTheme) {
+                        try {
+                            const parsed = JSON.parse(savedConvTheme);
+                            if (parsed && parsed.preset && parsed.preset !== 'default') {
+                                resolvedChatTheme = parsed.preset;
+                            }
+                        } catch (_) {
+                            if (typeof savedConvTheme === 'string' && savedConvTheme.length < 50 && savedConvTheme !== 'default') {
+                                resolvedChatTheme = savedConvTheme;
+                            }
+                        }
+                    }
+                }
+
+                // 2. Check global user default theme in localStorage
+                if (!resolvedChatTheme) {
+                    const savedDefault = localStorage.getItem('default_chat_theme') || localStorage.getItem('chat_theme');
+                    if (savedDefault && savedDefault !== 'default') {
+                        resolvedChatTheme = savedDefault;
+                    }
+                }
+
+                // 3. Check user preference from backend
+                if (!resolvedChatTheme) {
+                    const userPref = '{{ request.user.chat_theme_preference|default:"" }}';
+                    if (userPref && userPref !== 'default') {
+                        resolvedChatTheme = userPref;
+                    }
+                }
+
+                // 4. Default fallback
+                if (!resolvedChatTheme || resolvedChatTheme === 'default') {
+                    resolvedChatTheme = 'ocean-wave';
+                }
+
+                document.documentElement.setAttribute('data-chat-theme', resolvedChatTheme);
             } catch (e) {
                 document.documentElement.setAttribute('data-chat-theme', 'ocean-wave');
             }
@@ -2855,11 +2893,19 @@
                    data-bypass-htmx="true"
                    hx-boost="false"
                    aria-label="{% trans 'Chats' %}">
-                    <span class="position-relative d-inline-block"
-                          hx-get="{% url 'messaging:unread_message_count' %}"
-                          hx-trigger="load, every 60s"
-                          hx-swap="innerHTML">
+                    <span class="position-relative d-inline-block">
                         <i class="bi bi-chat-dots-fill"></i>
+                        {% if unread_messages_count > 0 %}
+                            <span class="position-absolute badge rounded-pill bg-danger messages-badge" style="top: -2px; right: -6px; font-size: 0.65rem;">
+                                {{ unread_messages_count }}
+                                <span class="visually-hidden">unread messages</span>
+                            </span>
+                        {% else %}
+                            <span class="position-absolute badge rounded-pill bg-danger messages-badge" style="top: -2px; right: -6px; font-size: 0.65rem; display: none;">
+                                0
+                                <span class="visually-hidden">unread messages</span>
+                            </span>
+                        {% endif %}
                     </span>
                     <span>{% trans "Chats" %}</span>
                 </a>
@@ -3421,17 +3467,14 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     const data = JSON.parse(e.data);
                     console.log('[GLOBAL] Received notification:', data);
 
-                    // Handle different notification types
-                    // Messaging handlers - FROZEN FOR MVP
-                    /*
                     if (data.type === 'conversation_update') {
-                        // Handle conversation updates
-                        if (typeof updateConversationInList === 'function') {
+                        // Real-time conversation list updates (sidebar rail & mobile list)
+                        if (typeof window.updateConversationInList === 'function') {
+                            window.updateConversationInList(data);
+                        } else if (typeof updateConversationInList === 'function') {
                             updateConversationInList(data);
                         }
-                    } else
-                    */
-                    if (data.type === 'notification') {
+                    } else if (data.type === 'notification') {
                         // Handle general notifications
                         console.log('[GLOBAL] Handling notification type:', data.type);
                         showNotification(data.notification);
@@ -3503,16 +3546,17 @@ window.addEventListener('beforeinstallprompt', (e) => {
     }
 
     function updateUnreadCount(unreadCount) {
-        // Update messages icon badge in navigation
-        const messagesBadge = document.querySelector('.messages-badge');
-        if (messagesBadge) {
+        // Update messages icon badge in navigation (desktop left rail, top nav, mobile bottom nav)
+        const messagesBadges = document.querySelectorAll('.messages-badge');
+        messagesBadges.forEach(badge => {
             if (unreadCount > 0) {
-                messagesBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-                messagesBadge.style.display = 'flex';
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                badge.style.display = 'inline-block';
             } else {
-                messagesBadge.style.display = 'none';
+                badge.textContent = '0';
+                badge.style.display = 'none';
             }
-        }
+        });
     }
 
     function updateNotificationCount(count) {
@@ -4066,6 +4110,13 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
         });
 
+        // Boundary helpers for top-level page navigations (exclude unread-count, v1 APIs, static, etc.)
+        const isMessagingPage = (p) => (p.startsWith('/messaging') || p.startsWith('/messages')) &&
+                                       !p.startsWith('/messaging/unread-count') &&
+                                       !p.startsWith('/messaging/v1') &&
+                                       !p.startsWith('/messaging/api');
+        const isPwanimatePage = (p) => p.startsWith('/pwanimate') && !p.startsWith('/pwanimate/api');
+
         // Enforce strict full-page browser navigation across the PwaniNet ↔ Pwanimate boundary
         document.body.addEventListener('htmx:beforeRequest', function(evt) {
             const path = (evt.detail && evt.detail.requestConfig && evt.detail.requestConfig.path) ||
@@ -4080,17 +4131,33 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 targetPath = path;
             }
 
-            const isTargetPwanimate = targetPath.startsWith('/pwanimate');
-            const isCurrentPwanimate = window.location.pathname.startsWith('/pwanimate');
+            const isTargetPwanimate = isPwanimatePage(targetPath);
+            const isCurrentPwanimate = isPwanimatePage(window.location.pathname);
 
-            if (isTargetPwanimate !== isCurrentPwanimate) {
+            const targetEl = evt.detail && (evt.detail.target || (evt.detail.requestConfig && evt.detail.requestConfig.target));
+            const isPageTarget = !targetEl || targetEl.id === 'page-content-target' || targetEl === document.body || targetEl.tagName === 'BODY' || targetEl.tagName === 'MAIN';
+
+            if (isPageTarget && (isTargetPwanimate !== isCurrentPwanimate)) {
                 // Crossing the boundary between PwaniNet and Pwanimate:
-                // Abort HTMX partial swap and trigger clean full-page navigation
                 evt.preventDefault();
                 if (evt.detail && evt.detail.xhr && typeof evt.detail.xhr.abort === 'function') {
                     try { evt.detail.xhr.abort(); } catch (_) {}
                 }
                 window.location.assign(path);
+                return;
+            }
+
+            const isTargetMessaging = isMessagingPage(targetPath);
+            const isCurrentMessaging = isMessagingPage(window.location.pathname);
+
+            if (isPageTarget && (isTargetMessaging !== isCurrentMessaging)) {
+                // Crossing the boundary between PwaniNet and Messaging:
+                evt.preventDefault();
+                if (evt.detail && evt.detail.xhr && typeof evt.detail.xhr.abort === 'function') {
+                    try { evt.detail.xhr.abort(); } catch (_) {}
+                }
+                window.location.assign(path);
+                return;
             }
         });
 
@@ -4203,6 +4270,17 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         evt.detail.shouldSwap = false;
                         const dest = responseUrl || (evt.detail.requestConfig && evt.detail.requestConfig.path) || (incomingIsPwanimate ? '/pwanimate/' : '/');
                         console.log('[Boundary Navigation] Crossing PwaniNet ↔ Pwanimate, forcing full-page navigation to:', dest);
+                        window.location.assign(dest);
+                        return;
+                    }
+
+                    // Check if response crosses the PwaniNet ↔ Messaging boundary
+                    const incomingIsMessaging = responseText.includes('whatsappLayout') || (responseUrl && isMessagingPage(new URL(responseUrl, window.location.origin).pathname));
+                    const currentIsMessaging = isMessagingPage(window.location.pathname);
+                    if (incomingIsMessaging !== currentIsMessaging) {
+                        evt.detail.shouldSwap = false;
+                        const dest = responseUrl || (evt.detail.requestConfig && evt.detail.requestConfig.path) || (incomingIsMessaging ? '/messaging/' : '/');
+                        console.log('[Boundary Navigation] Crossing PwaniNet ↔ Messaging, forcing full-page navigation to:', dest);
                         window.location.assign(dest);
                         return;
                     }
@@ -4394,8 +4472,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 return;
             }
 
-            // Exclude boundary navigation when departing /pwanimate/
-            if (window.location.pathname.startsWith('/pwanimate')) {
+            // Exclude boundary navigation when departing /pwanimate/ or /messaging/
+            if (window.location.pathname.startsWith('/pwanimate') || window.location.pathname.startsWith('/messaging') || window.location.pathname.startsWith('/messages')) {
                 return;
             }
 

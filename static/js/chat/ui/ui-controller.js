@@ -6,7 +6,7 @@
 
 import { store } from '../core/store.js';
 import { messageService } from '../core/message-service.js';
-import { MessageRenderer } from './renderer.js?v=40';
+import { MessageRenderer } from './renderer.js?v=42';
 import { contextMenuService } from '../features/context-menu/context-menu.service.js';
 import { messageSoundManager } from '../shared/message-sound.js';
 import { eventBus } from '../core/event-bus.js';
@@ -29,6 +29,12 @@ export class UIController {
      */
     init() {
         this._log('UI_CONTROLLER_INIT');
+
+        if (this.unsubscribe) {
+            try { this.unsubscribe(); } catch (_) {}
+            this.unsubscribe = null;
+        }
+        this.lastState = null;
 
         // Get state FIRST
         const initialState = store.getState();
@@ -84,7 +90,8 @@ export class UIController {
         const typingListStr = Array.from(state.typingUsers || []).join(',');
         const typingChanged = !last || (state.typingUsers.size !== last.typingUsersSize) || (typingListStr !== last.typingUsersList);
         const recordingChanged = !last || ((state.recordingUsers?.size || 0) !== (last.recordingUsersSize || 0));
-        const peerChanged = !last || (state.peerOnlineStatus.size !== last.peerOnlineStatusSize);
+        const peerChecksum = this._computePeerOnlineStatusChecksum(state.peerOnlineStatus);
+        const peerChanged = !last || (state.peerOnlineStatus.size !== last.peerOnlineStatusSize) || (peerChecksum !== (last.peerOnlineStatusChecksum || ''));
 
         if (typingChanged || peerChanged || recordingChanged) {
             this._updateTypingIndicators(state.typingUsers, state.peerOnlineStatus);
@@ -220,9 +227,8 @@ export class UIController {
         const cancelReplyBtn = document.getElementById('cancelReplyBtn');
         if (cancelReplyBtn) {
             cancelReplyBtn.addEventListener('click', () => {
-                this.replyToMessageId = null;
-                const bar = document.getElementById('replyPreviewBar');
-                if (bar) bar.classList.add('d-none');
+                this._clearReplyContext();
+                this._refreshComposerButton();
             });
         }
 
@@ -233,7 +239,12 @@ export class UIController {
                 const bar = document.getElementById('editPreviewBar');
                 if (bar) bar.classList.add('d-none');
                 const messageInput = document.getElementById('messageInput');
-                if (messageInput) messageInput.value = '';
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = 'auto';
+                }
+                // Restore mic button now that the composer is empty
+                this._refreshComposerButton();
             });
         }
 
@@ -383,6 +394,9 @@ export class UIController {
 
             let scrollDebounceTimer = null;
             messagesContainer.addEventListener('scroll', () => {
+                if (this.renderer && typeof this.renderer.updateScrollToBottomButton === 'function') {
+                    this.renderer.updateScrollToBottomButton();
+                }
                 if (messagesContainer.scrollTop <= 80) {
                     if (scrollDebounceTimer) return;
                     scrollDebounceTimer = setTimeout(async () => {
@@ -402,6 +416,28 @@ export class UIController {
             }, { passive: true });
         }
 
+        // Floating scroll to bottom button tap
+        document.addEventListener('click', (e) => {
+            const scrollBtn = e.target.closest('#chatScrollToBottomBtn');
+            if (scrollBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const container = document.getElementById('messagesContainer');
+                if (container) {
+                    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                }
+                scrollBtn.classList.add('d-none');
+                const badge = document.getElementById('chatScrollToBottomBadge');
+                if (badge) {
+                    badge.textContent = '0';
+                    badge.classList.add('d-none');
+                }
+                if (this.renderer) {
+                    this.renderer.unreadScrolledCount = 0;
+                }
+            }
+        });
+
         const themeBtn = document.getElementById('themeBtn');
         if (themeBtn) {
             themeBtn.addEventListener('click', (e) => {
@@ -409,10 +445,12 @@ export class UIController {
                 e.stopPropagation();
                 eventBus.emit(EVENTS.THEME_SELECTOR_SHOW);
                 
-                const themeModal = document.getElementById('themeModal');
-                const overlay = document.getElementById('overlay');
-                if (themeModal) themeModal.classList.add('show');
-                if (overlay) overlay.classList.add('show');
+                if (window.chatThemeHandler && typeof window.chatThemeHandler.showThemePanel === 'function') {
+                    window.chatThemeHandler.showThemePanel();
+                } else {
+                    const themeModal = document.getElementById('themeModal');
+                    if (themeModal) themeModal.classList.add('show');
+                }
             });
         }
 
@@ -445,6 +483,7 @@ export class UIController {
         if (!message) return;
 
         if (action === 'reply') {
+            const wasEditing = Boolean(this.editingMessageId);
             this.replyToMessageId = messageId;
             this.editingMessageId = null;
             const editBar = document.getElementById('editPreviewBar');
@@ -461,7 +500,7 @@ export class UIController {
                 let snippet = message.content;
                 if (!snippet) {
                     const t = message.type || message.metadata?.type;
-                    if (t === 'voice_note' || message.is_voice_note) snippet = '🎙️ Voice note';
+                    if (t === 'voice_note' || message.is_voice_note || message.metadata?.is_voice_note) snippet = '🎙️ Voice note';
                     else if (t === 'audio') snippet = '🎵 Audio track';
                     else if (t === 'media' || t === 'image') snippet = '📷 Photo';
                     else if (t === 'video') snippet = '🎥 Video';
@@ -471,8 +510,19 @@ export class UIController {
                 replyText.textContent = snippet;
                 replyBar.classList.remove('d-none');
             }
+            document.getElementById('messaging-composer-form')?.classList.add('has-reply-context');
+
             const input = document.getElementById('messageInput');
-            if (input) input.focus();
+            if (input) {
+                // Leftover text from a cancelled edit would keep the button in send mode
+                if (wasEditing) {
+                    input.value = '';
+                    input.style.height = 'auto';
+                }
+                input.focus();
+            }
+            // Keep the mic available while replying (voice replies) unless text is typed
+            this._refreshComposerButton();
 
         } else if (action === 'edit') {
             const currentUserId = store.getState().currentUserId;
@@ -489,9 +539,7 @@ export class UIController {
             }
 
             this.editingMessageId = messageId;
-            this.replyToMessageId = null;
-            const replyBar = document.getElementById('replyPreviewBar');
-            if (replyBar) replyBar.classList.add('d-none');
+            this._clearReplyContext();
 
             const editBar = document.getElementById('editPreviewBar');
             const editText = document.getElementById('editTextSnippet');
@@ -671,6 +719,63 @@ export class UIController {
     }
 
     /**
+     * Re-sync the mic/send button with the current composer text
+     */
+    _refreshComposerButton() {
+        const input = document.getElementById('messageInput');
+        this._toggleVoiceSendButton(input ? input.value : '');
+    }
+
+    /**
+     * Hide reply banner and forget the reply target
+     */
+    _clearReplyContext() {
+        this.replyToMessageId = null;
+        const bar = document.getElementById('replyPreviewBar');
+        if (bar) bar.classList.add('d-none');
+        document.getElementById('messaging-composer-form')?.classList.remove('has-reply-context');
+    }
+
+    /**
+     * Build reply_to_details payload for an original message
+     * @param {string|number} replyId
+     * @returns {Object|null}
+     */
+    _buildReplyDetails(replyId) {
+        if (!replyId) return null;
+        const originalMsg = store.getMessageById(replyId);
+        if (!originalMsg) return null;
+        const currentUserId = store.getState().currentUserId;
+        const isOwnOrig = originalMsg.isOwn || Number(originalMsg.senderId) === Number(currentUserId);
+        return {
+            id: originalMsg.id,
+            senderId: originalMsg.senderId,
+            sender: {
+                username: isOwnOrig ? 'You' : (originalMsg.sender?.username || originalMsg.senderUsername || 'User')
+            },
+            content: originalMsg.content,
+            type: originalMsg.type || originalMsg.message_type,
+            attachment_type: originalMsg.metadata?.type || originalMsg.attachment_type,
+            is_voice_note: Boolean(originalMsg.metadata?.is_voice_note || originalMsg.is_voice_note)
+        };
+    }
+
+    /**
+     * Read and clear the active reply context (used by text and voice sends)
+     * @returns {{reply_to_id: number|null, reply_to_details: Object|null}}
+     */
+    consumeReplyContext() {
+        const replyId = this.replyToMessageId;
+        const details = this._buildReplyDetails(replyId);
+        this._clearReplyContext();
+        const parsedId = replyId ? parseInt(replyId, 10) : null;
+        return {
+            reply_to_id: Number.isFinite(parsedId) ? parsedId : null,
+            reply_to_details: details
+        };
+    }
+
+    /**
      * Toggle voice/send button icon
      * @param {string} content - Input content
      */
@@ -742,6 +847,12 @@ export class UIController {
             messageInput.style.height = 'auto';
         }
 
+        // Immediately remove empty state container without waiting for network
+        const emptyEl = document.getElementById('messagingEmptyState') || document.querySelector('.messaging-empty-state, .pwanimate-empty-state');
+        if (emptyEl) {
+            emptyEl.remove();
+        }
+
         // Handle edit mode
         if (this.editingMessageId) {
             const editId = this.editingMessageId;
@@ -774,34 +885,11 @@ export class UIController {
         }
 
         // Handle reply mode
-        const replyId = this.replyToMessageId;
-        this.replyToMessageId = null;
-        const replyBar = document.getElementById('replyPreviewBar');
-        if (replyBar) replyBar.classList.add('d-none');
-
-        let replyDetails = null;
-        if (replyId) {
-            const originalMsg = store.getMessageById(replyId);
-            if (originalMsg) {
-                const currentUserId = store.getState().currentUserId;
-                const isOwnOrig = originalMsg.isOwn || Number(originalMsg.senderId) === Number(currentUserId);
-                replyDetails = {
-                    id: originalMsg.id,
-                    senderId: originalMsg.senderId,
-                    sender: {
-                        username: isOwnOrig ? 'You' : (originalMsg.sender?.username || originalMsg.senderUsername || 'User')
-                    },
-                    content: originalMsg.content,
-                    type: originalMsg.type || originalMsg.message_type,
-                    attachment_type: originalMsg.metadata?.type || originalMsg.attachment_type,
-                    is_voice_note: Boolean(originalMsg.metadata?.is_voice_note || originalMsg.is_voice_note)
-                };
-            }
-        }
+        const { reply_to_id, reply_to_details } = this.consumeReplyContext();
 
         await messageService.sendMessage(clean, {
-            reply_to_id: replyId ? parseInt(replyId, 10) : null,
-            reply_to_details: replyDetails
+            reply_to_id,
+            reply_to_details
         });
     }
 
@@ -868,6 +956,31 @@ export class UIController {
      * @param {Map} peerOnlineStatus - Peer online status map
      */
     _updateTypingIndicators(typingUsers, peerOnlineStatus) {
+        // Synchronize status dots and avatars across DOM (left rail, conversation list, suggested friends)
+        if (peerOnlineStatus && peerOnlineStatus.size > 0) {
+            peerOnlineStatus.forEach((statusObj, userId) => {
+                const isOnline = statusObj ? Boolean(statusObj.isOnline) : false;
+                const dots = document.querySelectorAll(`[data-user-status-id="${userId}"]`);
+                dots.forEach(dot => {
+                    if (isOnline) {
+                        dot.classList.add('online');
+                        dot.style.display = '';
+                    } else {
+                        dot.classList.remove('online');
+                        dot.style.display = 'none';
+                    }
+                });
+                const avatars = document.querySelectorAll(`.chat-avatar[data-user-id="${userId}"]`);
+                avatars.forEach(av => {
+                    if (isOnline) {
+                        av.classList.add('online', 'avatar-online');
+                    } else {
+                        av.classList.remove('online', 'avatar-online');
+                    }
+                });
+            });
+        }
+
         const chatStatus = document.getElementById('chatStatus');
         const chatAvatar = document.querySelector('.chat-avatar');
 
@@ -994,47 +1107,37 @@ export class UIController {
 
         // Create intersection observer
         this.readReceiptObserver = new IntersectionObserver((entries) => {
+            // Truthful check: If tab is hidden or window minimized, do not mark as read
+            if (document.hidden) {
+                return;
+            }
+
             const messageIdsToMark = [];
 
             entries.forEach(entry => {
-                console.log('[INTERSECTION_OBSERVER] Entry:', {
-                    isIntersecting: entry.isIntersecting,
-                    messageId: entry.target.getAttribute('data-message-id'),
-                    senderId: entry.target.getAttribute('data-sender-id'),
-                    currentUserId: this.currentUserId
-                });
-
                 if (entry.isIntersecting) {
                     const messageId = entry.target.getAttribute('data-message-id');
                     const senderId = entry.target.getAttribute('data-sender-id');
+                    const status = entry.target.getAttribute('data-status');
 
                     // Only mark received messages (not own messages) that haven't been read yet
                     if (messageId &&
                         senderId &&
                         String(senderId) !== String(this.currentUserId) &&
+                        status !== 'read' &&
                         !this.readMessageIds.has(messageId)) {
 
-                        console.log('[INTERSECTION_OBSERVER] Marking message as read:', messageId);
                         messageIdsToMark.push(messageId);
                         this.readMessageIds.add(messageId);
 
                         // Stop observing this message
                         this.readReceiptObserver.unobserve(entry.target);
-                    } else {
-                        console.log('[INTERSECTION_OBSERVER] Skipping message:', {
-                            messageId,
-                            hasMessageId: !!messageId,
-                            hasSenderId: !!senderId,
-                            isOwnMessage: senderId ? String(senderId) === String(this.currentUserId) : 'no sender',
-                            alreadyRead: messageId ? this.readMessageIds.has(messageId) : 'no id'
-                        });
                     }
                 }
             });
 
-            // Send read receipts for visible messages
+            // Send read receipts for visible messages in batch
             if (messageIdsToMark.length > 0) {
-                console.log('[INTERSECTION_OBSERVER] Sending read receipts for visible messages:', messageIdsToMark);
                 this._log('MESSAGES_BECAME_VISIBLE', { count: messageIdsToMark.length });
                 messageService.markMessagesAsRead(messageIdsToMark);
             }
@@ -1042,6 +1145,19 @@ export class UIController {
             root: document.getElementById('messagesContainer'),
             threshold: 0.5 // Message must be 50% visible
         });
+
+        // Add listeners for tab visibility and window focus to check visible messages when user returns
+        if (!this._visibilityHandlersAttached) {
+            this._visibilityHandlersAttached = true;
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    this._observeReceivedMessages();
+                }
+            });
+            window.addEventListener('focus', () => {
+                this._observeReceivedMessages();
+            });
+        }
 
         this._log('READ_RECEIPT_OBSERVER_SETUP');
     }
@@ -1064,18 +1180,29 @@ export class UIController {
         const container = document.getElementById('messagesContainer');
         if (!container || !this.readReceiptObserver) return;
 
+        // Truthful check: do not mark messages as read if the tab is currently in background/hidden
+        const canMarkImmediately = !document.hidden;
+
         // Find all received message bubbles (not sent by current user)
         const receivedMessages = container.querySelectorAll('.message-bubble.received[data-message-id]');
         const immediatelyVisibleIds = [];
 
         receivedMessages.forEach(messageEl => {
             const messageId = messageEl.getAttribute('data-message-id');
-            // Only observe if not already read
+            const status = messageEl.getAttribute('data-status');
+
+            // Skip if already marked read in DOM or previously handled
+            if (status === 'read') {
+                this.readMessageIds.add(messageId);
+                return;
+            }
+
+            // Only observe if not already processed
             if (messageId && !this.readMessageIds.has(messageId)) {
                 this.readReceiptObserver.observe(messageEl);
 
-                // Check if message is already visible in viewport (for real-time messages)
-                if (this._isElementVisible(messageEl, container)) {
+                // Check if message is already visible in viewport
+                if (canMarkImmediately && this._isElementVisible(messageEl, container)) {
                     immediatelyVisibleIds.push(messageId);
                     this.readMessageIds.add(messageId);
                     this.readReceiptObserver.unobserve(messageEl);
@@ -1085,11 +1212,8 @@ export class UIController {
 
         // Immediately mark visible messages as read (don't wait for scroll)
         if (immediatelyVisibleIds.length > 0) {
-            console.log('[READ_RECEIPTS] Sending immediate read receipts for:', immediatelyVisibleIds);
             this._log('MESSAGES_ALREADY_VISIBLE', { count: immediatelyVisibleIds.length });
             messageService.markMessagesAsRead(immediatelyVisibleIds);
-        } else {
-            console.log('[READ_RECEIPTS] No immediately visible messages found');
         }
 
         this._log('OBSERVING_RECEIVED_MESSAGES', {
@@ -1169,11 +1293,13 @@ export class UIController {
             }
         }
 
+        const newPeerChecksum = this._computePeerOnlineStatusChecksum(newState.peerOnlineStatus);
         const changed = (
             newState.connectionState !== lastState.connectionState ||
             newState.typingUsers.size !== lastState.typingUsersSize ||
             (newState.recordingUsers?.size || 0) !== (lastState.recordingUsersSize || 0) ||
             newState.peerOnlineStatus.size !== lastState.peerOnlineStatusSize ||
+            newPeerChecksum !== (lastState.peerOnlineStatusChecksum || '') ||
             newState.uiState !== lastState.uiState ||
             JSON.stringify(newState.currentTheme) !== JSON.stringify(lastState.currentTheme)
         );
@@ -1183,6 +1309,19 @@ export class UIController {
         }
 
         return changed;
+    }
+
+    /**
+     * Compute a checksum of peer online statuses
+     * @param {Map} peerOnlineStatus - Peer online status map
+     * @returns {string} Checksum string
+     */
+    _computePeerOnlineStatusChecksum(peerOnlineStatus) {
+        if (!peerOnlineStatus || peerOnlineStatus.size === 0) return '';
+        return Array.from(peerOnlineStatus.entries())
+            .map(([id, status]) => `${id}:${status?.isOnline ? 1 : 0}:${status?.lastSeen || ''}`)
+            .sort()
+            .join('|');
     }
 
     /**
@@ -1224,6 +1363,7 @@ export class UIController {
             typingUsersList: Array.from(state.typingUsers || []).join(','),
             recordingUsersSize: state.recordingUsers?.size || 0,
             peerOnlineStatusSize: state.peerOnlineStatus.size,
+            peerOnlineStatusChecksum: this._computePeerOnlineStatusChecksum(state.peerOnlineStatus),
             uiState: state.uiState,
             currentTheme: state.currentTheme ? JSON.parse(JSON.stringify(state.currentTheme)) : null
         };

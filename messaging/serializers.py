@@ -99,7 +99,7 @@ class MessageSerializer(serializers.ModelSerializer):
 
     def get_is_forwarded(self, obj):
         """Determine if this message was forwarded."""
-        return getattr(obj, '_is_forwarded', False)
+        return bool(getattr(obj, 'is_forwarded', False) or getattr(obj, '_is_forwarded', False))
 
     def get_reply_to_details(self, obj):
         """Get details of the message being replied to."""

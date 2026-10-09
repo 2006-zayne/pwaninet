@@ -17,9 +17,10 @@ class ChatThemeHandler {
             preset: 'ocean-wave',
             wallpaper: null,
             customWallpaperData: null,
-            overlayEnabled: true,
-            overlayOpacity: 30,
+            overlayEnabled: false,
+            overlayOpacity: 0,
             overlayColor: '#ffffff',
+            customOverlayActive: false,
             bubbleStyle: 'default',
             bubbleSentColor: '',
             bubbleReceivedColor: ''
@@ -33,12 +34,27 @@ class ChatThemeHandler {
         this.setupThemeModeObserver();
     }
 
+    reinit() {
+        this.currentConversationId = this.getConversationId();
+        this.setupEventListeners();
+        this.loadCurrentTheme();
+    }
+
     setupThemeModeObserver() {
         const observer = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
                 if (mutation.type === 'attributes' && (mutation.attributeName === 'data-theme' || mutation.attributeName === 'data-bs-theme')) {
                     // Re-apply current configuration to refresh contrast calculations for the new mode
                     this.applyThemeConfig(this.activeConfig, false);
+                    // Guarantee any backdrop/overlay is completely eliminated
+                    const overlay = document.getElementById('overlay');
+                    if (overlay) overlay.classList.remove('show');
+                    document.querySelectorAll('.overlay.show, .theme-modal-backdrop, .modal-backdrop, .dropdown-backdrop').forEach(el => {
+                        el.classList.remove('show');
+                        if (el.classList.contains('theme-modal-backdrop') || el.classList.contains('modal-backdrop') || el.classList.contains('dropdown-backdrop')) {
+                            el.remove();
+                        }
+                    });
                 }
             }
         });
@@ -70,6 +86,12 @@ class ChatThemeHandler {
             themeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                const dropdownEl = document.getElementById('chatHeaderOptionsBtn');
+                if (dropdownEl && window.bootstrap && bootstrap.Dropdown) {
+                    const dd = bootstrap.Dropdown.getInstance(dropdownEl);
+                    if (dd) dd.hide();
+                }
+                document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
                 this.showThemePanel();
             });
         }
@@ -131,6 +153,9 @@ class ChatThemeHandler {
                     this.activeConfig.preset = preset;
                     this.activeConfig.wallpaper = null;
                     this.activeConfig.customWallpaperData = null;
+                    this.activeConfig.overlayEnabled = false;
+                    this.activeConfig.overlayOpacity = 0;
+                    this.activeConfig.customOverlayActive = false;
                     this.applyThemeConfig(this.activeConfig, false);
                     this.syncActiveUI();
                 }
@@ -152,67 +177,83 @@ class ChatThemeHandler {
             });
         });
 
-        // Overlay Controls
-        const overlayEnabled = document.getElementById('overlayEnabled');
-        if (overlayEnabled) {
-            overlayEnabled.addEventListener('change', (e) => {
-                this.activeConfig.overlayEnabled = e.target.checked;
-                this.applyOverlay();
-                this.updateLivePreview();
-            });
-        }
+        // Setup Delegated Event Listeners once on document
+        if (!this._delegatedListenersBound) {
+            this._delegatedListenersBound = true;
+            document.addEventListener('click', (e) => {
+                const pill = e.target.closest('.preset-opacity-btn, .opacity-presets .preset-btn');
+                if (pill) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const op = Number(pill.dataset.opacity);
+                    this.setOverlayOpacity(op, true);
+                    return;
+                }
 
-        const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
-        const overlayOpacityValue = document.getElementById('overlayOpacityValue');
-        if (overlayOpacitySlider) {
-            overlayOpacitySlider.addEventListener('input', (e) => {
-                this.activeConfig.overlayOpacity = Number(e.target.value);
-                if (overlayOpacityValue) overlayOpacityValue.textContent = e.target.value + '%';
-                this.applyOverlay();
-                this.updateLivePreview();
-            });
-        }
+                const colorPreset = e.target.closest('.color-tint-preset, .color-presets .color-preset-btn');
+                if (colorPreset) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const color = colorPreset.dataset.color;
+                    if (color) {
+                        this.activeConfig.overlayColor = color;
+                        const picker = document.getElementById('overlayColorPicker');
+                        const hex = document.getElementById('overlayColorHex');
+                        if (picker) picker.value = color;
+                        if (hex) hex.textContent = color;
+                        this.applyOverlay();
+                        this.updateLivePreview();
+                    }
+                    return;
+                }
 
-        // Quick opacity chips
-        document.querySelectorAll('.preset-opacity-btn, .opacity-presets .preset-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const op = Number(btn.dataset.opacity);
-                this.activeConfig.overlayOpacity = op;
-                if (overlayOpacitySlider) overlayOpacitySlider.value = op;
-                if (overlayOpacityValue) overlayOpacityValue.textContent = op + '%';
-                document.querySelectorAll('.preset-opacity-btn, .opacity-presets .preset-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.applyOverlay();
-                this.updateLivePreview();
-            });
-        });
+                const themeTrigger = e.target.closest('#themeBtn');
+                if (themeTrigger) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.showThemePanel();
+                    return;
+                }
 
-        // Overlay Color Presets & Picker
-        document.querySelectorAll('.color-tint-preset, .color-presets .color-preset-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const color = btn.dataset.color;
-                if (color) {
-                    this.activeConfig.overlayColor = color;
-                    const picker = document.getElementById('overlayColorPicker');
+                const closeBtn = e.target.closest('#closeThemePanelBtn, #closeThemeModal');
+                if (closeBtn) {
+                    e.preventDefault();
+                    this.hideThemePanel();
+                    return;
+                }
+
+                const saveBtn = e.target.closest('#saveThemeBtn, #saveThemePanelBtn');
+                if (saveBtn) {
+                    e.preventDefault();
+                    this.saveTheme();
+                    return;
+                }
+
+                const resetBtn = e.target.closest('#resetThemeBtn');
+                if (resetBtn) {
+                    e.preventDefault();
+                    this.resetThemeToDefault();
+                    return;
+                }
+            });
+
+            document.addEventListener('input', (e) => {
+                if (e.target && e.target.id === 'overlayOpacitySlider') {
+                    const op = Number(e.target.value);
+                    this.setOverlayOpacity(op, false);
+                } else if (e.target && e.target.id === 'overlayColorPicker') {
+                    this.activeConfig.overlayColor = e.target.value;
                     const hex = document.getElementById('overlayColorHex');
-                    if (picker) picker.value = color;
-                    if (hex) hex.textContent = color;
+                    if (hex) hex.textContent = e.target.value;
                     this.applyOverlay();
                     this.updateLivePreview();
                 }
             });
-        });
 
-        const overlayColorPicker = document.getElementById('overlayColorPicker');
-        const overlayColorHex = document.getElementById('overlayColorHex');
-        if (overlayColorPicker) {
-            overlayColorPicker.addEventListener('input', (e) => {
-                this.activeConfig.overlayColor = e.target.value;
-                if (overlayColorHex) overlayColorHex.textContent = e.target.value;
-                this.applyOverlay();
-                this.updateLivePreview();
+            document.addEventListener('change', (e) => {
+                if (e.target && e.target.id === 'overlayEnabled') {
+                    this.setOverlayEnabled(e.target.checked);
+                }
             });
         }
 
@@ -316,6 +357,15 @@ class ChatThemeHandler {
     }
 
     showThemePanel() {
+        const overlay = document.getElementById('overlay');
+        if (overlay) overlay.classList.remove('show');
+        document.querySelectorAll('.overlay.show, .theme-modal-backdrop, .modal-backdrop, .dropdown-backdrop').forEach(el => {
+            el.classList.remove('show');
+            if (el.classList.contains('theme-modal-backdrop') || el.classList.contains('modal-backdrop') || el.classList.contains('dropdown-backdrop')) {
+                el.remove();
+            }
+        });
+
         const panel = document.getElementById('chatThemePanel');
         if (panel) {
             panel.classList.remove('d-none');
@@ -341,6 +391,17 @@ class ChatThemeHandler {
             modal.classList.remove('show');
             document.body.style.overflow = '';
         }
+        // Ensure any backdrop/overlay from theme selection is closed
+        const overlay = document.getElementById('overlay');
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
+        document.querySelectorAll('.overlay.show, .theme-modal-backdrop, .modal-backdrop, .dropdown-backdrop, .dropdown-menu.show').forEach(el => {
+            el.classList.remove('show');
+            if (el.classList.contains('theme-modal-backdrop') || el.classList.contains('modal-backdrop') || el.classList.contains('dropdown-backdrop')) {
+                el.remove();
+            }
+        });
     }
 
     // Alias for legacy calls
@@ -381,8 +442,16 @@ class ChatThemeHandler {
 
         const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
         const overlayOpacityValue = document.getElementById('overlayOpacityValue');
-        if (overlayOpacitySlider) overlayOpacitySlider.value = this.activeConfig.overlayOpacity;
-        if (overlayOpacityValue) overlayOpacityValue.textContent = this.activeConfig.overlayOpacity + '%';
+        const curOp = (this.activeConfig.overlayOpacity !== undefined && this.activeConfig.overlayOpacity !== null)
+            ? Number(this.activeConfig.overlayOpacity)
+            : 30;
+        if (overlayOpacitySlider) overlayOpacitySlider.value = curOp;
+        if (overlayOpacityValue) overlayOpacityValue.textContent = curOp + '%';
+
+        // Sync pills active state
+        document.querySelectorAll('.preset-opacity-btn, .opacity-presets .preset-btn').forEach(b => {
+            b.classList.toggle('active', Number(b.dataset.opacity) === curOp);
+        });
 
         const overlayColorPicker = document.getElementById('overlayColorPicker');
         const overlayColorHex = document.getElementById('overlayColorHex');
@@ -460,8 +529,11 @@ class ChatThemeHandler {
 
         // 2. Overlay in preview
         if (overlayLayer) {
-            const isEnabled = this.activeConfig.overlayEnabled;
-            const opacity = isEnabled ? (Number(this.activeConfig.overlayOpacity || 30) / 100) : 0;
+            const isEnabled = this.activeConfig.overlayEnabled !== false;
+            const rawOp = (this.activeConfig.overlayOpacity !== undefined && this.activeConfig.overlayOpacity !== null)
+                ? Number(this.activeConfig.overlayOpacity)
+                : 30;
+            const opacity = isEnabled ? (rawOp / 100) : 0;
             overlayLayer.style.backgroundColor = this.activeConfig.overlayColor || '#ffffff';
             overlayLayer.style.opacity = opacity;
         }
@@ -503,16 +575,80 @@ class ChatThemeHandler {
         }
     }
 
+    setOverlayOpacity(op, updateSlider = true) {
+        const numOp = Math.max(0, Math.min(80, Number(op)));
+        this.activeConfig.overlayOpacity = numOp;
+        this.activeConfig.overlayEnabled = numOp > 0;
+
+        const slider = document.getElementById('overlayOpacitySlider');
+        const valBadge = document.getElementById('overlayOpacityValue');
+        const sw = document.getElementById('overlayEnabled');
+
+        if (slider && updateSlider) slider.value = numOp;
+        if (valBadge) valBadge.textContent = numOp + '%';
+        if (sw) sw.checked = (numOp > 0);
+
+        document.querySelectorAll('.preset-opacity-btn, .opacity-presets .preset-btn').forEach(b => {
+            b.classList.toggle('active', Number(b.dataset.opacity) === numOp);
+        });
+
+        this.applyOverlay();
+        this.updateLivePreview();
+    }
+
+    setOverlayEnabled(enabled) {
+        this.activeConfig.overlayEnabled = Boolean(enabled);
+        const sw = document.getElementById('overlayEnabled');
+        if (sw) sw.checked = this.activeConfig.overlayEnabled;
+
+        const currentOp = this.activeConfig.overlayEnabled
+            ? (Number(this.activeConfig.overlayOpacity) || 30)
+            : 0;
+
+        const slider = document.getElementById('overlayOpacitySlider');
+        const valBadge = document.getElementById('overlayOpacityValue');
+        if (slider) slider.value = currentOp;
+        if (valBadge) valBadge.textContent = currentOp + '%';
+
+        document.querySelectorAll('.preset-opacity-btn, .opacity-presets .preset-btn').forEach(b => {
+            b.classList.toggle('active', Number(b.dataset.opacity) === currentOp);
+        });
+
+        this.applyOverlay();
+        this.updateLivePreview();
+    }
+
     applyOverlay() {
         const chatTarget = this.getChatTarget();
-        if (!chatTarget) return;
-
-        const isEnabled = this.activeConfig.overlayEnabled;
-        const opacity = isEnabled ? (Number(this.activeConfig.overlayOpacity || 30) / 100) : 0;
+        const whatsappLayout = document.getElementById('whatsappLayout');
+        const isPreset = this.activeConfig.type === 'preset' && !this.activeConfig.customOverlayActive;
+        const isEnabled = !isPreset && this.activeConfig.overlayEnabled !== false;
+        const rawOp = (isEnabled && this.activeConfig.overlayOpacity !== undefined && this.activeConfig.overlayOpacity !== null)
+            ? Number(this.activeConfig.overlayOpacity)
+            : 0;
+        const opacity = isEnabled ? (rawOp / 100) : 0;
         const color = this.activeConfig.overlayColor || '#ffffff';
 
-        chatTarget.style.setProperty('--chat-overlay-color', color);
-        chatTarget.style.setProperty('--chat-overlay-opacity', opacity);
+        if (chatTarget) {
+            chatTarget.style.setProperty('--chat-overlay-color', color);
+            chatTarget.style.setProperty('--chat-overlay-opacity', opacity);
+        }
+        if (whatsappLayout) {
+            whatsappLayout.style.setProperty('--chat-overlay-color', color);
+            whatsappLayout.style.setProperty('--chat-overlay-opacity', opacity);
+        }
+        document.documentElement.style.setProperty('--chat-overlay-color', color);
+        document.documentElement.style.setProperty('--chat-overlay-opacity', opacity);
+        if (document.body) {
+            document.body.style.setProperty('--chat-overlay-color', color);
+            document.body.style.setProperty('--chat-overlay-opacity', opacity);
+        }
+
+        const overlayLayer = document.getElementById('themePreviewOverlay');
+        if (overlayLayer) {
+            overlayLayer.style.backgroundColor = color;
+            overlayLayer.style.opacity = opacity;
+        }
     }
 
     applyBubbleStyle(style) {
@@ -630,6 +766,10 @@ class ChatThemeHandler {
         } else {
             // Curated Atmosphere Preset
             const preset = config.preset || 'default';
+            if (!config.customOverlayActive) {
+                this.activeConfig.overlayOpacity = 0;
+                this.activeConfig.overlayEnabled = false;
+            }
             if (chatTarget) {
                 chatTarget.style.removeProperty('--chat-wallpaper');
                 chatTarget.setAttribute('data-chat-theme', preset);
@@ -733,9 +873,10 @@ class ChatThemeHandler {
         let targetConfig = {
             type: 'preset',
             preset: defaultTheme,
-            overlayEnabled: true,
-            overlayOpacity: 30,
-            overlayColor: '#ffffff'
+            overlayEnabled: false,
+            overlayOpacity: 0,
+            overlayColor: '#ffffff',
+            customOverlayActive: false
         };
 
         // Check if there is a chat-specific theme for this conversation
@@ -767,15 +908,16 @@ class ChatThemeHandler {
             overlayEnabled: this.activeConfig.overlayEnabled,
             overlayOpacity: this.activeConfig.overlayOpacity,
             overlayColor: this.activeConfig.overlayColor,
+            customOverlayActive: this.activeConfig.customOverlayActive,
             bubbleStyle: this.activeConfig.bubbleStyle,
             bubbleSentColor: this.activeConfig.bubbleSentColor,
             bubbleReceivedColor: this.activeConfig.bubbleReceivedColor
         };
 
         if (applyToAll) {
-            // 1. Set global user default in localStorage
             const defaultThemeName = this.activeConfig.type === 'preset' ? this.activeConfig.preset : 'default';
             localStorage.setItem('default_chat_theme', defaultThemeName);
+            localStorage.setItem('chat_theme', defaultThemeName);
 
             // 2. Persist to backend user preference
             this.saveChatThemePreference(defaultThemeName);
@@ -812,9 +954,10 @@ class ChatThemeHandler {
             preset: defaultTheme,
             wallpaper: null,
             customWallpaperData: null,
-            overlayEnabled: true,
-            overlayOpacity: 30,
+            overlayEnabled: false,
+            overlayOpacity: 0,
             overlayColor: '#ffffff',
+            customOverlayActive: false,
             bubbleStyle: 'default',
             bubbleSentColor: '',
             bubbleReceivedColor: ''
@@ -878,8 +1021,24 @@ class ChatThemeHandler {
 }
 
 // Global initialization
-document.addEventListener('DOMContentLoaded', () => {
-    window.chatThemeHandler = new ChatThemeHandler();
+function initChatThemeHandler() {
+    if (!window.chatThemeHandler) {
+        window.chatThemeHandler = new ChatThemeHandler();
+    } else {
+        window.chatThemeHandler.reinit();
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChatThemeHandler);
+} else {
+    initChatThemeHandler();
+}
+
+document.addEventListener('htmx:afterSwap', () => {
+    if (window.chatThemeHandler) {
+        window.chatThemeHandler.reinit();
+    }
 });
 
 // Animation Keyframes

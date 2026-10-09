@@ -45,6 +45,13 @@ export class MessageRenderer {
         this._setupEvictionListeners();
         this._setupSingleMediaPlaybackCoordinator();
 
+        // Listen for image/video/media load events inside container to maintain bottom settling
+        this.container.addEventListener('load', (e) => {
+            if (e.target && (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO')) {
+                this._scrollToBottom(false);
+            }
+        }, true);
+
         // Listen for live upload progress updates
         eventBus.on(EVENTS.MESSAGE_UPLOAD_PROGRESS, (data) => {
             if (data?.tempId) {
@@ -552,13 +559,21 @@ export class MessageRenderer {
         }
 
         const onProgress = (percent) => {
-            if (sizeText) sizeText.textContent = `${percent}%`;
-            if (spinner) {
-                const spinnerBar = spinner.querySelector('.dl-spinner-bar');
-                if (spinnerBar) {
-                    const circumference = 94.25;
-                    const offset = circumference * (1 - percent / 100);
-                    spinnerBar.style.strokeDashoffset = Math.max(0, offset).toFixed(1);
+            if (isVoiceNote) {
+                const timer = bubble.querySelector('.vn-timer');
+                if (timer) timer.textContent = `${percent}%`;
+            } else if (isAudioTrack) {
+                const timeEl = bubble.querySelector('.audio-track-time');
+                if (timeEl) timeEl.textContent = `${percent}%`;
+            } else {
+                if (sizeText) sizeText.textContent = `${percent}%`;
+                if (spinner) {
+                    const spinnerBar = spinner.querySelector('.dl-spinner-bar');
+                    if (spinnerBar) {
+                        const circumference = 94.25;
+                        const offset = circumference * (1 - percent / 100);
+                        spinnerBar.style.strokeDashoffset = Math.max(0, offset).toFixed(1);
+                    }
                 }
             }
         };
@@ -705,19 +720,22 @@ export class MessageRenderer {
             if (isVoiceNote) {
                 const playBtn = bubble.querySelector('.vn-play-btn');
                 if (playBtn) {
-                    playBtn.innerHTML = `<i class="bi bi-arrow-down vn-play-icon"></i>`;
+                    playBtn.innerHTML = `<i class="bi bi-arrow-clockwise vn-play-icon"></i>`;
                 }
                 const timer = bubble.querySelector('.vn-timer');
                 if (timer) timer.textContent = 'Retry';
             } else if (isAudioTrack) {
                 const playBtn = bubble.querySelector('.audio-track-play-btn');
                 if (playBtn) {
-                    playBtn.innerHTML = `<i class="bi bi-arrow-down track-play-icon"></i>`;
+                    playBtn.innerHTML = `<i class="bi bi-arrow-clockwise track-play-icon"></i>`;
                 }
                 const timeEl = bubble.querySelector('.audio-track-time');
                 if (timeEl) timeEl.textContent = 'Retry';
             } else {
-                if (dlIcon) dlIcon.classList.remove('d-none');
+                if (dlIcon) {
+                    dlIcon.innerHTML = `<i class="bi bi-arrow-clockwise" style="font-size: 1.1rem;"></i>`;
+                    dlIcon.classList.remove('d-none');
+                }
                 if (spinner) spinner.classList.add('d-none');
                 if (sizeText) sizeText.textContent = 'Retry';
             }
@@ -920,7 +938,7 @@ export class MessageRenderer {
             }
 
             // Remove empty state if present
-            const emptyEl = this.container.querySelector('.empty-chat-placeholder, .empty-state-container');
+            const emptyEl = this.container.querySelector('.empty-chat-placeholder, .empty-state-container, #messagingEmptyState, .messaging-empty-state, .pwanimate-empty-state');
             if (emptyEl) {
                 emptyEl.remove();
             }
@@ -928,6 +946,8 @@ export class MessageRenderer {
             // Record scroll anchor metrics before DOM changes
             const prevScrollHeight = this.container.scrollHeight;
             const prevScrollTop = this.container.scrollTop;
+            const threshold = 180;
+            const wasNearBottom = (prevScrollHeight - prevScrollTop - this.container.clientHeight) < threshold;
 
             const viewItems = this._buildView(messages || []);
             console.log("[RENDERER] Built view items:", viewItems?.length);
@@ -1023,8 +1043,24 @@ export class MessageRenderer {
                 this.container.scrollTop = prevScrollTop + heightDiff;
                 this.preserveScrollOnPrepend = false;
             } else {
+                const isInitialRender = (this.lastRenderedCount === 0);
                 const isNewCount = messages.length > this.lastRenderedCount;
-                this._scrollToBottom(isNewCount);
+                if (isInitialRender) {
+                    this._scrollToBottom(true);
+                    this.updateScrollToBottomButton();
+                } else if (isNewCount) {
+                    const lastMsg = messages[messages.length - 1];
+                    const isFromMe = (lastMsg && (lastMsg.sender_id === this.currentUserId || lastMsg.senderId === this.currentUserId || lastMsg.isOptimistic));
+                    this.handleIncomingMessageScroll(isFromMe);
+                } else {
+                    // Small change (status update, reaction, typing) - anchor to bottom if user was near bottom, else preserve exact scroll offset!
+                    if (wasNearBottom) {
+                        this._scrollToBottom(true);
+                    } else {
+                        this.container.scrollTop = prevScrollTop;
+                    }
+                    this.updateScrollToBottomButton();
+                }
             }
             this.lastRenderedCount = messages.length;
 
@@ -1060,10 +1096,11 @@ export class MessageRenderer {
             return wrapperEl;
         }
 
+        const bubble = wrapperEl.querySelector('.message-bubble');
+
         // If message was edited, cleanly refresh text content and spacer, and ensure 'Edited' indicator
         const isEdited = Boolean(message.editedAt || message.is_edited || message.edited_at || message.metadata?.edited_at);
         if (isEdited) {
-            const bubble = wrapperEl.querySelector('.message-bubble');
             if (bubble) {
                 bubble.classList.add('is-edited-bubble');
             }
@@ -1085,22 +1122,32 @@ export class MessageRenderer {
             }
         }
 
+        // If message is forwarded and element doesn't have forwarded badge yet, inject it in-place
+        if (!wrapperEl.querySelector('.message-forwarded-badge')) {
+            const forwardedHtml = this._buildForwardedBadgeHtml(message);
+            if (forwardedHtml && bubble) {
+                const topMeta = bubble.querySelector('.media-bubble-top-meta');
+                if (topMeta) {
+                    topMeta.insertAdjacentHTML('afterbegin', forwardedHtml);
+                } else {
+                    bubble.insertAdjacentHTML('afterbegin', forwardedHtml);
+                }
+            }
+        }
+
         // If message has reply quote and element doesn't have it yet, inject it in-place
         if (!wrapperEl.querySelector('.quoted-reply-box')) {
             const replyHtml = this._buildReplyQuoteHtml(message);
-            if (replyHtml) {
-                const bubble = wrapperEl.querySelector('.message-bubble');
-                if (bubble) {
-                    const tempWrap = document.createElement('div');
-                    tempWrap.innerHTML = replyHtml;
-                    const replyBox = tempWrap.firstElementChild;
-                    if (replyBox) {
-                        const forwardedBadge = bubble.querySelector('.message-forwarded-badge');
-                        if (forwardedBadge) {
-                            forwardedBadge.after(replyBox);
-                        } else {
-                            bubble.prepend(replyBox);
-                        }
+            if (replyHtml && bubble) {
+                const tempWrap = document.createElement('div');
+                tempWrap.innerHTML = replyHtml;
+                const replyBox = tempWrap.firstElementChild;
+                if (replyBox) {
+                    const forwardedBadge = bubble.querySelector('.message-forwarded-badge');
+                    if (forwardedBadge) {
+                        forwardedBadge.after(replyBox);
+                    } else {
+                        bubble.prepend(replyBox);
                     }
                 }
             }
@@ -1116,7 +1163,6 @@ export class MessageRenderer {
             wrapperEl.classList.add(`group-${message.groupPosition}`);
         }
 
-        const bubble = wrapperEl.querySelector('.message-bubble');
         if (bubble) {
             if (bubble.getAttribute('data-status') !== message.status) {
                 bubble.setAttribute('data-status', message.status);
@@ -1198,6 +1244,20 @@ export class MessageRenderer {
     updateMessageStatuses(messages) {
         if (!this.container || !messages) return;
 
+        // Find the highest ID among sent messages that are marked as 'read'
+        let lastReadId = null;
+        for (const msg of messages) {
+            const isSent = (this.currentUserId !== null && Number(msg.senderId) === Number(this.currentUserId)) ||
+                String(msg.senderId) === String(this.currentUserId) ||
+                msg.isOwn;
+            if (isSent && msg.status === 'read') {
+                const numId = parseInt(msg.id, 10);
+                if (!isNaN(numId) && (lastReadId === null || numId > lastReadId)) {
+                    lastReadId = numId;
+                }
+            }
+        }
+
         for (const msg of messages) {
             let wrapper = this.container.querySelector(`.message-wrapper[data-message-id="${msg.id}"]`);
             if (!wrapper && msg.metadata?.temp_id) {
@@ -1209,17 +1269,18 @@ export class MessageRenderer {
             if (!wrapper) continue;
 
             const currentStatus = wrapper.getAttribute('data-status');
-            if (currentStatus !== msg.status) {
+            const isSent = wrapper.classList.contains('sent-wrapper') ||
+                (this.currentUserId !== null && Number(msg.senderId) === Number(this.currentUserId)) ||
+                String(msg.senderId) === String(this.currentUserId) ||
+                msg.isOwn;
+
+            if (currentStatus !== msg.status || (isSent && msg.status === 'read')) {
                 wrapper.setAttribute('data-status', msg.status);
                 const bubble = wrapper.querySelector('.message-bubble');
                 if (bubble) bubble.setAttribute('data-status', msg.status);
 
-                const isSent = wrapper.classList.contains('sent-wrapper') ||
-                    (this.currentUserId !== null && Number(msg.senderId) === Number(this.currentUserId)) ||
-                    String(msg.senderId) === String(this.currentUserId);
-
                 if (isSent) {
-                    const metaDiv = wrapper.querySelector('.message-meta');
+                    const metaDiv = wrapper.querySelector('.message-meta, .jumboji-meta-pill, .sticker-meta-pill, .media-meta-overlay');
                     if (metaDiv) {
                         let receiptSpan = metaDiv.querySelector('.message-read-receipt');
                         if (!receiptSpan) {
@@ -1229,8 +1290,11 @@ export class MessageRenderer {
                         const status = msg.status || 'sent';
                         receiptSpan.className = `message-read-receipt status-${status}`;
                         const receiverAvatar = document.body.dataset.receiverAvatar;
-                        const avatarUrl = msg.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
-                        if (status === 'read') {
+                        const avatarUrl = msg.read_avatar || msg.metadata?.read_avatar || receiverAvatar;
+                        const numId = parseInt(msg.id, 10);
+                        const isLastRead = (numId === lastReadId);
+
+                        if (status === 'read' && isLastRead && avatarUrl) {
                             receiptSpan.classList.add('read-avatar-only');
                             receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
                         } else {
@@ -1446,7 +1510,15 @@ export class MessageRenderer {
     }
 
     _buildForwardedBadgeHtml(message) {
-        const isForwarded = Boolean(message.is_forwarded || message.isForwarded || message.metadata?.is_forwarded);
+        if (!message) return '';
+        const isForwarded = Boolean(
+            message.is_forwarded || 
+            message.isForwarded || 
+            message.forwarded ||
+            message.metadata?.is_forwarded || 
+            message.metadata?.isForwarded || 
+            message.metadata?.forwarded
+        );
         if (!isForwarded) return '';
         return `
             <div class="message-forwarded-badge">
@@ -1522,6 +1594,24 @@ export class MessageRenderer {
         wrapperDiv.setAttribute('data-status', message.status || 'sent');
         wrapperDiv.setAttribute('data-group-position', groupPos);
 
+        // Add avatar for received messages to match regular message alignment (only on last/single in group)
+        if (!isOwn) {
+            const shouldShowAvatar = groupPos === 'single' || groupPos === 'last';
+            const avatarContainer = document.createElement('div');
+            avatarContainer.className = `message-avatar-container ${shouldShowAvatar ? '' : 'hidden'}`;
+
+            if (shouldShowAvatar) {
+                const avatarUrl = this._getSenderAvatar(message.senderId);
+                const avatarImg = document.createElement('img');
+                avatarImg.className = 'message-avatar';
+                avatarImg.src = avatarUrl;
+                avatarImg.alt = 'Avatar';
+                avatarContainer.appendChild(avatarImg);
+            }
+
+            wrapperDiv.appendChild(avatarContainer);
+        }
+
         const contentWrapper = document.createElement('div');
         contentWrapper.className = 'message-content-wrapper';
 
@@ -1573,6 +1663,10 @@ export class MessageRenderer {
         return this._createEmojiMessage(message);
         }
 
+        if (message.type === 'media_group' || (message.attachments && message.attachments.length > 1) || (message.metadata?.attachments && message.metadata.attachments.length > 1)) {
+            return this._createMediaGroupMessage(message);
+        }
+
         if (
             message.type === 'media' ||
             message.type === 'sticker' ||
@@ -1580,16 +1674,15 @@ export class MessageRenderer {
             message.type === 'audio' ||
             message.type === 'voice_note' ||
             message.type === 'document' ||
+            Boolean(message.metadata?.url) ||
+            Boolean(message.attachment_url) ||
+            Boolean(message.attachment) ||
             message.metadata?.is_sticker ||
             message.metadata?.is_gif ||
             message.attachment_type === 'sticker' ||
             message.attachment_type === 'gif'
         ) {
             return this._createMediaMessage(message);
-        }
-
-        if (message.type === 'media_group' || (message.attachments && message.attachments.length > 1)) {
-            return this._createMediaGroupMessage(message);
         }
 
         if (message.type === 'link') {
@@ -1752,12 +1845,13 @@ export class MessageRenderer {
             receiptSpan.className = `message-read-receipt status-${status}`;
 
             const receiverAvatar = document.body.dataset.receiverAvatar;
-            const avatarUrl = message.metadata?.read_avatar || receiverAvatar || '/static/images/default_pic1.jpg';
+            const avatarUrl = message.read_avatar || message.metadata?.read_avatar || receiverAvatar;
 
-            if (status === 'read' && (message.isLastRead || message.groupPosition === 'single' || message.groupPosition === 'last')) {
+            if (status === 'read' && message.isLastRead && avatarUrl) {
                 receiptSpan.classList.add('read-avatar-only');
                 receiptSpan.innerHTML = `<img src="${escapeHtml(avatarUrl)}" alt="Read" class="read-avatar-img">`;
             } else {
+                receiptSpan.classList.remove('read-avatar-only');
                 receiptSpan.innerHTML = this._getStatusIcon(status, message.id, message);
             }
             metaDiv.appendChild(receiptSpan);
@@ -1987,8 +2081,8 @@ export class MessageRenderer {
         console.log('[MEDIA_BUBBLE] Rendering single media bubble for:', message.id);
 
         const metadata = message.metadata || {};
-        const attachmentType = metadata.type || 'image';
-        const mediaUrl = metadata.url || '';
+        const mediaUrl = metadata.url || message.attachment_url || (typeof message.attachment === 'string' ? message.attachment : '') || (metadata.attachments && metadata.attachments[0] ? (metadata.attachments[0].file_url || metadata.attachments[0].file || metadata.attachments[0].url) : '') || '';
+        const attachmentType = metadata.type || message.attachment_type || (metadata.attachments && metadata.attachments[0] ? metadata.attachments[0].file_type : '') || (mediaUrl.match(/\.(mp4|webm|mov|ogg)$/i) ? 'video' : 'image');
         const caption = message.content || '';
         const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
         const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
@@ -2051,7 +2145,7 @@ export class MessageRenderer {
                 // When not downloaded: render blurred preview thumbnail underneath download overlay
                 const previewSrc = metadata.thumbnail || metadata.previewUrl || mediaUrl;
                 mediaContent = `
-                    <img src="${escapeHtml(previewSrc)}" data-full-src="${escapeHtml(mediaUrl)}" alt="Image preview" class="single-media-img not-downloaded-thumb" style="filter: blur(14px) brightness(0.72); transform: scale(1.04); display: block; width: 100%; height: auto; max-height: 380px; object-fit: cover; border-radius: 12px !important;">
+                    <img src="${escapeHtml(previewSrc)}" data-full-src="${escapeHtml(mediaUrl)}" alt="Image preview" loading="lazy" class="single-media-img not-downloaded-thumb" style="filter: blur(14px) brightness(0.72); transform: scale(1.04); display: block; width: 100%; height: auto; max-height: 380px; object-fit: cover; border-radius: 12px !important;">
                 `;
             } else {
                 mediaContent = `<img src="${escapeHtml(mediaUrl)}" alt="Image" loading="lazy" class="single-media-img" style="border-radius: 12px !important;">`;
@@ -2069,7 +2163,7 @@ export class MessageRenderer {
                         </svg>
                     </div>
                     ${thumbUrl ? `
-                        <img src="${escapeHtml(thumbUrl)}" data-full-src="${escapeHtml(mediaUrl)}" alt="Video preview" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;">
+                        <img src="${escapeHtml(thumbUrl)}" data-full-src="${escapeHtml(mediaUrl)}" alt="Video preview" loading="lazy" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;">
                     ` : `
                         <video src="${videoSource}" preload="metadata" poster="${escapeHtml(thumbUrl)}" data-full-src="${escapeHtml(mediaUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;"></video>
                     `}
@@ -2328,6 +2422,15 @@ export class MessageRenderer {
             mediaFrame.appendChild(downloadOverlay);
         }
 
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
+        if (forwardedHtml || replyHtml) {
+            const topDiv = document.createElement('div');
+            topDiv.className = 'media-bubble-top-meta px-2 pt-1 pb-1';
+            topDiv.innerHTML = `${forwardedHtml}${replyHtml}`;
+            bubble.appendChild(topDiv);
+        }
+
         bubble.appendChild(mediaFrame);
 
         // Footer / caption area: has timestamp on floating overlay if no caption, or global caption text + timestamp if has caption
@@ -2420,7 +2523,7 @@ export class MessageRenderer {
                     const tileThumb = attachment.thumbnail || attachment.previewUrl || fileUrl;
                     tileContent = `
                         ${tileThumb ? `
-                            <img src="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" alt="Image preview" class="tile-image-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;">
+                            <img src="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" alt="Image preview" loading="lazy" class="tile-image-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;">
                         ` : `
                             <div class="tile-placeholder-wrap" style="border-radius: 8px !important;">
                                 <svg class="tile-placeholder-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -2447,7 +2550,7 @@ export class MessageRenderer {
                             </svg>
                         </div>
                         ${tileThumb ? `
-                            <img src="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" alt="Video preview" class="tile-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;">
+                            <img src="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" alt="Video preview" loading="lazy" class="tile-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;">
                         ` : `
                             <video src="${videoSrc}" preload="metadata" poster="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;"></video>
                         `}
@@ -2646,11 +2749,153 @@ export class MessageRenderer {
 
             if (fileType === 'video') {
                 content.innerHTML = `
-                    <video class="media-viewer-video" controls autoplay playsinline>
-                        <source src="${escapeHtml(fileUrl)}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
+                    <div class="media-viewer-video-container">
+                        <video class="media-viewer-video"
+                               src="${escapeHtml(fileUrl)}"
+                               autoplay
+                               playsinline
+                               loop
+                               preload="auto"
+                               data-chat-media="true">
+                            Your browser does not support the video tag.
+                        </video>
+
+                        <!-- Tap Hitbox for play / pause -->
+                        <button type="button" class="media-viewer-tap-hitbox" aria-label="Play or pause video"></button>
+
+                        <!-- Transient Play/Pause HUD Indicator -->
+                        <div class="media-viewer-play-hud" aria-hidden="true">
+                            <i class="bi bi-play-fill"></i>
+                        </div>
+
+                        <!-- Floating Mute / Unmute Toggle Button -->
+                        <button type="button" class="media-viewer-floating-mute" title="Sound" aria-label="Toggle mute">
+                            <i class="bi bi-volume-up-fill"></i>
+                        </button>
+
+                        <!-- Draggable Micro-Scrubber / Progress Bar -->
+                        <div class="media-viewer-progress-container" aria-label="Video scrubber">
+                            <div class="media-viewer-progress-bar"></div>
+                        </div>
+                    </div>
                 `;
+
+                const video = content.querySelector('.media-viewer-video');
+                const tapHitbox = content.querySelector('.media-viewer-tap-hitbox');
+                const playHud = content.querySelector('.media-viewer-play-hud');
+                const muteBtn = content.querySelector('.media-viewer-floating-mute');
+                const progressContainer = content.querySelector('.media-viewer-progress-container');
+                const progressBar = content.querySelector('.media-viewer-progress-bar');
+
+                if (video) {
+                    // Chat full media videos are NOT muted by default
+                    video.muted = false;
+                    video.volume = 1.0;
+
+                    // Play attempt
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(() => {
+                            // If browser autoplay policy with audio fails, fallback to muted then user can tap unmute
+                            video.muted = true;
+                            if (muteBtn) {
+                                muteBtn.innerHTML = '<i class="bi bi-volume-mute-fill"></i>';
+                            }
+                            video.play().catch(() => {});
+                        });
+                    }
+
+                    // Transient HUD trigger
+                    const showHud = (isPlay) => {
+                        if (!playHud) return;
+                        playHud.innerHTML = isPlay ? '<i class="bi bi-play-fill"></i>' : '<i class="bi bi-pause-fill"></i>';
+                        playHud.classList.add('show');
+                        clearTimeout(playHud._hudTimeout);
+                        playHud._hudTimeout = setTimeout(() => {
+                            playHud.classList.remove('show');
+                        }, 500);
+                    };
+
+                    // Tap to play / pause
+                    if (tapHitbox) {
+                        tapHitbox.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (video.paused) {
+                                video.play().then(() => showHud(true)).catch(() => {});
+                            } else {
+                                video.pause();
+                                showHud(false);
+                            }
+                        });
+                    }
+
+                    // Floating mute / unmute button
+                    if (muteBtn) {
+                        muteBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            video.muted = !video.muted;
+                            muteBtn.innerHTML = video.muted
+                                ? '<i class="bi bi-volume-mute-fill"></i>'
+                                : '<i class="bi bi-volume-up-fill"></i>';
+                        });
+                    }
+
+                    // Progress update
+                    let isDragging = false;
+                    video.addEventListener('timeupdate', () => {
+                        if (!isDragging && progressBar && video.duration) {
+                            const pct = Math.min(100, Math.max(0, (video.currentTime / video.duration) * 100));
+                            progressBar.style.width = `${pct}%`;
+                        }
+                    });
+
+                    // Draggable Progress Scrubber
+                    if (progressContainer && progressBar) {
+                        const seekToPosition = (clientX) => {
+                            const rect = progressContainer.getBoundingClientRect();
+                            if (rect.width <= 0) return;
+                            const offsetX = Math.max(0, Math.min(clientX - rect.left, rect.width));
+                            const fraction = offsetX / rect.width;
+                            const pct = fraction * 100;
+                            progressBar.style.width = `${pct}%`;
+                            if (video.duration) {
+                                video.currentTime = fraction * video.duration;
+                            }
+                        };
+
+                        const handleDragStart = (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            isDragging = true;
+                            progressContainer.classList.add('is-dragging');
+                            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                            seekToPosition(clientX);
+
+                            const handleDragMove = (moveEvt) => {
+                                moveEvt.preventDefault();
+                                const currentX = moveEvt.touches ? moveEvt.touches[0].clientX : moveEvt.clientX;
+                                seekToPosition(currentX);
+                            };
+
+                            const handleDragEnd = () => {
+                                isDragging = false;
+                                progressContainer.classList.remove('is-dragging');
+                                window.removeEventListener('mousemove', handleDragMove);
+                                window.removeEventListener('mouseup', handleDragEnd);
+                                window.removeEventListener('touchmove', handleDragMove);
+                                window.removeEventListener('touchend', handleDragEnd);
+                            };
+
+                            window.addEventListener('mousemove', handleDragMove, { passive: false });
+                            window.addEventListener('mouseup', handleDragEnd);
+                            window.addEventListener('touchmove', handleDragMove, { passive: false });
+                            window.addEventListener('touchend', handleDragEnd);
+                        };
+
+                        progressContainer.addEventListener('mousedown', handleDragStart);
+                        progressContainer.addEventListener('touchstart', handleDragStart, { passive: false });
+                    }
+                }
             } else {
                 content.innerHTML = `<img src="${escapeHtml(fileUrl)}" alt="Media" class="media-viewer-content">`;
             }
@@ -2761,6 +3006,12 @@ export class MessageRenderer {
         console.log('[RENDERER] [MEDIA] Creating media message for:', message.id);
 
         const metadata = message.metadata || {};
+        if (!metadata.url) {
+            metadata.url = message.attachment_url || (typeof message.attachment === 'string' ? message.attachment : '') || (metadata.attachments && metadata.attachments[0] ? (metadata.attachments[0].file_url || metadata.attachments[0].file || metadata.attachments[0].url) : '') || '';
+        }
+        if (!metadata.type) {
+            metadata.type = message.attachment_type || (metadata.attachments && metadata.attachments[0] ? metadata.attachments[0].file_type : '') || (metadata.url.match(/\.(mp4|webm|mov|ogg)$/i) ? 'video' : (metadata.url.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? 'image' : 'file'));
+        }
         const attachmentType = metadata.type || 'file';
         const isImageOrVideo = attachmentType === 'image' || attachmentType === 'video';
 
@@ -2850,6 +3101,8 @@ export class MessageRenderer {
         const forwardedHtml = this._buildForwardedBadgeHtml(message);
         const replyHtml = this._buildReplyQuoteHtml(message);
 
+        const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
+
         bubble.innerHTML = `
             ${forwardedHtml}
             ${replyHtml}
@@ -2863,11 +3116,18 @@ export class MessageRenderer {
                     <div class="document-meta-row">
                         ${fileSizeFormatted ? `<span class="document-size-label">${fileSizeFormatted}</span><span class="document-dot">•</span>` : ''}
                         <span class="document-type-label">${docStyles.label}</span>
+                        ${isUploading ? `<span class="document-dot">•</span><span class="document-progress-text text-primary">0%</span>` : ''}
                     </div>
                 </div>
-                <a href="${escapeHtml(fileUrl)}" download="${escapeHtml(fileName)}" target="_blank" rel="noopener" class="document-download-btn" title="Download ${escapeHtml(fileName)}" aria-label="Download">
-                    <i class="bi bi-arrow-down"></i>
-                </a>
+                ${isUploading ? `
+                    <div class="document-download-btn uploading" title="Uploading...">
+                        <span class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem; border-width: 2px;"></span>
+                    </div>
+                ` : `
+                    <a href="${escapeHtml(fileUrl)}" download="${escapeHtml(fileName)}" target="_blank" rel="noopener" class="document-download-btn" title="Download ${escapeHtml(fileName)}" aria-label="Download">
+                        <i class="bi bi-arrow-down"></i>
+                    </a>
+                `}
             </div>
         `;
 
@@ -2891,7 +3151,12 @@ export class MessageRenderer {
         const timeStr = this._formatMessageTime(message.timestamp);
         const isOwn = message.isOwn || (this.currentUserId !== null && Number(message.senderId) === Number(this.currentUserId));
 
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
+
         bubble.innerHTML = `
+            ${forwardedHtml}
+            ${replyHtml}
             <div class="sticker-media-container">
                 <img src="${escapeHtml(stickerUrl)}" alt="Sticker" class="sticker-img" loading="lazy" />
             </div>
@@ -2933,7 +3198,12 @@ export class MessageRenderer {
             ? `<video src="${escapeHtml(gifUrl)}" class="gif-media" autoplay loop muted playsinline preload="auto" disablepictureinpicture onloadedmetadata="if(this.videoWidth && this.videoHeight && this.parentElement) { this.parentElement.style.aspectRatio = this.videoWidth + '/' + this.videoHeight; }"></video>`
             : `<img src="${escapeHtml(gifUrl)}" alt="GIF" class="gif-media" loading="lazy" onload="if(this.naturalWidth && this.naturalHeight && this.parentElement) { this.parentElement.style.aspectRatio = this.naturalWidth + '/' + this.naturalHeight; }" />`;
 
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
+
         bubble.innerHTML = `
+            ${forwardedHtml}
+            ${replyHtml}
             <div class="gif-media-container" style="${containerStyle}">
                 ${mediaTag}
                 <span class="gif-badge">GIF</span>
@@ -2982,9 +3252,13 @@ export class MessageRenderer {
         const barsHtml = barHeights.map((h, i) => `<span class="vn-bar" data-idx="${i}" style="height: ${h}%;"></span>`).join('');
 
         const playBtnClass = isNotDownloaded ? 'vn-play-btn vn-download-mode' : 'vn-play-btn';
-        const playIconHtml = isNotDownloaded
+        let playIconHtml = isNotDownloaded
             ? `<i class="bi bi-arrow-down vn-play-icon"></i>`
             : `<i class="bi bi-play-fill vn-play-icon"></i>`;
+        if (isUploading) {
+            playIconHtml = `<span class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem; border-width: 2px;"></span>`;
+        }
+
         const audioTag = isNotDownloaded
             ? `<audio data-src="${escapeHtml(audioUrl)}" preload="none" class="d-none vn-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`
             : `<audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none vn-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`;
@@ -2992,7 +3266,12 @@ export class MessageRenderer {
         const forwardedHtml = this._buildForwardedBadgeHtml(message);
         const replyHtml = this._buildReplyQuoteHtml(message);
 
-        bubble.innerHTML = `${forwardedHtml}${replyHtml}<div class="voice-note-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}" title="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}">${playIconHtml}</button><div class="vn-content"><div class="vn-waveform-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div class="vn-waveform">${barsHtml}</div><div class="vn-progress-track"><div class="vn-progress-fill"></div><div class="vn-progress-thumb"></div></div></div><div class="vn-meta-row"><span class="vn-timer">0:00</span>${isNotDownloaded && sizeStr ? `<span class="vn-dot">•</span><span class="vn-size-indicator">${sizeStr}</span>` : ''}</div></div><button type="button" class="vn-speed-btn" title="Playback speed" data-speed="1">1x</button></div>${audioTag}`;
+        if (replyHtml) {
+            bubble.classList.add('has-reply-quote');
+        }
+
+        const initialTimer = isUploading ? '0%' : '0:00';
+        bubble.innerHTML = `${forwardedHtml}${replyHtml}<div class="voice-note-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}" title="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}">${playIconHtml}</button><div class="vn-content"><div class="vn-waveform-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div class="vn-waveform">${barsHtml}</div><div class="vn-progress-track"><div class="vn-progress-fill"></div><div class="vn-progress-thumb"></div></div></div><div class="vn-meta-row"><span class="vn-timer">${initialTimer}</span>${isNotDownloaded && sizeStr ? `<span class="vn-dot">•</span><span class="vn-size-indicator">${sizeStr}</span>` : ''}</div></div><button type="button" class="vn-speed-btn" title="Playback speed" data-speed="1">1x</button></div>${audioTag}`;
 
         this._bindVoiceNoteEvents(bubble);
 
@@ -3191,9 +3470,12 @@ export class MessageRenderer {
         const sizeStr = this._formatFileSize(metadata.size || message.file_size || 0);
 
         const playBtnClass = isNotDownloaded ? 'audio-track-play-btn audio-download-mode' : 'audio-track-play-btn';
-        const playIconHtml = isNotDownloaded
+        let playIconHtml = isNotDownloaded
             ? `<i class="bi bi-arrow-down track-play-icon"></i>`
             : `<i class="bi bi-play-fill track-play-icon"></i>`;
+        if (isUploading) {
+            playIconHtml = `<span class="spinner-border spinner-border-sm" role="status" style="width: 1rem; height: 1rem; border-width: 2px;"></span>`;
+        }
         const audioTag = isNotDownloaded
             ? `<audio data-src="${escapeHtml(audioUrl)}" preload="none" class="d-none track-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`
             : `<audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none track-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`;
@@ -3201,7 +3483,12 @@ export class MessageRenderer {
         const forwardedHtml = this._buildForwardedBadgeHtml(message);
         const replyHtml = this._buildReplyQuoteHtml(message);
 
-        bubble.innerHTML = `${forwardedHtml}${replyHtml}<div class="audio-track-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download track' : 'Play track'}" title="${isNotDownloaded ? 'Download track' : 'Play track'}">${playIconHtml}</button><div class="audio-track-details"><div class="audio-track-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div><div class="audio-track-scrubber-track"><div class="audio-track-scrubber-fill" style="width: 0%;"></div></div><div class="audio-track-meta-row"><span class="audio-track-time">0:00</span>${sizeStr ? `<span class="audio-track-dot">•</span><span class="audio-track-size">${sizeStr}</span>` : ''}${isNotDownloaded ? `<span class="audio-track-status opacity-75 ms-1">• Tap to download</span>` : ''}</div></div><div class="audio-track-badge"><i class="bi bi-music-note-beamed"></i></div></div>${audioTag}`;
+        if (replyHtml) {
+            bubble.classList.add('has-reply-quote');
+        }
+
+        const initialAudioTime = isUploading ? '0%' : '0:00';
+        bubble.innerHTML = `${forwardedHtml}${replyHtml}<div class="audio-track-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download track' : 'Play track'}" title="${isNotDownloaded ? 'Download track' : 'Play track'}">${playIconHtml}</button><div class="audio-track-details"><div class="audio-track-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div><div class="audio-track-scrubber-track"><div class="audio-track-scrubber-fill" style="width: 0%;"></div></div><div class="audio-track-meta-row"><span class="audio-track-time">${initialAudioTime}</span>${sizeStr ? `<span class="audio-track-dot">•</span><span class="audio-track-size">${sizeStr}</span>` : ''}${isNotDownloaded ? `<span class="audio-track-status opacity-75 ms-1">• Tap to download</span>` : ''}</div></div><div class="audio-track-badge"><i class="bi bi-music-note-beamed"></i></div></div>${audioTag}`;
 
         this._bindAudioTrackEvents(bubble);
 
@@ -3444,12 +3731,15 @@ export class MessageRenderer {
             `;
         }
         
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
+
         // Add text content if present
         const textContent = message.content 
             ? `<p class="message-content">${escapeHtml(message.content)}${this._getSpacerHtml(message)}</p>` 
             : '';
         
-        messageDiv.innerHTML = textContent + linkContent;
+        messageDiv.innerHTML = `${forwardedHtml}${replyHtml}${textContent}${linkContent}`;
 
         // Inside-bubble meta
         const metaDiv = this._createMetaElement(message, false);
@@ -3539,11 +3829,88 @@ export class MessageRenderer {
      * Scroll to bottom of container (pure DOM manipulation)
      */
     _scrollToBottom(force = false) {
+        if (!this.container) {
+            this.container = document.getElementById('messagesContainer');
+        }
         if (!this.container) return;
         const threshold = 180;
         const isNearBottom = (this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight) < threshold;
         if (force || isNearBottom) {
-            this.container.scrollTop = this.container.scrollHeight;
+            const applyScroll = () => {
+                if (this.container) {
+                    this.container.scrollTop = this.container.scrollHeight;
+                }
+                this.updateScrollToBottomButton();
+            };
+            applyScroll();
+            requestAnimationFrame(() => {
+                applyScroll();
+                setTimeout(applyScroll, 25);
+                setTimeout(applyScroll, 80);
+                setTimeout(applyScroll, 200);
+            });
+        } else {
+            this.updateScrollToBottomButton();
+        }
+    }
+
+    /**
+     * Update floating scroll-to-bottom button visibility & state
+     */
+    updateScrollToBottomButton() {
+        if (!this.container) {
+            this.container = document.getElementById('messagesContainer');
+        }
+        if (!this.container) return;
+
+        const btn = document.getElementById('chatScrollToBottomBtn');
+        const badge = document.getElementById('chatScrollToBottomBadge');
+        if (!btn) return;
+
+        const threshold = 180;
+        const distanceFromBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight;
+        const isNearBottom = distanceFromBottom < threshold;
+
+        if (isNearBottom) {
+            btn.classList.add('d-none', 'is-hidden');
+            btn.style.setProperty('display', 'none', 'important');
+            this.unreadScrolledCount = 0;
+            if (badge) {
+                badge.textContent = '0';
+                badge.classList.add('d-none');
+            }
+        } else {
+            btn.classList.remove('d-none', 'is-hidden');
+            btn.style.removeProperty('display');
+        }
+    }
+
+    /**
+     * Handle new incoming message arrival when scrolled up
+     */
+    handleIncomingMessageScroll(isFromMe = false) {
+        if (!this.container) {
+            this.container = document.getElementById('messagesContainer');
+        }
+        if (!this.container) return;
+
+        const threshold = 180;
+        const distanceFromBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight;
+        const isNearBottom = distanceFromBottom < threshold;
+
+        if (isFromMe || isNearBottom) {
+            this._scrollToBottom(true);
+            this.updateScrollToBottomButton();
+        } else {
+            // User is scrolled up reading earlier messages!
+            this.unreadScrolledCount = (this.unreadScrolledCount || 0) + 1;
+            const btn = document.getElementById('chatScrollToBottomBtn');
+            const badge = document.getElementById('chatScrollToBottomBadge');
+            if (btn) btn.classList.remove('d-none');
+            if (badge) {
+                badge.textContent = String(this.unreadScrolledCount);
+                badge.classList.remove('d-none');
+            }
         }
     }
 

@@ -143,6 +143,62 @@ class ConversationViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=['post'])
+    def pin(self, request, pk=None):
+        """Pin conversation for current user (max 3 pinned)."""
+        from django.utils import timezone
+        conversation = self.get_object()
+        member = conversation.members.filter(user=request.user).first()
+
+        if not member:
+            return Response(
+                {'error': 'You are not a member of this conversation'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        pinned_count = ConversationMember.objects.filter(
+            user=request.user,
+            is_pinned=True
+        ).exclude(id=member.id).count()
+
+        if pinned_count >= 3:
+            return Response(
+                {'error': 'You can only pin up to 3 conversations'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        member.is_pinned = True
+        member.pinned_at = timezone.now()
+        member.save()
+
+        return Response({
+            'status': 'pinned',
+            'is_pinned': True,
+            'conversation_id': conversation.id
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def unpin(self, request, pk=None):
+        """Unpin conversation for current user."""
+        conversation = self.get_object()
+        member = conversation.members.filter(user=request.user).first()
+
+        if not member:
+            return Response(
+                {'error': 'You are not a member of this conversation'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        member.is_pinned = False
+        member.pinned_at = None
+        member.save()
+
+        return Response({
+            'status': 'unpinned',
+            'is_pinned': False,
+            'conversation_id': conversation.id
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
     def set_public_key(self, request, pk=None):
         """Set the public key for the current user in this conversation."""
         conversation = self.get_object()
@@ -413,7 +469,13 @@ def conversation_list(request):
         last_msg_time=models.Max('messages__created_at')
     ).order_by('-last_msg_time').distinct()
 
-    # Calculate read status and unread count efficiently
+    # Map memberships for current user
+    user_memberships = {
+        m.conversation_id: m
+        for m in ConversationMember.objects.filter(user=request.user)
+    }
+
+    # Calculate read status, unread count and pin status efficiently
     conversation_data = []
     for conversation in conversations:
         # Get last message efficiently from the queryset
@@ -424,8 +486,8 @@ def conversation_list(request):
         if last_message and last_message.sender == request.user:
             read_status = conversation.get_last_message_read_status(request.user) or 'sent'
         
-        # Calculate unread count for this user
-        member = conversation.members.filter(user=request.user).first()
+        # Calculate unread count and pin status for this user
+        member = user_memberships.get(conversation.id)
         if member and member.last_read_message:
             unread_count = conversation.messages.filter(
                 created_at__gt=member.last_read_message.created_at
@@ -433,11 +495,24 @@ def conversation_list(request):
         else:
             unread_count = conversation.messages.count()
         
+        is_pinned = bool(member and member.is_pinned)
+        pinned_at = member.pinned_at if member else None
+
         conversation_data.append({
             'conversation': conversation,
             'read_status': read_status,
-            'unread_count': unread_count
+            'unread_count': unread_count,
+            'is_pinned': is_pinned,
+            'pinned_at': pinned_at,
         })
+
+    # Sort pinned conversations first, then by last message time
+    conversation_data.sort(
+        key=lambda item: (
+            not item['is_pinned'],
+            -(item['conversation'].last_msg_time.timestamp() if item['conversation'].last_msg_time else 0)
+        )
+    )
 
     from users.models import User, Follow
     from users.services.friend_suggestion_service import get_friend_suggestions_for_user
@@ -577,6 +652,12 @@ def conversation_detail(request, conversation_id):
         last_msg_time=models.Max('messages__created_at')
     ).order_by('-last_msg_time').distinct()
 
+    # Map memberships for current user
+    user_memberships = {
+        m.conversation_id: m
+        for m in ConversationMember.objects.filter(user=request.user)
+    }
+
     conversation_data = []
     for conv in conversations:
         last_msg = conv.messages.order_by('-created_at').first()
@@ -584,7 +665,7 @@ def conversation_detail(request, conversation_id):
         if last_msg and last_msg.sender == request.user:
             read_status = conv.get_last_message_read_status(request.user) or 'sent'
         
-        mem = conv.members.filter(user=request.user).first()
+        mem = user_memberships.get(conv.id)
         if mem and mem.last_read_message:
             unread_count = conv.messages.filter(
                 created_at__gt=mem.last_read_message.created_at
@@ -592,11 +673,24 @@ def conversation_detail(request, conversation_id):
         else:
             unread_count = conv.messages.count()
         
+        is_pinned = bool(mem and mem.is_pinned)
+        pinned_at = mem.pinned_at if mem else None
+
         conversation_data.append({
             'conversation': conv,
             'read_status': read_status,
-            'unread_count': unread_count
+            'unread_count': unread_count,
+            'is_pinned': is_pinned,
+            'pinned_at': pinned_at,
         })
+
+    # Sort pinned conversations first, then by last message time
+    conversation_data.sort(
+        key=lambda item: (
+            not item['is_pinned'],
+            -(item['conversation'].last_msg_time.timestamp() if item['conversation'].last_msg_time else 0)
+        )
+    )
 
     # Pre-categorize media for the dynamic WhatsApp right media rail
     attachments = MessageAttachment.objects.filter(
@@ -637,9 +731,41 @@ def conversation_detail(request, conversation_id):
     today = timezone.now().date()
     yesterday = today - timedelta(days=1)
 
+    # Determine partner user for direct conversations
+    partner_user = None
+    partner_relationship = 'Connected on PwaniNet'
+    if conversation.type == 'direct':
+        partner_member = conversation.members.exclude(user=request.user).select_related('user').first()
+        if partner_member:
+            partner_user = partner_member.user
+            try:
+                from users.models import Follow
+                is_following = Follow.objects.filter(follower=request.user, following=partner_user).exists()
+                is_followed = Follow.objects.filter(follower=partner_user, following=request.user).exists()
+                if is_following and is_followed:
+                    partner_relationship = 'Mutual Follower'
+            except Exception:
+                pass
+            if hasattr(request.user, 'profile') and hasattr(partner_user, 'profile'):
+                try:
+                    if request.user.profile.course and request.user.profile.course == partner_user.profile.course:
+                        partner_relationship = 'Classmate'
+                except Exception:
+                    pass
+
+    # Aggressive instant caching: serialize recent messages directly for 0ms DOM paint
+    import json
+    from .serializers import MessageSerializer
+    recent_messages_qs = messages.order_by('-created_at')[:100]
+    recent_messages_list = list(reversed(recent_messages_qs))
+    initial_messages_json = json.dumps(MessageSerializer(recent_messages_list, many=True).data)
+
     context = {
         'conversation': conversation,
         'messages': messages,
+        'initial_messages_json': initial_messages_json,
+        'partner_user': partner_user,
+        'partner_relationship': partner_relationship,
         'conversation_data': conversation_data,
         'users': users,
         'unmessaged_friends': unmessaged_friends,
@@ -655,7 +781,184 @@ def conversation_detail(request, conversation_id):
         'yesterday': yesterday.strftime('%Y-%m-%d'),
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, 'messaging/partials/conversation_chat_partial.html', context)
+
     return render(request, 'messaging/conversation_detail_refactored.html', context)
+
+
+def get_conversation_media_items(conversation, media_type, page=1, page_size=24):
+    """Helper to query and normalize media items for lazy loading."""
+    from django.conf import settings
+    offset = (page - 1) * page_size
+    limit = page_size + 1
+
+    if media_type == 'media':
+        atts = list(MessageAttachment.objects.filter(
+            message__conversation=conversation,
+            file_type__in=['image', 'video']
+        ).select_related('message'))
+
+        legacy = list(Message.objects.filter(
+            conversation=conversation,
+            attachment_type__in=['image', 'video']
+        ).exclude(attachment=''))
+
+        normalized = []
+        for a in atts:
+            url = a.file.url if a.file else a.file_url
+            if url:
+                file_display_name = (getattr(a.file, 'name', '').split('/')[-1] if getattr(a.file, 'name', None) else '') or getattr(a, 'caption', '') or 'Media'
+                normalized.append({
+                    'id': a.id,
+                    'type': a.file_type,
+                    'url': url,
+                    'created_at': a.created_at or a.message.created_at,
+                    'name': file_display_name
+                })
+        for m in legacy:
+            url = m.attachment.url if m.attachment else m.attachment_url
+            if url:
+                normalized.append({
+                    'id': f"legacy_{m.id}",
+                    'type': m.attachment_type,
+                    'url': url,
+                    'created_at': m.created_at,
+                    'name': getattr(m.attachment, 'name', '') or 'Media'
+                })
+
+        normalized.sort(key=lambda x: x['created_at'], reverse=True)
+        slice_items = normalized[offset:offset + limit]
+        has_next = len(slice_items) > page_size
+        return slice_items[:page_size], has_next
+
+    elif media_type == 'docs':
+        atts = list(MessageAttachment.objects.filter(
+            message__conversation=conversation,
+            file_type='document'
+        ).select_related('message'))
+
+        legacy = list(Message.objects.filter(
+            conversation=conversation,
+            attachment_type='document'
+        ).exclude(attachment=''))
+
+        normalized = []
+        for a in atts:
+            url = a.file.url if a.file else a.file_url
+            if url:
+                doc_display_name = (getattr(a.file, 'name', '').split('/')[-1] if getattr(a.file, 'name', None) else '') or getattr(a, 'caption', '') or 'Document'
+                normalized.append({
+                    'id': a.id,
+                    'url': url,
+                    'created_at': a.created_at or a.message.created_at,
+                    'name': doc_display_name
+                })
+        for m in legacy:
+            url = m.attachment.url if m.attachment else m.attachment_url
+            if url:
+                normalized.append({
+                    'id': f"legacy_{m.id}",
+                    'url': url,
+                    'created_at': m.created_at,
+                    'name': (getattr(m.attachment, 'name', '').split('/')[-1] if getattr(m.attachment, 'name', None) else 'Document')
+                })
+
+        normalized.sort(key=lambda x: x['created_at'], reverse=True)
+        slice_items = normalized[offset:offset + limit]
+        has_next = len(slice_items) > page_size
+        return slice_items[:page_size], has_next
+
+    elif media_type == 'audio':
+        atts = list(MessageAttachment.objects.filter(
+            message__conversation=conversation,
+            file_type='audio'
+        ).select_related('message'))
+
+        legacy = list(Message.objects.filter(
+            conversation=conversation,
+            attachment_type='audio'
+        ).exclude(attachment=''))
+
+        normalized = []
+        for a in atts:
+            url = a.file.url if a.file else a.file_url
+            if url:
+                audio_display_name = (getattr(a.file, 'name', '').split('/')[-1] if getattr(a.file, 'name', None) else '') or getattr(a, 'caption', '') or 'Voice Note'
+                normalized.append({
+                    'id': a.id,
+                    'url': url,
+                    'created_at': a.created_at or a.message.created_at,
+                    'name': audio_display_name
+                })
+        for m in legacy:
+            url = m.attachment.url if m.attachment else m.attachment_url
+            if url:
+                normalized.append({
+                    'id': f"legacy_{m.id}",
+                    'url': url,
+                    'created_at': m.created_at,
+                    'name': 'Voice Note'
+                })
+
+        normalized.sort(key=lambda x: x['created_at'], reverse=True)
+        slice_items = normalized[offset:offset + limit]
+        has_next = len(slice_items) > page_size
+        return slice_items[:page_size], has_next
+
+    elif media_type == 'links':
+        msgs = Message.objects.filter(
+            models.Q(link_url__isnull=False) | models.Q(link_preview__isnull=False),
+            conversation=conversation
+        ).exclude(link_url='').select_related('link_preview').order_by('-created_at')
+
+        normalized = []
+        for m in msgs:
+            preview = getattr(m, 'link_preview', None)
+            url = m.link_url or (preview.url if preview else '')
+            if url:
+                normalized.append({
+                    'id': m.id,
+                    'url': url,
+                    'title': (preview.title if preview and preview.title else url),
+                    'description': (preview.description if preview and preview.description else ''),
+                    'created_at': m.created_at
+                })
+
+        slice_items = normalized[offset:offset + limit]
+        has_next = len(slice_items) > page_size
+        return slice_items[:page_size], has_next
+
+    return [], False
+
+
+@login_required
+def conversation_media(request, conversation_id):
+    """Paginated lazy-loaded media endpoint for the dynamic right media rail."""
+    conversation = get_object_or_404(
+        Conversation,
+        id=conversation_id,
+        members__user=request.user
+    )
+
+    media_type = request.GET.get('type', 'media')
+    try:
+        page = max(1, int(request.GET.get('page', 1)))
+    except (ValueError, TypeError):
+        page = 1
+
+    items, has_next = get_conversation_media_items(conversation, media_type, page=page, page_size=24)
+
+    context = {
+        'conversation': conversation,
+        'media_type': media_type,
+        'items': items,
+        'page': page,
+        'has_next': has_next,
+        'next_page': page + 1 if has_next else None,
+    }
+
+    return render(request, 'messaging/partials/conversation_media_items.html', context)
 
 
 @csrf_exempt

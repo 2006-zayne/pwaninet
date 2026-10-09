@@ -1,0 +1,117 @@
+{% load i18n %}
+{% load static %}
+
+<!-- Center Chat Content swapped into #chatMainAreaWrapper -->
+{% include 'messaging/partials/conversation_chat_content.html' %}
+
+<!-- Out-of-band: WhatsApp Right Media Rail swapped automatically -->
+{% include 'messaging/partials/conversation_right_rail.html' with is_oob=True %}
+
+<!-- Dynamic Active Conversation State Sync Script -->
+<script>
+  (function() {
+    const convId = '{{ conversation.id|default:"" }}';
+    const isEncrypted = '{% if conversation and conversation.is_encrypted %}true{% else %}false{% endif %}';
+    const convType = '{{ conversation.type|default:"" }}';
+
+    // Update body datasets
+    document.body.dataset.conversationId = convId;
+    document.body.dataset.isEncrypted = isEncrypted;
+    document.body.dataset.conversationType = convType;
+    window.HAS_CONVERSATION = {% if conversation %}true{% else %}false{% endif %};
+
+    {% if conversation and conversation.type == 'direct' %}
+      {% for member in conversation.members.all %}
+        {% if member.user != request.user %}
+          document.body.dataset.receiverAvatar = '{% if member.user.profile_pic %}{{ member.user.profile_pic.url|escapejs }}{% else %}/static/images/default_pic1.jpg{% endif %}';
+          document.body.dataset.receiverName = '{{ member.user.get_full_name|default:member.user.username|escapejs }}';
+          document.body.dataset.receiverUsername = '{{ member.user.username|escapejs }}';
+          document.body.dataset.receiverProfileUrl = '/users/user/{{ member.user.username|escapejs }}/';
+        {% endif %}
+      {% endfor %}
+    {% elif conversation and conversation.type == 'group' %}
+      document.body.dataset.receiverName = '{{ conversation.name|escapejs }}';
+      delete document.body.dataset.receiverUsername;
+      delete document.body.dataset.receiverProfileUrl;
+    {% endif %}
+
+    // Sync active item highlight & clear unread badges in list/rail
+    if (convId) {
+      if (typeof window.markConversationAsActive === 'function') {
+        window.markConversationAsActive(convId);
+      } else {
+        document.querySelectorAll('.whatsapp-chat-item, .chat-row, .messaging-rail-avatar-link').forEach(function(item) {
+          if (item.dataset.conversationId === convId) {
+            item.classList.add('active');
+            const badge = item.querySelector('.whatsapp-chat-unread-badge, .messaging-rail-unread-dot, .unread-badge');
+            if (badge) {
+              badge.style.display = 'none';
+              badge.classList.add('d-none');
+            }
+            const snippet = item.querySelector('.whatsapp-chat-snippet, .chat-preview-text');
+            if (snippet) {
+              snippet.classList.remove('fw-bold', 'unread', 'text-body');
+              snippet.classList.add('text-muted', 'fw-normal');
+            }
+          } else {
+            item.classList.remove('active');
+          }
+        });
+      }
+
+      const layout = document.getElementById('whatsappLayout');
+      if (layout) {
+        layout.classList.add('mobile-chat-active');
+        document.body.classList.add('mobile-chat-active');
+        document.documentElement.classList.add('in-conversation-active');
+        document.body.classList.add('in-conversation-active');
+      }
+
+      // Synchronize data-chat-theme matching full reload logic
+      try {
+        let themeToApply = null;
+        const savedConv = localStorage.getItem('chat_theme_' + convId);
+        if (savedConv) {
+          try {
+            const parsed = JSON.parse(savedConv);
+            if (parsed && parsed.preset && parsed.preset !== 'default') themeToApply = parsed.preset;
+          } catch (_) {
+            if (typeof savedConv === 'string' && savedConv.length < 50 && savedConv !== 'default') themeToApply = savedConv;
+          }
+        }
+        if (!themeToApply) {
+          const savedDef = localStorage.getItem('default_chat_theme') || localStorage.getItem('chat_theme');
+          if (savedDef && savedDef !== 'default') themeToApply = savedDef;
+        }
+        if (!themeToApply) {
+          const userPref = '{{ request.user.chat_theme_preference|default:"" }}';
+          if (userPref && userPref !== 'default') themeToApply = userPref;
+        }
+        if (!themeToApply || themeToApply === 'default') {
+          themeToApply = 'ocean-wave';
+        }
+        document.documentElement.setAttribute('data-chat-theme', themeToApply);
+        if (layout) layout.setAttribute('data-chat-theme', themeToApply);
+      } catch (e) {}
+    }
+
+    // Ensure stray overlays/backdrops are dismissed on navigation
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.classList.remove('show');
+    document.querySelectorAll('.overlay.show, .theme-modal-backdrop, .modal-backdrop, .dropdown-backdrop').forEach(function(el) {
+      el.classList.remove('show');
+      if (el.classList.contains('theme-modal-backdrop') || el.classList.contains('modal-backdrop') || el.classList.contains('dropdown-backdrop')) {
+        el.remove();
+      }
+    });
+
+    // Initialize/reconnect Chat components
+    if (typeof window.initializeChatApp === 'function') {
+      window.initializeChatApp();
+    }
+    // Re-initialize Chat Theme Handler
+    if (window.chatThemeHandler && typeof window.chatThemeHandler.reinit === 'function') {
+      window.chatThemeHandler.reinit();
+    }
+  })();
+</script>

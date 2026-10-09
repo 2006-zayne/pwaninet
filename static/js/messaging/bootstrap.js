@@ -70,12 +70,15 @@ function setupThemeModalButton() {
   const themeModal = document.getElementById('themeModal');
   const overlay = document.getElementById('overlay');
 
-  if (themeBtn && themeModal) {
+  if (themeBtn) {
     const openThemeModal = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      themeModal.classList.add('show');
-      if (overlay) overlay.classList.add('show');
+      if (window.chatThemeHandler && typeof window.chatThemeHandler.showThemePanel === 'function') {
+        window.chatThemeHandler.showThemePanel();
+      } else if (themeModal) {
+        themeModal.classList.add('show');
+      }
     };
 
     themeBtn.addEventListener('click', openThemeModal);

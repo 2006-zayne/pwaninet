@@ -51,16 +51,29 @@ export class VoiceModalController {
    * Initialize voice capture controller
    */
   init() {
-    if (this.initialized) return;
-
     this._initializeElements();
     this._setupButtonListeners();
     this._setupVoiceGestures();
-    this._setupServiceListeners();
+    if (!this.serviceListenersSetup) {
+      this._setupServiceListeners();
+      this.serviceListenersSetup = true;
+    }
     this.resetToIdle();
 
     this.initialized = true;
     console.log('[VOICE_CONTROLLER] Inline voice capture controller initialized');
+  }
+
+  /**
+   * Start hands-free voice recording
+   */
+  startVoiceRecording() {
+    this._initializeElements();
+    this.isDesktopRecording = true;
+    this.isHolding = false;
+    this.isLocked = true;
+    voiceService.startRecording();
+    this.showDesktopRecordingState();
   }
 
   /**
@@ -88,44 +101,48 @@ export class VoiceModalController {
   }
 
   /**
-   * Setup UI button click listeners
+   * Setup UI button click listeners (delegated on document)
    */
   _setupButtonListeners() {
-    // Cancel / Discard (X)
-    if (this.voiceCancelBtn) {
-      this.voiceCancelBtn.addEventListener('click', (e) => {
+    if (this._buttonsDelegated) return;
+    this._buttonsDelegated = true;
+
+    document.addEventListener('click', async (e) => {
+      // Cancel / Discard (X)
+      const cancelBtn = e.target.closest('#voiceCancelBtn');
+      if (cancelBtn) {
         e.preventDefault();
         voiceService.discardRecording();
         this.resetToIdle();
-      });
-    }
+        return;
+      }
 
-    // Stop button (locked mode on mobile or desktop recording)
-    if (this.voiceStopBtn) {
-      this.voiceStopBtn.addEventListener('click', (e) => {
+      // Stop button (locked mode on mobile or desktop recording)
+      const stopBtn = e.target.closest('#voiceStopBtn');
+      if (stopBtn) {
         e.preventDefault();
         voiceService.stopRecording();
-      });
-    }
+        return;
+      }
 
-    // Play/Pause button (in preview mode)
-    if (this.voicePlayBtn) {
-      this.voicePlayBtn.addEventListener('click', (e) => {
+      // Play/Pause button (in preview mode)
+      const playBtn = e.target.closest('#voicePlayBtn');
+      if (playBtn) {
         e.preventDefault();
         voiceService.togglePlayPause();
-      });
-    }
+        return;
+      }
 
-    // Send button
-    if (this.voiceSendBtn) {
-      this.voiceSendBtn.addEventListener('click', async (e) => {
+      // Send button
+      const sendBtn = e.target.closest('#voiceSendBtn');
+      if (sendBtn) {
         e.preventDefault();
-        if (this.voiceSendBtn.disabled) return;
+        if (sendBtn.disabled) return;
 
-        this.voiceSendBtn.disabled = true;
-        this.voiceSendBtn.classList.add('is-loading');
-        const icon = this.voiceSendBtn.querySelector('i');
-        const spinner = this.voiceSendBtn.querySelector('.spinner-border');
+        sendBtn.disabled = true;
+        sendBtn.classList.add('is-loading');
+        const icon = sendBtn.querySelector('i');
+        const spinner = sendBtn.querySelector('.spinner-border');
         if (icon) icon.classList.add('d-none');
         if (spinner) spinner.classList.remove('d-none');
 
@@ -136,8 +153,22 @@ export class VoiceModalController {
         } finally {
           this.resetToIdle();
         }
-      });
-    }
+        return;
+      }
+
+      // Desktop click on voiceBtn (when NOT in send mode)
+      const voiceBtn = e.target.closest('#voiceBtn');
+      if (voiceBtn && !voiceBtn.classList.contains('send-mode')) {
+        if (e.pointerType !== 'touch') {
+          e.preventDefault();
+          if (voiceService.isRecording) {
+            voiceService.stopRecording();
+          } else {
+            this.startVoiceRecording();
+          }
+        }
+      }
+    });
   }
 
   /**
@@ -355,6 +386,7 @@ export class VoiceModalController {
    * Display desktop single-click hands-free recording state with Stop button
    */
   showDesktopRecordingState() {
+    this._initializeElements();
     if (this.composerForm) this.composerForm.classList.add('is-voice-recording');
     if (this.composerStandard) this.composerStandard.classList.add('d-none');
     if (this.voiceCapture) this.voiceCapture.classList.remove('d-none');
@@ -375,6 +407,7 @@ export class VoiceModalController {
    * Display mobile holding-to-record state with lock badge
    */
   showHoldingState() {
+    this._initializeElements();
     if (this.composerForm) this.composerForm.classList.add('is-voice-recording');
     if (this.composerStandard) this.composerStandard.classList.add('d-none');
     if (this.voiceCapture) this.voiceCapture.classList.remove('d-none');
@@ -394,6 +427,7 @@ export class VoiceModalController {
    * Display mobile swipe-up locked recording state
    */
   showLockedState() {
+    this._initializeElements();
     if (this.voiceLockBadge) this.voiceLockBadge.classList.add('d-none');
     if (this.voiceStopBtn) this.voiceStopBtn.classList.remove('d-none');
     if (this.voicePlayBtn) this.voicePlayBtn.classList.add('d-none');
@@ -405,6 +439,7 @@ export class VoiceModalController {
    * @param {number} duration - Recorded duration in seconds
    */
   showPreviewState(duration) {
+    this._initializeElements();
     this.stopWaveformAnimation();
     this.isDesktopRecording = false;
     this.currentDuration = Math.max(1, duration || 0);
@@ -442,6 +477,7 @@ export class VoiceModalController {
    * Reset composer to idle standard state
    */
   resetToIdle() {
+    this._initializeElements();
     this.stopWaveformAnimation();
     this.isDesktopRecording = false;
     this.isHolding = false;

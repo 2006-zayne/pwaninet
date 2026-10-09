@@ -128,18 +128,21 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         }))
 
     async def conversation_update(self, event):
-        """Send conversation update to client for real-time list updates - FROZEN FOR MVP"""
-        # Messaging feature - FROZEN FOR MVP
-        # print(f'[NOTIFICATIONS] Sending conversation update to user {self.user.id}: {event}')
-        # await self.send(text_data=json.dumps({
-        #     'type': 'conversation_update',
-        #     'conversation_id': event['conversation_id'],
-        #     'message_preview': event['message_preview'],
-        #     'sender_name': event['sender_name'],
-        #     'timestamp': event['timestamp'],
-        #     'unread_count': event['unread_count']
-        # }))
-        pass
+        """Send conversation update to client for real-time list updates."""
+        try:
+            await self.send(text_data=json.dumps({
+                'type': 'conversation_update',
+                'conversation_id': event.get('conversation_id'),
+                'message_preview': event.get('message_preview'),
+                'preview_type': event.get('preview_type', 'text'),
+                'sender_name': event.get('sender_name'),
+                'sender_id': event.get('sender_id'),
+                'is_sender': event.get('is_sender', False),
+                'timestamp': event.get('timestamp'),
+                'unread_count': event.get('unread_count', 0),
+            }))
+        except Exception as e:
+            logger.error(f"Error sending conversation_update to user {getattr(self, 'user', None)}: {e}")
 
     async def typing_indicator(self, event):
         """Send typing indicator to client for real-time list updates - FROZEN FOR MVP"""

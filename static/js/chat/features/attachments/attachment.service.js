@@ -90,6 +90,9 @@ export class AttachmentService {
     if (options.tempId) {
       formData.append('temp_id', options.tempId);
     }
+    if (options.replyToId) {
+      formData.append('reply_to_id', options.replyToId);
+    }
 
     const csrfToken = this.getCSRFToken();
     if (csrfToken) {
@@ -108,20 +111,63 @@ export class AttachmentService {
       // Emit upload start event (QUEUED state)
       eventBus.emit(EVENTS.ATTACHMENT_UPLOAD_START, { file, status: this.MESSAGE_STATES.QUEUED });
 
-      // Upload file to messaging app endpoint
-      const headers = {};
-      if (csrfToken) {
-        headers['X-CSRFToken'] = csrfToken;
-      }
+      // Upload file to messaging app endpoint with real progress tracking via XMLHttpRequest
+      const data = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/messaging/api/attachments/upload/', true);
+        if (csrfToken) {
+          xhr.setRequestHeader('X-CSRFToken', csrfToken);
+        }
 
-      const response = await fetch('/messaging/api/attachments/upload/', {
-        method: 'POST',
-        body: formData,
-        headers,
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+            eventBus.emit(EVENTS.ATTACHMENT_PROGRESS, {
+              tempId: options.tempId,
+              loaded: e.loaded,
+              total: e.total,
+              progress: percent
+            });
+            // Update UI directly if message exists in DOM
+            if (options.tempId) {
+              const msgEl = document.querySelector(`[data-message-id="${options.tempId}"]`);
+              if (msgEl) {
+                const vnTimer = msgEl.querySelector('.vn-timer');
+                if (vnTimer) vnTimer.textContent = `${percent}%`;
+                const audioTime = msgEl.querySelector('.audio-track-time');
+                if (audioTime) audioTime.textContent = `${percent}%`;
+                const docProgress = msgEl.querySelector('.document-progress-text');
+                if (docProgress) docProgress.textContent = `${percent}%`;
+              }
+            }
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const parsed = JSON.parse(xhr.responseText);
+              resolve(parsed);
+            } catch (err) {
+              reject(new Error('Failed to parse server response'));
+            }
+          } else {
+            let errorMsg = `Upload failed (${xhr.status})`;
+            try {
+              const errObj = JSON.parse(xhr.responseText);
+              errorMsg = errObj.error || errObj.detail || errObj.message || errorMsg;
+            } catch (_) {}
+            reject(new Error(errorMsg));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.ontimeout = () => reject(new Error('Upload request timed out'));
+
+        xhr.send(formData);
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (data) {
 
         // Rekey local media store from tempId to permanent message id
         if (options.tempId && data?.id) {

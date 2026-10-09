@@ -579,6 +579,16 @@ export class VoiceService {
 
     const audioUrl = localUrl || this.audioUrl || (this.audioBlob ? URL.createObjectURL(this.audioBlob) : '');
 
+    // Pick up the active reply target (if the user is replying to a message)
+    let replyContext = { reply_to_id: null, reply_to_details: null };
+    try {
+      if (window.uiController && typeof window.uiController.consumeReplyContext === 'function') {
+        replyContext = window.uiController.consumeReplyContext() || replyContext;
+      }
+    } catch (ctxErr) {
+      console.warn('[VOICE_SERVICE] Failed to read reply context:', ctxErr);
+    }
+
     // Optimistically add voice note to UI immediately
     const optMsg = {
       id: tempId,
@@ -593,7 +603,9 @@ export class VoiceService {
         is_voice_note: true,
         url: audioUrl,
         size: this.audioBlob.size,
-        duration: this.duration || 0
+        duration: this.duration || 0,
+        reply_to_id: replyContext.reply_to_id,
+        reply_to_details: replyContext.reply_to_details
       },
       created_at: new Date().toISOString(),
       status: 'uploading'
@@ -602,7 +614,11 @@ export class VoiceService {
 
     try {
       const { attachmentService } = await import('../attachments/attachment.service.js');
-      await attachmentService.handleFileUpload(file, conversationId, { isVoiceNote: true, tempId });
+      await attachmentService.handleFileUpload(file, conversationId, {
+        isVoiceNote: true,
+        tempId,
+        replyToId: replyContext.reply_to_id
+      });
       this.discardRecording();
     } catch (err) {
       console.error('[VOICE_SERVICE] Upload failed:', err);

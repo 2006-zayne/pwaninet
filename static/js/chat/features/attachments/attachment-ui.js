@@ -26,18 +26,16 @@ export class AttachmentUI {
      */
     init() {
         console.log('[ATTACHMENT_UI] Attachment UI initializing...');
-        if (this.initialized) {
-            console.log('[ATTACHMENT_UI] Already initialized');
-            return;
-        }
-
         this._initializeElements();
         this._setupEventListeners();
-        this._setupServiceListeners();
-        
+        if (!this.serviceListenersSetup) {
+            this._setupServiceListeners();
+            this.serviceListenersSetup = true;
+        }
+
         // Initialize voice modal controller
         voiceModalController.init();
-        
+
         // Initialize media composer
         mediaComposer.init();
 
@@ -62,71 +60,68 @@ export class AttachmentUI {
      * Setup UI event listeners
      */
     _setupEventListeners() {
-        // Attachment button
-        const attachBtn = document.getElementById('attachBtn');
-        if (attachBtn) {
-            attachBtn.addEventListener('click', () => {
+        if (this._listenersAttached) return;
+        this._listenersAttached = true;
+
+        // Attachment button click (delegated on document)
+        document.addEventListener('click', (e) => {
+            const attachBtn = e.target.closest('#attachBtn');
+            if (attachBtn) {
+                e.preventDefault();
+                e.stopPropagation();
                 this.showAttachmentModal();
-            });
-        }
+                return;
+            }
 
-        // Camera button
-        const cameraBtn = document.getElementById('cameraBtn');
-        if (cameraBtn) {
-            cameraBtn.addEventListener('click', () => {
+            const cameraBtn = e.target.closest('#cameraBtn');
+            if (cameraBtn) {
+                e.preventDefault();
+                e.stopPropagation();
                 this.handleCameraCapture();
-            });
-        }
+                return;
+            }
 
-        // Voice button listeners removed - now handled by UIController to prevent conflicts
-        // and support the voice/send toggle logic.
-        // Voice modal is now handled by voiceModalController
-
-        // Close attachment modal
-        const closeAttachmentModal = document.getElementById('closeAttachmentModal');
-        if (closeAttachmentModal) {
-            closeAttachmentModal.addEventListener('click', () => {
+            const closeBtn = e.target.closest('#closeAttachmentModal, .pwanimate-attachment-modal-close');
+            if (closeBtn) {
+                e.preventDefault();
+                e.stopPropagation();
                 this.hideAttachmentModal();
-            });
-        }
+                return;
+            }
 
-        // Attachment options
-        const attachmentOptions = document.querySelectorAll('.attachment-option');
-        attachmentOptions.forEach(option => {
-            option.addEventListener('click', () => {
+            const option = e.target.closest('.attachment-option');
+            if (option) {
+                e.preventDefault();
+                e.stopPropagation();
                 const type = option.dataset.type;
                 this.handleAttachmentOption(type);
-            });
+                return;
+            }
+
+            // Close when clicking directly on overlay/modal backdrop
+            const modal = e.target.closest('.pwanimate-attachment-modal');
+            if (modal && e.target === modal) {
+                this.hideAttachmentModal();
+                return;
+            }
+            if (e.target.id === 'overlay' && document.getElementById('attachmentModal')?.classList.contains('show')) {
+                this.hideAttachmentModal();
+                return;
+            }
         });
 
-        // File input change
-        if (this.fileInput) {
-            this.fileInput.setAttribute('multiple', 'true');
-            this.fileInput.addEventListener('change', (e) => {
-                this.handleFileSelection(e.target.files);
-            });
-        }
-
-        // Camera input change
-        if (this.cameraInput) {
-            this.cameraInput.addEventListener('change', (e) => {
-                this.handleFileSelection(e.target.files);
-            });
-        }
-
+        // Delegated file input changes
+        document.addEventListener('change', (e) => {
+            if (e.target && (e.target.id === 'fileInput' || e.target.id === 'cameraInput')) {
+                if (e.target.files && e.target.files.length > 0) {
+                    this.handleFileSelection(e.target.files);
+                }
+            }
+        });
         // Drag and drop support for input area
-        if (this.inputArea) {
+        const inputArea = document.querySelector('.input-area');
+        if (inputArea) {
             this._setupDragAndDrop();
-        }
-
-        // Voice recording actions are now handled by voiceModalController
-
-        // Overlay click to close modals
-        if (this.overlay) {
-            this.overlay.addEventListener('click', () => {
-                this.hideAttachmentModal();
-                // Voice modal overlay is handled by voiceModalController
-            });
         }
     }
 
@@ -159,9 +154,11 @@ export class AttachmentUI {
      * Show attachment modal
      */
     showAttachmentModal() {
-        if (this.attachmentModal && this.overlay) {
-            this.attachmentModal.classList.add('show');
-            this.overlay.classList.add('show');
+        const modal = document.getElementById('attachmentModal') || this.attachmentModal;
+        const overlay = document.getElementById('overlay') || this.overlay;
+        if (modal) {
+            modal.classList.add('show');
+            if (overlay) overlay.classList.add('show');
         }
     }
 
@@ -169,10 +166,10 @@ export class AttachmentUI {
      * Hide attachment modal
      */
     hideAttachmentModal() {
-        if (this.attachmentModal && this.overlay) {
-            this.attachmentModal.classList.remove('show');
-            this.overlay.classList.remove('show');
-        }
+        const modal = document.getElementById('attachmentModal') || this.attachmentModal;
+        const overlay = document.getElementById('overlay') || this.overlay;
+        if (modal) modal.classList.remove('show');
+        if (overlay) overlay.classList.remove('show');
     }
 
     /**
@@ -181,11 +178,16 @@ export class AttachmentUI {
      */
     handleAttachmentOption(type) {
         this.hideAttachmentModal();
+        const fileInput = document.getElementById('fileInput') || this.fileInput;
+        const cameraInput = document.getElementById('cameraInput') || this.cameraInput;
 
         switch (type) {
             case 'camera':
-                if (this.cameraInput) {
-                    this.cameraInput.click();
+                if (cameraInput) {
+                    cameraInput.click();
+                } else if (fileInput) {
+                    fileInput.accept = 'image/*';
+                    fileInput.click();
                 } else {
                     this.handleCameraCapture();
                 }
@@ -199,7 +201,7 @@ export class AttachmentUI {
                 break;
             case 'documents':
             case 'docs':
-                this.triggerFileInput('.pdf,.doc,.docx,.txt');
+                this.triggerFileInput('.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.zip');
                 break;
             case 'audio':
                 this.triggerFileInput('audio/*');
@@ -212,9 +214,10 @@ export class AttachmentUI {
      * @param {string} accept - File accept attribute
      */
     triggerFileInput(accept) {
-        if (this.fileInput) {
-            this.fileInput.accept = accept;
-            this.fileInput.click();
+        const fileInput = document.getElementById('fileInput') || this.fileInput;
+        if (fileInput) {
+            fileInput.accept = accept;
+            fileInput.click();
         }
     }
 

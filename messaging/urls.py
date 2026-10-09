@@ -13,7 +13,8 @@ from .views import (
     batch_attachment_upload,
     fetch_link_metadata,
     unread_message_count,
-    proxy_chat_media
+    proxy_chat_media,
+    conversation_media
 )
 
 router = DefaultRouter()
@@ -28,6 +29,7 @@ urlpatterns = [
     path('v1/', include(router.urls)),
     path('', conversation_list, name='conversation_list'),
     path('conversation/<int:conversation_id>/', conversation_detail, name='conversation_detail'),
+    path('conversation/<int:conversation_id>/media/', conversation_media, name='conversation_media'),
     path('search-followed-users/', search_followed_users, name='search_followed_users'),
     path('create/', create_conversation, name='create_conversation'),
     path('api/attachments/upload/', attachment_upload, name='attachment_upload'),

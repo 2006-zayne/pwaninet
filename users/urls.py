@@ -52,6 +52,7 @@ urlpatterns = [
     ),
     path('user/<str:username>/pwanimate-card/', views.pwanimate_profile_card, name='pwanimate_profile_card'),
     path('user/<str:username>/', views.profile_view, name='profile'),
+    path('user/<str:username>/', views.profile_view, name='user_profile'),
     path('user/<str:username>/mark-shared-viewed/', views.mark_shared_viewed, name='mark_shared_viewed'),
     path('profile/edit/', views.update_profile_view, name='update_profile'),
     path('toggle-follow/<str:username>/', views.toggle_follow, name='toggle_follow'),

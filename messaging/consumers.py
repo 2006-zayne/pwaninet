@@ -64,7 +64,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Join conversation room group
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
-        await self.accept()
+        try:
+            await self.accept()
+        except RuntimeError:
+            return
 
         # Mark all pending messages sent to this user as 'delivered'
         delivered_ids = await self._mark_received_messages_delivered()
@@ -96,6 +99,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=json.dumps({
                 'type': 'peer_status',
                 **peer_status
+            }))
+
+        # Send peer's last read status if available
+        peer_last_read = await self._get_peer_last_read()
+        if peer_last_read:
+            await self.send(text_data=json.dumps({
+                'type': 'read_receipt',
+                **peer_last_read
             }))
 
     async def disconnect(self, close_code):
@@ -235,20 +246,55 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
 
         # 4. Notify members' personal channel for conversation list updates
-        preview_text = content or (f"[{message_type.capitalize()}]" if message_type != 'text' else 'New message')
+        att_type = data.get('attachment_type')
+        if message_type == 'audio' or att_type == 'audio':
+            rich_preview = "🎤 Voice message"
+            preview_type = 'audio'
+        elif message_type == 'media_group' or att_type == 'image' or data.get('attachments'):
+            rich_preview = f"📷 {content}" if content else "📷 Photo"
+            preview_type = 'image'
+        elif att_type == 'video':
+            rich_preview = f"🎥 {content}" if content else "🎥 Video"
+            preview_type = 'video'
+        elif att_type == 'document':
+            rich_preview = f"📄 {content}" if content else "📄 Document"
+            preview_type = 'document'
+        else:
+            rich_preview = content or "New message"
+            preview_type = 'text'
+
         for member_id in other_members:
             unread_count = await self._get_unread_count(member_id)
             await self.channel_layer.group_send(
                 f'notifications_{member_id}',
                 {
                     'type': 'conversation_update',
-                    'conversation_id': self.conversation_id,
-                    'message_preview': preview_text,
+                    'conversation_id': int(self.conversation_id),
+                    'message_preview': rich_preview,
+                    'preview_type': preview_type,
                     'sender_name': self.user.username,
+                    'sender_id': self.user_id,
+                    'is_sender': False,
                     'timestamp': saved_msg.created_at.isoformat(),
                     'unread_count': unread_count
                 }
             )
+
+        # Notify sender personal channel so their list updates to top instantly
+        await self.channel_layer.group_send(
+            f'notifications_{self.user_id}',
+            {
+                'type': 'conversation_update',
+                'conversation_id': int(self.conversation_id),
+                'message_preview': f"You: {rich_preview}",
+                'preview_type': preview_type,
+                'sender_name': 'You',
+                'sender_id': self.user_id,
+                'is_sender': True,
+                'timestamp': saved_msg.created_at.isoformat(),
+                'unread_count': 0
+            }
+        )
 
     async def _handle_message_delivered(self, data):
         message_id = data.get('message_id')
@@ -268,14 +314,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def _handle_read_receipt(self, data):
         message_id = data.get('message_id')
-        last_id = await self._update_last_read(message_id)
+        message_ids = data.get('message_ids')
+        target_id = message_id
+        if message_ids and isinstance(message_ids, list):
+            valid_ids = [int(i) for i in message_ids if str(i).isdigit()]
+            if valid_ids:
+                max_list_id = max(valid_ids)
+                target_id = max(int(target_id), max_list_id) if target_id and str(target_id).isdigit() else max_list_id
+
+        last_id, reader_avatar = await self._update_last_read(target_id)
         if last_id:
+            # 1. Broadcast read receipt to chat room
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'read_receipt_event',
                     'user_id': self.user_id,
-                    'last_read_message_id': last_id
+                    'last_read_message_id': last_id,
+                    'read_avatar': reader_avatar
+                }
+            )
+
+            # 2. Update reader's sidebar unread badge to 0 immediately
+            await self.channel_layer.group_send(
+                f'notifications_{self.user_id}',
+                {
+                    'type': 'conversation_update',
+                    'conversation_id': int(self.conversation_id),
+                    'unread_count': 0
                 }
             )
 
@@ -402,7 +468,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'read_receipt',
             'user_id': event['user_id'],
-            'last_read_message_id': event['last_read_message_id']
+            'last_read_message_id': event['last_read_message_id'],
+            'read_avatar': event.get('read_avatar')
         }))
 
     async def typing_event(self, event):
@@ -530,11 +597,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 except Exception as e:
                     logger.debug(f"Link preview generation skipped: {e}")
 
+            if data.get('is_forwarded') or data.get('metadata', {}).get('is_forwarded'):
+                msg.is_forwarded = True
+                msg.save(update_fields=['is_forwarded'])
             conv.save(update_fields=['updated_at'])
-            if data.get('is_forwarded') or data.get('metadata', {}).get('is_forwarded'):
-                msg._is_forwarded = True
             serialized = MessageSerializer(msg).data
-            if data.get('is_forwarded') or data.get('metadata', {}).get('is_forwarded'):
+            if msg.is_forwarded:
                 serialized['is_forwarded'] = True
             return msg, serialized
         except Exception as e:
@@ -562,6 +630,29 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return delivered_ids
 
     @database_sync_to_async
+    def _get_peer_last_read(self):
+        try:
+            member = ConversationMember.objects.filter(
+                conversation_id=self.conversation_id
+            ).exclude(user_id=self.user_id).select_related('user', 'last_read_message').first()
+            if member and member.last_read_message_id:
+                reader_avatar = None
+                if hasattr(member.user, 'profile_pic') and member.user.profile_pic:
+                    try:
+                        reader_avatar = member.user.profile_pic.url
+                    except Exception:
+                        reader_avatar = None
+                return {
+                    'user_id': member.user_id,
+                    'last_read_message_id': member.last_read_message_id,
+                    'read_avatar': reader_avatar
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Error getting peer last read: {e}")
+            return None
+
+    @database_sync_to_async
     def _update_last_read(self, message_id=None):
         try:
             member = ConversationMember.objects.filter(
@@ -569,7 +660,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 user_id=self.user_id
             ).first()
             if not member:
-                return None
+                return None, None
 
             if message_id:
                 target_msg = Message.objects.filter(id=message_id, conversation_id=self.conversation_id).first()
@@ -586,11 +677,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     id__lte=target_msg.id
                 ).exclude(sender_id=self.user_id).update(status='read')
 
-                return target_msg.id
-            return None
+                reader_avatar = None
+                if hasattr(self.user, 'profile_pic') and self.user.profile_pic:
+                    try:
+                        reader_avatar = self.user.profile_pic.url
+                    except Exception:
+                        reader_avatar = None
+
+                return target_msg.id, reader_avatar
+            return None, None
         except Exception as e:
             logger.error(f"Error updating read receipt: {e}")
-            return None
+            return None, None
 
     @database_sync_to_async
     def _toggle_reaction(self, message_id, emoji):
@@ -673,9 +771,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 link_description=orig_msg.link_description,
                 link_image=orig_msg.link_image,
                 link_type=orig_msg.link_type,
+                link_preview=orig_msg.link_preview,
+                is_forwarded=True,
                 status='sent'
             )
-            new_msg._is_forwarded = True
+            # Duplicate any MessageAttachment entries (for multi-file attachments)
+            for att in orig_msg.attachments.all():
+                MessageAttachment.objects.create(
+                    message=new_msg,
+                    file=att.file,
+                    file_type=att.file_type,
+                    caption=att.caption,
+                    order=att.order,
+                    size=att.size,
+                    width=att.width,
+                    height=att.height,
+                    duration=att.duration
+                )
             conv.save(update_fields=['updated_at'])
             serialized = MessageSerializer(new_msg).data
             serialized['is_forwarded'] = True
@@ -690,7 +802,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             conv = Conversation.objects.get(id=self.conversation_id)
             member = conv.members.filter(user_id=user_id).first()
             if member and member.last_read_message:
-                return conv.messages.filter(id__gt=member.last_read_message.id).count()
-            return conv.messages.count()
+                return conv.messages.filter(id__gt=member.last_read_message.id).exclude(sender_id=user_id).count()
+            return conv.messages.exclude(sender_id=user_id).count()
         except Exception:
             return 0

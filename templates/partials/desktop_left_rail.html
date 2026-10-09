@@ -34,11 +34,17 @@
            class="left-rail-link nav-chip {% if request.resolver_match.app_name == 'messaging' %}active{% endif %}"
            data-bypass-htmx="true"
            hx-boost="false">
-            <span class="position-relative d-inline-flex align-items-center justify-content-center"
-                  hx-get="{% url 'messaging:unread_message_count' %}"
-                  hx-trigger="load, every 60s"
-                  hx-swap="innerHTML">
+            <span class="position-relative d-inline-flex align-items-center justify-content-center">
                 <i class="bi bi-chat-dots-fill left-rail-icon"></i>
+                {% if unread_messages_count > 0 %}
+                    <span class="position-absolute badge rounded-pill bg-danger messages-badge" style="top: -4px; right: -8px; font-size: 0.65rem;">
+                        {{ unread_messages_count }}
+                    </span>
+                {% else %}
+                    <span class="position-absolute badge rounded-pill bg-danger messages-badge" style="top: -4px; right: -8px; font-size: 0.65rem; display: none;">
+                        0
+                    </span>
+                {% endif %}
             </span>
             <span class="left-rail-label">{% trans "Chats" %}</span>
         </a>

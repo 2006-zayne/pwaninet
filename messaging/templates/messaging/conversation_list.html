@@ -2,6 +2,9 @@
 {% load static %}
 {% load messaging_extras %}
 {% block content %}
+<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=7">
+<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=25">
+<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=44">
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 <script>
 // Helper function to get CSRF token
@@ -117,6 +120,7 @@ document.addEventListener('click', function(e) {
   /* ── Design Tokens (matches groups_dashboard.html) ── */
   :root, [data-theme="light"] {
     --brand:          #2563eb;
+    --chat-accent:    #0284c7;
     --brand-light:    #dbeafe;
     --brand-mid:      #bfdbfe;
     --brand-glow:     rgba(37, 99, 235, 0.10);
@@ -141,6 +145,7 @@ document.addEventListener('click', function(e) {
 
   [data-theme="dark"] {
     --brand:          #6366f1;
+    --chat-accent:    #38bdf8;
     --brand-light:    #312e81;
     --brand-mid:      #4338ca;
     --brand-glow:     rgba(99, 102, 241, 0.15);
@@ -265,13 +270,14 @@ document.addEventListener('click', function(e) {
     margin: 0;
   }
 
-  .btn-create {
+  .btn-create,
+  .whatsapp-start-chat-btn {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     padding: 0.6rem 1.25rem;
-    background: var(--brand);
-    color: #fff;
+    background: var(--chat-accent, var(--brand, #2563eb)) !important;
+    color: #fff !important;
     border: none;
     border-radius: var(--radius-pill);
     font-size: 0.82rem;
@@ -283,13 +289,15 @@ document.addEventListener('click', function(e) {
     white-space: nowrap;
     flex-shrink: 0;
   }
-  .btn-create:hover {
-    background: #1d4ed8;
-    color: #fff;
+  .btn-create:hover,
+  .whatsapp-start-chat-btn:hover {
+    background: color-mix(in srgb, var(--chat-accent, var(--brand, #2563eb)) 85%, #000000) !important;
+    color: #fff !important;
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px var(--brand-glow);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--chat-accent, var(--brand, #2563eb)) 35%, transparent) !important;
   }
-  .btn-create i { font-size: 14px; }
+  .btn-create i,
+  .whatsapp-start-chat-btn i { font-size: 14px; }
 
   .btn-back-arrow {
     display: inline-flex;
@@ -751,11 +759,45 @@ document.addEventListener('click', function(e) {
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
+    border: none !important;
   }
   .chat-row:hover {
-    background: var(--brand-light);
+    background: color-mix(in srgb, var(--chat-accent, var(--brand, #2563eb)) 8%, transparent);
     transform: translateX(2px);
   }
+  .chat-row.active {
+    background-color: color-mix(in srgb, var(--chat-accent, var(--brand, #2563eb)) 14%, transparent) !important;
+    border-left: 3.5px solid var(--chat-accent, var(--brand, #2563eb)) !important;
+  }
+  [data-theme="dark"] .chat-row.active,
+  [data-bs-theme="dark"] .chat-row.active {
+    background-color: color-mix(in srgb, var(--chat-accent, var(--brand, #2563eb)) 22%, transparent) !important;
+    border-left: 3.5px solid var(--chat-accent, var(--brand, #2563eb)) !important;
+  }
+  [data-theme="dark"] .chat-row:hover,
+  [data-bs-theme="dark"] .chat-row:hover {
+    background: color-mix(in srgb, var(--chat-accent, var(--brand, #2563eb)) 12%, transparent);
+  }
+
+  /* Online Active Status Dot */
+  .user-status-dot.online {
+    position: absolute;
+    bottom: 1px;
+    right: 1px;
+    width: 11px;
+    height: 11px;
+    background-color: #22c55e;
+    border: 2px solid var(--card-bg, #ffffff);
+    border-radius: 50%;
+    z-index: 2;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    display: block;
+  }
+  [data-theme="dark"] .user-status-dot.online,
+  [data-bs-theme="dark"] .user-status-dot.online {
+    border-color: var(--card-bg, #242526);
+  }
+
   .chat-avatar {
     width: 48px;
     height: 48px;
@@ -845,11 +887,16 @@ document.addEventListener('click', function(e) {
     color: var(--text-secondary);
   }
   .chat-preview-text.unread {
-    font-weight: 700;
-    color: var(--text-primary);
+    font-weight: 700 !important;
+    color: #0f172a !important;
+  }
+  [data-theme="dark"] .chat-preview-text.unread,
+  [data-bs-theme="dark"] .chat-preview-text.unread {
+    font-weight: 700 !important;
+    color: #f8fafc !important;
   }
   .chat-preview-text.typing {
-    color: var(--brand);
+    color: var(--chat-accent, var(--brand));
     font-style: italic;
     font-weight: 600;
   }
@@ -919,10 +966,10 @@ document.addEventListener('click', function(e) {
 
   /* ── Unread Badge ── */
   .unread-badge {
-    background: var(--brand);
-    color: #fff;
-    font-size: 0.65rem;
-    font-weight: 800;
+    background-color: var(--chat-accent, var(--brand, #2563eb)) !important;
+    color: #ffffff !important;
+    font-size: 0.68rem;
+    font-weight: 700;
     border-radius: var(--radius-pill);
     padding: 2px 7px;
     min-width: 18px;
@@ -931,10 +978,32 @@ document.addEventListener('click', function(e) {
     align-items: center;
     justify-content: center;
     line-height: 1.2;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   }
   .unread-badge:hover {
-    background: #1d4ed8;
+    filter: brightness(1.1);
     text-decoration: none;
+  }
+
+  /* Suggested Friends */
+  .suggested-friend-item {
+    transition: background-color 0.15s ease;
+    border-radius: 10px;
+  }
+  .suggested-friend-item:hover {
+    background-color: color-mix(in srgb, var(--chat-accent, var(--brand, #2563eb)) 8%, transparent);
+  }
+  .start-conversation-btn,
+  .btn.start-conversation {
+    border-color: var(--chat-accent, var(--brand, #2563eb));
+    color: var(--chat-accent, var(--brand, #2563eb));
+    font-weight: 600;
+  }
+  .start-conversation-btn:hover,
+  .btn.start-conversation:hover {
+    background-color: var(--chat-accent, var(--brand, #2563eb));
+    color: #ffffff;
+    border-color: var(--chat-accent, var(--brand, #2563eb));
   }
 
   /* Sidebar: tip card */
@@ -1083,7 +1152,7 @@ document.addEventListener('click', function(e) {
       </div>
       <div style="display: flex; align-items: center; gap: 1rem;">
         <h1 class="page-title">Messaging</h1>
-        <button class="btn-create" data-bs-toggle="modal" data-bs-target="#newConversationModal">
+        <button class="btn-create whatsapp-start-chat-btn" data-bs-toggle="modal" data-bs-target="#newConversationModal">
           <i class="bi bi-plus-lg"></i> Start New Chat
         </button>
       </div>
@@ -1122,71 +1191,126 @@ document.addEventListener('click', function(e) {
               <div class="chats-scroll">
                 {% for item in conversation_data %}
                   {% with conversation=item.conversation %}
-                  <a href="{% url 'messaging:conversation_detail' conversation.id %}" class="chat-row">
-                    {% if conversation.type == 'group' %}
-                      <div class="chat-icon">
-                        <i class="bi bi-people-fill"></i>
-                      </div>
-                    {% else %}
-                      {% for member in conversation.members.all %}
-                        {% if member.user != request.user %}
-                          {% if member.user.profile_pic %}
-                            <img src="{{ member.user.profile_pic.url }}" 
-                                 class="chat-avatar" 
-                                 alt="{{ member.user.username }}"
-                                 data-user-id="{{ member.user.id }}">
-                          {% else %}
-                            <div class="chat-avatar d-flex align-items-center justify-content-center bg-secondary text-white"
-                                 data-user-id="{{ member.user.id }}">
-                              <i class="bi bi-person-fill fs-5"></i>
+                  <div class="chat-row-wrapper position-relative mb-1">
+                    <a href="{% url 'messaging:conversation_detail' conversation.id %}" class="chat-row{% if active_conversation and conversation.id|stringformat:'s' == active_conversation|stringformat:'s' %} active{% endif %}" data-conversation-id="{{ conversation.id }}" data-is-pinned="{% if item.is_pinned %}true{% else %}false{% endif %}">
+                      {% if conversation.type == 'group' %}
+                        <div class="chat-icon">
+                          <i class="bi bi-people-fill"></i>
+                        </div>
+                      {% else %}
+                        {% for member in conversation.members.all %}
+                          {% if member.user != request.user %}
+                            <div class="position-relative d-inline-block flex-shrink-0">
+                              {% if member.user.profile_pic %}
+                                <img src="{{ member.user.profile_pic.url }}" 
+                                     class="chat-avatar" 
+                                     alt="{{ member.user.username }}"
+                                     data-user-id="{{ member.user.id }}">
+                              {% else %}
+                                <div class="chat-avatar d-flex align-items-center justify-content-center bg-secondary text-white"
+                                     data-user-id="{{ member.user.id }}">
+                                  <i class="bi bi-person-fill fs-5"></i>
+                                </div>
+                              {% endif %}
+                              {% if member.user.is_online %}
+                                <span class="user-status-dot online" data-user-status-id="{{ member.user.id }}"></span>
+                              {% else %}
+                                <span class="user-status-dot" data-user-status-id="{{ member.user.id }}" style="display: none;"></span>
+                              {% endif %}
                             </div>
                           {% endif %}
-                        {% endif %}
-                      {% endfor %}
-                    {% endif %}
-                    <div class="chat-info">
-                      <div class="chat-top-line">
-                        <h4 class="chat-name">
-                          {% if conversation.type == 'group' and conversation.name %}
-                            <span title="{{ conversation.name }}">{{ conversation.name|truncatechars:28 }}</span>
-                          {% else %}
-                            {% for member in conversation.members.all %}
-                              {% if member.user != request.user %}
-                                <span title="{{ member.user.username }}">{{ member.user.username|truncatechars:25 }}</span>
-                              {% endif %}
-                            {% endfor %}
-                          {% endif %}
-                        </h4>
-                        <div class="chat-meta">
-                          {% if conversation.unread_count > 0 %}
-                            <span class="unread-badge">
-                              {{ conversation.unread_count }}
-                            </span>
-                          {% elif conversation.last_message and conversation.last_message.sender == request.user %}
-                            <span class="read-receipt-icon" style="font-size: 12px; color: var(--text-muted);">&#10003;</span>
-                          {% endif %}
+                        {% endfor %}
+                      {% endif %}
+                      <div class="chat-info flex-grow-1 overflow-hidden" style="min-width: 0;">
+                        <div class="chat-top-line d-flex align-items-center justify-content-between mb-1">
+                          <h4 class="chat-name fw-semibold text-truncate me-2 mb-0" style="font-size: 0.95rem;">
+                            {% if conversation.type == 'group' and conversation.name %}
+                              <span title="{{ conversation.name }}">{{ conversation.name|truncatechars:28 }}</span>
+                            {% else %}
+                              {% for member in conversation.members.all %}
+                                {% if member.user != request.user %}
+                                  <span title="{{ member.user.username }}">{{ member.user.username|truncatechars:25 }}</span>
+                                {% endif %}
+                              {% endfor %}
+                            {% endif %}
+                          </h4>
+
+                          <!-- Top Right Actions: Pin icon, Time/Receipt (padded for 3-dots) -->
+                          <div class="chat-meta d-flex align-items-center gap-1 flex-shrink-0 ms-auto" style="padding-right: 26px;">
+                            <i class="bi bi-pin-angle-fill text-primary chat-pin-icon {% if not item.is_pinned %}d-none{% endif %}" title="Pinned" style="font-size: 0.78rem;"></i>
+                            {% if conversation.last_message and conversation.last_message.sender == request.user %}
+                              <span class="read-receipt-icon" style="font-size: 12px; color: var(--text-muted);">&#10003;</span>
+                            {% endif %}
+                            {% if conversation.last_msg_time %}
+                              <span class="chat-time text-muted small" style="font-size: 0.72rem;">{{ conversation.last_msg_time|date:"H:i" }}</span>
+                            {% endif %}
+                          </div>
                         </div>
-                      </div>
-                      <div class="chat-bottom-line">
-                        <div class="chat-preview">
-                          {% if conversation.last_message %}
-                            {% if conversation.last_message.sender == request.user %}
-                              <span class="chat-preview-text{% if conversation.unread_count > 0 %} unread{% endif %}">
-                                You: {{ conversation.last_message.content|truncatechars:38 }}
+
+                        <!-- Bottom Line: Preview Snippet (Left) + Unread Badge (Right side-by-side) -->
+                        <div class="chat-bottom-line d-flex align-items-center justify-content-between" style="padding-right: 26px;">
+                          <div class="chat-preview flex-grow-1 overflow-hidden" style="min-width: 0;">
+                            {% if item.preview %}
+                              <span class="chat-preview-text text-truncate d-block {% if item.unread_count > 0 %}fw-bold text-body unread{% else %}text-muted fw-normal{% endif %}">
+                                {% if item.preview.icon %}
+                                  <i class="bi {{ item.preview.icon }} me-1 {% if item.preview.type == 'audio' %}text-primary{% else %}text-muted{% endif %}"></i>
+                                {% endif %}
+                                {{ item.preview.text }}
+                              </span>
+                            {% elif conversation.last_message %}
+                              <span class="chat-preview-text text-truncate d-block {% if item.unread_count > 0 %}fw-bold text-body unread{% else %}text-muted fw-normal{% endif %}">
+                                {% if conversation.last_message.sender == request.user %}
+                                  You: {{ conversation.last_message.content|truncatechars:38 }}
+                                {% else %}
+                                  {{ conversation.last_message.sender.username }}: {{ conversation.last_message.content|truncatechars:38 }}
+                                {% endif %}
                               </span>
                             {% else %}
-                              <span class="chat-preview-text{% if conversation.unread_count > 0 %} unread{% endif %}">
-                                {{ conversation.last_message.sender.username }}: {{ conversation.last_message.content|truncatechars:38 }}
-                              </span>
+                              <span class="chat-preview-text text-muted">Start a conversation</span>
                             {% endif %}
-                          {% else %}
-                            <span class="chat-preview-text">Start a conversation</span>
-                          {% endif %}
+                          </div>
+
+                          <!-- Unread Badge side by side with preview -->
+                          <span class="unread-badge ms-2 flex-shrink-0 {% if item.unread_count == 0 %}d-none{% endif %}">
+                            {{ item.unread_count }}
+                          </span>
                         </div>
                       </div>
+                    </a>
+
+                    <!-- 3-Dots Dropdown: Positioned absolute in wrapper, OUTSIDE <a> -->
+                    <div class="dropdown chat-item-dropdown position-absolute" style="top: 8px; right: 6px; z-index: 1065;">
+                      <button class="btn btn-sm btn-link text-muted p-0 border-0 chat-dropdown-toggle-btn d-flex align-items-center justify-content-center"
+                              type="button"
+                              data-bs-toggle="dropdown"
+                              data-bs-strategy="fixed"
+                              data-bs-popper-config='{"strategy":"fixed"}'
+                              data-conversation-id="{{ conversation.id }}"
+                              aria-expanded="false"
+                              title="Chat options"
+                              style="width: 24px; height: 24px;">
+                        <i class="bi bi-three-dots-vertical" style="font-size: 0.85rem;"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end shadow border py-1 small" style="z-index: 1070;">
+                        <li>
+                          <button class="dropdown-item py-1 px-3 pin-toggle-btn"
+                                  type="button"
+                                  data-conversation-id="{{ conversation.id }}"
+                                  data-action="{% if item.is_pinned %}unpin{% else %}pin{% endif %}">
+                            <i class="bi bi-pin-angle{% if item.is_pinned %}-fill{% endif %} me-2 text-primary"></i>
+                            {% if item.is_pinned %}Unpin chat{% else %}Pin chat{% endif %}
+                          </button>
+                        </li>
+                        <li>
+                          <button class="dropdown-item py-1 px-3 mark-read-btn"
+                                  type="button"
+                                  data-conversation-id="{{ conversation.id }}">
+                            <i class="bi bi-check2-all me-2 text-info"></i> Mark as read
+                          </button>
+                        </li>
+                      </ul>
                     </div>
-                    <i class="bi bi-chevron-right chat-arrow"></i>
-                  </a>
+                  </div>
                   {% endwith %}
                 {% empty %}
                   <div class="sidebar-empty">
@@ -1195,6 +1319,47 @@ document.addEventListener('click', function(e) {
                   </div>
                 {% endfor %}
               </div>
+
+              <!-- Suggested Friends Section at Bottom -->
+              {% if suggested_users or unmessaged_friends %}
+              <div class="sidebar-label mt-4 pt-3 border-top d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-people-fill me-1"></i> Suggested Friends</span>
+                <span class="badge bg-secondary-subtle text-muted" style="font-size: 0.68rem;">{{ suggested_users|length|default:unmessaged_friends|length }}</span>
+              </div>
+              <div class="suggested-friends-list mt-2">
+                {% for u in suggested_users|default:unmessaged_friends|slice:":8" %}
+                <div class="d-flex align-items-center justify-content-between py-2 px-1 suggested-friend-item">
+                  <div class="d-flex align-items-center gap-2 overflow-hidden" style="min-width: 0;">
+                    <div class="position-relative d-inline-block flex-shrink-0">
+                      {% if u.profile_picture %}
+                        <img src="{{ u.profile_picture.url }}" class="rounded-circle" style="width: 38px; height: 38px; object-fit: cover;" alt="{{ u.username }}">
+                      {% elif u.profile_pic %}
+                        <img src="{{ u.profile_pic.url }}" class="rounded-circle" style="width: 38px; height: 38px; object-fit: cover;" alt="{{ u.username }}">
+                      {% else %}
+                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width: 38px; height: 38px; font-size: 15px;">
+                          <i class="bi bi-person-fill"></i>
+                        </div>
+                      {% endif %}
+                      {% if u.is_online %}
+                        <span class="user-status-dot online" data-user-status-id="{{ u.id }}"></span>
+                      {% else %}
+                        <span class="user-status-dot" data-user-status-id="{{ u.id }}" style="display: none;"></span>
+                      {% endif %}
+                    </div>
+                    <div class="overflow-hidden" style="min-width: 0;">
+                      <div class="fw-semibold text-truncate" style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.2;">
+                        {{ u.get_full_name|default:u.username }}
+                      </div>
+                      <div class="text-muted text-truncate" style="font-size: 0.72rem;">@{{ u.username }}</div>
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-primary rounded-pill start-conversation flex-shrink-0 px-2 py-1" data-user-id="{{ u.id }}" style="font-size: 0.75rem;">
+                    <i class="bi bi-chat-dots me-1"></i>Message
+                  </button>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
             </div>
           </div>
 
@@ -1465,9 +1630,21 @@ async function checkUserOnlineStatus(userId, avatarElement) {
         const response = await fetch(`/users/api/users/${userId}/online-status/`);
         if (response.ok) {
             const data = await response.json();
-            if (data.is_online) {
-                avatarElement.classList.add('online');
+            const isOnline = Boolean(data.is_online);
+            if (avatarElement) {
+                if (isOnline) avatarElement.classList.add('online');
+                else avatarElement.classList.remove('online');
             }
+            const dots = document.querySelectorAll(`[data-user-status-id="${userId}"]`);
+            dots.forEach(dot => {
+                if (isOnline) {
+                    dot.classList.add('online');
+                    dot.style.display = '';
+                } else {
+                    dot.classList.remove('online');
+                    dot.style.display = 'none';
+                }
+            });
         }
     } catch (error) {
         // Silent fail - don't show errors in console
@@ -1476,19 +1653,35 @@ async function checkUserOnlineStatus(userId, avatarElement) {
 
 // Handle real-time user status updates from WebSocket
 function handleUserStatusUpdate(userData) {
+    if (!userData) return;
     const { user_id, is_online } = userData;
+    const online = Boolean(is_online);
     
     // Update all avatars for this user
     const avatars = document.querySelectorAll(`.chat-avatar[data-user-id="${user_id}"], .conversation-card-avatar[data-user-id="${user_id}"]`);
-    
     avatars.forEach(avatar => {
-        if (is_online) {
+        if (online) {
             avatar.classList.add('online');
         } else {
             avatar.classList.remove('online');
         }
     });
+
+    // Update all status dots for this user
+    const dots = document.querySelectorAll(`[data-user-status-id="${user_id}"]`);
+    dots.forEach(dot => {
+        if (online) {
+            dot.classList.add('online');
+            dot.style.display = '';
+        } else {
+            dot.classList.remove('online');
+            dot.style.display = 'none';
+        }
+    });
 }
+window.handleUserStatusUpdate = handleUserStatusUpdate;
 </script>
+<script src="{% static 'js/messaging/conversation-realtime-manager.js' %}?v=4"></script>
+<script src="{% static 'js/chat-theme-handler.js' %}?v=28"></script>
 
 {% endblock %}

@@ -30,11 +30,12 @@ export class MessageSoundManager {
         try {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             
-            // Preload the sound buffer
+            // Preload the sound buffers
             this.audioBuffer = this._createSendSoundBuffer();
+            this.receiveAudioBuffer = this._createReceiveSoundBuffer();
             
             this.initialized = true;
-            console.log('[MESSAGE_SOUND] Audio context initialized and sound buffer preloaded');
+            console.log('[MESSAGE_SOUND] Audio context initialized and sound buffers preloaded');
         } catch (error) {
             console.warn('[MESSAGE_SOUND] Audio context not supported:', error);
             this.enabled = false;
@@ -97,6 +98,33 @@ export class MessageSoundManager {
     }
 
     /**
+     * Create preloaded audio buffer for receive sound
+     * Pleasant subtle notification chime (~180ms duration)
+     * @returns {AudioBuffer} Preloaded audio buffer
+     */
+    _createReceiveSoundBuffer() {
+        if (!this.audioContext) return null;
+
+        const sampleRate = this.audioContext.sampleRate;
+        const duration = 0.18; // 180ms
+        const frameCount = sampleRate * duration;
+        const buffer = this.audioContext.createBuffer(1, frameCount, sampleRate);
+        const data = buffer.getChannelData(0);
+
+        for (let i = 0; i < frameCount; i++) {
+            const t = i / sampleRate;
+            // Dual chime chords: D5 (587.33 Hz) and A5 (880 Hz)
+            const f1 = 587.33;
+            const f2 = 880.00;
+            const env1 = Math.exp(-t * 22);
+            const env2 = (t > 0.04) ? Math.exp(-(t - 0.04) * 18) : 0;
+            data[i] = (0.12 * Math.sin(2 * Math.PI * f1 * t) * env1) + (0.15 * Math.sin(2 * Math.PI * f2 * t) * env2);
+        }
+
+        return buffer;
+    }
+
+    /**
      * Play preloaded send sound instantly
      * @param {string} messageId - Optional message ID to prevent replay
      */
@@ -129,6 +157,45 @@ export class MessageSoundManager {
         } catch (error) {
             console.warn('[MESSAGE_SOUND] Failed to play sound:', error);
         }
+    }
+
+    /**
+     * Play preloaded receive sound instantly
+     * @param {string} messageId - Optional message ID to prevent replay
+     */
+    playReceiveSound(messageId = null) {
+        if (!this.enabled || !this.initialized || !this.receiveAudioBuffer) {
+            return;
+        }
+
+        if (messageId && this.playedMessageIds.has(messageId)) {
+            return;
+        }
+
+        try {
+            const source = this.audioContext.createBufferSource();
+            source.buffer = this.receiveAudioBuffer;
+            source.connect(this.audioContext.destination);
+            source.start();
+
+            if (messageId) {
+                this.playedMessageIds.add(messageId);
+                setTimeout(() => {
+                    this.playedMessageIds.delete(messageId);
+                }, 5000);
+            }
+
+            console.log('[MESSAGE_SOUND] Receive sound played');
+        } catch (error) {
+            console.warn('[MESSAGE_SOUND] Failed to play receive sound:', error);
+        }
+    }
+
+    /**
+     * Alias for playReceiveSound
+     */
+    playMessageReceived(messageId = null) {
+        this.playReceiveSound(messageId);
     }
 
     /**

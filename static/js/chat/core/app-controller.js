@@ -10,6 +10,8 @@ import { messageService } from './message-service.js';
 import { webSocketManager } from './websocket.js';
 import { uiController } from '../ui/ui-controller.js';
 import { networkHealthTracker } from '../shared/network-health-tracker.js';
+import { eventBus } from './event-bus.js';
+import { messageSoundManager } from '../shared/message-sound.js';
 
 export class AppController {
     constructor() {
@@ -124,7 +126,108 @@ export class AppController {
             this.handleConnectionChange(isConnected);
         });
 
+        // Initialize Notification & Push Handlers
+        this._setupNotificationHandlers();
+
         this._log('DATA_FLOW_CONNECTIONS_SETUP');
+    }
+
+    /**
+     * Setup notification listeners and Web Push integration
+     */
+    _setupNotificationHandlers() {
+        // Sync active Web Push subscription if permission already granted
+        if (typeof window.PushSubscriptionManager !== 'undefined') {
+            try {
+                const pushManager = new window.PushSubscriptionManager();
+                if (pushManager.isSupported() && pushManager.hasPermission()) {
+                    pushManager.syncActiveSubscription().catch(e => console.warn('[APP_CONTROLLER] Push sync:', e));
+                }
+            } catch (e) {
+                console.warn('[APP_CONTROLLER] Push manager init error:', e);
+            }
+        }
+
+        // Global manual registration trigger
+        window.registerMessagingNotifications = async () => {
+            if (!('Notification' in window)) {
+                if (window.showNotification) window.showNotification('Notifications are not supported in this browser.', 'warning');
+                return false;
+            }
+            try {
+                const perm = await Notification.requestPermission();
+                if (perm === 'granted') {
+                    if (window.PushSubscriptionManager) {
+                        const pm = new window.PushSubscriptionManager();
+                        await pm.subscribe();
+                    }
+                    if (window.showNotification) {
+                        window.showNotification('Push notifications enabled successfully!', 'success');
+                    }
+                    return true;
+                } else {
+                    if (window.showNotification) {
+                        window.showNotification('Notification permission was not granted.', 'info');
+                    }
+                }
+            } catch (err) {
+                console.warn('[APP_CONTROLLER] Error subscribing to push:', err);
+            }
+            return false;
+        };
+
+        // Wire dropdown button if clicked
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('#enableNotificationsBtn');
+            if (btn) {
+                e.preventDefault();
+                window.registerMessagingNotifications();
+            }
+        });
+
+        // Listen for incoming message notifications
+        eventBus.on('notification_received', (message) => {
+            if (!message) return;
+            const state = store.getState();
+            if (message.senderId === state.currentUserId) return;
+
+            // In-app audio chime
+            if (messageSoundManager && typeof messageSoundManager.playReceiveSound === 'function') {
+                messageSoundManager.playReceiveSound(message.id);
+            }
+
+            // Browser Notification API
+            if (document.hidden || Number(message.conversationId) !== Number(state.conversationId)) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    try {
+                        const senderName = message.senderName || message.senderUsername || (document.body.dataset.receiverName || 'New Message');
+                        const bodySnippet = message.content || (message.attachments?.length ? 'Sent an attachment' : 'New message');
+                        const avatar = message.senderAvatar || document.body.dataset.receiverAvatar || '/static/images/pwaninetmonochrome.png';
+                        const notif = new Notification(senderName, {
+                            body: bodySnippet,
+                            icon: avatar,
+                            badge: '/static/images/favicon-96x96.png',
+                            tag: `chat-${message.conversationId}`,
+                            renotify: true,
+                            data: {
+                                conversationId: message.conversationId,
+                                url: `/messaging/conversation/${message.conversationId}/`
+                            }
+                        });
+                        notif.onclick = function() {
+                            window.focus();
+                            if (message.conversationId) {
+                                const chatItem = document.querySelector(`.whatsapp-chat-item[data-conversation-id="${message.conversationId}"]`);
+                                if (chatItem) chatItem.click();
+                            }
+                            this.close();
+                        };
+                    } catch (e) {
+                        console.warn('[APP_CONTROLLER] Notification error:', e);
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -138,11 +241,7 @@ export class AppController {
             console.log('[APP_CONTROLLER] Pausing WebSocket before loading messages');
             webSocketManager.pause();
 
-            // 2. reset store FIRST
-            console.log('[APP_CONTROLLER] Resetting store');
-            store.reset();
-
-            // 3. load history
+            // 2. load history
             console.log('[APP_CONTROLLER] Loading conversation history for ID:', this.config.conversationId);
             await messageService.loadConversationHistory(
                 this.config.conversationId

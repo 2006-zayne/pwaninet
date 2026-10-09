@@ -67,8 +67,18 @@ export class Store {
     init(config) {
         this._logMutation('STORE_INIT', config);
         
-        this._state.conversationId = config.conversationId;
-        this._state.currentUserId = config.currentUserId;
+        const targetConvId = Number(config.conversationId);
+        if (this._state.conversationId !== targetConvId) {
+            this._state.messages.clear();
+            this._state.messageOrder = [];
+            this._state.processedMessageIds.clear();
+            this._state.isInitialHistoryLoaded = false;
+            this._state.hasMoreOlderMessages = true;
+            this._state.typingUsers.clear();
+        }
+
+        this._state.conversationId = targetConvId;
+        this._state.currentUserId = Number(config.currentUserId);
         this._state.isEncrypted = config.isEncrypted || false;
         
         this._notifySubscribers();
@@ -626,18 +636,31 @@ export class Store {
     /**
      * Mark all sent messages up to a given ID as read
      * @param {number|string} lastReadMessageId - Highest message ID read
+     * @param {string} [readAvatar] - Reader's avatar URL
      */
-    markMessagesAsReadUpTo(lastReadMessageId) {
+    markMessagesAsReadUpTo(lastReadMessageId, readAvatar = null) {
         let changed = false;
         const targetId = parseInt(lastReadMessageId, 10);
+        if (isNaN(targetId)) return;
+
+        this._state.lastReadMessageId = targetId;
+        if (readAvatar) {
+            this._state.lastReadAvatar = readAvatar;
+        }
+
         for (const [id, msg] of this._state.messages.entries()) {
             const numericId = parseInt(id, 10);
-            if (!isNaN(numericId) && numericId <= targetId && msg.status !== 'read') {
-                msg.status = 'read';
-                changed = true;
+            if (!isNaN(numericId) && numericId <= targetId) {
+                if (msg.status !== 'read') {
+                    msg.status = 'read';
+                    changed = true;
+                }
+                if (numericId === targetId && readAvatar) {
+                    msg.read_avatar = readAvatar;
+                }
             }
         }
-        if (changed) {
+        if (changed || readAvatar) {
             this._notifySubscribers();
         }
     }
@@ -748,7 +771,8 @@ export class Store {
             global_caption: message.global_caption || message.metadata?.global_caption || '',
             isOptimistic: message.isOptimistic || false,
             isDeleted: Boolean(message.isDeleted || message.metadata?.is_deleted),
-            isForwarded: Boolean(message.isForwarded || message.metadata?.is_forwarded),
+            isForwarded: Boolean(message.isForwarded || message.is_forwarded || message.metadata?.is_forwarded || message.metadata?.isForwarded),
+            is_forwarded: Boolean(message.isForwarded || message.is_forwarded || message.metadata?.is_forwarded || message.metadata?.isForwarded),
             editedAt: message.editedAt || message.metadata?.edited_at || null,
             replyToId: message.replyToId || message.metadata?.reply_to_id || null,
             replyToDetails: message.replyToDetails || message.metadata?.reply_to_details || null,

@@ -1,0 +1,165 @@
+{% load i18n %}
+{% load static %}
+
+{% if media_type == 'media' %}
+  {% if page == 1 and not items %}
+    <div class="text-center py-5 text-muted small" id="mediaPhotosVideosEmpty">
+      <i class="bi bi-images fs-2 d-block mb-2 opacity-50"></i>
+      {% trans "No photos or videos shared yet" %}
+    </div>
+  {% else %}
+    {% if page == 1 %}
+      <div class="media-gallery-grid" id="mediaPhotosVideosGrid">
+    {% endif %}
+
+    {% for item in items %}
+      <div class="media-gallery-item">
+        {% if item.type == 'image' %}
+          <a href="{{ item.url }}" target="_blank" rel="noopener">
+            <img src="{{ item.url }}" alt="Media" loading="lazy">
+          </a>
+        {% elif item.type == 'video' %}
+          <a href="{{ item.url }}" target="_blank" rel="noopener" class="position-relative d-block w-100 h-100">
+            <video src="{{ item.url }}" preload="none"></video>
+            <i class="bi bi-play-circle-fill position-absolute top-50 start-50 translate-middle text-white fs-4"></i>
+          </a>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    {% if has_next %}
+      <div class="media-sentinel text-center py-2"
+           hx-get="{% url 'messaging:conversation_media' conversation.id %}?type=media&page={{ next_page }}"
+           hx-trigger="revealed"
+           hx-swap="outerHTML"
+           style="grid-column: 1 / -1;">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if page == 1 %}
+      </div>
+    {% endif %}
+  {% endif %}
+
+{% elif media_type == 'docs' %}
+  {% if page == 1 and not items %}
+    <div class="text-center py-5 text-muted small" id="mediaDocsEmpty">
+      <i class="bi bi-file-earmark-text fs-2 d-block mb-2 opacity-50"></i>
+      {% trans "No documents shared yet" %}
+    </div>
+  {% else %}
+    {% if page == 1 %}
+      <div class="d-flex flex-column gap-2" id="mediaDocsList">
+    {% endif %}
+
+    {% for item in items %}
+      <a href="{{ item.url }}" download class="d-flex align-items-center gap-3 p-2 rounded border text-decoration-none text-dark bg-light bg-opacity-50">
+        <div class="p-2 bg-primary bg-opacity-10 text-primary rounded">
+          <i class="bi bi-file-earmark-text fs-4"></i>
+        </div>
+        <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
+          <div class="fw-semibold text-truncate small">{{ item.name }}</div>
+          <div class="text-muted x-small" style="font-size: 0.72rem;">{{ item.created_at|date:"M d, Y" }}</div>
+        </div>
+        <i class="bi bi-download text-muted"></i>
+      </a>
+    {% endfor %}
+
+    {% if has_next %}
+      <div class="media-sentinel text-center py-2"
+           hx-get="{% url 'messaging:conversation_media' conversation.id %}?type=docs&page={{ next_page }}"
+           hx-trigger="revealed"
+           hx-swap="outerHTML">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if page == 1 %}
+      </div>
+    {% endif %}
+  {% endif %}
+
+{% elif media_type == 'audio' %}
+  {% if page == 1 and not items %}
+    <div class="text-center py-5 text-muted small" id="mediaAudioEmpty">
+      <i class="bi bi-mic fs-2 d-block mb-2 opacity-50"></i>
+      {% trans "No audio messages shared yet" %}
+    </div>
+  {% else %}
+    {% if page == 1 %}
+      <div class="d-flex flex-column gap-2" id="mediaAudioList">
+    {% endif %}
+
+    {% for item in items %}
+      <div class="p-2 rounded border bg-light bg-opacity-50">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <i class="bi bi-mic text-primary"></i>
+          <span class="small fw-semibold text-truncate">{{ item.name|default:"Voice Note" }}</span>
+          <span class="text-muted x-small ms-auto" style="font-size: 0.7rem;">{{ item.created_at|date:"H:i" }}</span>
+        </div>
+        <audio controls preload="none" src="{{ item.url }}" class="w-100" style="height: 32px;"></audio>
+      </div>
+    {% endfor %}
+
+    {% if has_next %}
+      <div class="media-sentinel text-center py-2"
+           hx-get="{% url 'messaging:conversation_media' conversation.id %}?type=audio&page={{ next_page }}"
+           hx-trigger="revealed"
+           hx-swap="outerHTML">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if page == 1 %}
+      </div>
+    {% endif %}
+  {% endif %}
+
+{% elif media_type == 'links' %}
+  {% if page == 1 and not items %}
+    <div class="text-center py-5 text-muted small" id="mediaLinksEmpty">
+      <i class="bi bi-link-45deg fs-2 d-block mb-2 opacity-50"></i>
+      {% trans "No links shared yet" %}
+    </div>
+  {% else %}
+    {% if page == 1 %}
+      <div class="d-flex flex-column gap-2" id="mediaLinksList">
+    {% endif %}
+
+    {% for item in items %}
+      <a href="{{ item.url }}" target="_blank" rel="noopener" class="d-flex flex-column p-2 rounded border text-decoration-none text-dark bg-light bg-opacity-50">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-link-45deg text-primary fs-5"></i>
+          <span class="fw-semibold text-truncate small text-primary">{{ item.title|default:item.url }}</span>
+          <i class="bi bi-box-arrow-up-right x-small text-muted ms-auto" style="font-size: 0.75rem;"></i>
+        </div>
+        {% if item.description %}
+          <p class="text-muted x-small mb-1 text-truncate" style="font-size: 0.72rem;">{{ item.description }}</p>
+        {% endif %}
+        <span class="text-muted x-small" style="font-size: 0.68rem;">{{ item.created_at|date:"M d, Y" }}</span>
+      </a>
+    {% endfor %}
+
+    {% if has_next %}
+      <div class="media-sentinel text-center py-2"
+           hx-get="{% url 'messaging:conversation_media' conversation.id %}?type=links&page={{ next_page }}"
+           hx-trigger="revealed"
+           hx-swap="outerHTML">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if page == 1 %}
+      </div>
+    {% endif %}
+  {% endif %}
+{% endif %}

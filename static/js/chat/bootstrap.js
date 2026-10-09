@@ -1,6 +1,7 @@
 /**
  * Bootstrap - Single entry point with mandatory SOT data flow enforcement
  * Enforces: websocket → message-service → store → ui-controller → renderer
+ * Supports HTMX partial swaps and continuous conversation switching without full-page reload
  */
 
 import { appController } from './core/app-controller.js';
@@ -21,62 +22,70 @@ if (typeof E2EEncryption === 'undefined') {
     console.warn('E2EEncryption module not loaded');
 }
 
-// Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-    // Get configuration from data attributes
+let _currentInitConvId = null;
+let _isInitializing = false;
+
+/**
+ * Initialize or re-initialize chat system for the active conversation
+ */
+export async function initializeChatApp() {
     const chatContainer = document.querySelector('.chat-container');
+    const convId = parseInt(chatContainer?.dataset.conversationId || document.body.dataset.conversationId);
+    const userId = parseInt(chatContainer?.dataset.userId || document.body.dataset.userId);
+
     const config = {
-        conversationId: parseInt(chatContainer?.dataset.conversationId || document.body.dataset.conversationId),
-        currentUserId: parseInt(chatContainer?.dataset.userId || document.body.dataset.userId),
+        conversationId: convId,
+        currentUserId: userId,
         isEncrypted: (chatContainer?.dataset.isEncrypted || document.body.dataset.isEncrypted) === 'true',
         isGroupChat: !!chatContainer?.dataset.groupId
     };
 
-    // Validate configuration
+    // Validate configuration (e.g. skip if on empty state)
     if (!config.conversationId || !config.currentUserId) {
-        console.error('Invalid chat configuration:', config);
+        console.log('No active conversation selected yet or awaiting selection:', config);
         return;
     }
 
-    // Initialize with strict SOT data flow order
-    console.log('🔒 Initializing with strict SOT architecture...');
+    if (_isInitializing && _currentInitConvId === config.conversationId) {
+        console.log('[BOOTSTRAP] Already initializing conversation:', config.conversationId);
+        return;
+    }
+
+    _isInitializing = true;
+    _currentInitConvId = config.conversationId;
+
+    try {
+        console.log('🔒 Initializing chat system (SOT) for conversation:', config.conversationId);
 
     // 1. Store first (SOT) - ONLY mutation source
     store.init(config);
-    console.log('✅ Store initialized (SOT)');
 
     // 2. Message service (ONLY ingestion layer)
     messageService.init();
-    console.log('✅ Message service initialized (ingestion layer)');
 
     // 3. WebSocket (transport ONLY)
-    // Check if groups-specific WebSocket URL is set
     const wsUrl = window.GROUPS_WS_URL || null;
     webSocketManager.init(config.conversationId, wsUrl);
-    console.log('✅ WebSocket initialized (transport layer)');
 
     // 4. UI controller (read-only consumer)
     uiController.init();
-    console.log('✅ UI controller initialized (read-only consumer)');
 
     // 5. Feature services (context menu, voice, emoji, camera, attachment)
     contextMenuService.init();
-    console.log('✅ Context menu service initialized');
-    
     attachmentService.init();
     cameraService.init();
     voiceService.init();
     voiceModalController.init();
     emojiService.init();
-    console.log('✅ Attachment and emoji services initialized');
 
     // 6. Attachment UI
     attachmentUI.init();
-    console.log('✅ Attachment UI initialized');
 
     // 7. App controller (orchestration ONLY)
-    appController.init(config);
-    console.log('✅ App controller initialized (orchestration)');
+    if (appController.initialized) {
+        appController.initialized = false;
+    }
+    await appController.init(config);
 
     // Expose globally for debugging and DOM reconciliation
     window.appController = appController;
@@ -86,6 +95,34 @@ document.addEventListener('DOMContentLoaded', () => {
     window.messageService = messageService;
     window.webSocketManager = webSocketManager;
 
-    console.log('🎉 SOT architecture initialized with mandatory data flow enforcement');
-    console.log('📊 Data flow: websocket → message-service → store → ui-controller → renderer');
+    // Load theme for this conversation
+    if (window.chatThemeHandler && typeof window.chatThemeHandler.reinit === 'function') {
+        window.chatThemeHandler.reinit();
+    }
+
+        console.log('🎉 SOT architecture ready for conversation:', config.conversationId);
+    } finally {
+        _isInitializing = false;
+    }
+}
+
+// Expose globally on window
+window.initializeChatApp = initializeChatApp;
+
+// Initialize on DOM ready or immediately if already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeChatApp();
+    });
+} else {
+    initializeChatApp();
+}
+
+// Re-initialize seamlessly on HTMX chat swaps
+document.addEventListener('htmx:afterSwap', (evt) => {
+    const target = evt.detail.target;
+    if (target && (target.id === 'chatMainAreaWrapper' || target.closest('#chatMainAreaWrapper'))) {
+        console.log('[HTMX] Chat swapped, re-initializing chat app...');
+        initializeChatApp();
+    }
 });

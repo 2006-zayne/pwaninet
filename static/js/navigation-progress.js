@@ -150,8 +150,16 @@
     // HTMX-managed navigation is handled separately via htmx events.
     function interceptNavigation() {
         document.addEventListener('click', function(event) {
+            if (event.defaultPrevented) return;
             const link = event.target.closest('a');
             if (!link) return;
+
+            // Skip in-page controls and desktop HTMX rail items
+            if (link.closest('.chat-back-btn, #chatBackBtn, .whatsapp-chat-item, .chat-item-dropdown, .messaging-rail-avatar-link') ||
+                link.classList.contains('chat-back-btn') ||
+                link.classList.contains('whatsapp-chat-item')) {
+                return;
+            }
 
             const href = link.getAttribute('href');
 

@@ -241,6 +241,24 @@ export class UploadQueue {
         const msgEl = document.querySelector(`[data-message-id="${tempId}"]`);
         if (!msgEl) return;
 
+        // Update voice note upload indicator
+        const vnTimer = msgEl.querySelector('.vn-timer');
+        if (vnTimer && msgEl.querySelector('.vn-bubble-container')) {
+            vnTimer.textContent = isProcessing ? 'Processing...' : `${percent}%`;
+        }
+
+        // Update audio track upload indicator
+        const audioTime = msgEl.querySelector('.audio-track-time');
+        if (audioTime && msgEl.querySelector('.audio-track-container')) {
+            audioTime.textContent = isProcessing ? 'Processing...' : `${percent}%`;
+        }
+
+        // Update document progress indicator
+        const docProgress = msgEl.querySelector('.document-progress-text');
+        if (docProgress) {
+            docProgress.textContent = isProcessing ? 'Processing...' : `${percent}%`;
+        }
+
         const overlay = msgEl.querySelector('.media-upload-overlay');
         if (!overlay) return;
 

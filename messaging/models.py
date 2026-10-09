@@ -87,6 +87,8 @@ class ConversationMember(models.Model):
         related_name='read_by_members'
     )
     is_muted = models.BooleanField(default=False)
+    is_pinned = models.BooleanField(default=False)
+    pinned_at = models.DateTimeField(null=True, blank=True)
     # E2E encryption: Store public key for each participant
     public_key = models.TextField(blank=True, null=True, help_text="User's public key for this conversation")
 
@@ -95,6 +97,7 @@ class ConversationMember(models.Model):
         indexes = [
             models.Index(fields=['conversation', 'user']),
             models.Index(fields=['user', 'conversation']),
+            models.Index(fields=['user', 'is_pinned']),
         ]
 
     def __str__(self):
@@ -193,6 +196,7 @@ class Message(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     edited_at = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
+    is_forwarded = models.BooleanField(default=False)
     status = models.CharField(
         max_length=20,
         choices=[

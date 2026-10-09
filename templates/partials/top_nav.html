@@ -44,11 +44,19 @@
            hx-boost="false"
            style="display: flex; flex-direction: column; align-items: center; gap: 0px;"
            aria-label="{% trans 'Chats' %}">
-            <span style="position: relative; display: inline-block;"
-                  hx-get="{% url 'messaging:unread_message_count' %}"
-                  hx-trigger="load, every 60s"
-                  hx-swap="innerHTML">
+            <span style="position: relative; display: inline-block;">
                 <i class="bi bi-chat-dots-fill" style="font-size: 1.35rem;"></i>
+                {% if unread_messages_count > 0 %}
+                    <span class="position-absolute badge rounded-pill bg-danger messages-badge" style="top: -2px; right: -6px; font-size: 0.65rem;">
+                        {{ unread_messages_count }}
+                        <span class="visually-hidden">unread messages</span>
+                    </span>
+                {% else %}
+                    <span class="position-absolute badge rounded-pill bg-danger messages-badge" style="top: -2px; right: -6px; font-size: 0.65rem; display: none;">
+                        0
+                        <span class="visually-hidden">unread messages</span>
+                    </span>
+                {% endif %}
             </span>
             <span style="font-size: 0.65rem; font-weight: 600;">{% trans "Chats" %}</span>
         </a>

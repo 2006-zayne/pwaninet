@@ -437,7 +437,7 @@ def _academic_unit_members_recipient(event_data: Dict[str, Any]) -> List[int]:
 
 def _message_recipient_recipient(event_data: Dict[str, Any]) -> List[int]:
     """Recipient: Message recipient."""
-    from messaging.frozen.models import Message
+    from messaging.models import Message
     
     target_id = event_data.get('target_id')
     if not target_id:
@@ -447,9 +447,9 @@ def _message_recipient_recipient(event_data: Dict[str, Any]) -> List[int]:
         message = Message.objects.get(id=target_id)
         # Get conversation members except the sender
         conversation_members = message.conversation.members.exclude(
-            id=message.sender.id
+            user=message.sender
         )
-        return [m.id for m in conversation_members]
+        return [m.user_id for m in conversation_members]
     except Message.DoesNotExist:
         return []
 

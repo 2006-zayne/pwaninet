@@ -1,0 +1,72 @@
+<aside class="whatsapp-right-rail border-start bg-white flex-column" id="whatsappRightRail" {% if is_oob %}hx-swap-oob="true"{% endif %}>
+{% if conversation %}
+    <!-- Rail Header -->
+    <div class="whatsapp-right-rail-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+      <div class="d-flex align-items-center gap-2">
+        <h6 class="mb-0 fw-bold" style="font-size: 0.95rem;">Media, Links & Docs</h6>
+      </div>
+      <button type="button" class="btn btn-link p-0 text-muted d-flex align-items-center justify-content-center" id="closeRightRailBtn" aria-label="Close media panel" style="width: 36px; height: 36px;">
+        <i class="bi bi-x-lg fs-5"></i>
+      </button>
+    </div>
+
+    <!-- Navigation Tabs: Media | Docs | Audio | Links -->
+    <ul class="nav nav-tabs whatsapp-media-tabs border-bottom px-2" id="mediaTabs" role="tablist">
+      <li class="nav-item flex-fill text-center" role="presentation">
+        <button class="nav-link active w-100 py-2 small fw-semibold" id="tab-media-btn" data-bs-toggle="tab" data-bs-target="#tab-media-content" type="button" role="tab" data-media-type="media">Media</button>
+      </li>
+      <li class="nav-item flex-fill text-center" role="presentation">
+        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-docs-btn" data-bs-toggle="tab" data-bs-target="#tab-docs-content" type="button" role="tab" data-media-type="docs">Docs</button>
+      </li>
+      <li class="nav-item flex-fill text-center" role="presentation">
+        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-audio-btn" data-bs-toggle="tab" data-bs-target="#tab-audio-content" type="button" role="tab" data-media-type="audio">Audio</button>
+      </li>
+      <li class="nav-item flex-fill text-center" role="presentation">
+        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-links-btn" data-bs-toggle="tab" data-bs-target="#tab-links-content" type="button" role="tab" data-media-type="links">Links</button>
+      </li>
+    </ul>
+
+    <!-- Tab Panes with Lazy Loading Placeholders -->
+    <div class="tab-content flex-grow-1 overflow-y-auto p-3" id="mediaTabsContent">
+      <!-- 1. Media Tab (Photos & Videos) -->
+      <div class="tab-pane fade show active" id="tab-media-content" role="tabpanel" data-loaded="false" data-media-type="media">
+        <div class="text-center py-5 text-muted small media-tab-placeholder">
+          <div class="spinner-border spinner-border-sm text-primary mb-2" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div>Loading photos & videos...</div>
+        </div>
+      </div>
+
+      <!-- 2. Docs Tab (Documents & Files) -->
+      <div class="tab-pane fade" id="tab-docs-content" role="tabpanel" data-loaded="false" data-media-type="docs">
+        <div class="text-center py-5 text-muted small media-tab-placeholder">
+          <div class="spinner-border spinner-border-sm text-primary mb-2" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div>Loading documents...</div>
+        </div>
+      </div>
+
+      <!-- 3. Audio Tab (Voice Messages & Audio Files) -->
+      <div class="tab-pane fade" id="tab-audio-content" role="tabpanel" data-loaded="false" data-media-type="audio">
+        <div class="text-center py-5 text-muted small media-tab-placeholder">
+          <div class="spinner-border spinner-border-sm text-primary mb-2" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div>Loading audio...</div>
+        </div>
+      </div>
+
+      <!-- 4. Links Tab (Shared URLs & Link Previews) -->
+      <div class="tab-pane fade" id="tab-links-content" role="tabpanel" data-loaded="false" data-media-type="links">
+        <div class="text-center py-5 text-muted small media-tab-placeholder">
+          <div class="spinner-border spinner-border-sm text-primary mb-2" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div>Loading links...</div>
+        </div>
+      </div>
+    </div>
+{% endif %}
+</aside>

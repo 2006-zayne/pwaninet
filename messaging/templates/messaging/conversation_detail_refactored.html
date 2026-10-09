@@ -10,11 +10,11 @@
 {% block mobile_bottom_nav %}{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=41">
-<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=6">
-<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=24">
-<link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}?v=26">
-<link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}?v=27">
+<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=44">
+<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=7">
+<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=25">
+<link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}?v=27">
+<link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}?v=28">
 <script>
   document.documentElement.classList.add('in-conversation-active');
   document.body.classList.add('in-conversation-active');
@@ -23,12 +23,45 @@
       document.documentElement.classList.add('messaging-left-collapsed');
       document.body.classList.add('messaging-left-collapsed');
     }
+    const convId = '{{ conversation.id|default:"" }}';
+    if (!convId && (window.innerWidth < 992 || window.matchMedia('(max-width: 991.98px)').matches)) {
+      window.location.replace('/messaging/?view=list');
+    }
+    let themeToApply = null;
+    if (convId) {
+      const savedConv = localStorage.getItem('chat_theme_' + convId);
+      if (savedConv) {
+        try {
+          const parsed = JSON.parse(savedConv);
+          if (parsed && parsed.preset && parsed.preset !== 'default') themeToApply = parsed.preset;
+        } catch (_) {
+          if (typeof savedConv === 'string' && savedConv.length < 50 && savedConv !== 'default') themeToApply = savedConv;
+        }
+      }
+    }
+    if (!themeToApply) {
+      const savedDef = localStorage.getItem('default_chat_theme') || localStorage.getItem('chat_theme');
+      if (savedDef && savedDef !== 'default') themeToApply = savedDef;
+    }
+    if (!themeToApply) {
+      const userPref = '{{ request.user.chat_theme_preference|default:"" }}';
+      if (userPref && userPref !== 'default') themeToApply = userPref;
+    }
+    if (!themeToApply || themeToApply === 'default') {
+      themeToApply = 'ocean-wave';
+    }
+    document.documentElement.setAttribute('data-chat-theme', themeToApply);
   } catch (e) {}
 </script>
 
-<div class="whatsapp-layout" id="whatsappLayout">
+<div class="whatsapp-layout {% if conversation %}mobile-chat-active{% endif %}" id="whatsappLayout">
+  <!-- Fast Chat Switching Top Progress Bar (HTMX Indicator) -->
+  <div id="chatSwitchProgress" class="htmx-indicator chat-switch-progress-bar">
+    <div class="chat-switch-progress-fill"></div>
+  </div>
+
   <!-- 1. LEFT CONVERSATIONS RAIL (PwaniMate/WhatsApp style) -->
-  <aside class="whatsapp-left-rail d-none d-lg-flex flex-column position-relative" id="whatsappLeftRail">
+  <aside class="whatsapp-left-rail flex-column position-relative" id="whatsappLeftRail">
     <!-- EXPANDED STATE (~30% of viewport, 340–560px, WhatsApp Desktop style) -->
     <div class="p-3 d-flex flex-column messaging-left-rail-expanded" style="height: 100%; overflow: hidden;">
       <!-- Header Tools & Collapse Toggle -->
@@ -85,7 +118,7 @@
 
       <!-- Start New Chat Blue Pill Button -->
       <button type="button"
-              class="btn btn-primary w-100 btn-sm rounded-pill d-flex align-items-center justify-content-center gap-2 mb-3 flex-shrink-0"
+              class="btn btn-primary w-100 btn-sm rounded-pill d-flex align-items-center justify-content-center gap-2 mb-3 flex-shrink-0 whatsapp-start-chat-btn"
               data-bs-toggle="modal"
               data-bs-target="#newConversationModal">
         <i class="bi bi-chat-plus"></i>
@@ -108,59 +141,117 @@
       <div class="whatsapp-rail-chats flex-grow-1 overflow-y-auto" id="whatsappRailChatsList" style="min-height: 0;">
         {% for item in conversation_data %}
         {% with conv=item.conversation %}
-        <a href="{% url 'messaging:conversation_detail' conv.id %}"
-           class="whatsapp-chat-item d-flex align-items-center gap-3 px-2 py-2 text-decoration-none rounded-3 mb-1 {% if conversation and conv.id == conversation.id %}active{% endif %}"
-           data-conversation-id="{{ conv.id }}">
-          <div class="position-relative flex-shrink-0">
-            {% if conv.type == 'group' %}
-              <div class="chat-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;">
-                <i class="bi bi-people-fill fs-5"></i>
-              </div>
-            {% else %}
-              {% for member in conv.members.all %}
-                {% if member.user != request.user %}
-                  {% if member.user.profile_pic %}
-                    <img src="{{ member.user.profile_pic.url }}" class="chat-avatar rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="{{ member.user.username }}" data-user-id="{{ member.user.id }}">
-                  {% else %}
-                    <div class="chat-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;" data-user-id="{{ member.user.id }}">
-                      <i class="bi bi-person-fill fs-5"></i>
-                    </div>
-                  {% endif %}
-                {% endif %}
-              {% endfor %}
-            {% endif %}
-          </div>
-          <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-              <span class="whatsapp-chat-name fw-semibold text-truncate" style="font-size: 0.92rem; color: var(--text-primary); min-width: 0;">
-                {% if conv.type == 'group' and conv.name %}
-                  {{ conv.name }}
-                {% else %}
-                  {% for member in conv.members.all %}
-                    {% if member.user != request.user %}
-                      {{ member.user.get_full_name|default:member.user.username }}
+        <div class="whatsapp-chat-item-wrapper position-relative mb-1">
+          <a href="{% url 'messaging:conversation_detail' conv.id %}"
+             class="whatsapp-chat-item d-flex align-items-center gap-2 px-2 py-2 text-decoration-none rounded-3 {% if conversation and conv.id == conversation.id %}active{% endif %}"
+             data-conversation-id="{{ conv.id }}"
+             data-is-pinned="{% if item.is_pinned %}true{% else %}false{% endif %}"
+             hx-get="{% url 'messaging:conversation_detail' conv.id %}"
+             hx-target="#chatMainAreaWrapper"
+             hx-swap="innerHTML"
+             hx-push-url="true"
+             hx-indicator="#chatSwitchProgress">
+            <div class="position-relative flex-shrink-0">
+              {% if conv.type == 'group' %}
+                <div class="chat-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;">
+                  <i class="bi bi-people-fill fs-5"></i>
+                </div>
+              {% else %}
+                {% for member in conv.members.all %}
+                  {% if member.user != request.user %}
+                    {% if member.user.profile_pic %}
+                      <img src="{{ member.user.profile_pic.url }}" class="chat-avatar rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="{{ member.user.username }}" data-user-id="{{ member.user.id }}">
+                    {% else %}
+                      <div class="chat-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;" data-user-id="{{ member.user.id }}">
+                        <i class="bi bi-person-fill fs-5"></i>
+                      </div>
                     {% endif %}
-                  {% endfor %}
-                {% endif %}
-              </span>
-              {% if conv.last_msg_time %}
-                <span class="whatsapp-chat-time text-muted flex-shrink-0 ms-2" style="font-size: 0.72rem;">{{ conv.last_msg_time|date:"H:i" }}</span>
+                    {% if member.user.is_online %}
+                      <span class="user-status-dot online" data-user-status-id="{{ member.user.id }}"></span>
+                    {% else %}
+                      <span class="user-status-dot" data-user-status-id="{{ member.user.id }}" style="display: none;"></span>
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
               {% endif %}
             </div>
-            <div class="d-flex align-items-center justify-content-between">
-              <span class="whatsapp-chat-snippet text-muted text-truncate flex-grow-1" style="font-size: 0.8rem; min-width: 0;">
-                {% if conv.messages.last %}
-                  {{ conv.messages.last.content|truncatechars:200 }}
-                {% else %}
-                  Start chatting...
-                {% endif %}
-              </span>
-              {% if item.unread_count > 0 %}
-                <span class="badge rounded-pill bg-primary ms-1" style="font-size: 0.65rem;">{{ item.unread_count }}</span>
-              {% endif %}
+            <div class="flex-grow-1 overflow-hidden d-flex flex-column justify-content-center" style="min-width: 0;">
+              <!-- TOP LINE: Name (Left) + Actions/Pin/Time (Right End) -->
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="whatsapp-chat-name fw-semibold text-truncate me-2" style="font-size: 0.92rem; color: var(--text-primary); min-width: 0;">
+                  {% if conv.type == 'group' and conv.name %}
+                    {{ conv.name }}
+                  {% else %}
+                    {% for member in conv.members.all %}
+                      {% if member.user != request.user %}
+                        {{ member.user.get_full_name|default:member.user.username }}
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                </span>
+
+                <!-- Pin icon & Time (Space for 3-dots button) -->
+                <div class="chat-item-actions d-flex align-items-center gap-1 flex-shrink-0 ms-auto" style="padding-right: 26px;">
+                  <i class="bi bi-pin-angle-fill text-primary chat-pin-icon {% if not item.is_pinned %}d-none{% endif %}" title="Pinned" style="font-size: 0.78rem;"></i>
+                  {% if conv.last_msg_time %}
+                    <span class="whatsapp-chat-time text-muted small" style="font-size: 0.72rem;">{{ conv.last_msg_time|date:"H:i" }}</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- BOTTOM LINE: Snippet (Left) + Unread Badge (Right side-by-side) -->
+              <div class="d-flex align-items-center justify-content-between" style="padding-right: 26px;">
+                <span class="whatsapp-chat-snippet text-truncate flex-grow-1 {% if item.unread_count > 0 %}fw-bold text-body unread{% else %}text-muted fw-normal{% endif %}" style="font-size: 0.8rem; min-width: 0;">
+                  {% if item.preview %}
+                    {% if item.preview.icon %}
+                      <i class="bi {{ item.preview.icon }} me-1 {% if item.preview.type == 'audio' %}text-primary{% else %}text-muted{% endif %}"></i>
+                    {% endif %}
+                    {{ item.preview.text }}
+                  {% elif conv.messages.last %}
+                    {{ conv.messages.last.content|truncatechars:200 }}
+                  {% else %}
+                    Start chatting...
+                  {% endif %}
+                </span>
+                
+                <span class="whatsapp-chat-unread-badge ms-2 flex-shrink-0 {% if item.unread_count == 0 %}d-none{% endif %}">{{ item.unread_count }}</span>
+              </div>
             </div>
+          </a>
+
+          <!-- 3-Dots Dropdown: Positioned absolute in wrapper, OUTSIDE <a> so it NEVER triggers navigation -->
+          <div class="dropdown chat-item-dropdown position-absolute" style="top: 8px; right: 6px; z-index: 1065;">
+            <button class="btn btn-sm btn-link text-muted p-0 border-0 chat-dropdown-toggle-btn d-flex align-items-center justify-content-center"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    data-bs-strategy="fixed"
+                    data-bs-popper-config='{"strategy":"fixed"}'
+                    data-conversation-id="{{ conv.id }}"
+                    aria-expanded="false"
+                    title="Chat options"
+                    style="width: 24px; height: 24px;">
+              <i class="bi bi-three-dots-vertical" style="font-size: 0.85rem;"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border py-1 small" style="z-index: 1070;">
+              <li>
+                <button class="dropdown-item py-1 px-3 pin-toggle-btn"
+                        type="button"
+                        data-conversation-id="{{ conv.id }}"
+                        data-action="{% if item.is_pinned %}unpin{% else %}pin{% endif %}">
+                  <i class="bi bi-pin-angle{% if item.is_pinned %}-fill{% endif %} me-2 text-primary"></i>
+                  {% if item.is_pinned %}Unpin chat{% else %}Pin chat{% endif %}
+                </button>
+              </li>
+              <li>
+                <button class="dropdown-item py-1 px-3 mark-read-btn"
+                        type="button"
+                        data-conversation-id="{{ conv.id }}">
+                  <i class="bi bi-check2-all me-2 text-info"></i> Mark as read
+                </button>
+              </li>
+            </ul>
           </div>
-        </a>
+        </div>
         {% endwith %}
         {% empty %}
           <div class="text-center py-5 text-muted small">
@@ -168,6 +259,79 @@
             No active conversations
           </div>
         {% endfor %}
+
+        <!-- Suggested Friends Section at Bottom -->
+        {% if unmessaged_friends or suggested_users %}
+        <div class="whatsapp-rail-suggested">
+          <div class="d-flex align-items-center justify-content-between px-1 mb-2">
+            <span class="fw-bold text-muted small text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">Suggested Friends</span>
+            <span class="badge rounded-pill bg-light text-muted border" style="font-size: 0.65rem;">
+              {{ unmessaged_friends|length|default:suggested_users|length }}
+            </span>
+          </div>
+          <div class="suggested-friends-list d-flex flex-column gap-1">
+            {% for friend in unmessaged_friends|slice:":8" %}
+            <div class="suggested-friend-item d-flex align-items-center justify-content-between p-2 rounded-3">
+              <div class="d-flex align-items-center gap-2 overflow-hidden me-2" style="min-width: 0;">
+                <div class="position-relative flex-shrink-0">
+                  {% if friend.profile_pic %}
+                    <img src="{{ friend.profile_pic.url }}" class="rounded-circle border" style="width: 36px; height: 36px; object-fit: cover;" alt="{{ friend.username }}">
+                  {% else %}
+                    <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; font-size: 0.85rem;">
+                      <i class="bi bi-person-fill"></i>
+                    </div>
+                  {% endif %}
+                  {% if friend.is_online %}
+                    <span class="user-status-dot online" data-user-status-id="{{ friend.id }}"></span>
+                  {% else %}
+                    <span class="user-status-dot" data-user-status-id="{{ friend.id }}" style="display: none;"></span>
+                  {% endif %}
+                </div>
+                <div class="overflow-hidden" style="min-width: 0;">
+                  <div class="fw-semibold text-truncate small" style="color: var(--text-primary); line-height: 1.2;">
+                    {{ friend.get_full_name|default:friend.username }}
+                  </div>
+                  <div class="text-muted text-truncate" style="font-size: 0.72rem;">@{{ friend.username }}</div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm rounded-pill btn-outline-primary start-conversation-btn" data-user-id="{{ friend.id }}">
+                <i class="bi bi-chat-dots me-1"></i> Message
+              </button>
+            </div>
+            {% empty %}
+              {% for friend in suggested_users|slice:":8" %}
+              <div class="suggested-friend-item d-flex align-items-center justify-content-between p-2 rounded-3">
+                <div class="d-flex align-items-center gap-2 overflow-hidden me-2" style="min-width: 0;">
+                  <div class="position-relative flex-shrink-0">
+                    {% if friend.profile_pic %}
+                      <img src="{{ friend.profile_pic.url }}" class="rounded-circle border" style="width: 36px; height: 36px; object-fit: cover;" alt="{{ friend.username }}">
+                    {% else %}
+                      <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; font-size: 0.85rem;">
+                        <i class="bi bi-person-fill"></i>
+                      </div>
+                    {% endif %}
+                    {% if friend.is_online %}
+                      <span class="user-status-dot online" data-user-status-id="{{ friend.id }}"></span>
+                    {% else %}
+                      <span class="user-status-dot" data-user-status-id="{{ friend.id }}" style="display: none;"></span>
+                    {% endif %}
+                  </div>
+                  <div class="overflow-hidden" style="min-width: 0;">
+                    <div class="fw-semibold text-truncate small" style="color: var(--text-primary); line-height: 1.2;">
+                      {{ friend.get_full_name|default:friend.username }}
+                    </div>
+                    <div class="text-muted text-truncate" style="font-size: 0.72rem;">@{{ friend.username }}</div>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-sm rounded-pill btn-outline-primary start-conversation-btn" data-user-id="{{ friend.id }}">
+                  <i class="bi bi-chat-dots me-1"></i> Message
+                </button>
+              </div>
+              {% endfor %}
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -183,7 +347,7 @@
       </button>
 
       <button type="button"
-              class="messaging-rail-icon-btn btn-primary"
+              class="messaging-rail-icon-btn btn-primary whatsapp-start-chat-btn"
               title="Start new chat"
               aria-label="Start new chat"
               data-bs-toggle="modal"
@@ -206,6 +370,12 @@
         {% with conv=item.conversation %}
         <a href="{% url 'messaging:conversation_detail' conv.id %}"
            class="messaging-rail-avatar-link position-relative {% if conversation and conv.id == conversation.id %}active{% endif %}"
+           data-conversation-id="{{ conv.id }}"
+           hx-get="{% url 'messaging:conversation_detail' conv.id %}"
+           hx-target="#chatMainAreaWrapper"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-indicator="#chatSwitchProgress"
            data-bs-toggle="tooltip"
            data-bs-placement="right"
            title="{% if conv.type == 'group' %}{{ conv.name }}{% else %}{% for member in conv.members.all %}{% if member.user != request.user %}{{ member.user.get_full_name|default:member.user.username }}{% endif %}{% endfor %}{% endif %}">
@@ -222,6 +392,11 @@
                   <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; font-size: 0.85rem;">
                     <i class="bi bi-person-fill"></i>
                   </div>
+                {% endif %}
+                {% if member.user.is_online %}
+                  <span class="user-status-dot online" data-user-status-id="{{ member.user.id }}"></span>
+                {% else %}
+                  <span class="user-status-dot" data-user-status-id="{{ member.user.id }}" style="display: none;"></span>
                 {% endif %}
               {% endif %}
             {% endfor %}
@@ -249,745 +424,12 @@
   </aside>
 
   <!-- 2. CENTER CHAT AREA -->
-  <div class="chat-container d-flex flex-column flex-grow-1 {% if not conversation %}chat-container-empty{% endif %}" id="chatMainArea"
-       {% if conversation %}data-conversation-id="{{ conversation.id }}" data-user-id="{{ request.user.id }}" data-is-encrypted="false"{% endif %}
-       data-default-chat-theme="{{ request.user.chat_theme_preference|default:'ocean-wave' }}">
-    {% if conversation %}
-    <!-- Floating Media Rail Reopen Button (Desktop) -->
-    <div class="whatsapp-media-rail-toggle-wrapper d-none d-lg-flex" id="whatsappMediaRailToggleWrapper">
-      <button type="button"
-              class="whatsapp-media-rail-toggle-btn shadow-sm"
-              id="whatsappMediaRailToggleBtn"
-              title="Media, Links & Docs"
-              aria-label="View Media">
-        <i class="bi bi-layout-sidebar-reverse"></i>
-        <span class="small ms-1">Media</span>
-      </button>
-    </div>
-
-    <div class="chat-header d-flex align-items-center justify-content-between px-3 border-bottom" data-conversation-id="{{ conversation.id }}">
-      <div class="d-flex align-items-center gap-2 overflow-hidden flex-grow-1" style="min-width: 0;">
-        <!-- Left Back Chevron -->
-        <a href="{% url 'messaging:conversation_list' %}" class="chat-back-btn text-decoration-none d-flex align-items-center justify-content-center me-1 d-lg-none" style="color: var(--text-primary); width: 36px; height: 36px; flex-shrink: 0;" aria-label="Back">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
-        </a>
-
-        <!-- Avatar -->
-        <div class="position-relative flex-shrink-0" id="headerProfileTrigger" style="cursor: pointer;" title="View info & media">
-          {% if conversation.type == 'group' %}
-          <div class="chat-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px;">
-            <i class="bi bi-people-fill fs-5"></i>
-          </div>
-          {% else %}
-          {% for member in conversation.members.all %}
-          {% if member.user != request.user %}
-          <div class="position-relative">
-            {% if member.user.profile_pic %}
-            <img src="{{ member.user.profile_pic.url }}" class="chat-avatar rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ member.user.username }}">
-            {% else %}
-            <div class="chat-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px;">
-              <i class="bi bi-person-fill fs-5"></i>
-            </div>
-            {% endif %}
-          </div>
-          {% endif %}
-          {% endfor %}
-          {% endif %}
-        </div>
-
-        <!-- Partner / Group Info -->
-        <div class="flex-grow-1 overflow-hidden ps-1" id="headerInfoTrigger" style="cursor: pointer; min-width: 0;" title="View info & media">
-          <div class="chat-username fw-bold text-truncate" style="font-size: 0.96rem; color: var(--text-primary); line-height: 1.2;">
-            {% if conversation.type == 'group' and conversation.name %}
-            {{ conversation.name }}
-            {% else %}
-            {% for member in conversation.members.all %}
-            {% if member.user != request.user %}
-            {{ member.user.get_full_name|default:member.user.username }}
-            {% endif %}
-            {% endfor %}
-            {% endif %}
-          </div>
-          <div class="chat-status small text-muted text-truncate" id="chatStatus" style="font-size: 0.75rem;">
-            {% if conversation.type == 'group' %}
-            {{ conversation.members.count }} member{{ conversation.members.count|pluralize }}
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      <!-- Far Right End: ONLY 3-dots Menu -->
-      <div class="dropdown flex-shrink-0">
-        <button class="btn btn-link p-0 d-flex align-items-center justify-content-center" data-bs-toggle="dropdown" style="color: var(--text-primary); width: 36px; height: 36px;" aria-label="Chat options">
-          <i class="bi bi-three-dots-vertical" style="font-size: 1.25rem;"></i>
-        </button>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm border">
-            <li><a class="dropdown-item d-flex align-items-center gap-2" href="#" id="viewMediaBtn"><i class="bi bi-images text-primary"></i> View Media</a></li>
-            <li><a class="dropdown-item d-flex align-items-center gap-2" href="#" id="muteBtn"><i class="bi bi-bell-slash"></i> Mute Notifications</a></li>
-            <li><a class="dropdown-item d-flex align-items-center gap-2" href="#" id="starBtn"><i class="bi bi-star"></i> Starred Messages</a></li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-            <li><a class="dropdown-item d-flex align-items-center gap-2" href="#" id="themeBtn" data-bs-no-dropdown="true"><i class="bi bi-palette"></i> Chat Theme</a></li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-            <li><a class="dropdown-item d-flex align-items-center gap-2 text-danger" href="#" id="leaveBtn"><i class="bi bi-box-arrow-right"></i> Leave Chat</a></li>
-          </ul>
-        </div>
-      </div>
-
-  <div class="messages-area d-flex flex-column" id="messagesContainer">
-    {% if not conversation.messages.exists %}
-    <div class="pwanimate-empty-state messaging-empty-state my-auto" id="messagingEmptyState">
-      {% if conversation.type == 'group' %}
-        <div class="pwanimate-hero-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 88px; height: 88px; margin-bottom: 1.25rem;">
-          <i class="bi bi-people-fill" style="font-size: 2.75rem;"></i>
-        </div>
-        <h2 class="pwanimate-empty-title">{{ conversation.name|default:"Group Chat" }}</h2>
-        <p class="pwanimate-empty-greeting">{{ conversation.members.count }} member{{ conversation.members.count|pluralize }} in this group</p>
-        <p class="pwanimate-empty-question">Send a message to break the ice!</p>
-      {% else %}
-        {% for member in conversation.members.all %}
-          {% if member.user != request.user %}
-            {% if member.user.profile_pic %}
-              <img src="{{ member.user.profile_pic.url }}" class="pwanimate-hero-avatar rounded-circle shadow-sm" style="width: 88px; height: 88px; object-fit: cover; margin-bottom: 1.25rem; border: 3px solid var(--border);" alt="{{ member.user.username }}">
-            {% else %}
-              <div class="pwanimate-hero-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 88px; height: 88px; margin-bottom: 1.25rem;">
-                <i class="bi bi-person-fill" style="font-size: 2.75rem;"></i>
-              </div>
-            {% endif %}
-            <h2 class="pwanimate-empty-title">{{ member.user.get_full_name|default:member.user.username }}</h2>
-            <p class="pwanimate-empty-greeting">@{{ member.user.username }}</p>
-            <p class="pwanimate-empty-question">Say hello and start the conversation!</p>
-          {% endif %}
-        {% endfor %}
-      {% endif %}
-
-      <div class="pwanimate-suggestion-grid messaging-suggestion-grid" aria-label="Suggested greetings">
-        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Hello 👋">Hello 👋</button>
-        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Hey there! How are you?">Hey there! How are you?</button>
-        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Good morning! ☀️">Good morning! ☀️</button>
-        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="What's up? 🙌">What's up? 🙌</button>
-      </div>
-    </div>
-    {% endif %}
+  <div id="chatMainAreaWrapper" class="d-flex flex-column flex-grow-1" style="min-height: 0; min-width: 0; position: relative;">
+    {% include 'messaging/partials/conversation_chat_content.html' %}
   </div>
 
-  <!-- Reusable empty state template for JS renderer -->
-  <template id="emptyStateTemplate">
-    <div class="pwanimate-empty-state messaging-empty-state my-auto" id="messagingEmptyState">
-      {% if conversation.type == 'group' %}
-        <div class="pwanimate-hero-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 88px; height: 88px; margin-bottom: 1.25rem;">
-          <i class="bi bi-people-fill" style="font-size: 2.75rem;"></i>
-        </div>
-        <h2 class="pwanimate-empty-title">{{ conversation.name|default:"Group Chat" }}</h2>
-        <p class="pwanimate-empty-greeting">{{ conversation.members.count }} member{{ conversation.members.count|pluralize }} in this group</p>
-        <p class="pwanimate-empty-question">Send a message to break the ice!</p>
-      {% else %}
-        {% for member in conversation.members.all %}
-          {% if member.user != request.user %}
-            {% if member.user.profile_pic %}
-              <img src="{{ member.user.profile_pic.url }}" class="pwanimate-hero-avatar rounded-circle shadow-sm" style="width: 88px; height: 88px; object-fit: cover; margin-bottom: 1.25rem; border: 3px solid var(--border);" alt="{{ member.user.username }}">
-            {% else %}
-              <div class="pwanimate-hero-avatar bg-secondary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm" style="width: 88px; height: 88px; margin-bottom: 1.25rem;">
-                <i class="bi bi-person-fill" style="font-size: 2.75rem;"></i>
-              </div>
-            {% endif %}
-            <h2 class="pwanimate-empty-title">{{ member.user.get_full_name|default:member.user.username }}</h2>
-            <p class="pwanimate-empty-greeting">@{{ member.user.username }}</p>
-            <p class="pwanimate-empty-question">Say hello and start the conversation!</p>
-          {% endif %}
-        {% endfor %}
-      {% endif %}
-
-      <div class="pwanimate-suggestion-grid messaging-suggestion-grid" aria-label="Suggested greetings">
-        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Hello 👋">Hello 👋</button>
-        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Hey there! How are you?">Hey there! How are you?</button>
-        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="Good morning! ☀️">Good morning! ☀️</button>
-        <button type="button" class="pwanimate-suggestion-chip empty-greeting-chip" data-text="What's up? 🙌">What's up? 🙌</button>
-      </div>
-    </div>
-  </template>
-
-  <!-- PwaniMate-Styled Floating Composer Card -->
-  <div class="pwanimate-composer-wrapper input-area">
-    <form id="messaging-composer-form" class="pwanimate-composer-box" onsubmit="return false;">
-      <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.wav" style="display: none;">
-      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
-
-      <!-- Reply Preview Banner -->
-      <div class="reply-preview-bar d-none" id="replyPreviewBar">
-        <div class="reply-preview-content flex-grow-1 overflow-hidden" style="text-overflow: ellipsis; white-space: nowrap;">
-          <div class="reply-preview-sender fw-bold text-primary" id="replySenderName" style="font-size: 0.82rem;">Replying to</div>
-          <div class="reply-preview-text text-truncate text-muted" id="replyTextSnippet" style="font-size: 0.8rem;"></div>
-        </div>
-        <button type="button" class="btn-close btn-sm ms-2" id="cancelReplyBtn" aria-label="Cancel reply" style="font-size: 0.7rem;"></button>
-      </div>
-
-      <!-- Edit Preview Banner -->
-      <div class="edit-preview-bar d-none" id="editPreviewBar">
-        <div class="edit-preview-content flex-grow-1 overflow-hidden" style="text-overflow: ellipsis; white-space: nowrap;">
-          <div class="edit-preview-title fw-bold text-warning" id="editTitle" style="font-size: 0.82rem; color: #ca8a04 !important;"><i class="bi bi-pencil me-1"></i>Editing message</div>
-          <div class="edit-preview-text text-truncate text-muted" id="editTextSnippet" style="font-size: 0.8rem;"></div>
-        </div>
-        <button type="button" class="btn-close btn-sm ms-2" id="cancelEditBtn" aria-label="Cancel edit" style="font-size: 0.7rem;"></button>
-      </div>
-      <!-- Live Voice Capture & VN Preview Strip (PwaniMate layout) -->
-      <div class="pwanimate-voice-capture d-none" id="messagingVoiceCapture" role="region" aria-label="Voice recording">
-        <button type="button" class="pwanimate-voice-cancel" id="voiceCancelBtn" aria-label="Discard voice message" title="Discard">
-          <i class="bi bi-x-lg" aria-hidden="true"></i>
-        </button>
-
-        <div class="pwanimate-voice-waveform" id="voiceWaveform" aria-hidden="true">
-          {% for bar in "123456789012345678901234567890123456789012345678" %}
-            <span class="pwanimate-voice-waveform-bar" data-idx="{{ forloop.counter0 }}"></span>
-          {% endfor %}
-        </div>
-
-        <span class="messaging-voice-timer" id="voiceTimer">0:00</span>
-
-        <div class="messaging-voice-controls d-flex align-items-center gap-2">
-          <!-- Stop Button (Locked Recording State) -->
-          <button type="button" class="pwanimate-voice-stop d-none" id="voiceStopBtn" aria-label="Stop recording" title="Stop recording">
-            <i class="bi bi-stop-fill" aria-hidden="true"></i>
-          </button>
-
-          <!-- Play/Pause Button (VN Preview State - next to stop button) -->
-          <button type="button" class="pwanimate-voice-play d-none" id="voicePlayBtn" aria-label="Play recording preview" title="Play">
-            <i class="bi bi-play-fill" id="voicePlayIcon" aria-hidden="true"></i>
-          </button>
-
-          <!-- Send Button (In Preview State or Locked Recording State) -->
-          <button type="button" class="pwanimate-voice-send d-none" id="voiceSendBtn" aria-label="Send voice message" title="Send">
-            <i class="bi bi-arrow-up" aria-hidden="true"></i>
-            <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
-          </button>
-        </div>
-      </div>
-
-      <div class="pwanimate-composer-standard" id="composerStandard">
-        <!-- Input Row: Textarea -->
-        <div class="pwanimate-composer-input-row">
-          <textarea id="messageInput"
-                    class="pwanimate-textarea"
-                    rows="1"
-                    placeholder="Message..."
-                    aria-label="Message"></textarea>
-        </div>
-
-        <!-- Action Row -->
-        <div class="pwanimate-composer-action-row">
-          <div class="pwanimate-composer-actions-start d-flex align-items-center gap-1">
-            <!-- Attachment Button (Paperclip) -->
-            <button type="button"
-                    class="pwanimate-attach-btn"
-                    id="attachBtn"
-                    title="Add attachment"
-                    aria-label="Add attachment">
-              <i class="bi bi-paperclip"></i>
-            </button>
-            <!-- Emoji Picker Trigger (Universal Comments Media Picker) -->
-            <button type="button"
-                    class="pwanimate-attach-btn composer-media-trigger"
-                    id="emojiBtn"
-                    data-media-picker
-                    data-input="#messageInput"
-                    title="Emoji, GIFs & Stickers"
-                    aria-label="Insert emoji">
-              <i class="bi bi-emoji-smile"></i>
-            </button>
-          </div>
-
-          <div class="pwanimate-composer-actions-end d-flex align-items-center gap-2">
-            <!-- Combined Dynamic Voice / Send Button -->
-            <button type="button"
-                    class="pwanimate-send-btn"
-                    id="voiceBtn"
-                    title="Voice message"
-                    aria-label="Voice message">
-              <span class="mic-icon-wrapper d-inline-flex align-items-center justify-content-center" id="micIconWrapper">
-                <i class="bi bi-mic-fill" style="font-size: 1.15rem;"></i>
-              </span>
-              <svg class="pwanimate-send-icon d-none" id="sendIconWrapper" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <line x1="12" y1="19" x2="12" y2="5"></line>
-                <polyline points="5 12 12 5 19 12"></polyline>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </form>
-    <!-- Swipe up to lock badge -->
-    <div class="messaging-voice-lock-badge d-none" id="voiceLockBadge" aria-hidden="true">
-      <i class="bi bi-chevron-up bounce-chevron"></i>
-      <i class="bi bi-lock-fill"></i>
-    </div>
-  </div>
-
-  <!-- WhatsApp-Style Chat Theme & Wallpaper Full-Area Panel -->
-  <aside class="chat-theme-panel d-none" id="chatThemePanel" aria-label="Chat Theme and Wallpaper Settings">
-    <!-- Panel Header -->
-    <div class="chat-theme-panel-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
-      <div class="d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-link p-0 text-body d-flex align-items-center justify-content-center" id="closeThemePanelBtn" aria-label="Back to chat" style="width: 36px; height: 36px; border-radius: 50%;">
-          <i class="bi bi-arrow-left fs-5"></i>
-        </button>
-        <div>
-          <h5 class="mb-0 fw-bold" style="font-size: 1.05rem;">Chat Theme & Wallpaper</h5>
-          <small class="text-muted" style="font-size: 0.78rem;">Personalize appearance for this conversation</small>
-        </div>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" id="resetThemeBtn" title="Reset this chat to default">Reset</button>
-        <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold" id="saveThemePanelBtn">Done</button>
-      </div>
-    </div>
-
-    <!-- Live Preview Card (Shows dynamic changes in real-time) -->
-    <div class="chat-theme-preview-wrapper p-3 border-bottom">
-      <div class="theme-live-preview-card" id="themeLivePreviewCard">
-        <div class="theme-preview-overlay" id="themePreviewOverlay"></div>
-        <div class="theme-preview-messages">
-          <div class="demo-bubble received" id="previewReceivedBubble">
-            <span>Looking forward to trying out the new theme! ✨</span>
-            <span class="preview-bubble-time">10:42 AM</span>
-          </div>
-          <div class="demo-bubble sent" id="previewSentBubble">
-            <span>Awesome! Solid colors and crisp contrast look great.</span>
-            <span class="preview-bubble-time">10:43 AM <i class="bi bi-check2-all text-info"></i></span>
-          </div>
-        </div>
-        <div class="theme-preview-composer" id="themePreviewComposer">
-          <span class="preview-composer-text" id="previewComposerText">Message...</span>
-          <i class="bi bi-send-fill text-primary" id="previewComposerIcon"></i>
-        </div>
-      </div>
-    </div>
-
-    <!-- Theme Tabs -->
-    <ul class="nav nav-pills chat-theme-nav-pills px-3 pt-2 pb-2 border-bottom gap-2" role="tablist" id="chatThemeNavPills">
-      <li class="nav-item">
-        <button class="nav-link active py-1 px-3 small fw-semibold" data-theme-tab="presets">Presets</button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link py-1 px-3 small fw-semibold" data-theme-tab="wallpapers">Wallpapers</button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link py-1 px-3 small fw-semibold" data-theme-tab="overlay">Overlay & Tint</button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link py-1 px-3 small fw-semibold" data-theme-tab="bubbles">Bubbles</button>
-      </li>
-    </ul>
-
-    <!-- Scrollable Tab Content Container -->
-    <div class="chat-theme-panel-body flex-grow-1 overflow-y-auto p-3" id="chatThemePanelBody">
-      <!-- 1. Presets Tab -->
-      <div class="theme-panel-tab-pane active" id="pane-presets">
-        <div class="mb-2">
-          <h6 class="fw-bold mb-1">Curated Atmosphere Presets</h6>
-          <p class="text-muted small mb-3">Complete color harmonies for bubbles, background, text, and composer.</p>
-        </div>
-        <div class="theme-options-grid">
-          <div class="theme-option preset-option" data-preset="ocean-wave">
-            <div class="theme-preview-swatch" style="background: #e0f2fe;">
-              <span style="background: #ffffff; border: 1px solid #bae6fd;"></span>
-              <span style="background: #0284c7;"></span>
-            </div>
-            <span class="theme-option-label">Ocean Wave</span>
-          </div>
-          <div class="theme-option preset-option" data-preset="classic">
-            <div class="theme-preview-swatch" style="background: #efeae2;">
-              <span style="background: #ffffff; border: 1px solid #ccc;"></span>
-              <span style="background: #008489;"></span>
-            </div>
-            <span class="theme-option-label">Classic</span>
-          </div>
-          <div class="theme-option preset-option" data-preset="sand-gradient">
-            <div class="theme-preview-swatch" style="background: #fef3c7;">
-              <span style="background: #fffdfa; border: 1px solid #fde68a;"></span>
-              <span style="background: #d97706;"></span>
-            </div>
-            <span class="theme-option-label">Sand</span>
-          </div>
-          <div class="theme-option preset-option" data-preset="swahili-wave">
-            <div class="theme-preview-swatch" style="background: #ccfbf1;">
-              <span style="background: #ffffff; border: 1px solid #99f6e4;"></span>
-              <span style="background: #0d9488;"></span>
-            </div>
-            <span class="theme-option-label">Swahili Wave</span>
-          </div>
-          <div class="theme-option preset-option" data-preset="midnight-coast">
-            <div class="theme-preview-swatch" style="background: #0b1329;">
-              <span style="background: #1e293b; border: 1px solid #334155;"></span>
-              <span style="background: #2563eb;"></span>
-            </div>
-            <span class="theme-option-label">Midnight</span>
-          </div>
-          <div class="theme-option preset-option" data-preset="forest-glow">
-            <div class="theme-preview-swatch" style="background: #0a1f18;">
-              <span style="background: #1e2e28; border: 1px solid #2d453b;"></span>
-              <span style="background: #059669;"></span>
-            </div>
-            <span class="theme-option-label">Forest Glow</span>
-          </div>
-          <div class="theme-option preset-option" data-preset="pwani-neon">
-            <div class="theme-preview-swatch" style="background: #13091f;">
-              <span style="background: #2d1847; border: 1px solid #4a2777;"></span>
-              <span style="background: #7c3aed;"></span>
-            </div>
-            <span class="theme-option-label">Pwani Neon</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. Wallpapers & Gradients Tab -->
-      <div class="theme-panel-tab-pane d-none" id="pane-wallpapers">
-        <div class="mb-3">
-          <h6 class="fw-bold mb-1">Preset Gradients & Backgrounds</h6>
-          <p class="text-muted small mb-2">Vibrant gradients and clean solids for the chat wallpaper.</p>
-          <div class="theme-options-grid mb-3">
-            <div class="theme-option bg-option" data-wallpaper="light">
-              <div class="theme-preview-swatch" style="background: #efeae2;"></div>
-              <span class="theme-option-label">Classic Beige</span>
-            </div>
-            <div class="theme-option bg-option" data-wallpaper="dark">
-              <div class="theme-preview-swatch" style="background: #0b141a;"></div>
-              <span class="theme-option-label">Midnight Slate</span>
-            </div>
-            <div class="theme-option bg-option" data-wallpaper="wallpaper-1">
-              <div class="theme-preview-swatch" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
-              <span class="theme-option-label">Purple Dawn</span>
-            </div>
-            <div class="theme-option bg-option" data-wallpaper="wallpaper-2">
-              <div class="theme-preview-swatch" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
-              <span class="theme-option-label">Sunset Rose</span>
-            </div>
-            <div class="theme-option bg-option" data-wallpaper="wallpaper-3">
-              <div class="theme-preview-swatch" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
-              <span class="theme-option-label">Neon Cyan</span>
-            </div>
-            <div class="theme-option bg-option" data-wallpaper="wallpaper-4">
-              <div class="theme-preview-swatch" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
-              <span class="theme-option-label">Emerald Mint</span>
-            </div>
-            <div class="theme-option bg-option" data-wallpaper="wallpaper-5">
-              <div class="theme-preview-swatch" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
-              <span class="theme-option-label">Warm Amber</span>
-            </div>
-            <div class="theme-option bg-option" data-wallpaper="wallpaper-6">
-              <div class="theme-preview-swatch" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
-              <span class="theme-option-label">Deep Ocean</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="mb-3 pt-3 border-top">
-          <h6 class="fw-bold mb-1">Custom Picture Wallpaper</h6>
-          <p class="text-muted small mb-3">Upload your own photo or wallpaper image.</p>
-          <div class="d-flex align-items-center gap-3 flex-wrap">
-            <input type="file" id="wallpaperImageInput" accept="image/*" style="display: none;">
-            <button type="button" class="btn btn-outline-primary rounded-pill px-4" id="uploadWallpaperBtn">
-              <i class="bi bi-image me-1"></i> Upload Image
-            </button>
-            <button type="button" class="btn btn-outline-danger rounded-pill px-3 d-none" id="removeWallpaperBtn">
-              <i class="bi bi-trash"></i> Remove
-            </button>
-            <span class="text-muted small">Max 5MB (JPG, PNG, WebP)</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 3. Overlay & Tint Tab -->
-      <div class="theme-panel-tab-pane d-none" id="pane-overlay">
-        <div class="mb-3">
-          <h6 class="fw-bold mb-1">Background Dimming & Readability</h6>
-          <p class="text-muted small mb-3">Add a frosted tint over wallpaper or gradients to keep messages readable.</p>
-          
-          <div class="form-check form-switch mb-3">
-            <input class="form-check-input" type="checkbox" id="overlayEnabled" checked style="cursor: pointer;">
-            <label class="form-check-label fw-semibold" for="overlayEnabled" style="cursor: pointer;">
-              Enable Background Overlay
-            </label>
-          </div>
-
-          <div class="mb-3" id="overlayOpacityControlWrapper">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <label for="overlayOpacitySlider" class="form-label small fw-semibold mb-0">Overlay Opacity</label>
-              <span class="badge bg-secondary-subtle text-body font-monospace" id="overlayOpacityValue">30%</span>
-            </div>
-            <input type="range" class="form-range" id="overlayOpacitySlider" min="0" max="70" value="30">
-            <div class="preset-opacity-buttons-row mt-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill preset-opacity-btn" data-opacity="0">None</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill preset-opacity-btn" data-opacity="15">15%</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill preset-opacity-btn active" data-opacity="30">30%</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill preset-opacity-btn" data-opacity="50">50%</button>
-            </div>
-          </div>
-
-          <div class="mb-3 pt-3 border-top">
-            <label class="form-label small fw-semibold mb-2">Overlay Tint Color</label>
-            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-              <button type="button" class="btn color-tint-preset rounded-circle p-0" data-color="#000000" style="width: 28px; height: 28px; background: #000000; border: 2px solid #ccc;"></button>
-              <button type="button" class="btn color-tint-preset rounded-circle p-0" data-color="#ffffff" style="width: 28px; height: 28px; background: #ffffff; border: 2px solid #ccc;"></button>
-              <button type="button" class="btn color-tint-preset rounded-circle p-0" data-color="#0b141a" style="width: 28px; height: 28px; background: #0b141a; border: 2px solid #ccc;"></button>
-              <button type="button" class="btn color-tint-preset rounded-circle p-0" data-color="#1e293b" style="width: 28px; height: 28px; background: #1e293b; border: 2px solid #ccc;"></button>
-              <input type="color" id="overlayColorPicker" value="#ffffff" class="form-control form-control-color border-0 p-0" style="width: 28px; height: 28px; cursor: pointer;">
-              <span class="small font-monospace text-muted" id="overlayColorHex">#ffffff</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4. Bubble Styling Tab -->
-      <div class="theme-panel-tab-pane d-none" id="pane-bubbles">
-        <div class="mb-3">
-          <h6 class="fw-bold mb-1">Message Bubble Shapes</h6>
-          <p class="text-muted small mb-3">Choose the corner curvature for chat messages.</p>
-          <div class="bubble-style-cards-grid mb-4">
-            <div class="bubble-style-card active" data-bubble-style="default">
-              <span class="bubble-card-title">Default</span>
-              <small class="bubble-card-desc">Classic</small>
-            </div>
-            <div class="bubble-style-card" data-bubble-style="rounded">
-              <span class="bubble-card-title">Pill</span>
-              <small class="bubble-card-desc">Rounded</small>
-            </div>
-            <div class="bubble-style-card" data-bubble-style="square">
-              <span class="bubble-card-title">Square</span>
-              <small class="bubble-card-desc">Compact</small>
-            </div>
-          </div>
-
-          <h6 class="fw-bold mb-1 pt-2 border-top">Custom Bubble Colors</h6>
-          <p class="text-muted small mb-3">Customize sent and received bubble shades.</p>
-          <div class="row g-3">
-            <div class="col-sm-6">
-              <label class="form-label small fw-semibold">Sent Bubble Color</label>
-              <div class="d-flex align-items-center gap-2">
-                <input type="color" id="sentBubbleColor" value="#0084ff" class="form-control form-control-color border-0 p-0" style="width: 32px; height: 32px; cursor: pointer;">
-                <span class="font-monospace small" id="sentBubbleHex">#0084ff</span>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <label class="form-label small fw-semibold">Received Bubble Color</label>
-              <div class="d-flex align-items-center gap-2">
-                <input type="color" id="receivedBubbleColor" value="#e4e4ea" class="form-control form-control-color border-0 p-0" style="width: 32px; height: 32px; cursor: pointer;">
-                <span class="font-monospace small" id="receivedBubbleHex">#e4e4ea</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Panel Footer / Scope Toggle -->
-    <div class="chat-theme-panel-footer p-3 border-top d-flex align-items-center justify-content-between">
-      <div class="form-check form-switch mb-0">
-        <input class="form-check-input" type="checkbox" id="themeApplyToAllChats" style="cursor: pointer;">
-        <label class="form-check-label small fw-semibold" for="themeApplyToAllChats" style="cursor: pointer;">
-          Apply to all chats
-        </label>
-        <div class="text-muted" style="font-size: 0.72rem;">Set this theme as your default for all conversations</div>
-      </div>
-      <button type="button" class="btn btn-primary rounded-pill px-4 fw-semibold" id="saveThemeBtn">Save Theme</button>
-    </div>
-  </aside>
-  {% else %}
-  <!-- Empty Selection State (When no conversation is selected on desktop) -->
-  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center my-auto messaging-empty-selection">
-    <div class="pwanimate-empty-state messaging-empty-state">
-      <div class="pwanimate-hero-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle shadow-sm mx-auto mb-3" style="width: 88px; height: 88px;">
-        <i class="bi bi-chat-quote-fill" style="font-size: 2.75rem;"></i>
-      </div>
-      <h2 class="pwanimate-empty-title">Select a chat</h2>
-      <p class="pwanimate-empty-greeting">Choose a conversation from the left to start messaging</p>
-      <p class="pwanimate-empty-question">Or begin a new conversation with someone from your friend circle.</p>
-      <button type="button"
-              class="btn btn-primary rounded-pill px-4 py-2 mt-2 d-inline-flex align-items-center gap-2 shadow-sm"
-              data-bs-toggle="modal"
-              data-bs-target="#newConversationModal">
-        <i class="bi bi-chat-plus"></i>
-        <span class="fw-semibold">Start new chat</span>
-      </button>
-    </div>
-  </div>
-  {% endif %}
-</div>
-
-<!-- 3. RIGHT MEDIA RAIL (Dynamic WhatsApp Media, Links & Docs) -->
-{% if conversation %}
-<aside class="whatsapp-right-rail border-start bg-white d-none flex-column" id="whatsappRightRail">
-    <!-- Rail Header -->
-    <div class="whatsapp-right-rail-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
-      <div class="d-flex align-items-center gap-2">
-        <h6 class="mb-0 fw-bold" style="font-size: 0.95rem;">Media, Links & Docs</h6>
-      </div>
-      <button type="button" class="btn btn-link p-0 text-muted d-flex align-items-center justify-content-center" id="closeRightRailBtn" aria-label="Close media panel" style="width: 32px; height: 32px;">
-        <i class="bi bi-x-lg fs-6"></i>
-      </button>
-    </div>
-
-    <!-- Navigation Tabs: Media | Docs | Audio | Links -->
-    <ul class="nav nav-tabs whatsapp-media-tabs border-bottom px-2" id="mediaTabs" role="tablist">
-      <li class="nav-item flex-fill text-center" role="presentation">
-        <button class="nav-link active w-100 py-2 small fw-semibold" id="tab-media-btn" data-bs-toggle="tab" data-bs-target="#tab-media-content" type="button" role="tab">Media</button>
-      </li>
-      <li class="nav-item flex-fill text-center" role="presentation">
-        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-docs-btn" data-bs-toggle="tab" data-bs-target="#tab-docs-content" type="button" role="tab">Docs</button>
-      </li>
-      <li class="nav-item flex-fill text-center" role="presentation">
-        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-audio-btn" data-bs-toggle="tab" data-bs-target="#tab-audio-content" type="button" role="tab">Audio</button>
-      </li>
-      <li class="nav-item flex-fill text-center" role="presentation">
-        <button class="nav-link w-100 py-2 small fw-semibold" id="tab-links-btn" data-bs-toggle="tab" data-bs-target="#tab-links-content" type="button" role="tab">Links</button>
-      </li>
-    </ul>
-
-    <!-- Tab Panes -->
-    <div class="tab-content flex-grow-1 overflow-y-auto p-3" id="mediaTabsContent">
-      <!-- 1. Media Tab (Photos & Videos) -->
-      <div class="tab-pane fade show active" id="tab-media-content" role="tabpanel">
-        {% if media_photos_videos or legacy_photos_videos %}
-          <div class="media-gallery-grid" id="mediaPhotosVideosGrid">
-            {% for item in media_photos_videos %}
-              <div class="media-gallery-item">
-                {% if item.file_type == 'image' %}
-                  <a href="{{ item.file.url }}" target="_blank" rel="noopener">
-                    <img src="{{ item.file.url }}" alt="Media" loading="lazy">
-                  </a>
-                {% elif item.file_type == 'video' %}
-                  <a href="{{ item.file.url }}" target="_blank" rel="noopener" class="position-relative d-block w-100 h-100">
-                    <video src="{{ item.file.url }}" preload="metadata"></video>
-                    <i class="bi bi-play-circle-fill position-absolute top-50 start-50 translate-middle text-white fs-4"></i>
-                  </a>
-                {% endif %}
-              </div>
-            {% endfor %}
-            {% for item in legacy_photos_videos %}
-              <div class="media-gallery-item">
-                {% if item.attachment_type == 'image' %}
-                  <a href="{{ item.attachment.url }}" target="_blank" rel="noopener">
-                    <img src="{{ item.attachment.url }}" alt="Media" loading="lazy">
-                  </a>
-                {% elif item.attachment_type == 'video' %}
-                  <a href="{{ item.attachment.url }}" target="_blank" rel="noopener" class="position-relative d-block w-100 h-100">
-                    <video src="{{ item.attachment.url }}" preload="metadata"></video>
-                    <i class="bi bi-play-circle-fill position-absolute top-50 start-50 translate-middle text-white fs-4"></i>
-                  </a>
-                {% endif %}
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="text-center py-5 text-muted small" id="mediaPhotosVideosEmpty">
-            <i class="bi bi-images fs-2 d-block mb-2 opacity-50"></i>
-            No photos or videos shared yet
-          </div>
-        {% endif %}
-      </div>
-
-      <!-- 2. Docs Tab (Documents & Files) -->
-      <div class="tab-pane fade" id="tab-docs-content" role="tabpanel">
-        {% if media_docs or legacy_docs %}
-          <div class="d-flex flex-column gap-2" id="mediaDocsList">
-            {% for item in media_docs %}
-              <a href="{{ item.file.url }}" download class="d-flex align-items-center gap-3 p-2 rounded border text-decoration-none text-dark bg-light bg-opacity-50">
-                <div class="p-2 bg-primary bg-opacity-10 text-primary rounded">
-                  <i class="bi bi-file-earmark-text fs-4"></i>
-                </div>
-                <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
-                  <div class="fw-semibold text-truncate small">{{ item.file.name|slice:"20:"|default:"Document" }}</div>
-                  <div class="text-muted x-small" style="font-size: 0.72rem;">{{ item.message.created_at|date:"M d, Y" }}</div>
-                </div>
-                <i class="bi bi-download text-muted"></i>
-              </a>
-            {% endfor %}
-            {% for item in legacy_docs %}
-              <a href="{{ item.attachment.url }}" download class="d-flex align-items-center gap-3 p-2 rounded border text-decoration-none text-dark bg-light bg-opacity-50">
-                <div class="p-2 bg-primary bg-opacity-10 text-primary rounded">
-                  <i class="bi bi-file-earmark-text fs-4"></i>
-                </div>
-                <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
-                  <div class="fw-semibold text-truncate small">{{ item.attachment.name|slice:"20:"|default:"Document" }}</div>
-                  <div class="text-muted x-small" style="font-size: 0.72rem;">{{ item.created_at|date:"M d, Y" }}</div>
-                </div>
-                <i class="bi bi-download text-muted"></i>
-              </a>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="text-center py-5 text-muted small" id="mediaDocsEmpty">
-            <i class="bi bi-file-earmark-text fs-2 d-block mb-2 opacity-50"></i>
-            No documents shared yet
-          </div>
-        {% endif %}
-      </div>
-
-      <!-- 3. Audio Tab (Voice Messages & Audio Files) -->
-      <div class="tab-pane fade" id="tab-audio-content" role="tabpanel">
-        {% if media_audio or legacy_audio %}
-          <div class="d-flex flex-column gap-2" id="mediaAudioList">
-            {% for item in media_audio %}
-              <div class="p-2 rounded border bg-light bg-opacity-50">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <i class="bi bi-mic text-primary"></i>
-                  <span class="small fw-semibold text-truncate">Voice Note</span>
-                  <span class="text-muted x-small ms-auto" style="font-size: 0.7rem;">{{ item.message.created_at|date:"H:i" }}</span>
-                </div>
-                <audio controls src="{{ item.file.url }}" class="w-100" style="height: 32px;"></audio>
-              </div>
-            {% endfor %}
-            {% for item in legacy_audio %}
-              <div class="p-2 rounded border bg-light bg-opacity-50">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                  <i class="bi bi-mic text-primary"></i>
-                  <span class="small fw-semibold text-truncate">Voice Note</span>
-                  <span class="text-muted x-small ms-auto" style="font-size: 0.7rem;">{{ item.created_at|date:"H:i" }}</span>
-                </div>
-                <audio controls src="{{ item.attachment.url }}" class="w-100" style="height: 32px;"></audio>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="text-center py-5 text-muted small" id="mediaAudioEmpty">
-            <i class="bi bi-mic fs-2 d-block mb-2 opacity-50"></i>
-            No audio messages shared yet
-          </div>
-        {% endif %}
-      </div>
-
-      <!-- 4. Links Tab (Shared URLs & Link Previews) -->
-      <div class="tab-pane fade" id="tab-links-content" role="tabpanel">
-        {% if media_links %}
-          <div class="d-flex flex-column gap-2" id="mediaLinksList">
-            {% for item in media_links %}
-              <a href="{{ item.link_url }}" target="_blank" rel="noopener" class="d-flex flex-column p-2 rounded border text-decoration-none text-dark bg-light bg-opacity-50">
-                <div class="d-flex align-items-center gap-2">
-                  <i class="bi bi-link-45deg text-primary fs-5"></i>
-                  <span class="fw-semibold text-truncate small text-primary">{{ item.link_title|default:item.link_url }}</span>
-                  <i class="bi bi-box-arrow-up-right x-small text-muted ms-auto" style="font-size: 0.75rem;"></i>
-                </div>
-                {% if item.link_description %}
-                  <p class="text-muted x-small mb-1 text-truncate" style="font-size: 0.72rem;">{{ item.link_description }}</p>
-                {% endif %}
-                <span class="text-muted x-small" style="font-size: 0.68rem;">{{ item.created_at|date:"M d, Y" }}</span>
-              </a>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="text-center py-5 text-muted small" id="mediaLinksEmpty">
-            <i class="bi bi-link-45deg fs-2 d-block mb-2 opacity-50"></i>
-            No links shared yet
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </aside>
-  {% endif %}
+  <!-- 3. RIGHT MEDIA RAIL (Dynamic WhatsApp Media, Links & Docs) -->
+  {% include 'messaging/partials/conversation_right_rail.html' %}
 </div> <!-- /#whatsappLayout -->
 
 <!-- New Conversation Modal (Desktop & Mobile) -->
@@ -1774,14 +1216,42 @@
     }
   });
 
-  // Mobile viewport check: if on mobile screen (< 992px) and no conversation selected, redirect to mobile dashboard
-  if (!window.HAS_CONVERSATION && window.innerWidth < 992) {
-    window.location.replace("{% url 'messaging:conversation_list' %}?view=list");
-  }
+  // Handle real-time user status updates from global WebSocket in base.html
+  window.handleUserStatusUpdate = function(userData) {
+    if (!userData) return;
+    const userId = userData.user_id;
+    const isOnline = Boolean(userData.is_online);
+
+    // Update status dots in left rail, header, suggested friends
+    const dots = document.querySelectorAll(`[data-user-status-id="${userId}"]`);
+    dots.forEach(dot => {
+      if (isOnline) {
+        dot.classList.add('online');
+        dot.style.display = '';
+      } else {
+        dot.classList.remove('online');
+        dot.style.display = 'none';
+      }
+    });
+
+    // Update avatars
+    const avatars = document.querySelectorAll(`.chat-avatar[data-user-id="${userId}"]`);
+    avatars.forEach(av => {
+      if (isOnline) {
+        av.classList.add('online', 'avatar-online');
+      } else {
+        av.classList.remove('online', 'avatar-online');
+      }
+    });
+
+    // Notify state store if active
+    if (window.store && typeof window.store.setPeerOnlineStatus === 'function') {
+      window.store.setPeerOnlineStatus(userId, isOnline, userData.last_seen);
+    }
+  };
 </script>
 
-{% if conversation %}
-{% if conversation.type == 'direct' %}
+{% if conversation and conversation.type == 'direct' %}
 {% for member in conversation.members.all %}
 {% if member.user != request.user %}
 <script>
@@ -1792,6 +1262,12 @@
 </script>
 {% endif %}
 {% endfor %}
+{% elif conversation and conversation.type == 'group' %}
+<script>
+  document.body.dataset.receiverName = '{{ conversation.name|escapejs }}';
+  delete document.body.dataset.receiverUsername;
+  delete document.body.dataset.receiverProfileUrl;
+</script>
 {% endif %}
 
 <!-- Media Composer Fullscreen Overlay (Immersive Edge-to-Edge with Floating Circular Controls) -->
@@ -1957,9 +1433,9 @@
 </div>
 
 <script src="{% static 'js/encryption.js' %}"></script>
-<script src="{% static 'js/messaging/offline-cache.js' %}?v=46"></script>
-<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=46"></script>
-<script src="{% static 'js/chat-theme-handler.js' %}?v=25"></script>
+<script src="{% static 'js/messaging/offline-cache.js' %}?v=47"></script>
+<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=50"></script>
+<script src="{% static 'js/chat-theme-handler.js' %}?v=28"></script>
 
 <script>
   // Handle quick action and empty state greeting chip clicks
@@ -1986,78 +1462,10 @@
     }
   });
 </script>
-{% endif %}
 
 <script>
-  // WhatsApp Right Media Rail and Left Rail Search Controller
+  // Left Rail conversation search filter and setup
   (function() {
-    const rightRail = document.getElementById('whatsappRightRail');
-    const layout = document.getElementById('whatsappLayout');
-    const toggleFloatingBtn = document.getElementById('whatsappMediaRailToggleBtn');
-    const closeBtn = document.getElementById('closeRightRailBtn');
-    const viewMediaBtn = document.getElementById('viewMediaBtn');
-    const profileTrigger = document.getElementById('headerProfileTrigger');
-    const infoTrigger = document.getElementById('headerInfoTrigger');
-
-    window.openMediaRail = function(tabId) {
-      if (!rightRail) return;
-      rightRail.classList.remove('d-none');
-      rightRail.classList.add('open');
-      if (layout) layout.classList.add('whatsapp-media-rail-open');
-      document.body.classList.add('whatsapp-media-rail-open');
-      if (tabId && window.bootstrap) {
-        const tabEl = document.getElementById(tabId);
-        if (tabEl) {
-          const tab = bootstrap.Tab.getOrCreateInstance(tabEl);
-          tab.show();
-        }
-      }
-    };
-
-    window.closeMediaRail = function() {
-      if (!rightRail) return;
-      rightRail.classList.remove('open');
-      rightRail.classList.add('d-none');
-      if (layout) layout.classList.remove('whatsapp-media-rail-open');
-      document.body.classList.remove('whatsapp-media-rail-open');
-    };
-
-    if (toggleFloatingBtn) {
-      toggleFloatingBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        openMediaRail('tab-media-btn');
-      });
-    }
-
-    if (viewMediaBtn) {
-      viewMediaBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        openMediaRail('tab-media-btn');
-      });
-    }
-
-    if (profileTrigger) {
-      profileTrigger.addEventListener('click', function(e) {
-        e.preventDefault();
-        openMediaRail('tab-media-btn');
-      });
-    }
-
-    if (infoTrigger) {
-      infoTrigger.addEventListener('click', function(e) {
-        e.preventDefault();
-        openMediaRail();
-      });
-    }
-
-    if (closeBtn) {
-      closeBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        closeMediaRail();
-      });
-    }
-
-    // Left Rail conversation search filter
     const railSearchInput = document.getElementById('railChatSearchInput');
     if (railSearchInput) {
       railSearchInput.addEventListener('input', function() {
@@ -2081,7 +1489,175 @@
         new bootstrap.Tooltip(el);
       });
     }
+
+    // Start conversation click handler for suggested friends in left rail
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('.start-conversation-btn');
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const userId = btn.dataset.userId;
+        if (!userId) return;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width: 0.8rem; height: 0.8rem;"></span>...';
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || (document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1]) || '';
+        fetch('/messaging/v1/conversations/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify({
+            type: 'direct',
+            member_ids: [parseInt(userId, 10)]
+          })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.id) {
+            window.location.href = `/messaging/conversation/${data.id}/`;
+          } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-chat-dots me-1"></i> Message';
+          }
+        })
+        .catch(function(err) {
+          console.error(err);
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-chat-dots me-1"></i> Message';
+        });
+      }
+    });
+  // Mobile Navigation: Seamless Instant Switch between List & Chat with ZERO Full Page Reload
+  (function() {
+    function setMobileChatActive(active) {
+      const layout = document.getElementById('whatsappLayout');
+      if (layout) {
+        layout.classList.toggle('mobile-chat-active', active);
+      }
+      document.body.classList.toggle('mobile-chat-active', active);
+      document.documentElement.classList.toggle('in-conversation-active', active);
+      document.body.classList.toggle('in-conversation-active', active);
+    }
+
+    // Tap on back button in chat header on mobile: Navigate cleanly to mobile conversation list
+    document.addEventListener('click', function(e) {
+      const backBtn = e.target.closest('.chat-back-btn, #chatBackBtn');
+      if (backBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.href = '/messaging/';
+      }
+    });
+
+    // Tap / Click on a conversation item in rail: Optimistic instant active state & mobile view switch
+    document.addEventListener('click', function(e) {
+      const chatItem = e.target.closest('.whatsapp-chat-item, .messaging-rail-avatar-link');
+      if (chatItem) {
+        setMobileChatActive(true);
+        const convId = chatItem.dataset.conversationId;
+        if (convId) {
+          document.querySelectorAll('.whatsapp-chat-item, .messaging-rail-avatar-link').forEach(function(el) {
+            if (el.dataset.conversationId === convId) {
+              el.classList.add('active');
+              const badge = el.querySelector('.whatsapp-chat-unread-badge, .messaging-rail-unread-dot, .unread-badge');
+              if (badge) {
+                badge.style.display = 'none';
+                badge.classList.add('d-none');
+              }
+              const snippet = el.querySelector('.whatsapp-chat-snippet, .chat-preview-text');
+              if (snippet) {
+                snippet.classList.remove('fw-bold', 'unread', 'text-body');
+                snippet.classList.add('text-muted', 'fw-normal');
+              }
+            } else {
+              el.classList.remove('active');
+            }
+          });
+        }
+      }
+    });
+
+    // Suggested greeting chip click handler -> populates chatInput and triggers input event
+    document.addEventListener('click', function(e) {
+      const chip = e.target.closest('.empty-greeting-chip');
+      if (chip) {
+        const text = chip.getAttribute('data-text') || chip.textContent.trim();
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput && text) {
+          chatInput.value = text;
+          chatInput.focus();
+          chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    });
+
+    // Handle browser back/forward buttons (popstate)
+    window.addEventListener('popstate', function() {
+      const isChat = window.location.pathname.includes('/conversation/');
+      setMobileChatActive(isChat);
+      if (!isChat) {
+        document.querySelectorAll('.whatsapp-chat-item.active, .messaging-rail-avatar-link.active').forEach(function(el) {
+          el.classList.remove('active');
+        });
+      }
+    });
+
+    // Re-evaluate time-conscious greeting chips on HTMX swaps
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+      if (evt.detail.target && evt.detail.target.id === 'chatMainAreaWrapper') {
+        const container = document.getElementById('messagingEmptyState');
+        if (container) {
+          const hour = new Date().getHours();
+          let greetingTime = 'Hey there';
+          let emoji = '👋';
+
+          if (hour >= 5 && hour < 12) {
+            greetingTime = 'Good morning';
+            emoji = '☀️';
+          } else if (hour >= 12 && hour < 17) {
+            greetingTime = 'Good afternoon';
+            emoji = '🌤️';
+          } else if (hour >= 17 && hour < 22) {
+            greetingTime = 'Good evening';
+            emoji = '🌙';
+          } else {
+            greetingTime = 'Hey there';
+            emoji = '👋';
+          }
+
+          let targetName = document.body.dataset.receiverName || '';
+          if (!targetName) {
+            const title = container.querySelector('.pwanimate-empty-title');
+            if (title) targetName = title.textContent.trim();
+          }
+          const firstName = targetName ? targetName.split(' ')[0] : '';
+
+          const timeChip = container.querySelector('.time-aware-chip');
+          if (timeChip) {
+            const timeText = firstName ? `${greetingTime} ${firstName}! ${emoji}` : `${greetingTime}! ${emoji}`;
+            timeChip.textContent = timeText;
+            timeChip.setAttribute('data-text', timeText);
+          }
+
+          const howChip = container.querySelector('[data-chip-type="how-doing"]');
+          if (howChip && firstName) {
+            const howText = `Hello ${firstName}, how you doing? 🙌`;
+            howChip.textContent = howText;
+            howChip.setAttribute('data-text', howText);
+          }
+
+          const heyChip = container.querySelector('[data-chip-type="hey"]');
+          if (heyChip && firstName) {
+            const heyText = `Hey ${firstName}! 👋`;
+            heyChip.textContent = heyText;
+            heyChip.setAttribute('data-text', heyText);
+          }
+        }
+      }
+    });
   })();
 </script>
+<script src="{% static 'js/messaging/conversation-realtime-manager.js' %}?v=4"></script>
 
 {% endblock %}

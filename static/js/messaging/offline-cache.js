@@ -70,6 +70,31 @@ class OfflineCache {
         return store.put(conversation);
     }
 
+    async saveConversations(conversations) {
+        if (!this.db || !conversations || !conversations.length) return;
+        
+        const transaction = this.db.transaction(['conversations'], 'readwrite');
+        const store = transaction.objectStore('conversations');
+        
+        for (const item of conversations) {
+            const conv = item.conversation || item;
+            if (conv && conv.id) {
+                const dataToSave = {
+                    id: conv.id,
+                    type: conv.type || 'direct',
+                    name: conv.name || '',
+                    is_pinned: item.is_pinned || false,
+                    last_msg_time: conv.last_msg_time || null,
+                    preview: item.preview || null,
+                    cached_at: new Date().toISOString()
+                };
+                store.put(dataToSave);
+            }
+        }
+        
+        return transaction.complete;
+    }
+
     async getConversations(limit = 50) {
         if (!this.db) return [];
         
@@ -316,3 +341,4 @@ class OfflineCache {
 
 // Global instance
 window.offlineCache = new OfflineCache();
+window.offlineCache.init();

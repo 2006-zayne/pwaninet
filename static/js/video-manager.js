@@ -2550,15 +2550,6 @@
     function reinitHtmxElement(el) {
         if (!el || !window.htmx) return;
         try {
-            const clearCache = (node) => {
-                if (node && node['htmx-internal-data']) {
-                    delete node['htmx-internal-data'];
-                }
-            };
-            clearCache(el);
-            if (el.querySelectorAll) {
-                el.querySelectorAll('[hx-get], [hx-post], [hx-put], [hx-patch], [hx-delete], [hx-boost]').forEach(clearCache);
-            }
             window.htmx.process(el);
         } catch (e) {
             console.warn('[VideoManager] HTMX process error:', e);
@@ -5979,7 +5970,6 @@
         document.addEventListener('htmx:afterSwap', function(event) {
             const target = event.detail?.target;
             if (target) {
-                reinitHtmxElement(target);
                 initializeVideos(target);
                 if (target.closest && (target.closest('#fsRailCommentsList') || target.closest('#commentsModalList') || target.id === 'comments-section')) {
                     truncateLongComments(target);
