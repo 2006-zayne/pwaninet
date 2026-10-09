@@ -340,9 +340,9 @@
   padding-bottom: 0.5rem !important;
   padding-left: calc(0.5rem + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px))) !important;
   padding-right: calc(0.75rem + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px))) !important;
-  margin: 0 auto !important;
+  margin: 0 !important;
   width: 100% !important;
-  max-width: 960px !important;
+  max-width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 0 !important;
@@ -936,6 +936,11 @@
 .bubble-meta-spacer.has-receipt,
 .sent .bubble-meta-spacer.has-receipt {
   padding-right: 17px;
+}
+
+/* Extra spacer width when message is edited to cleanly accommodate 'Edited' indicator */
+.bubble-meta-spacer.is-edited {
+  padding-left: 42px !important;
 }
 
 /* Reply quote inside Obsidian sent bubble and slate received bubble */
@@ -5402,4 +5407,165 @@ body.whatsapp-media-rail-open .whatsapp-media-rail-toggle-wrapper {
     padding-left: calc(0.5rem + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px))) !important;
     padding-right: calc(0.5rem + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px))) !important;
   }
+}
+
+/* ==================== Reply, Forward, Delete & Edit Bubble Enhancements ==================== */
+
+/* Quoted Reply Box inside bubble */
+.quoted-reply-box {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.06);
+  border-left: 3.5px solid var(--chat-accent, #2563eb);
+  border-radius: 6px 10px 10px 6px;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  user-select: none;
+  max-width: 100%;
+  overflow: hidden;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+[data-bs-theme="dark"] .quoted-reply-box {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sent .quoted-reply-box {
+  background: rgba(0, 0, 0, 0.08);
+  border-left-color: rgba(255, 255, 255, 0.85);
+}
+
+[data-bs-theme="dark"] .sent .quoted-reply-box {
+  background: rgba(0, 0, 0, 0.2);
+  border-left-color: rgba(255, 255, 255, 0.7);
+}
+
+.quoted-reply-box:active {
+  opacity: 0.75;
+}
+
+.quoted-reply-sender {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--chat-accent, #2563eb);
+  margin-bottom: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sent .quoted-reply-sender {
+  color: #ffffff;
+}
+
+.quoted-reply-snippet {
+  font-size: 0.78rem;
+  opacity: 0.88;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+}
+
+/* Forwarded Badge */
+.message-forwarded-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-style: italic;
+  opacity: 0.78;
+  margin-bottom: 3px;
+  user-select: none;
+}
+
+.message-forwarded-badge .forward-icon {
+  font-size: 0.75rem;
+  transform: scaleX(-1);
+  display: inline-block;
+}
+
+/* Deleted Message Bubble */
+.deleted-message-bubble {
+  opacity: 0.82 !important;
+  font-style: italic !important;
+}
+
+.deleted-message-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.deleted-message-inner i {
+  font-size: 0.95rem;
+  opacity: 0.75;
+}
+
+/* Edited indicator */
+.edited-indicator {
+  font-size: 0.68rem;
+  font-style: italic;
+  opacity: 0.75;
+  margin-right: 4px;
+}
+
+/* Increased width & breathing room for edited message bubbles */
+.messages-area .message-bubble.is-edited-bubble,
+.message-bubble.is-edited-bubble,
+.messages-area .message-bubble:has(.edited-indicator),
+.message-bubble:has(.edited-indicator) {
+  min-width: 125px !important;
+}
+
+.messages-area .message-bubble.sent.is-edited-bubble,
+.message-bubble.sent.is-edited-bubble,
+.messages-area .message-bubble.sent:has(.edited-indicator),
+.message-bubble.sent:has(.edited-indicator) {
+  min-width: 140px !important;
+}
+
+/* Flash highlight animation for tap-to-scroll to quote */
+@keyframes messageHighlightFlash {
+  0% {
+    background-color: rgba(56, 189, 248, 0.5) !important;
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.7) !important;
+  }
+  40% {
+    background-color: rgba(56, 189, 248, 0.35) !important;
+  }
+  100% {
+    background-color: inherit;
+    box-shadow: none;
+  }
+}
+
+.highlight-flash {
+  animation: messageHighlightFlash 1.6s ease-in-out !important;
+}
+
+/* Forward modal item styles */
+.forward-chat-item {
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+[data-bs-theme="dark"] .forward-chat-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.forward-chat-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-bs-theme="dark"] .forward-chat-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.forward-chat-item:last-child {
+  border-bottom: none;
 }

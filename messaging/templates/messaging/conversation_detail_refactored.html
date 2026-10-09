@@ -10,8 +10,8 @@
 {% block mobile_bottom_nav %}{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=38">
-<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=5">
+<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=41">
+<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=6">
 <link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=24">
 <link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}?v=26">
 <link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}?v=27">
@@ -1102,6 +1102,59 @@
   </div>
 </div>
 
+<!-- Delete Message Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 380px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 18px; overflow: hidden; background: var(--chat-composer-bg, var(--card-bg, #ffffff)); color: var(--chat-composer-text, var(--text-primary, #0f172a));">
+      <div class="modal-header border-0 pb-1 pt-3 px-4">
+        <h6 class="modal-title fw-bold">Delete message?</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body px-4 py-2" style="font-size: 0.88rem; opacity: 0.85;">
+        You can delete this message for everyone or delete it just for yourself.
+      </div>
+      <div class="modal-footer border-0 d-flex flex-column gap-2 p-3 pt-2">
+        <button type="button" class="btn btn-danger w-100 rounded-pill py-2 d-none fw-semibold" id="deleteForEveryoneBtn">
+          Delete for everyone
+        </button>
+        <button type="button" class="btn btn-secondary w-100 rounded-pill py-2 fw-semibold" id="deleteForMeBtn">
+          Delete for me
+        </button>
+        <button type="button" class="btn btn-light w-100 rounded-pill py-2" data-bs-dismiss="modal">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Forward Message Modal -->
+<div class="modal fade" id="forwardModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 440px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 18px; overflow: hidden; max-height: 85vh; background: var(--chat-composer-bg, var(--card-bg, #ffffff)); color: var(--chat-composer-text, var(--text-primary, #0f172a));">
+      <div class="modal-header border-bottom py-3 px-4">
+        <h6 class="modal-title fw-bold m-0"><i class="bi bi-reply-fill forward-icon me-2" style="transform: scaleX(-1); display: inline-block;"></i>Forward message to...</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="px-3 pt-3 pb-2 border-bottom">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control bg-transparent border-start-0" id="forwardSearchInput" placeholder="Search chats..." autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-body p-0" id="forwardConversationsList" style="min-height: 220px; max-height: 380px; overflow-y: auto;">
+        <!-- Populated dynamically from left rail / store -->
+      </div>
+      <div class="modal-footer border-top py-2 px-3 d-flex justify-content-between">
+        <span class="small text-muted" id="forwardSelectedCount">0 selected</span>
+        <button type="button" class="btn btn-primary rounded-pill px-4 btn-sm" id="sendForwardBtn" disabled>
+          Send <i class="bi bi-send ms-1"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Emoji Picker Modal -->
 <div class="overlay" id="overlay"></div>
 
@@ -1904,8 +1957,8 @@
 </div>
 
 <script src="{% static 'js/encryption.js' %}"></script>
-<script src="{% static 'js/messaging/offline-cache.js' %}"></script>
-<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=42"></script>
+<script src="{% static 'js/messaging/offline-cache.js' %}?v=46"></script>
+<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=46"></script>
 <script src="{% static 'js/chat-theme-handler.js' %}?v=25"></script>
 
 <script>

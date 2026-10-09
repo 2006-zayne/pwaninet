@@ -83,6 +83,7 @@ class MessageSerializer(serializers.ModelSerializer):
     is_voice_note = serializers.SerializerMethodField()
     file_size = serializers.SerializerMethodField()
     file_name = serializers.SerializerMethodField()
+    is_forwarded = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -92,9 +93,13 @@ class MessageSerializer(serializers.ModelSerializer):
             'reply_to_details', 'attachment_url', 'read_status', 'status', 'created_at', 'edited_at', 'is_deleted',
             'link_url', 'link_title', 'link_description', 'link_image', 'link_type',
             'global_caption', 'message_type', 'attachments', 'link_preview',
-            'is_voice_note', 'file_size', 'file_name'
+            'is_voice_note', 'file_size', 'file_name', 'is_forwarded'
         ]
         read_only_fields = ['id', 'created_at', 'edited_at', 'is_encrypted', 'status']
+
+    def get_is_forwarded(self, obj):
+        """Determine if this message was forwarded."""
+        return getattr(obj, '_is_forwarded', False)
 
     def get_reply_to_details(self, obj):
         """Get details of the message being replied to."""

@@ -177,6 +177,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         elif msg_type == 'delete_message':
             await self._handle_delete_message(data)
 
+        elif msg_type == 'forward_message':
+            await self._handle_forward_message(data)
+
     # -------------------------------------------------------------
     # Action Handlers
     # -------------------------------------------------------------
@@ -349,6 +352,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
+    async def _handle_forward_message(self, data):
+        message_id = data.get('message_id')
+        target_conv_ids = data.get('conversation_ids', [])
+        if not message_id or not target_conv_ids:
+            return
+
+        orig_msg = await self._get_message_for_forward(message_id)
+        if not orig_msg:
+            return
+
+        for target_id in target_conv_ids:
+            forwarded_msg, serialized = await self._forward_message_to_conv(orig_msg, target_id)
+            if forwarded_msg and serialized:
+                await self.channel_layer.group_send(
+                    f"chat_{target_id}",
+                    {
+                        'type': 'chat_message_event',
+                        'message': serialized,
+                        'temp_id': None
+                    }
+                )
+
     # -------------------------------------------------------------
     # Group Broadcast Dispatches (Downlink to WebSocket)
     # -------------------------------------------------------------
@@ -506,7 +531,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     logger.debug(f"Link preview generation skipped: {e}")
 
             conv.save(update_fields=['updated_at'])
+            if data.get('is_forwarded') or data.get('metadata', {}).get('is_forwarded'):
+                msg._is_forwarded = True
             serialized = MessageSerializer(msg).data
+            if data.get('is_forwarded') or data.get('metadata', {}).get('is_forwarded'):
+                serialized['is_forwarded'] = True
             return msg, serialized
         except Exception as e:
             logger.error(f"Error saving message: {e}", exc_info=True)
@@ -591,6 +620,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def _edit_message(self, message_id, content):
         try:
             msg = Message.objects.get(id=message_id, conversation_id=self.conversation_id, sender=self.user)
+            # Enforce 15-minute window for message editing
+            if (timezone.now() - msg.created_at).total_seconds() > 15 * 60:
+                logger.warning(f"Edit attempt past 15-minute window for message {message_id}")
+                return None
             msg.content = content
             msg.edited_at = timezone.now()
             msg.save(update_fields=['content', 'edited_at'])
@@ -602,14 +635,54 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _delete_message(self, message_id):
         try:
-            rows = Message.objects.filter(id=message_id, conversation_id=self.conversation_id, sender=self.user).update(
-                is_deleted=True,
-                content='This message was deleted'
-            )
-            return rows > 0
+            msg = Message.objects.filter(id=message_id, conversation_id=self.conversation_id, sender=self.user).first()
+            if not msg:
+                return False
+            # Enforce 48-hour window for delete for everyone
+            if (timezone.now() - msg.created_at).total_seconds() > 48 * 3600:
+                logger.warning(f"Delete for everyone attempt past 48-hour window for message {message_id}")
+                return False
+            msg.is_deleted = True
+            msg.content = 'This message was deleted'
+            msg.save(update_fields=['is_deleted', 'content'])
+            return True
         except Exception as e:
             logger.error(f"Error deleting message: {e}")
             return False
+
+    @database_sync_to_async
+    def _get_message_for_forward(self, message_id):
+        return Message.objects.filter(id=message_id).first()
+
+    @database_sync_to_async
+    def _forward_message_to_conv(self, orig_msg, target_conv_id):
+        try:
+            conv = Conversation.objects.filter(id=target_conv_id, members__user=self.user).first()
+            if not conv:
+                return None, None
+            new_msg = Message.objects.create(
+                conversation=conv,
+                sender=self.user,
+                content=orig_msg.content,
+                message_type=orig_msg.message_type,
+                attachment=orig_msg.attachment,
+                attachment_type=orig_msg.attachment_type,
+                global_caption=orig_msg.global_caption,
+                link_url=orig_msg.link_url,
+                link_title=orig_msg.link_title,
+                link_description=orig_msg.link_description,
+                link_image=orig_msg.link_image,
+                link_type=orig_msg.link_type,
+                status='sent'
+            )
+            new_msg._is_forwarded = True
+            conv.save(update_fields=['updated_at'])
+            serialized = MessageSerializer(new_msg).data
+            serialized['is_forwarded'] = True
+            return new_msg, serialized
+        except Exception as e:
+            logger.error(f"Error forwarding message: {e}", exc_info=True)
+            return None, None
 
     @database_sync_to_async
     def _get_unread_count(self, user_id):

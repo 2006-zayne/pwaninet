@@ -967,7 +967,8 @@ export class MessageRenderer {
                     existingElements.delete(key);
                     // Update existing element attributes/grouping in-place without rebuilding
                     if (viewType === 'message') {
-                        this._updateExistingMessageElement(el, item);
+                        const updatedEl = this._updateExistingMessageElement(el, item);
+                        if (updatedEl) el = updatedEl;
                     }
                 } else {
                     // Create new element
@@ -1047,7 +1048,63 @@ export class MessageRenderer {
      * Update an existing message element in-place to avoid re-rendering and media playback interruption
      */
     _updateExistingMessageElement(wrapperEl, message) {
-        if (!wrapperEl || !message) return;
+        if (!wrapperEl || !message) return wrapperEl;
+
+        // If message was deleted, replace with deleted tombstone
+        if (message.isDeleted) {
+            if (!wrapperEl.querySelector('.deleted-message-bubble')) {
+                const newEl = this._createDeletedMessage(message);
+                wrapperEl.replaceWith(newEl);
+                return newEl;
+            }
+            return wrapperEl;
+        }
+
+        // If message was edited, cleanly refresh text content and spacer, and ensure 'Edited' indicator
+        const isEdited = Boolean(message.editedAt || message.is_edited || message.edited_at || message.metadata?.edited_at);
+        if (isEdited) {
+            const bubble = wrapperEl.querySelector('.message-bubble');
+            if (bubble) {
+                bubble.classList.add('is-edited-bubble');
+            }
+            const contentEl = wrapperEl.querySelector('.message-content');
+            if (contentEl && message.content) {
+                contentEl.innerHTML = `${escapeHtml(message.content)}${this._getSpacerHtml(message)}`;
+            }
+            const metaDiv = wrapperEl.querySelector('.message-meta');
+            if (metaDiv && !metaDiv.querySelector('.edited-indicator')) {
+                const editedSpan = document.createElement('span');
+                editedSpan.className = 'edited-indicator me-1';
+                editedSpan.textContent = 'Edited';
+                const timeEl = metaDiv.querySelector('.timestamp');
+                if (timeEl) {
+                    metaDiv.insertBefore(editedSpan, timeEl);
+                } else {
+                    metaDiv.prepend(editedSpan);
+                }
+            }
+        }
+
+        // If message has reply quote and element doesn't have it yet, inject it in-place
+        if (!wrapperEl.querySelector('.quoted-reply-box')) {
+            const replyHtml = this._buildReplyQuoteHtml(message);
+            if (replyHtml) {
+                const bubble = wrapperEl.querySelector('.message-bubble');
+                if (bubble) {
+                    const tempWrap = document.createElement('div');
+                    tempWrap.innerHTML = replyHtml;
+                    const replyBox = tempWrap.firstElementChild;
+                    if (replyBox) {
+                        const forwardedBadge = bubble.querySelector('.message-forwarded-badge');
+                        if (forwardedBadge) {
+                            forwardedBadge.after(replyBox);
+                        } else {
+                            bubble.prepend(replyBox);
+                        }
+                    }
+                }
+            }
+        }
 
         // Update status and group position attributes
         if (wrapperEl.getAttribute('data-status') !== message.status) {
@@ -1115,6 +1172,7 @@ export class MessageRenderer {
                 }
             }
         }
+        return wrapperEl;
     }
 
     /**
@@ -1387,6 +1445,107 @@ export class MessageRenderer {
         return element;
     }
 
+    _buildForwardedBadgeHtml(message) {
+        const isForwarded = Boolean(message.is_forwarded || message.isForwarded || message.metadata?.is_forwarded);
+        if (!isForwarded) return '';
+        return `
+            <div class="message-forwarded-badge">
+                <i class="bi bi-reply-fill forward-icon" style="transform: scaleX(-1); display: inline-block;"></i>
+                <span>Forwarded</span>
+            </div>
+        `;
+    }
+
+    _buildReplyQuoteHtml(message) {
+        let replyDetails = message.replyToDetails || message.reply_to_details || message.metadata?.reply_to_details;
+        const repId = message.replyToId || message.reply_to_id || message.reply_to || message.replyTo || message.metadata?.reply_to_id || message.metadata?.reply_to;
+        
+        if (!replyDetails && repId) {
+            const originalMsg = typeof store !== 'undefined' && store.getMessageById ? store.getMessageById(repId) : null;
+            if (originalMsg) {
+                const currentUserId = this.currentUserId;
+                const isOwnOrig = originalMsg.isOwn || (currentUserId !== null && Number(originalMsg.senderId) === Number(currentUserId));
+                replyDetails = {
+                    id: originalMsg.id,
+                    senderId: originalMsg.senderId,
+                    sender: { username: isOwnOrig ? 'You' : (originalMsg.sender?.username || originalMsg.senderUsername || 'User') },
+                    content: originalMsg.content,
+                    type: originalMsg.type || originalMsg.messageType || originalMsg.message_type,
+                    attachment_type: originalMsg.metadata?.type || originalMsg.attachment_type,
+                    is_voice_note: Boolean(originalMsg.metadata?.is_voice_note || originalMsg.is_voice_note)
+                };
+            }
+        }
+        if (!replyDetails) return '';
+
+        const currentUserId = this.currentUserId;
+        const isOwn = replyDetails.senderId === currentUserId || replyDetails.isOwn;
+        const senderName = isOwn ? 'You' : (replyDetails.sender?.username || replyDetails.senderUsername || 'User');
+        
+        let snippet = replyDetails.content;
+        const attType = replyDetails.attachment_type || replyDetails.type;
+        const isVn = replyDetails.is_voice_note || attType === 'voice_note';
+        
+        if (!snippet || !snippet.trim()) {
+            if (isVn) snippet = '🎙️ Voice note';
+            else if (attType === 'audio') snippet = '🎵 Audio track';
+            else if (attType === 'image') snippet = '📷 Photo';
+            else if (attType === 'video') snippet = '🎥 Video';
+            else if (attType === 'document') snippet = '📄 Document';
+            else if (attType === 'sticker') snippet = 'Sticker';
+            else if (attType === 'gif') snippet = 'GIF';
+            else snippet = 'Message';
+        } else {
+            if (isVn) snippet = `🎙️ ${snippet}`;
+            else if (attType === 'image') snippet = `📷 ${snippet}`;
+            else if (attType === 'video') snippet = `🎥 ${snippet}`;
+            else if (attType === 'audio') snippet = `🎵 ${snippet}`;
+            else if (attType === 'document') snippet = `📄 ${snippet}`;
+        }
+
+        return `
+            <div class="quoted-reply-box" data-reply-id="${replyDetails.id}">
+                <div class="quoted-reply-sender">${escapeHtml(senderName)}</div>
+                <div class="quoted-reply-snippet">${escapeHtml(snippet)}</div>
+            </div>
+        `;
+    }
+
+    _createDeletedMessage(message) {
+        const isOwn = message.isOwn ?? (this.currentUserId !== null && Number(message.senderId) === Number(this.currentUserId));
+        const groupPos = message.groupPosition || 'single';
+
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.className = `message-wrapper ${isOwn ? 'sent-wrapper' : 'received-wrapper'} group-${groupPos}`;
+        wrapperDiv.setAttribute('data-message-id', message.id);
+        wrapperDiv.setAttribute('data-sender-id', message.senderId);
+        wrapperDiv.setAttribute('data-status', message.status || 'sent');
+        wrapperDiv.setAttribute('data-group-position', groupPos);
+
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'message-content-wrapper';
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-bubble ${isOwn ? 'sent' : 'received'} deleted-message-bubble group-${groupPos}`;
+        messageDiv.setAttribute('data-message-id', message.id);
+
+        this._applyBubbleStyle(messageDiv);
+
+        messageDiv.innerHTML = `
+            <div class="deleted-message-inner">
+                <i class="bi bi-slash-circle me-1"></i>
+                <span>${isOwn ? 'You deleted this message' : 'This message was deleted'}</span>
+                ${this._getSpacerHtml(message)}
+            </div>
+        `;
+
+        const metaDiv = this._createMetaElement(message, false);
+        messageDiv.appendChild(metaDiv);
+        contentWrapper.appendChild(messageDiv);
+        wrapperDiv.appendChild(contentWrapper);
+        return wrapperDiv;
+    }
+
     /**
      * Create message element (pure DOM creation)
      * @param {Object} message - Message object with view properties (canonical schema)
@@ -1395,9 +1554,13 @@ export class MessageRenderer {
     _createMessageElement(message) {
         // DEBUG: Log message type detection
         console.log('[RENDERER] Creating message element. ID:', message.id, 'Type:', message.type, 'Metadata:', message.metadata);
-        
+
+        if (message.is_deleted || message.isDeleted) {
+            return this._createDeletedMessage(message);
+        }
+
         if (message.type === 'system') {
-        return this._createSystemMessage(message);
+            return this._createSystemMessage(message);
         }
 
         // Check for 1 or 2 emojis (Jumboji) - floating without bubble background
@@ -1464,8 +1627,9 @@ export class MessageRenderer {
         contentWrapper.className = 'message-content-wrapper';
 
         // Create bubble (no timestamp/read receipt inside)
+        const isEdited = Boolean(message.edited_at || message.editedAt || message.is_edited || message.isEdited || message.metadata?.edited_at);
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition} ${message.isLastSent ? 'last-sent' : ''}`;
+        messageDiv.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} group-${message.groupPosition} ${message.isLastSent ? 'last-sent' : ''} ${isEdited ? 'is-edited-bubble' : ''}`;
         messageDiv.setAttribute('data-message-id', message.id);
         messageDiv.setAttribute('data-sender-id', message.senderId);
         messageDiv.setAttribute('data-status', message.status);
@@ -1477,25 +1641,9 @@ export class MessageRenderer {
         // Use canonical schema fields
         const status = message.status || 'sent';
 
-        // Render reply quote if present
-        let replyHtml = '';
-        const replyDetails = message.metadata?.reply_to_details;
-        if (replyDetails) {
-            const senderName = replyDetails.sender?.username || (replyDetails.senderId === this.currentUserId ? 'You' : 'User');
-            const snippet = escapeHtml(replyDetails.content || (replyDetails.type === 'media' ? '[Media]' : 'Message'));
-            replyHtml = `
-                <div class="message-reply-quote" onclick="document.querySelector('[data-message-id=\\'${replyDetails.id}\\']')?.scrollIntoView({ behavior: 'smooth', block: 'center' })" style="cursor: pointer; padding: 4px 8px; margin-bottom: 6px; border-left: 3px solid var(--brand); background: rgba(0,0,0,0.06); border-radius: 4px; font-size: 0.8rem;">
-                    <div class="fw-bold" style="color: var(--brand); font-size: 0.75rem;">${escapeHtml(senderName)}</div>
-                    <div class="text-truncate text-muted" style="max-width: 260px;">${snippet}</div>
-                </div>
-            `;
-        }
-
-        // Render edited tag if edited
-        let editedHtml = '';
-        if (message.metadata?.edited_at) {
-            editedHtml = `<span class="edited-tag text-muted ms-1" style="font-size: 0.72rem; font-style: italic;">(edited)</span>`;
-        }
+        // Render forwarded badge and reply quote if present
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
 
         // Render reactions if present
         let reactionsHtml = '';
@@ -1520,8 +1668,9 @@ export class MessageRenderer {
 
         // Bubble content
         messageDiv.innerHTML = `
+            ${forwardedHtml}
             ${replyHtml}
-            <p class="message-content">${escapeHtml(message.content || '')}${editedHtml}${this._getSpacerHtml(message)}</p>
+            <p class="message-content">${escapeHtml(message.content || '')}${this._getSpacerHtml(message)}</p>
             ${reactionsHtml}
         `;
 
@@ -1552,7 +1701,11 @@ export class MessageRenderer {
     _getSpacerClass(message) {
         if (!message) return 'bubble-meta-spacer';
         const hasAvatarReceipt = message.isOwn && message.status === 'read' && (message.isLastRead || message.groupPosition === 'single' || message.groupPosition === 'last');
-        return hasAvatarReceipt ? 'bubble-meta-spacer has-receipt' : 'bubble-meta-spacer';
+        const isEdited = Boolean(message.edited_at || message.editedAt || message.is_edited || message.isEdited || message.metadata?.edited_at);
+        let cls = 'bubble-meta-spacer';
+        if (hasAvatarReceipt) cls += ' has-receipt';
+        if (isEdited) cls += ' is-edited';
+        return cls;
     }
 
     /**
@@ -1578,6 +1731,14 @@ export class MessageRenderer {
         metaDiv.className = isMediaBadge 
             ? 'message-meta media-meta-badge' 
             : 'message-meta';
+
+        const isEdited = Boolean(message.edited_at || message.editedAt || message.is_edited || message.isEdited || message.metadata?.edited_at);
+        if (isEdited) {
+            const editedSpan = document.createElement('span');
+            editedSpan.className = 'edited-indicator me-1';
+            editedSpan.textContent = 'Edited';
+            metaDiv.appendChild(editedSpan);
+        }
 
         const timeSpan = document.createElement('span');
         timeSpan.className = 'timestamp';
@@ -1993,6 +2154,15 @@ export class MessageRenderer {
                 </button>
             `;
             mediaFrame.appendChild(downloadOverlay);
+        }
+
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
+        if (forwardedHtml || replyHtml) {
+            const topDiv = document.createElement('div');
+            topDiv.className = 'media-bubble-top-meta px-2 pt-1 pb-1';
+            topDiv.innerHTML = `${forwardedHtml}${replyHtml}`;
+            bubble.appendChild(topDiv);
         }
 
         bubble.appendChild(mediaFrame);
@@ -2677,7 +2847,12 @@ export class MessageRenderer {
         const fileSizeFormatted = this._formatFileSize(metadata.size);
         const docStyles = this._getDocumentTypeInfo(ext);
 
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
+
         bubble.innerHTML = `
+            ${forwardedHtml}
+            ${replyHtml}
             <div class="document-card-inner">
                 <div class="document-badge ${docStyles.badgeClass}">
                     <i class="bi ${docStyles.icon}"></i>
@@ -2814,7 +2989,10 @@ export class MessageRenderer {
             ? `<audio data-src="${escapeHtml(audioUrl)}" preload="none" class="d-none vn-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`
             : `<audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none vn-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`;
 
-        bubble.innerHTML = `<div class="voice-note-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}" title="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}">${playIconHtml}</button><div class="vn-content"><div class="vn-waveform-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div class="vn-waveform">${barsHtml}</div><div class="vn-progress-track"><div class="vn-progress-fill"></div><div class="vn-progress-thumb"></div></div></div><div class="vn-meta-row"><span class="vn-timer">0:00</span>${isNotDownloaded && sizeStr ? `<span class="vn-dot">•</span><span class="vn-size-indicator">${sizeStr}</span>` : ''}</div></div><button type="button" class="vn-speed-btn" title="Playback speed" data-speed="1">1x</button></div>${audioTag}`;
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
+
+        bubble.innerHTML = `${forwardedHtml}${replyHtml}<div class="voice-note-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}" title="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}">${playIconHtml}</button><div class="vn-content"><div class="vn-waveform-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div class="vn-waveform">${barsHtml}</div><div class="vn-progress-track"><div class="vn-progress-fill"></div><div class="vn-progress-thumb"></div></div></div><div class="vn-meta-row"><span class="vn-timer">0:00</span>${isNotDownloaded && sizeStr ? `<span class="vn-dot">•</span><span class="vn-size-indicator">${sizeStr}</span>` : ''}</div></div><button type="button" class="vn-speed-btn" title="Playback speed" data-speed="1">1x</button></div>${audioTag}`;
 
         this._bindVoiceNoteEvents(bubble);
 
@@ -3020,7 +3198,10 @@ export class MessageRenderer {
             ? `<audio data-src="${escapeHtml(audioUrl)}" preload="none" class="d-none track-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`
             : `<audio src="${escapeHtml(audioUrl)}" preload="metadata" class="d-none track-audio-el" style="display:none!important;position:absolute!important;width:0!important;height:0!important;opacity:0!important;pointer-events:none!important;"></audio>`;
 
-        bubble.innerHTML = `<div class="audio-track-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download track' : 'Play track'}" title="${isNotDownloaded ? 'Download track' : 'Play track'}">${playIconHtml}</button><div class="audio-track-details"><div class="audio-track-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div><div class="audio-track-scrubber-track"><div class="audio-track-scrubber-fill" style="width: 0%;"></div></div><div class="audio-track-meta-row"><span class="audio-track-time">0:00</span>${sizeStr ? `<span class="audio-track-dot">•</span><span class="audio-track-size">${sizeStr}</span>` : ''}${isNotDownloaded ? `<span class="audio-track-status opacity-75 ms-1">• Tap to download</span>` : ''}</div></div><div class="audio-track-badge"><i class="bi bi-music-note-beamed"></i></div></div>${audioTag}`;
+        const forwardedHtml = this._buildForwardedBadgeHtml(message);
+        const replyHtml = this._buildReplyQuoteHtml(message);
+
+        bubble.innerHTML = `${forwardedHtml}${replyHtml}<div class="audio-track-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download track' : 'Play track'}" title="${isNotDownloaded ? 'Download track' : 'Play track'}">${playIconHtml}</button><div class="audio-track-details"><div class="audio-track-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div><div class="audio-track-scrubber-track"><div class="audio-track-scrubber-fill" style="width: 0%;"></div></div><div class="audio-track-meta-row"><span class="audio-track-time">0:00</span>${sizeStr ? `<span class="audio-track-dot">•</span><span class="audio-track-size">${sizeStr}</span>` : ''}${isNotDownloaded ? `<span class="audio-track-status opacity-75 ms-1">• Tap to download</span>` : ''}</div></div><div class="audio-track-badge"><i class="bi bi-music-note-beamed"></i></div></div>${audioTag}`;
 
         this._bindAudioTrackEvents(bubble);
 

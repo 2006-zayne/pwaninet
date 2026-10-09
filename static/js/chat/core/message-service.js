@@ -320,6 +320,9 @@ export class MessageService {
         if (raw.is_deleted) {
             metadata.is_deleted = raw.is_deleted;
         }
+        if (raw.is_forwarded || raw.metadata?.is_forwarded) {
+            metadata.is_forwarded = true;
+        }
         
         return this._createCanonicalMessage({
             id: String(raw.id),
@@ -331,6 +334,11 @@ export class MessageService {
             type: messageType,
             metadata: metadata,
             isOptimistic: false,
+            isDeleted: Boolean(raw.is_deleted),
+            isForwarded: Boolean(raw.is_forwarded || metadata.is_forwarded),
+            editedAt: raw.edited_at || null,
+            replyToId: raw.reply_to || raw.reply_to_id || null,
+            replyToDetails: raw.reply_to_details || null,
             sortOrder: new Date(raw.created_at || raw.timestamp).getTime()
         });
     }
@@ -397,7 +405,8 @@ export class MessageService {
             // Record if there are older messages remaining
             store.setHasMoreOlderMessages(messages.length >= PAGE_LIMIT);
 
-            const normalizedList = messages.map(raw => this.normalizeServerMessage(raw));
+            const filteredMessages = this._filterDeletedForMe(messages, conversationId);
+            const normalizedList = filteredMessages.map(raw => this.normalizeServerMessage(raw));
             store.addMessages(normalizedList);
             console.log('[MESSAGE_SERVICE] All messages added to store');
 
@@ -462,7 +471,8 @@ export class MessageService {
                 if (window.offlineCache) {
                     window.offlineCache.saveMessages(messages).catch(e => console.warn('[OFFLINE_CACHE] Error caching messages:', e));
                 }
-                const normalizedList = messages.map(raw => this.normalizeServerMessage(raw));
+                const filteredMessages = this._filterDeletedForMe(messages, conversationId);
+                const normalizedList = filteredMessages.map(raw => this.normalizeServerMessage(raw));
                 store.addMessages(normalizedList);
             }
 
@@ -521,6 +531,8 @@ export class MessageService {
             status: MESSAGE_STATE.SENDING,
             content: cleanContent,
             type: options.type || 'text',
+            replyToId: options.reply_to_id || null,
+            replyToDetails: options.reply_to_details || null,
             metadata: {
                 ...(options.metadata || {}),
                 reply_to_id: options.reply_to_id || null,
@@ -760,6 +772,15 @@ export class MessageService {
                         content: data.content,
                         editedAt: data.edited_at
                     });
+                    if (window.offlineCache && typeof window.offlineCache.saveMessages === 'function') {
+                        const existing = store.getMessageById(data.message_id);
+                        window.offlineCache.saveMessages([{
+                            ...(existing || {}),
+                            id: data.message_id,
+                            content: data.content,
+                            edited_at: data.edited_at
+                        }]).catch(() => {});
+                    }
                     break;
 
                 case 'message_deleted':
@@ -767,6 +788,15 @@ export class MessageService {
                         isDeleted: true,
                         content: 'This message was deleted'
                     });
+                    if (window.offlineCache && typeof window.offlineCache.saveMessages === 'function') {
+                        const existing = store.getMessageById(data.message_id);
+                        window.offlineCache.saveMessages([{
+                            ...(existing || {}),
+                            id: data.message_id,
+                            is_deleted: true,
+                            content: 'This message was deleted'
+                        }]).catch(() => {});
+                    }
                     break;
 
                 case 'pong':
@@ -1137,8 +1167,28 @@ export class MessageService {
             attachments: data.attachments || data.metadata?.attachments || [],
             global_caption: data.global_caption || data.metadata?.global_caption || '',
             isOptimistic: data.isOptimistic || false,
+            isDeleted: Boolean(data.isDeleted || data.metadata?.is_deleted),
+            isForwarded: Boolean(data.isForwarded || data.metadata?.is_forwarded),
+            editedAt: data.editedAt || data.metadata?.edited_at || null,
+            replyToId: data.replyToId || data.metadata?.reply_to_id || data.metadata?.reply_to || null,
+            replyToDetails: data.replyToDetails || data.metadata?.reply_to_details || null,
             sortOrder: data.sortOrder ?? Date.now()
         };
+    }
+
+    /**
+     * Filter out messages deleted locally for the current user
+     */
+    _filterDeletedForMe(messages, conversationId) {
+        if (!conversationId || !messages || !messages.length) return messages;
+        try {
+            const raw = localStorage.getItem(`deleted_for_me_${conversationId}`);
+            if (!raw) return messages;
+            const deletedSet = new Set(JSON.parse(raw).map(id => String(id)));
+            return messages.filter(m => !deletedSet.has(String(m.id)));
+        } catch (_) {
+            return messages;
+        }
     }
 
     /**

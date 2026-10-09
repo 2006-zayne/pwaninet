@@ -477,6 +477,7 @@ def conversation_list(request):
             'conversation_data': conversation_data,
             'users': users,
             'unmessaged_friends': unmessaged_friends,
+            'suggested_users': suggested_users,
             'media_photos_videos': [],
             'media_docs': [],
             'media_audio': [],
@@ -629,6 +630,9 @@ def conversation_detail(request, conversation_id):
 
     unmessaged_friends = users.exclude(id__in=existing_direct_user_ids)
 
+    from users.services.friend_suggestion_service import get_friend_suggestions_for_user
+    suggested_users = get_friend_suggestions_for_user(request.user, limit=10)
+
     # Calculate today and yesterday dates
     today = timezone.now().date()
     yesterday = today - timedelta(days=1)
@@ -639,6 +643,7 @@ def conversation_detail(request, conversation_id):
         'conversation_data': conversation_data,
         'users': users,
         'unmessaged_friends': unmessaged_friends,
+        'suggested_users': suggested_users,
         'media_photos_videos': media_photos_videos,
         'media_docs': media_docs,
         'media_audio': media_audio,

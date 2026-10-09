@@ -11,6 +11,7 @@ import { contextMenuService } from '../features/context-menu/context-menu.servic
 import { messageSoundManager } from '../shared/message-sound.js';
 import { eventBus } from '../core/event-bus.js';
 import { EVENTS } from '../shared/constants.js';
+import { escapeHtml, getCSRFToken } from '../shared/utils.js';
 
 export class UIController {
     constructor() {
@@ -19,6 +20,8 @@ export class UIController {
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         this.lastState = null;
         this.audioInitialized = false;
+        this.pendingDeleteMessageId = null;
+        this.pendingForwardMessageId = null;
     }
 
     /**
@@ -97,17 +100,20 @@ export class UIController {
             this._applyTheme(state.currentTheme, state.themeMode);
         }
 
-        // 5. Messages: added, removed, status-changed, or initial load
+        // 5. Messages: added, removed, status-changed, edited, deleted, or initial load
         const currentMessages = state.messages || [];
         const prevLength = last?.messagesLength ?? -1;
         const newChecksum = currentMessages.length > 0 ? this._computeMessagesChecksum(currentMessages) : null;
         const prevChecksum = last?.messagesChecksum ?? null;
+        const newContentChecksum = currentMessages.length > 0 ? this._computeContentChecksum(currentMessages) : null;
+        const prevContentChecksum = last?.messagesContentChecksum ?? null;
 
         const countChanged = currentMessages.length !== prevLength;
+        const contentChanged = newContentChecksum !== prevContentChecksum;
         const checksumChanged = newChecksum !== prevChecksum;
 
-        if (countChanged) {
-            // New message added, removed, or initial load -> Reconcile messages in DOM smoothly
+        if (countChanged || contentChanged) {
+            // New message added, removed, edited, deleted, or initial load -> Reconcile messages in DOM smoothly
             this.renderer.render(currentMessages);
 
             setTimeout(() => {
@@ -231,14 +237,150 @@ export class UIController {
             });
         }
 
-        // Context menu action handler (Reply, Edit, Copy, Delete)
+        // Context menu action handler (Reply, Edit, Copy, Delete, Forward)
         eventBus.on(EVENTS.CONTEXT_MENU_ACTION, (detail) => {
             this._handleContextMenuAction(detail);
         });
 
-        // History pagination on scroll-to-top
+        // Delete Confirmation Modal button bindings
+        const deleteForEveryoneBtn = document.getElementById('deleteForEveryoneBtn');
+        if (deleteForEveryoneBtn) {
+            deleteForEveryoneBtn.addEventListener('click', () => {
+                const messageId = this.pendingDeleteMessageId;
+                if (!messageId) return;
+
+                import('../core/websocket.js').then(({ webSocketManager }) => {
+                    webSocketManager.send({
+                        type: 'delete_message',
+                        message_id: parseInt(messageId, 10)
+                    });
+                });
+                store.updateMessage(messageId, {
+                    isDeleted: true,
+                    content: 'This message was deleted'
+                });
+                if (window.offlineCache && typeof window.offlineCache.saveMessages === 'function') {
+                    const existing = store.getMessageById(messageId);
+                    window.offlineCache.saveMessages([{
+                        ...(existing || {}),
+                        id: messageId,
+                        is_deleted: true,
+                        content: 'This message was deleted'
+                    }]).catch(() => {});
+                }
+
+                const modalEl = document.getElementById('deleteConfirmModal');
+                if (window.bootstrap?.Modal) {
+                    window.bootstrap.Modal.getInstance(modalEl)?.hide();
+                } else if (modalEl) {
+                    modalEl.classList.remove('show');
+                    modalEl.style.display = 'none';
+                }
+                this._showToast('Message deleted for everyone');
+                this.pendingDeleteMessageId = null;
+            });
+        }
+
+        const deleteForMeBtn = document.getElementById('deleteForMeBtn');
+        if (deleteForMeBtn) {
+            deleteForMeBtn.addEventListener('click', () => {
+                const messageId = this.pendingDeleteMessageId;
+                if (!messageId) return;
+
+                const convId = store.getState().conversationId;
+                if (convId) {
+                    try {
+                        const key = `deleted_for_me_${convId}`;
+                        const raw = localStorage.getItem(key);
+                        const list = raw ? JSON.parse(raw) : [];
+                        if (!list.includes(String(messageId))) {
+                            list.push(String(messageId));
+                            localStorage.setItem(key, JSON.stringify(list));
+                        }
+                    } catch (_) {}
+                }
+                store.removeMessage(messageId);
+
+                const modalEl = document.getElementById('deleteConfirmModal');
+                if (window.bootstrap?.Modal) {
+                    window.bootstrap.Modal.getInstance(modalEl)?.hide();
+                } else if (modalEl) {
+                    modalEl.classList.remove('show');
+                    modalEl.style.display = 'none';
+                }
+                this._showToast('Message deleted for you');
+                this.pendingDeleteMessageId = null;
+            });
+        }
+
+        // Forward Message Modal bindings
+        const forwardSearchInput = document.getElementById('forwardSearchInput');
+        if (forwardSearchInput) {
+            forwardSearchInput.addEventListener('input', () => {
+                const query = forwardSearchInput.value.toLowerCase().trim();
+                const items = document.querySelectorAll('#forwardConversationsList .forward-chat-item');
+                items.forEach(item => {
+                    const name = item.getAttribute('data-chat-name') || '';
+                    item.style.display = name.includes(query) ? 'flex' : 'none';
+                });
+            });
+        }
+
+        const sendForwardBtn = document.getElementById('sendForwardBtn');
+        if (sendForwardBtn) {
+            sendForwardBtn.addEventListener('click', () => {
+                const messageId = this.pendingForwardMessageId;
+                if (!messageId) return;
+
+                const checked = document.querySelectorAll('#forwardConversationsList .forward-checkbox:checked');
+                const targetConvIds = Array.from(checked).map(cb => parseInt(cb.value, 10)).filter(Boolean);
+                if (targetConvIds.length === 0) return;
+
+                import('../core/websocket.js').then(({ webSocketManager }) => {
+                    webSocketManager.send({
+                        type: 'forward_message',
+                        message_id: parseInt(messageId, 10),
+                        conversation_ids: targetConvIds
+                    });
+                });
+
+                const modalEl = document.getElementById('forwardModal');
+                if (window.bootstrap?.Modal) {
+                    window.bootstrap.Modal.getInstance(modalEl)?.hide();
+                } else if (modalEl) {
+                    modalEl.classList.remove('show');
+                    modalEl.style.display = 'none';
+                }
+                this._showToast(`Forwarded to ${targetConvIds.length} chat${targetConvIds.length > 1 ? 's' : ''}`);
+                this.pendingForwardMessageId = null;
+            });
+        }
+
+        // History pagination and quote tap-to-scroll
         const messagesContainer = document.getElementById('messagesContainer');
         if (messagesContainer) {
+            // Tap-to-scroll on quoted reply box
+            messagesContainer.addEventListener('click', (e) => {
+                const quoteBox = e.target.closest('.quoted-reply-box');
+                if (quoteBox) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const replyId = quoteBox.getAttribute('data-reply-id');
+                    if (replyId) {
+                        const targetEl = document.querySelector(`.message-wrapper[data-message-id="${replyId}"] .message-bubble, .message-bubble[data-message-id="${replyId}"]`);
+                        if (targetEl) {
+                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            targetEl.classList.remove('highlight-flash');
+                            void targetEl.offsetWidth;
+                            targetEl.classList.add('highlight-flash');
+                            setTimeout(() => targetEl.classList.remove('highlight-flash'), 1800);
+                        } else {
+                            this._showToast('Original message is earlier in history');
+                        }
+                    }
+                }
+            });
+
             let scrollDebounceTimer = null;
             messagesContainer.addEventListener('scroll', () => {
                 if (messagesContainer.scrollTop <= 80) {
@@ -259,8 +401,6 @@ export class UIController {
                 }
             }, { passive: true });
         }
-
-
 
         const themeBtn = document.getElementById('themeBtn');
         if (themeBtn) {
@@ -285,6 +425,20 @@ export class UIController {
         }
     }
 
+    _showToast(text) {
+        const toast = document.createElement('div');
+        toast.className = 'position-fixed bottom-0 start-50 translate-middle-x bg-dark text-white px-3 py-2 rounded-pill shadow';
+        toast.style.zIndex = '9999';
+        toast.style.marginBottom = '84px';
+        toast.style.fontSize = '0.85rem';
+        toast.style.fontWeight = '500';
+        toast.style.letterSpacing = '0.2px';
+        toast.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
+        toast.textContent = text;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2200);
+    }
+
     _handleContextMenuAction(detail) {
         const { action, messageId } = detail;
         const message = store.getMessageById(messageId);
@@ -301,9 +455,20 @@ export class UIController {
             const replyText = document.getElementById('replyTextSnippet');
             if (replyBar && replySender && replyText) {
                 const currentUserId = store.getState().currentUserId;
-                const isOwn = message.senderId === currentUserId;
+                const isOwn = message.isOwn || Number(message.senderId) === Number(currentUserId);
                 replySender.textContent = isOwn ? 'Replying to yourself' : 'Replying to message';
-                replyText.textContent = message.content || '[Attachment]';
+
+                let snippet = message.content;
+                if (!snippet) {
+                    const t = message.type || message.metadata?.type;
+                    if (t === 'voice_note' || message.is_voice_note) snippet = '🎙️ Voice note';
+                    else if (t === 'audio') snippet = '🎵 Audio track';
+                    else if (t === 'media' || t === 'image') snippet = '📷 Photo';
+                    else if (t === 'video') snippet = '🎥 Video';
+                    else if (t === 'document') snippet = '📄 Document';
+                    else snippet = 'Attachment';
+                }
+                replyText.textContent = snippet;
                 replyBar.classList.remove('d-none');
             }
             const input = document.getElementById('messageInput');
@@ -311,10 +476,18 @@ export class UIController {
 
         } else if (action === 'edit') {
             const currentUserId = store.getState().currentUserId;
-            if (message.senderId !== currentUserId) {
-                alert('You can only edit your own messages.');
+            const isOwn = message.isOwn || Number(message.senderId) === Number(currentUserId);
+            if (!isOwn) {
+                this._showToast('You can only edit your own messages.');
                 return;
             }
+
+            const msgTime = message?.timestamp ? new Date(message.timestamp).getTime() : Date.now();
+            if ((Date.now() - msgTime) > 15 * 60 * 1000) {
+                this._showToast('Messages can only be edited within 15 minutes of sending.');
+                return;
+            }
+
             this.editingMessageId = messageId;
             this.replyToMessageId = null;
             const replyBar = document.getElementById('replyPreviewBar');
@@ -323,7 +496,7 @@ export class UIController {
             const editBar = document.getElementById('editPreviewBar');
             const editText = document.getElementById('editTextSnippet');
             if (editBar && editText) {
-                editText.textContent = message.content;
+                editText.textContent = message.content || '';
                 editBar.classList.remove('d-none');
             }
             const input = document.getElementById('messageInput');
@@ -334,38 +507,151 @@ export class UIController {
             }
 
         } else if (action === 'copy') {
-            if (message.content) {
-                navigator.clipboard.writeText(message.content).then(() => {
-                    const toast = document.createElement('div');
-                    toast.className = 'position-fixed bottom-0 start-50 translate-middle-x bg-dark text-white px-3 py-2 rounded-pill shadow';
-                    toast.style.zIndex = '9999';
-                    toast.style.marginBottom = '80px';
-                    toast.style.fontSize = '0.85rem';
-                    toast.textContent = 'Message copied to clipboard';
-                    document.body.appendChild(toast);
-                    setTimeout(() => toast.remove(), 2000);
+            const copyText = message.content || message.metadata?.global_caption || message.global_caption;
+            if (copyText) {
+                navigator.clipboard.writeText(copyText).then(() => {
+                    this._showToast('Message copied to clipboard');
+                }).catch(() => {
+                    this._showToast('Failed to copy');
                 });
+            } else {
+                this._showToast('No text to copy');
             }
 
         } else if (action === 'delete') {
-            const currentUserId = store.getState().currentUserId;
-            if (message.senderId !== currentUserId) {
-                alert('You can only delete your own messages.');
-                return;
+            this.pendingDeleteMessageId = messageId;
+            const modalEl = document.getElementById('deleteConfirmModal');
+            if (modalEl) {
+                const currentUserId = store.getState().currentUserId;
+                const isOwn = message.isOwn || Number(message.senderId) === Number(currentUserId);
+                const msgTime = message?.timestamp ? new Date(message.timestamp).getTime() : Date.now();
+                const isWithin48Hours = (Date.now() - msgTime) <= 48 * 60 * 60 * 1000;
+
+                const deleteForEveryoneBtn = document.getElementById('deleteForEveryoneBtn');
+                if (deleteForEveryoneBtn) {
+                    if (isOwn && isWithin48Hours) {
+                        deleteForEveryoneBtn.classList.remove('d-none');
+                    } else {
+                        deleteForEveryoneBtn.classList.add('d-none');
+                    }
+                }
+
+                if (window.bootstrap?.Modal) {
+                    const bsModal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+                    bsModal.show();
+                } else {
+                    modalEl.classList.add('show');
+                    modalEl.style.display = 'block';
+                }
             }
-            if (confirm('Delete this message for everyone?')) {
-                import('../core/websocket.js').then(({ webSocketManager }) => {
-                    webSocketManager.send({
-                        type: 'delete_message',
-                        message_id: parseInt(messageId, 10)
+
+        } else if (action === 'forward') {
+            this.pendingForwardMessageId = messageId;
+            this._openForwardModal();
+        }
+    }
+
+    _openForwardModal() {
+        const modalEl = document.getElementById('forwardModal');
+        if (!modalEl) return;
+
+        const listContainer = document.getElementById('forwardConversationsList');
+        const searchInput = document.getElementById('forwardSearchInput');
+        const countSpan = document.getElementById('forwardSelectedCount');
+        const sendBtn = document.getElementById('sendForwardBtn');
+
+        if (searchInput) searchInput.value = '';
+        if (countSpan) countSpan.textContent = '0 selected';
+        if (sendBtn) sendBtn.disabled = true;
+
+        if (listContainer) {
+            listContainer.innerHTML = '';
+            
+            // Collect conversations from the rail list
+            const railItems = document.querySelectorAll('#whatsappRailChatsList .whatsapp-chat-item');
+            const convs = [];
+            
+            railItems.forEach(item => {
+                const id = item.getAttribute('data-conversation-id');
+                const nameEl = item.querySelector('.whatsapp-chat-name');
+                const name = nameEl ? nameEl.textContent.trim() : `Chat #${id}`;
+                const avatarEl = item.querySelector('.chat-avatar');
+                const avatarHtml = avatarEl ? avatarEl.outerHTML : `<div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;"><i class="bi bi-person-fill"></i></div>`;
+                if (id) {
+                    convs.push({ id, name, avatarHtml });
+                }
+            });
+
+            if (convs.length > 0) {
+                this._renderForwardConversationList(convs, listContainer);
+            } else {
+                listContainer.innerHTML = `<div class="p-4 text-center text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading chats...</div>`;
+                fetch('/messaging/v1/conversations/', {
+                    headers: { 'X-CSRFToken': getCSRFToken() }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    const items = Array.isArray(data) ? data : (data.results || []);
+                    const currentUserId = store.getState().currentUserId;
+                    const fetchedConvs = items.map(c => {
+                        let name = c.name;
+                        if (!name && c.members) {
+                            const other = c.members.find(m => (m.user?.id || m.user) !== currentUserId);
+                            name = other?.user?.username || other?.user?.get_full_name || `Chat #${c.id}`;
+                        }
+                        return {
+                            id: c.id,
+                            name: name || `Chat #${c.id}`,
+                            avatarHtml: `<div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;"><i class="bi bi-chat-dots-fill"></i></div>`
+                        };
                     });
-                });
-                store.updateMessage(messageId, {
-                    isDeleted: true,
-                    content: 'This message was deleted'
+                    this._renderForwardConversationList(fetchedConvs, listContainer);
+                })
+                .catch(() => {
+                    listContainer.innerHTML = `<div class="p-4 text-center text-muted small">No other chats found</div>`;
                 });
             }
         }
+
+        if (window.bootstrap?.Modal) {
+            const bsModal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+            bsModal.show();
+        } else {
+            modalEl.classList.add('show');
+            modalEl.style.display = 'block';
+        }
+    }
+
+    _renderForwardConversationList(convs, container) {
+        if (!convs.length) {
+            container.innerHTML = `<div class="p-4 text-center text-muted small">No conversations found</div>`;
+            return;
+        }
+
+        container.innerHTML = convs.map(c => `
+            <label class="d-flex align-items-center gap-3 px-3 py-2 forward-chat-item m-0" style="cursor: pointer; user-select: none;" data-chat-name="${escapeHtml(c.name.toLowerCase())}">
+                <input type="checkbox" class="form-check-input flex-shrink-0 forward-checkbox" value="${c.id}" style="margin: 0; width: 1.15rem; height: 1.15rem; cursor: pointer;">
+                <div class="flex-shrink-0" style="width: 38px; height: 38px;">
+                    ${c.avatarHtml}
+                </div>
+                <div class="flex-grow-1 overflow-hidden">
+                    <div class="fw-semibold text-truncate" style="font-size: 0.9rem;">${escapeHtml(c.name)}</div>
+                </div>
+            </label>
+        `).join('');
+
+        const updateSelection = () => {
+            const checkedBoxes = container.querySelectorAll('.forward-checkbox:checked');
+            const count = checkedBoxes.length;
+            const countSpan = document.getElementById('forwardSelectedCount');
+            const sendBtn = document.getElementById('sendForwardBtn');
+            if (countSpan) countSpan.textContent = `${count} selected`;
+            if (sendBtn) sendBtn.disabled = count === 0;
+        };
+
+        container.querySelectorAll('.forward-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateSelection);
+        });
     }
 
     /**
@@ -470,10 +756,20 @@ export class UIController {
                     content: clean
                 });
             });
+            const nowIso = new Date().toISOString();
             store.updateMessage(editId, {
                 content: clean,
-                editedAt: new Date().toISOString()
+                editedAt: nowIso
             });
+            if (window.offlineCache && typeof window.offlineCache.saveMessages === 'function') {
+                const existing = store.getMessageById(editId);
+                window.offlineCache.saveMessages([{
+                    ...(existing || {}),
+                    id: parseInt(editId, 10),
+                    content: clean,
+                    edited_at: nowIso
+                }]).catch(() => {});
+            }
             return;
         }
 
@@ -483,8 +779,29 @@ export class UIController {
         const replyBar = document.getElementById('replyPreviewBar');
         if (replyBar) replyBar.classList.add('d-none');
 
+        let replyDetails = null;
+        if (replyId) {
+            const originalMsg = store.getMessageById(replyId);
+            if (originalMsg) {
+                const currentUserId = store.getState().currentUserId;
+                const isOwnOrig = originalMsg.isOwn || Number(originalMsg.senderId) === Number(currentUserId);
+                replyDetails = {
+                    id: originalMsg.id,
+                    senderId: originalMsg.senderId,
+                    sender: {
+                        username: isOwnOrig ? 'You' : (originalMsg.sender?.username || originalMsg.senderUsername || 'User')
+                    },
+                    content: originalMsg.content,
+                    type: originalMsg.type || originalMsg.message_type,
+                    attachment_type: originalMsg.metadata?.type || originalMsg.attachment_type,
+                    is_voice_note: Boolean(originalMsg.metadata?.is_voice_note || originalMsg.is_voice_note)
+                };
+            }
+        }
+
         await messageService.sendMessage(clean, {
-            reply_to_id: replyId ? parseInt(replyId, 10) : null
+            reply_to_id: replyId ? parseInt(replyId, 10) : null,
+            reply_to_details: replyDetails
         });
     }
 
@@ -837,6 +1154,14 @@ export class UIController {
                 console.log('[UI_CONTROLLER] State changed: message checksum', lastState.messagesChecksum, '->', newChecksum);
                 return true;
             }
+            const newContentChecksum = this._computeContentChecksum(newState.messages);
+            if (lastState.messagesContentChecksum && newContentChecksum !== lastState.messagesContentChecksum) {
+                console.log('[UI_CONTROLLER] State changed: message content/edit/delete checksum changed');
+                return true;
+            }
+            if (!lastState.messagesContentChecksum && newState.messages.length > 0) {
+                return true;
+            }
             // If no previous checksum but we have messages now, state changed
             if (!lastState.messagesChecksum && newState.messages.length > 0) {
                 console.log('[UI_CONTROLLER] State changed: new messages appeared');
@@ -872,6 +1197,15 @@ export class UIController {
     }
 
     /**
+     * Compute a checksum of message content, editedAt, and isDeleted
+     * @param {Array} messages - Messages array
+     * @returns {string} Checksum string
+     */
+    _computeContentChecksum(messages) {
+        return messages.map(m => `${m.id}:${m.editedAt || m.edited_at || ''}:${m.isDeleted ? '1' : '0'}:${m.content || ''}`).join('|');
+    }
+
+    /**
      * Create state snapshot for comparison (pure data transformation)
      * @param {Object} state - State to snapshot
      * @returns {Object} State snapshot
@@ -881,6 +1215,9 @@ export class UIController {
             messagesLength: state.messages.length,
             messagesChecksum: state.messages.length > 0
                 ? this._computeMessagesChecksum(state.messages)
+                : null,
+            messagesContentChecksum: state.messages.length > 0
+                ? this._computeContentChecksum(state.messages)
                 : null,
             connectionState: state.connectionState,
             typingUsersSize: state.typingUsers.size,

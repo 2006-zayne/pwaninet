@@ -135,7 +135,11 @@ export class Store {
      * @returns {Object|null} Message or null
      */
     getMessageById(messageId) {
-        const message = this._state.messages.get(messageId);
+        if (messageId === undefined || messageId === null) return null;
+        const idStr = String(messageId);
+        const message = this._state.messages.get(idStr) ||
+                        this._state.messages.get(Number(idStr)) ||
+                        this._state.messages.get(messageId);
         return message ? { ...message } : null; // Return copy to prevent mutation
     }
 
@@ -188,19 +192,29 @@ export class Store {
         }
 
         // Check for duplicates
-        if (this._state.processedMessageIds.has(validatedMessage.id)) {
-            console.log('[STORE] Duplicate message ignored:', validatedMessage.id);
-            this._logMutation('DUPLICATE_MESSAGE_IGNORED', validatedMessage.id);
+        const idStr = String(validatedMessage.id);
+        if (this._state.processedMessageIds.has(idStr)) {
+            console.log('[STORE] Message already in store, checking for update:', idStr);
+            const existing = this._state.messages.get(idStr) || this._state.messages.get(Number(idStr));
+            if (existing && (
+                existing.content !== validatedMessage.content ||
+                existing.editedAt !== validatedMessage.editedAt ||
+                existing.isDeleted !== validatedMessage.isDeleted ||
+                existing.status !== validatedMessage.status
+            )) {
+                this._state.messages.set(idStr, { ...existing, ...validatedMessage, id: idStr });
+                this._notifySubscribers();
+            }
             return;
         }
 
         // Add to processed IDs
-        this._state.processedMessageIds.add(validatedMessage.id);
+        this._state.processedMessageIds.add(idStr);
 
         // Store message (immutable)
-        this._state.messages.set(validatedMessage.id, validatedMessage);
+        this._state.messages.set(idStr, { ...validatedMessage, id: idStr });
 
-        console.log('[STORE] Message stored successfully:', validatedMessage.id);
+        console.log('[STORE] Message stored successfully:', idStr);
         console.log('[STORE] Current message count after add:', this._state.messages.size);
 
         // Clear typing indicator for this sender if they were typing
@@ -215,7 +229,7 @@ export class Store {
         }
 
         // Update order array for deterministic sorting
-        this._updateMessageOrder(validatedMessage);
+        this._updateMessageOrder({ ...validatedMessage, id: idStr });
 
         console.log('[STORE] Notifying subscribers...');
         this._notifySubscribers();
@@ -230,20 +244,34 @@ export class Store {
         if (!Array.isArray(messages) || messages.length === 0) return;
         this._logMutation('ADD_MESSAGES_BATCH', { count: messages.length });
 
-        let addedCount = 0;
+        let changedCount = 0;
         for (const message of messages) {
             const validated = this._validateCanonicalMessage(message);
             if (!validated) continue;
-            if (this._state.processedMessageIds.has(validated.id)) continue;
+            const idStr = String(validated.id);
 
-            this._state.processedMessageIds.add(validated.id);
-            this._state.messages.set(validated.id, validated);
-            this._updateMessageOrder(validated);
-            addedCount++;
+            if (this._state.processedMessageIds.has(idStr)) {
+                const existing = this._state.messages.get(idStr) || this._state.messages.get(Number(idStr));
+                if (existing && (
+                    existing.content !== validated.content ||
+                    existing.editedAt !== validated.editedAt ||
+                    existing.isDeleted !== validated.isDeleted ||
+                    existing.status !== validated.status
+                )) {
+                    this._state.messages.set(idStr, { ...existing, ...validated, id: idStr });
+                    changedCount++;
+                }
+                continue;
+            }
+
+            this._state.processedMessageIds.add(idStr);
+            this._state.messages.set(idStr, { ...validated, id: idStr });
+            this._updateMessageOrder({ ...validated, id: idStr });
+            changedCount++;
         }
 
-        if (addedCount > 0) {
-            console.log(`[STORE] Batch added ${addedCount} messages. Total:`, this._state.messages.size);
+        if (changedCount > 0) {
+            console.log(`[STORE] Batch processed ${changedCount} messages. Total:`, this._state.messages.size);
             this._notifySubscribers();
         }
     }
@@ -282,22 +310,29 @@ export class Store {
         console.log('[STORE] Updating message:', messageId, 'with updates:', updates);
         this._logMutation('UPDATE_MESSAGE', { messageId, updates });
 
-        const existingMessage = this._state.messages.get(messageId);
+        const key = String(messageId);
+        let existingMessage = this._state.messages.get(key) || this._state.messages.get(Number(messageId));
+
         if (!existingMessage) {
             console.error('[STORE] Message not found for update', messageId);
             return;
         }
         console.log('[STORE] Existing message before update:', existingMessage);
 
+        const originalSortOrder = (typeof existingMessage.sortOrder === 'number' && !isNaN(existingMessage.sortOrder))
+            ? existingMessage.sortOrder
+            : (existingMessage.timestamp ? new Date(existingMessage.timestamp).getTime() : Date.now());
+
         // Validate updates against canonical schema
         const updatedMessage = this._validateCanonicalMessage({
-        ...existingMessage,
-        ...updates,
-        metadata: {
-            ...existingMessage.metadata,
-            ...(updates.metadata || {})
-        },
-        id: messageId
+            ...existingMessage,
+            ...updates,
+            sortOrder: updates.sortOrder ?? originalSortOrder,
+            metadata: {
+                ...existingMessage.metadata,
+                ...(updates.metadata || {})
+            },
+            id: key
         });
 
         if (!updatedMessage) {
@@ -305,8 +340,9 @@ export class Store {
             return;
         }
 
-        // Update message (immutable)
-        this._state.messages.set(messageId, updatedMessage);
+        // Update message (immutable, normalized string key)
+        this._state.messages.delete(Number(key));
+        this._state.messages.set(key, updatedMessage);
 
         this._notifySubscribers();
     }
@@ -358,19 +394,34 @@ export class Store {
     removeMessage(messageId) {
         this._logMutation('REMOVE_MESSAGE', { messageId });
 
-        const message = this._state.messages.get(messageId);
+        let key = messageId;
+        let message = this._state.messages.get(key);
+        if (!message && typeof key !== 'string') {
+            message = this._state.messages.get(String(key));
+            if (message) key = String(key);
+        }
+        if (!message && typeof key === 'string' && !isNaN(Number(key))) {
+            message = this._state.messages.get(Number(key));
+            if (message) key = Number(key);
+        }
+
         if (!message) {
             console.error('Store: Message not found for removal', messageId);
             return;
         }
 
-        this._state.messages.delete(messageId);
-        this._state.processedMessageIds.delete(messageId);
+        this._state.messages.delete(key);
+        this._state.processedMessageIds.delete(key);
+        this._state.processedMessageIds.delete(message.id);
 
         // Remove from order array
-        const orderIndex = this._state.messageOrder.indexOf(messageId);
+        const orderIndex = this._state.messageOrder.indexOf(key);
         if (orderIndex !== -1) {
             this._state.messageOrder.splice(orderIndex, 1);
+        }
+        const orderIndexActual = this._state.messageOrder.indexOf(message.id);
+        if (orderIndexActual !== -1) {
+            this._state.messageOrder.splice(orderIndexActual, 1);
         }
 
         this._notifySubscribers();
@@ -693,8 +744,17 @@ export class Store {
             content: message.content,
             type: message.type,
             metadata: message.metadata || {},
+            attachments: message.attachments || message.metadata?.attachments || [],
+            global_caption: message.global_caption || message.metadata?.global_caption || '',
             isOptimistic: message.isOptimistic || false,
-            sortOrder: message.sortOrder ?? Date.now()
+            isDeleted: Boolean(message.isDeleted || message.metadata?.is_deleted),
+            isForwarded: Boolean(message.isForwarded || message.metadata?.is_forwarded),
+            editedAt: message.editedAt || message.metadata?.edited_at || null,
+            replyToId: message.replyToId || message.metadata?.reply_to_id || null,
+            replyToDetails: message.replyToDetails || message.metadata?.reply_to_details || null,
+            sortOrder: (typeof message.sortOrder === 'number' && !isNaN(message.sortOrder))
+                ? message.sortOrder
+                : (message.timestamp ? new Date(message.timestamp).getTime() : Date.now())
         };
 
         console.log('[STORE] Message validated successfully:', validated.id);
@@ -706,26 +766,36 @@ export class Store {
      * @param {Object} message - Message to add to order
      */
     _updateMessageOrder(message) {
-        const existingIndex = this._state.messageOrder.indexOf(message.id);
+        const idStr = String(message.id);
+        const existingIndex = this._state.messageOrder.findIndex(id => String(id) === idStr);
         
+        const getMsgSortOrder = (msgId, fallbackMsg) => {
+            const m = this._state.messages.get(String(msgId)) || (fallbackMsg && String(fallbackMsg.id) === String(msgId) ? fallbackMsg : null);
+            if (m && typeof m.sortOrder === 'number' && !isNaN(m.sortOrder)) return m.sortOrder;
+            if (m && m.timestamp) return new Date(m.timestamp).getTime();
+            return 0;
+        };
+
+        const targetSortOrder = (typeof message.sortOrder === 'number' && !isNaN(message.sortOrder))
+            ? message.sortOrder
+            : (message.timestamp ? new Date(message.timestamp).getTime() : Date.now());
+
         if (existingIndex === -1) {
             // New message - insert in correct position
             const insertIndex = this._state.messageOrder.findIndex(id => {
-                const existingMessage = this._state.messages.get(id);
-                return existingMessage && existingMessage.sortOrder > message.sortOrder;
+                return getMsgSortOrder(id) > targetSortOrder;
             });
 
             if (insertIndex === -1) {
-                this._state.messageOrder.push(message.id);
+                this._state.messageOrder.push(idStr);
             } else {
-                this._state.messageOrder.splice(insertIndex, 0, message.id);
+                this._state.messageOrder.splice(insertIndex, 0, idStr);
             }
         } else {
             // Existing message - reorder if needed
+            this._state.messageOrder[existingIndex] = idStr;
             this._state.messageOrder.sort((a, b) => {
-                const messageA = this._state.messages.get(a);
-                const messageB = this._state.messages.get(b);
-                return (messageA?.sortOrder || 0) - (messageB?.sortOrder || 0);
+                return getMsgSortOrder(a, message) - getMsgSortOrder(b, message);
             });
         }
     }
@@ -742,7 +812,7 @@ export class Store {
             const idStr = String(messageId);
             if (seenIds.has(idStr)) continue;
             seenIds.add(idStr);
-            const message = this._state.messages.get(idStr);
+            const message = this._state.messages.get(idStr) || this._state.messages.get(Number(idStr));
             if (message) {
                 orderedMessages.push({ ...message }); // Return copy
             }

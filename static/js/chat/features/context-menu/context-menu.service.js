@@ -5,6 +5,7 @@
 
 import { EVENTS } from '../../shared/constants.js';
 import { eventBus } from '../../core/event-bus.js';
+import { store } from '../../core/store.js';
 
 export class ContextMenuService {
   constructor() {
@@ -14,8 +15,10 @@ export class ContextMenuService {
     this.longPressTimer = null;
     this.longPressThreshold = 500; // 500ms for long press
     this.isLongPress = false;
+    this.isSwiping = false;
     this.touchStartX = 0;
     this.touchStartY = 0;
+    this.activeSwipeBubble = null;
     this.isInitialized = false;
   }
 
@@ -124,12 +127,12 @@ export class ContextMenuService {
 
     bubble.addEventListener('touchend', (e) => {
       this._handleTouchEnd(e, bubble);
-    }, { passive: true });
+    });
 
     // Also handle touchcancel
     bubble.addEventListener('touchcancel', (e) => {
       this._handleTouchEnd(e, bubble);
-    }, { passive: true });
+    });
   }
 
   /**
@@ -159,6 +162,8 @@ export class ContextMenuService {
       return;
     }
     this.isLongPress = false;
+    this.isSwiping = false;
+    this.activeSwipeBubble = bubble;
     this.touchStartX = e.touches[0].clientX;
     this.touchStartY = e.touches[0].clientY;
     
@@ -186,16 +191,26 @@ export class ContextMenuService {
   }
 
   /**
-   * Handle touch move (cancel long-press if moved too much)
+   * Handle touch move (cancel long-press if moved too much, track swipe-to-reply)
    * @param {Event} e - Touch event
    */
   _handleTouchMove(e) {
     const touch = e.touches[0];
-    const deltaX = Math.abs(touch.clientX - this.touchStartX);
-    const deltaY = Math.abs(touch.clientY - this.touchStartY);
+    const deltaX = touch.clientX - this.touchStartX;
+    const deltaY = touch.clientY - this.touchStartY;
     
-    // Cancel long-press if moved more than 10px
-    if (deltaX > 10 || deltaY > 10) {
+    // Horizontal right swipe on bubble
+    if (deltaX > 20 && Math.abs(deltaY) < 30 && this.activeSwipeBubble) {
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+      this.isSwiping = true;
+      const clampedX = Math.min(Math.max(0, deltaX), 65);
+      this.activeSwipeBubble.style.transform = `translateX(${clampedX}px)`;
+      this.activeSwipeBubble.style.transition = 'none';
+    } else if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+      // Cancel long-press if moved more than 10px
       if (this.longPressTimer) {
         clearTimeout(this.longPressTimer);
         this.longPressTimer = null;
@@ -214,10 +229,35 @@ export class ContextMenuService {
       clearTimeout(this.longPressTimer);
       this.longPressTimer = null;
     }
+
+    if (this.isSwiping && bubble) {
+      const changedTouch = e.changedTouches ? e.changedTouches[0] : null;
+      const finalDeltaX = changedTouch ? (changedTouch.clientX - this.touchStartX) : 0;
+      
+      bubble.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)';
+      bubble.style.transform = '';
+      
+      if (finalDeltaX >= 50) {
+        if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
+          window.Haptics.impactLight();
+        } else if (navigator.vibrate) {
+          navigator.vibrate(20);
+        }
+        eventBus.emit(EVENTS.CONTEXT_MENU_ACTION, {
+          action: 'reply',
+          messageId: bubble.dataset.messageId,
+          messageElement: bubble
+        });
+      }
+      this.isSwiping = false;
+    }
+    this.activeSwipeBubble = null;
     
     // If it was a long-press, prevent default click behavior
     if (this.isLongPress) {
-      e.preventDefault();
+      if (e.cancelable) {
+        e.preventDefault();
+      }
       this.isLongPress = false;
     }
   }
@@ -231,6 +271,56 @@ export class ContextMenuService {
     if (!this.contextMenu) return;
 
     console.log('[CONTEXT_MENU_SERVICE] Showing context menu at:', x, y);
+
+    // Dynamic menu item filtering
+    const message = store.getMessageById(this.selectedMessageId);
+    const currentUserId = store.getState().currentUserId;
+    const isOwn = message && (message.isOwn || Number(message.senderId) === Number(currentUserId));
+    const isNotDeleted = message && !message.isDeleted;
+    const isTextMessage = message && (message.type === 'text' || Boolean(message.content));
+    const msgTime = message?.timestamp ? new Date(message.timestamp).getTime() : Date.now();
+    const isWithin15Min = (Date.now() - msgTime) <= 15 * 60 * 1000;
+
+    // Edit option: only sender, under 15 min, text/caption, not deleted
+    const editItem = this.contextMenu.querySelector('[data-action="edit"]');
+    if (editItem) {
+      if (isOwn && isNotDeleted && isTextMessage && isWithin15Min) {
+        editItem.classList.remove('d-none');
+      } else {
+        editItem.classList.add('d-none');
+      }
+    }
+
+    // Copy option: has text and not deleted
+    const copyItem = this.contextMenu.querySelector('[data-action="copy"]');
+    if (copyItem) {
+      const hasText = message && Boolean(message.content && message.content.trim()) && isNotDeleted;
+      if (hasText) {
+        copyItem.classList.remove('d-none');
+      } else {
+        copyItem.classList.add('d-none');
+      }
+    }
+
+    // Forward option: not deleted
+    const forwardItem = this.contextMenu.querySelector('[data-action="forward"]');
+    if (forwardItem) {
+      if (message && isNotDeleted) {
+        forwardItem.classList.remove('d-none');
+      } else {
+        forwardItem.classList.add('d-none');
+      }
+    }
+
+    // Delete option: not already deleted
+    const deleteItem = this.contextMenu.querySelector('[data-action="delete"]');
+    if (deleteItem) {
+      if (message && message.isDeleted) {
+        deleteItem.classList.add('d-none');
+      } else {
+        deleteItem.classList.remove('d-none');
+      }
+    }
     
     // Position menu
     this._positionMenu(x, y);
@@ -321,15 +411,18 @@ export class ContextMenuService {
       console.error('[CONTEXT_MENU_SERVICE] No message selected');
       return;
     }
+
+    const targetMessageId = this.selectedMessageId;
+    const targetElement = this.selectedMessageElement;
     
     // Hide menu
     this.hideContextMenu();
     
-    // Emit event for action
+    // Emit event for action with preserved ID and element
     eventBus.emit(EVENTS.CONTEXT_MENU_ACTION, {
       action,
-      messageId: this.selectedMessageId,
-      messageElement: this.selectedMessageElement
+      messageId: targetMessageId,
+      messageElement: targetElement
     });
   }
 
