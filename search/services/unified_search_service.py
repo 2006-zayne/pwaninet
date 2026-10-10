@@ -481,19 +481,17 @@ class UnifiedSearchService:
         # Academic, category, and metadata filters
         category = filters.get('category')
         if category:
-            base_qs = base_qs.filter(
-                Q(category_code=category) |
-                Q(document__category__id=category) |
-                Q(document__category__code=category)
-            )
+            category_q = Q(category_code=category) | Q(document__category__code=category)
+            if str(category).isdigit():
+                category_q |= Q(document__category__id=category)
+            base_qs = base_qs.filter(category_q)
 
         unit = filters.get('academic_unit') or filters.get('unit')
         if unit:
-            base_qs = base_qs.filter(
-                Q(academic_unit_codes__contains=unit) |
-                Q(document__academic_units__academic_unit__code=unit) |
-                Q(document__academic_units__academic_unit__id=unit)
-            )
+            unit_q = Q(academic_unit_codes__contains=unit) | Q(document__academic_units__academic_unit__code=unit)
+            if str(unit).isdigit():
+                unit_q |= Q(document__academic_units__academic_unit__id=unit)
+            base_qs = base_qs.filter(unit_q)
 
         academic_units = filters.get('academic_units')
         if academic_units:
