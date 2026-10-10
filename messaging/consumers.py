@@ -13,6 +13,7 @@ from .presence import PresenceService
 from .ws_middleware import WebSocketConnectionTracker, WebSocketRateLimiter
 from .observability import metrics
 from .services.link_preview_service import LinkPreviewService
+from .services.chat_notification_service import ChatNotificationService
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -245,56 +246,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
-        # 4. Notify members' personal channel for conversation list updates
-        att_type = data.get('attachment_type')
-        if message_type == 'audio' or att_type == 'audio':
-            rich_preview = "🎤 Voice message"
-            preview_type = 'audio'
-        elif message_type == 'media_group' or att_type == 'image' or data.get('attachments'):
-            rich_preview = f"📷 {content}" if content else "📷 Photo"
-            preview_type = 'image'
-        elif att_type == 'video':
-            rich_preview = f"🎥 {content}" if content else "🎥 Video"
-            preview_type = 'video'
-        elif att_type == 'document':
-            rich_preview = f"📄 {content}" if content else "📄 Document"
-            preview_type = 'document'
-        else:
-            rich_preview = content or "New message"
-            preview_type = 'text'
-
-        for member_id in other_members:
-            unread_count = await self._get_unread_count(member_id)
-            await self.channel_layer.group_send(
-                f'notifications_{member_id}',
-                {
-                    'type': 'conversation_update',
-                    'conversation_id': int(self.conversation_id),
-                    'message_preview': rich_preview,
-                    'preview_type': preview_type,
-                    'sender_name': self.user.username,
-                    'sender_id': self.user_id,
-                    'is_sender': False,
-                    'timestamp': saved_msg.created_at.isoformat(),
-                    'unread_count': unread_count
-                }
-            )
-
-        # Notify sender personal channel so their list updates to top instantly
-        await self.channel_layer.group_send(
-            f'notifications_{self.user_id}',
-            {
-                'type': 'conversation_update',
-                'conversation_id': int(self.conversation_id),
-                'message_preview': f"You: {rich_preview}",
-                'preview_type': preview_type,
-                'sender_name': 'You',
-                'sender_id': self.user_id,
-                'is_sender': True,
-                'timestamp': saved_msg.created_at.isoformat(),
-                'unread_count': 0
-            }
-        )
+        # 4. Dispatch rich conversation_update + OS push notifications via ChatNotificationService
+        await ChatNotificationService.notify_new_message_async(saved_msg)
 
     async def _handle_message_delivered(self, data):
         message_id = data.get('message_id')
@@ -335,15 +288,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
-            # 2. Update reader's sidebar unread badge to 0 immediately
-            await self.channel_layer.group_send(
-                f'notifications_{self.user_id}',
-                {
-                    'type': 'conversation_update',
-                    'conversation_id': int(self.conversation_id),
-                    'unread_count': 0
-                }
-            )
+            # 2. Update reader's sidebar unread badge & global messages badge immediately + retract push
+            await ChatNotificationService.notify_read_receipt_async(self.conversation_id, self.user)
 
     async def _handle_typing(self, data):
         is_typing = bool(data.get('is_typing', data.get('typing', False)))
@@ -375,7 +321,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not message_id or not emoji:
             return
 
-        grouped_reactions = await self._toggle_reaction(message_id, emoji)
+        grouped_reactions, reacted_msg = await self._toggle_reaction(message_id, emoji)
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -384,6 +330,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'reactions': grouped_reactions
             }
         )
+        if reacted_msg:
+            await ChatNotificationService.notify_reaction_async(reacted_msg, self.user, emoji)
 
     async def _handle_edit_message(self, data):
         message_id = data.get('message_id')
@@ -402,14 +350,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'edited_at': edited.edited_at.isoformat()
                 }
             )
+            await ChatNotificationService.notify_message_edited_async(edited, self.user)
 
     async def _handle_delete_message(self, data):
         message_id = data.get('message_id')
         if not message_id:
             return
 
-        deleted = await self._delete_message(message_id)
-        if deleted:
+        deleted_msg = await self._delete_message(message_id)
+        if deleted_msg:
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -417,6 +366,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'message_id': message_id
                 }
             )
+            await ChatNotificationService.notify_message_deleted_async(deleted_msg, self.user)
 
     async def _handle_forward_message(self, data):
         message_id = data.get('message_id')
@@ -439,6 +389,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         'temp_id': None
                     }
                 )
+                await ChatNotificationService.notify_new_message_async(forwarded_msg)
 
     # -------------------------------------------------------------
     # Group Broadcast Dispatches (Downlink to WebSocket)
@@ -699,12 +650,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _toggle_reaction(self, message_id, emoji):
         try:
-            msg = Message.objects.get(id=message_id, conversation_id=self.conversation_id)
+            msg = Message.objects.select_related('sender', 'conversation').get(id=message_id, conversation_id=self.conversation_id)
             existing = MessageReaction.objects.filter(message=msg, user=self.user, emoji=emoji).first()
+            reacted_msg = None
             if existing:
                 existing.delete()
             else:
                 MessageReaction.objects.create(message=msg, user=self.user, emoji=emoji)
+                reacted_msg = msg
 
             # Build aggregated summary: [{'emoji': '❤️', 'count': 2, 'user_ids': [1, 2]}]
             reactions = msg.reactions.all().select_related('user')
@@ -715,15 +668,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 agg[r.emoji]['count'] += 1
                 agg[r.emoji]['user_ids'].append(r.user.id)
                 agg[r.emoji]['usernames'].append(r.user.username)
-            return list(agg.values())
+            return list(agg.values()), reacted_msg
         except Exception as e:
             logger.error(f"Error toggling reaction: {e}")
-            return []
+            return [], None
 
     @database_sync_to_async
     def _edit_message(self, message_id, content):
         try:
-            msg = Message.objects.get(id=message_id, conversation_id=self.conversation_id, sender=self.user)
+            msg = Message.objects.select_related('sender', 'conversation').get(id=message_id, conversation_id=self.conversation_id, sender=self.user)
             # Enforce 15-minute window for message editing
             if (timezone.now() - msg.created_at).total_seconds() > 15 * 60:
                 logger.warning(f"Edit attempt past 15-minute window for message {message_id}")
@@ -739,20 +692,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _delete_message(self, message_id):
         try:
-            msg = Message.objects.filter(id=message_id, conversation_id=self.conversation_id, sender=self.user).first()
+            msg = Message.objects.select_related('sender', 'conversation').filter(id=message_id, conversation_id=self.conversation_id, sender=self.user).first()
             if not msg:
-                return False
+                return None
             # Enforce 48-hour window for delete for everyone
             if (timezone.now() - msg.created_at).total_seconds() > 48 * 3600:
                 logger.warning(f"Delete for everyone attempt past 48-hour window for message {message_id}")
-                return False
+                return None
             msg.is_deleted = True
             msg.content = 'This message was deleted'
             msg.save(update_fields=['is_deleted', 'content'])
-            return True
+            return msg
         except Exception as e:
             logger.error(f"Error deleting message: {e}")
-            return False
+            return None
 
     @database_sync_to_async
     def _get_message_for_forward(self, message_id):
@@ -807,8 +760,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             conv = Conversation.objects.get(id=self.conversation_id)
             member = conv.members.filter(user_id=user_id).first()
-            if member and member.last_read_message:
-                return conv.messages.filter(id__gt=member.last_read_message.id).exclude(sender_id=user_id).count()
-            return conv.messages.exclude(sender_id=user_id).count()
+            base_qs = conv.messages.filter(is_deleted=False).exclude(sender_id=user_id)
+            if member and member.last_read_message_id:
+                return base_qs.filter(id__gt=member.last_read_message_id).count()
+            return base_qs.count()
         except Exception:
             return 0

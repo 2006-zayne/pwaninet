@@ -281,10 +281,27 @@ def resolve_notification_target_url(notification):
     meta = notification.metadata if isinstance(notification.metadata, dict) else {}
     ctx_type = str(notification.context_type or '').upper()
     ctx_id = notification.context_id
+    ntype = str(getattr(notification, 'notification_type', '') or '').upper()
+    target_type_str = str(getattr(notification, 'target_type', '') or '').upper()
+
+    # Messaging / Conversation targets
+    if (
+        ctx_type in ('CONVERSATION', 'MESSAGE', 'CHAT')
+        or target_type_str in ('CONVERSATION', 'MESSAGE')
+        or ntype in ('CHAT_MESSAGE', 'MESSAGE_SENT', 'CONVERSATION_MEMBER_ADDED')
+    ):
+        conv_id = (
+            meta.get('conversation_id')
+            or (ctx_id if ctx_type == 'CONVERSATION' else None)
+            or (getattr(notification, 'target_id', None) if target_type_str == 'CONVERSATION' else None)
+        )
+        if conv_id:
+            return f'/messaging/conversation/{conv_id}/'
+
     # App Download shares
     is_app_share = (
         ctx_type == 'APP'
-        or str(getattr(notification, 'target_type', '') or '').upper() in ('APPDOWNLOAD', 'APP')
+        or target_type_str in ('APPDOWNLOAD', 'APP')
         or meta.get('resource_type') == 'APP'
     )
     if is_app_share:

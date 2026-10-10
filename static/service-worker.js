@@ -180,6 +180,7 @@ self.addEventListener('push', (event) => {
                 actions: data.actions || pushData.actions,
                 data: {
                     notification_id: data.data?.notification_id,
+                    conversation_id: data.data?.conversation_id,
                     url: data.data?.url || pushData.data.url,
                     destination_url: data.data?.destination_url,
                     notification_type: data.data?.notification_type,
@@ -196,7 +197,28 @@ self.addEventListener('push', (event) => {
     }
 
     event.waitUntil(
-        self.registration.showNotification(pushData.title, pushData)
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            const convId = pushData.data?.conversation_id;
+            if (convId) {
+                const targetPath = `/messaging/conversation/${convId}`;
+                const isActivelyViewingChat = clientList.some((client) => {
+                    try {
+                        const clientPath = new URL(client.url).pathname;
+                        return (
+                            (client.focused || client.visibilityState === 'visible') &&
+                            clientPath.indexOf(targetPath) === 0
+                        );
+                    } catch (_) {
+                        return false;
+                    }
+                });
+                if (isActivelyViewingChat) {
+                    console.log('Service Worker: Suppressing OS push because user is actively viewing conversation', convId);
+                    return;
+                }
+            }
+            return self.registration.showNotification(pushData.title, pushData);
+        })
     );
 });
 
@@ -212,9 +234,24 @@ self.addEventListener('notificationclick', (event) => {
         return;
     }
 
+    const convId = event.notification.data?.conversation_id;
+    if (event.action === 'mark_read' && convId) {
+        event.waitUntil(
+            fetch(`/messaging/v1/conversations/${convId}/mark_read/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).catch((err) => {
+                console.warn('Service Worker: mark_read request failed:', err);
+            })
+        );
+        return;
+    }
+
     // Handle view action or default click
     const urlToOpen = event.notification.data?.url || event.notification.data?.destination_url || '/notifications/';
-    const notificationId = event.notification.data?.notification_id;
 
     event.waitUntil(
         clients.matchAll({
@@ -810,6 +847,20 @@ self.addEventListener('message', (event) => {
             
         case 'ACTIVATE_UPDATE':
             self.skipWaiting();
+            break;
+
+        case 'CLOSE_CHAT_NOTIFICATIONS':
+            if (self.registration && typeof self.registration.getNotifications === 'function') {
+                const targetTag = (payload && payload.tag) || (payload && payload.conversation_id ? `pwaninet-chat-${payload.conversation_id}` : null);
+                const opts = targetTag ? { tag: targetTag } : {};
+                self.registration.getNotifications(opts).then((notifications) => {
+                    notifications.forEach((n) => {
+                        if (!targetTag || n.tag === targetTag || (payload && payload.conversation_id && String(n.data?.conversation_id) === String(payload.conversation_id))) {
+                            n.close();
+                        }
+                    });
+                }).catch(() => {});
+            }
             break;
     }
 });

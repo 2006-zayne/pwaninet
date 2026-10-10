@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 from .models import Conversation, ConversationMember, Message, MessageReaction, ConversationTheme, MessageAttachment
 from .services.link_preview_service import LinkPreviewService
+from .services.chat_notification_service import ChatNotificationService
 from .serializers import (
     ConversationSerializer,
     ConversationDetailSerializer,
@@ -71,6 +72,14 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 conversation=conversation,
                 user=self.request.user
             )
+        # Notify newly added members when a group conversation is created
+        if conversation.type == Conversation.GROUP:
+            for member in conversation.members.select_related('user').exclude(user=self.request.user):
+                ChatNotificationService.notify_member_added(
+                    conversation=conversation,
+                    added_user=member.user,
+                    actor=self.request.user,
+                )
         return conversation
 
     @action(detail=True, methods=['post'])
@@ -92,6 +101,12 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 conversation=conversation,
                 user=user
             )
+            if created and user.id != request.user.id:
+                ChatNotificationService.notify_member_added(
+                    conversation=conversation,
+                    added_user=user,
+                    actor=request.user,
+                )
             return Response(
                 ConversationMemberSerializer(member).data,
                 status=status.HTTP_200_OK
@@ -135,10 +150,16 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        last_message = conversation.messages.last()
+        last_message = conversation.messages.order_by('-id').first()
         if last_message:
             member.last_read_message = last_message
-            member.save()
+            member.save(update_fields=['last_read_message'])
+            Message.objects.filter(
+                conversation=conversation,
+                id__lte=last_message.id,
+            ).exclude(sender=request.user).exclude(status='read').update(status='read')
+
+        ChatNotificationService.notify_read_receipt(conversation.id, request.user)
 
         return Response(
             {'status': 'marked as read'},
@@ -290,6 +311,15 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(messages_slice, many=True)
         return Response(serializer.data)
 
+    def create(self, request, *args, **kwargs):
+        """Create a message and return full canonical MessageSerializer payload (including id, status, created_at, temp_id)."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        message = self.perform_create(serializer)
+        response_data = getattr(self, '_last_created_msg_data', None) or MessageSerializer(message, context=self.get_serializer_context()).data
+        headers = self.get_success_headers(response_data)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
+
     def perform_create(self, serializer):
         """Create a new message and broadcast via WebSocket with rate limiting."""
         # Handle conversation_id from FormData for file uploads
@@ -314,9 +344,10 @@ class MessageViewSet(viewsets.ModelViewSet):
         
         # Broadcast message via WebSocket with temp_id preserved
         temp_id = self.request.data.get('temp_id') or self.request.data.get('client_id')
-        msg_data = MessageSerializer(message).data
+        msg_data = MessageSerializer(message, context=self.get_serializer_context()).data
         if temp_id:
             msg_data['temp_id'] = temp_id
+        self._last_created_msg_data = msg_data
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"chat_{message.conversation.id}",
@@ -326,13 +357,18 @@ class MessageViewSet(viewsets.ModelViewSet):
                 'temp_id': temp_id
             }
         )
+
+        # Dispatch rich conversation_update + OS push notifications
+        ChatNotificationService.notify_new_message(message)
         
         return message
 
     def perform_update(self, serializer):
         """Update message and mark as edited."""
         from django.utils import timezone
-        serializer.save(edited_at=timezone.now())
+        updated_msg = serializer.save(edited_at=timezone.now())
+        ChatNotificationService.notify_message_edited(updated_msg, self.request.user)
+        return updated_msg
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
@@ -350,7 +386,13 @@ class MessageViewSet(viewsets.ModelViewSet):
         member = message.conversation.members.filter(user=request.user).first()
         if member:
             member.last_read_message = message
-            member.save()
+            member.save(update_fields=['last_read_message'])
+            Message.objects.filter(
+                conversation_id=message.conversation_id,
+                id__lte=message.id,
+            ).exclude(sender=request.user).exclude(status='read').update(status='read')
+
+        ChatNotificationService.notify_read_receipt(message.conversation_id, request.user)
         
         return Response(
             {'status': 'marked as read', 'message_id': message.id},
@@ -389,6 +431,7 @@ class MessageViewSet(viewsets.ModelViewSet):
             user=request.user,
             emoji=emoji
         )
+        ChatNotificationService.notify_reaction(message, request.user, emoji)
         
         return Response(
             MessageReactionSerializer(reaction_obj).data,
@@ -457,43 +500,15 @@ class MessageReactionViewSet(viewsets.ModelViewSet):
 
 
 def _build_message_preview(last_msg, current_user, is_group=False):
-    """Build a lightweight preview dict for a conversation's last message without extra DB queries."""
+    """Build a rich preview dict for a conversation's last message using ChatNotificationService."""
     if not last_msg:
         return None
 
-    icon = None
-    msg_type = 'text'
-    raw_text = (last_msg.content or last_msg.global_caption or '').strip()
-
-    att_type = getattr(last_msg, 'attachment_type', None)
-    m_type = getattr(last_msg, 'message_type', 'normal')
-
-    if att_type == 'audio' or m_type == 'voice':
-        icon = 'bi-mic-fill'
-        msg_type = 'audio'
-        label = raw_text or 'Voice message'
-    elif m_type == 'album':
-        icon = 'bi-images'
-        msg_type = 'image'
-        label = raw_text or 'Photo album'
-    elif att_type == 'image':
-        icon = 'bi-image'
-        msg_type = 'image'
-        label = raw_text or 'Photo'
-    elif att_type == 'video':
-        icon = 'bi-camera-video'
-        msg_type = 'video'
-        label = raw_text or 'Video'
-    elif att_type == 'document':
-        icon = 'bi-file-earmark-text'
-        msg_type = 'document'
-        label = raw_text or 'Document'
-    elif getattr(last_msg, 'link_url', None):
-        icon = 'bi-link-45deg'
-        msg_type = 'link'
-        label = raw_text or getattr(last_msg, 'link_title', None) or last_msg.link_url
-    else:
-        label = raw_text or 'Attachment'
+    preview_info = ChatNotificationService.build_message_preview(
+        last_msg,
+        include_forwarded_prefix=False,
+    )
+    clean_label = preview_info['clean_text']
 
     if last_msg.sender_id == current_user.id:
         prefix = 'You: '
@@ -502,13 +517,13 @@ def _build_message_preview(last_msg, current_user, is_group=False):
     else:
         prefix = ''
 
-    full_text = f"{prefix}{label}"
-    if len(full_text) > 55:
-        full_text = full_text[:52] + '...'
+    full_text = f"{prefix}{clean_label}"
+    if len(full_text) > 58:
+        full_text = full_text[:55] + '...'
 
     return {
-        'icon': icon,
-        'type': msg_type,
+        'icon': preview_info['icon'],
+        'type': preview_info['type'],
         'text': full_text,
     }
 
@@ -539,17 +554,18 @@ def build_user_conversation_data(user, active_conversation_id=None):
     if not conversations:
         return []
 
-    # Batch-fetch only the latest message per conversation (1 query)
+    # Batch-fetch only the latest message per conversation (with attachments prefetched for album/duration previews)
     last_msg_ids = [c.last_msg_id for c in conversations if c.last_msg_id]
     last_messages_by_id = {}
     if last_msg_ids:
-        for msg in Message.objects.filter(id__in=last_msg_ids).select_related('sender'):
+        for msg in Message.objects.filter(id__in=last_msg_ids).select_related('sender').prefetch_related('attachments'):
             last_messages_by_id[msg.id] = msg
 
-    # Batch-fetch unread counts per conversation in a single grouped SQL query (1 query)
+    # Batch-fetch unread counts per conversation in a single grouped SQL query (excluding deleted messages)
     unread_rows = (
         Message.objects.filter(
             conversation__members__user=user,
+            is_deleted=False,
             id__gt=Coalesce(models.F('conversation__members__last_read_message_id'), models.Value(0)),
         )
         .exclude(sender=user)
@@ -751,8 +767,7 @@ def conversation_detail(request, conversation_id):
                 conversation_id=conversation.id,
                 id__lte=last_message.id
             ).exclude(sender=request.user).exclude(status='read').update(status='read')
-            from .context_processors import invalidate_unread_message_count_cache
-            invalidate_unread_message_count_cache(request.user.id)
+            ChatNotificationService.notify_read_receipt(conversation.id, request.user)
 
     # Calculate today and yesterday dates
     today = timezone.now().date()
@@ -1233,6 +1248,8 @@ def attachment_upload(request):
         is_voice_note = request.data.get('is_voice_note') in ['true', 'True', True, '1', 1] or file.name.startswith('voice_')
         final_attachment_type = 'voice_note' if is_voice_note else attachment_type
         final_message_type = 'voice_note' if is_voice_note else ('audio' if attachment_type == 'audio' else 'media')
+        raw_reply_to = request.data.get('reply_to_id') or request.POST.get('reply_to_id')
+        reply_to_id = int(raw_reply_to) if raw_reply_to and str(raw_reply_to).isdigit() else None
 
         # Create message with attachment
         message = Message.objects.create(
@@ -1241,6 +1258,7 @@ def attachment_upload(request):
             attachment=file,
             attachment_type=final_attachment_type,
             message_type=final_message_type,
+            reply_to_id=reply_to_id,
             content=file.name if final_attachment_type in ['document', 'audio'] else ''
         )
 
@@ -1277,6 +1295,9 @@ def attachment_upload(request):
                 'temp_id': temp_id
             }
         )
+
+        # Dispatch rich conversation_update + OS push notifications after attachment is created
+        ChatNotificationService.notify_new_message(message)
         
         return Response(
             msg_payload,
@@ -1601,7 +1622,7 @@ def batch_attachment_upload(request):
         # Update conversation timestamp
         conversation.save()
 
-        # Broadcast all created messages via WebSocket
+        # Broadcast all created messages via WebSocket and dispatch notifications
         channel_layer = get_channel_layer()
         for idx, msg in enumerate(created_messages):
             msg_data = MessageSerializer(msg).data
@@ -1616,6 +1637,7 @@ def batch_attachment_upload(request):
                     'temp_id': temp_id if idx == 0 else None
                 }
             )
+            ChatNotificationService.notify_new_message(msg)
 
         if not created_messages:
             return Response(

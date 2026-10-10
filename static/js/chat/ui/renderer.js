@@ -121,15 +121,27 @@ export class MessageRenderer {
             }
         }, true);
 
-        // Keep pinned to bottom on container resizing (keyboard opening, viewport changes)
+        // Keep pinned to bottom or smoothly anchor visible messages on container resizing (keyboard opening, composer growth)
         if (window.ResizeObserver) {
             try {
                 if (this._containerResizeObserver) {
                     this._containerResizeObserver.disconnect();
                 }
+                let lastClientHeight = this.container.clientHeight;
                 this._containerResizeObserver = new ResizeObserver(() => {
+                    if (!this.container) return;
+                    const newClientHeight = this.container.clientHeight;
+                    const deltaH = lastClientHeight - newClientHeight;
+                    lastClientHeight = newClientHeight;
+
                     if (this.isGroundedToBottom && !this.isUserScrolledUp) {
-                        this._scrollToBottom(true);
+                        this.container.scrollTop = this.container.scrollHeight;
+                        this.updateScrollToBottomButton();
+                    } else if (deltaH > 0) {
+                        // Container shrank (keyboard opened or composer expanded):
+                        // Shift scrollTop by deltaH so messages right above the composer glide upward with it
+                        this.container.scrollTop += deltaH;
+                        this.updateScrollToBottomButton();
                     }
                 });
                 this._containerResizeObserver.observe(this.container);
@@ -982,7 +994,8 @@ export class MessageRenderer {
         console.log("[RENDERER] RENDER CALLED - messages count:", messages?.length);
         
         if (this.isRendering) {
-            console.log("[RENDERER] Already rendering, skipping");
+            console.log("[RENDERER] Already rendering, queueing latest messages");
+            this._pendingRenderMessages = messages;
             return;
         }
 
@@ -1054,6 +1067,16 @@ export class MessageRenderer {
                 }
 
                 let el = key ? existingElements.get(key) : null;
+                if (!el && viewType === 'message' && item.metadata?.temp_id) {
+                    const tempKey = `msg_${item.metadata.temp_id}`;
+                    const tempEl = existingElements.get(tempKey);
+                    if (tempEl) {
+                        existingElements.delete(tempKey);
+                        this.rekeyMessageElement(item.metadata.temp_id, item.id);
+                        el = tempEl;
+                    }
+                }
+
                 if (el) {
                     existingElements.delete(key);
                     // Update existing element attributes/grouping in-place without rebuilding
@@ -1140,6 +1163,11 @@ export class MessageRenderer {
 
         } finally {
             this.isRendering = false;
+            if (this._pendingRenderMessages) {
+                const nextMessages = this._pendingRenderMessages;
+                this._pendingRenderMessages = null;
+                this.render(nextMessages);
+            }
         }
     }
 
@@ -1149,6 +1177,120 @@ export class MessageRenderer {
      */
     setPreserveScrollOnPrepend(preserve = true) {
         this.preserveScrollOnPrepend = preserve;
+    }
+
+    /**
+     * Transition media, voice note, audio track, and document bubbles out of uploading spinner state in-place
+     */
+    _reconcileMediaUploadCompletion(wrapperEl, message) {
+        if (!wrapperEl || !message) return;
+        const isUploading = message.status === 'uploading' || message.status === 'sending' || Boolean(message.isOptimistic);
+        if (isUploading) return;
+
+        const bubble = wrapperEl.querySelector('.message-bubble') || wrapperEl;
+        const mediaUrl = message.metadata?.url || message.attachments?.[0]?.file_url || message.metadata?.localBlobUrl || '';
+
+        // 1. Voice Note bubble: replace spinner with play button icon and restore duration timer
+        if (bubble.classList.contains('voice-note-bubble') || wrapperEl.querySelector('.voice-note-bubble')) {
+            const vnBubble = bubble.classList.contains('voice-note-bubble') ? bubble : wrapperEl.querySelector('.voice-note-bubble');
+            const playBtn = vnBubble.querySelector('.vn-play-btn');
+            if (playBtn && (playBtn.querySelector('.spinner-border') || !playBtn.querySelector('.vn-play-icon'))) {
+                playBtn.innerHTML = `<i class="bi bi-play-fill vn-play-icon"></i>`;
+            }
+            const audioEl = vnBubble.querySelector('.vn-audio-el');
+            if (audioEl) {
+                const currentSrc = audioEl.getAttribute('src') || '';
+                if ((!currentSrc || (!currentSrc.startsWith('blob:') && mediaUrl && currentSrc !== mediaUrl)) && mediaUrl) {
+                    audioEl.setAttribute('src', mediaUrl);
+                    audioEl.removeAttribute('data-src');
+                }
+                if (message.id && !String(message.id).startsWith('temp_')) {
+                    deviceMediaStore.getLocalMediaUrl(message.id).then(localUrl => {
+                        if (localUrl && audioEl.src !== localUrl) {
+                            audioEl.src = localUrl;
+                            audioEl.removeAttribute('data-src');
+                        }
+                    }).catch(() => {});
+                }
+            }
+            const timerEl = vnBubble.querySelector('.vn-timer');
+            if (timerEl && timerEl.textContent.includes('%')) {
+                if (audioEl && isFinite(audioEl.duration) && audioEl.duration > 0) {
+                    timerEl.textContent = this._formatAudioDuration(audioEl.duration);
+                } else if (message.metadata?.duration && isFinite(Number(message.metadata.duration))) {
+                    timerEl.textContent = this._formatAudioDuration(Number(message.metadata.duration));
+                } else {
+                    timerEl.textContent = '0:00';
+                }
+            }
+        }
+
+        // 2. Audio Track bubble: replace spinner with play button icon and restore duration timer
+        if (bubble.classList.contains('audio-track-bubble') || wrapperEl.querySelector('.audio-track-bubble')) {
+            const trackBubble = bubble.classList.contains('audio-track-bubble') ? bubble : wrapperEl.querySelector('.audio-track-bubble');
+            const playBtn = trackBubble.querySelector('.audio-track-play-btn');
+            if (playBtn && (playBtn.querySelector('.spinner-border') || !playBtn.querySelector('.track-play-icon'))) {
+                playBtn.innerHTML = `<i class="bi bi-play-fill track-play-icon"></i>`;
+            }
+            const audioEl = trackBubble.querySelector('.track-audio-el');
+            if (audioEl) {
+                const currentSrc = audioEl.getAttribute('src') || '';
+                if ((!currentSrc || (!currentSrc.startsWith('blob:') && mediaUrl && currentSrc !== mediaUrl)) && mediaUrl) {
+                    audioEl.setAttribute('src', mediaUrl);
+                    audioEl.removeAttribute('data-src');
+                }
+                if (message.id && !String(message.id).startsWith('temp_')) {
+                    deviceMediaStore.getLocalMediaUrl(message.id).then(localUrl => {
+                        if (localUrl && audioEl.src !== localUrl) {
+                            audioEl.src = localUrl;
+                            audioEl.removeAttribute('data-src');
+                        }
+                    }).catch(() => {});
+                }
+            }
+            const timerEl = trackBubble.querySelector('.audio-track-time');
+            if (timerEl && timerEl.textContent.includes('%')) {
+                if (audioEl && isFinite(audioEl.duration) && audioEl.duration > 0) {
+                    timerEl.textContent = this._formatAudioDuration(audioEl.duration);
+                } else if (message.metadata?.duration && isFinite(Number(message.metadata.duration))) {
+                    timerEl.textContent = this._formatAudioDuration(Number(message.metadata.duration));
+                } else {
+                    timerEl.textContent = '0:00';
+                }
+            }
+        }
+
+        // 3. Document bubble: replace uploading spinner div with download anchor and remove progress text
+        if (bubble.classList.contains('document-bubble') || wrapperEl.querySelector('.document-bubble')) {
+            const docBubble = bubble.classList.contains('document-bubble') ? bubble : wrapperEl.querySelector('.document-bubble');
+            const progressText = docBubble.querySelector('.document-progress-text');
+            if (progressText) {
+                const prevDot = progressText.previousElementSibling;
+                if (prevDot && prevDot.classList.contains('document-dot')) {
+                    prevDot.remove();
+                }
+                progressText.remove();
+            }
+            const uploadingBtn = docBubble.querySelector('.document-download-btn.uploading');
+            if (uploadingBtn) {
+                const rawName = message.metadata?.file_name || message.content || 'Document';
+                const fileName = rawName.split('/').pop().split('\\').pop();
+                const link = document.createElement('a');
+                link.href = mediaUrl || '#';
+                link.download = fileName;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.className = 'document-download-btn';
+                link.title = `Download ${fileName}`;
+                link.setAttribute('aria-label', 'Download');
+                link.innerHTML = `<i class="bi bi-arrow-down"></i>`;
+                uploadingBtn.replaceWith(link);
+            }
+        }
+
+        // 4. Single / Group Media overlays: remove upload progress overlay once upload is complete
+        const uploadOverlays = wrapperEl.querySelectorAll('.media-upload-overlay');
+        uploadOverlays.forEach(overlay => overlay.remove());
     }
 
     /**
@@ -1168,6 +1310,9 @@ export class MessageRenderer {
         }
 
         const bubble = wrapperEl.querySelector('.message-bubble');
+
+        // Transition any voice note, audio track, document, or media upload spinner to completed state
+        this._reconcileMediaUploadCompletion(wrapperEl, message);
 
         // If message was edited, cleanly refresh text content and spacer, and ensure 'Edited' indicator
         const isEdited = Boolean(message.editedAt || message.is_edited || message.edited_at || message.metadata?.edited_at);
@@ -1302,7 +1447,6 @@ export class MessageRenderer {
         const elements = this.container.querySelectorAll(selector);
         elements.forEach(el => {
             el.setAttribute('data-message-id', String(actualId));
-            el.setAttribute('data-status', 'sent');
         });
         const uploadOverlays = this.container.querySelectorAll(`[data-upload-id="${tempId}"]`);
         uploadOverlays.forEach(el => {
@@ -1340,13 +1484,19 @@ export class MessageRenderer {
             }
             if (!wrapper) continue;
 
+            // Ensure any completed voice note, audio track, document, or media upload removes its spinner immediately
+            this._reconcileMediaUploadCompletion(wrapper, msg);
+
             const currentStatus = wrapper.getAttribute('data-status');
             const isSent = wrapper.classList.contains('sent-wrapper') ||
                 (this.currentUserId !== null && Number(msg.senderId) === Number(this.currentUserId)) ||
                 String(msg.senderId) === String(this.currentUserId) ||
                 msg.isOwn;
 
-            if (currentStatus !== msg.status || (isSent && msg.status === 'read')) {
+            const existingReceipt = wrapper.querySelector('.message-read-receipt');
+            const receiptOutOfSync = isSent && (!existingReceipt || !existingReceipt.classList.contains(`status-${msg.status}`));
+
+            if (currentStatus !== msg.status || receiptOutOfSync || (isSent && msg.status === 'read')) {
                 wrapper.setAttribute('data-status', msg.status);
                 const bubble = wrapper.querySelector('.message-bubble');
                 if (bubble) bubble.setAttribute('data-status', msg.status);
@@ -3425,7 +3575,9 @@ export class MessageRenderer {
             bubble.classList.add('has-reply-quote');
         }
 
-        const initialTimer = isUploading ? '0%' : '0:00';
+        const initialTimer = isUploading
+            ? '0%'
+            : (metadata.duration && isFinite(Number(metadata.duration)) ? this._formatAudioDuration(Number(metadata.duration)) : '0:00');
         bubble.innerHTML = `${forwardedHtml}${replyHtml}<div class="voice-note-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}" title="${isNotDownloaded ? 'Download voice note' : 'Play voice note'}">${playIconHtml}</button><div class="vn-content"><div class="vn-waveform-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div class="vn-waveform">${barsHtml}</div><div class="vn-progress-track"><div class="vn-progress-fill"></div><div class="vn-progress-thumb"></div></div></div><div class="vn-meta-row"><span class="vn-timer">${initialTimer}</span>${isNotDownloaded && sizeStr ? `<span class="vn-dot">•</span><span class="vn-size-indicator">${sizeStr}</span>` : ''}</div></div><button type="button" class="vn-speed-btn" title="Playback speed" data-speed="1">1x</button></div>${audioTag}`;
 
         this._bindVoiceNoteEvents(bubble);
@@ -3453,7 +3605,7 @@ export class MessageRenderer {
      */
     _bindVoiceNoteEvents(bubble) {
         const playBtn = bubble.querySelector('.vn-play-btn');
-        const playIcon = bubble.querySelector('.vn-play-icon');
+        const getPlayIcon = () => bubble.querySelector('.vn-play-icon');
         const audio = bubble.querySelector('.vn-audio-el');
         const timer = bubble.querySelector('.vn-timer');
         const speedBtn = bubble.querySelector('.vn-speed-btn');
@@ -3464,8 +3616,22 @@ export class MessageRenderer {
 
         if (!playBtn || !audio) return;
 
+        const syncIdleDuration = () => {
+            if (!timer || !audio.paused || audio.currentTime > 0) return;
+            if (playBtn.querySelector('.spinner-border') || timer.textContent.includes('%')) return;
+            if (isFinite(audio.duration) && audio.duration > 0) {
+                timer.textContent = this._formatAudioDuration(audio.duration);
+            }
+        };
+
+        audio.addEventListener('loadedmetadata', syncIdleDuration);
+        audio.addEventListener('durationchange', syncIdleDuration);
+
         playBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (playBtn.querySelector('.spinner-border')) {
+                return;
+            }
             if (bubble.classList.contains('not-downloaded')) {
                 const messageId = bubble.getAttribute('data-message-id');
                 if (messageId) {
@@ -3474,6 +3640,7 @@ export class MessageRenderer {
                 return;
             }
 
+            const playIcon = getPlayIcon();
             if (audio.paused) {
                 // Pause all other playing audio on the page
                 document.querySelectorAll('.vn-audio-el, .track-audio-el').forEach(other => {
@@ -3491,11 +3658,11 @@ export class MessageRenderer {
                 audio.playbackRate = currentSpeed;
 
                 audio.play().then(() => {
-                    playIcon.classList.replace('bi-play-fill', 'bi-pause-fill');
+                    getPlayIcon()?.classList.replace('bi-play-fill', 'bi-pause-fill');
                 }).catch(err => console.warn('[VOICE_NOTE] Play blocked:', err));
             } else {
                 audio.pause();
-                playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+                playIcon?.classList.replace('bi-pause-fill', 'bi-play-fill');
             }
         });
 
@@ -3524,11 +3691,15 @@ export class MessageRenderer {
         });
 
         audio.addEventListener('ended', () => {
-            playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+            getPlayIcon()?.classList.replace('bi-pause-fill', 'bi-play-fill');
             bars.forEach(b => b.classList.remove('is-played'));
             if (progressFill) progressFill.style.width = '0%';
             if (progressThumb) progressThumb.style.left = '0%';
-            if (timer) timer.textContent = '0:00';
+            if (timer) {
+                timer.textContent = (isFinite(audio.duration) && audio.duration > 0)
+                    ? this._formatAudioDuration(audio.duration)
+                    : '0:00';
+            }
             audio.currentTime = 0;
         });
 
@@ -3642,7 +3813,9 @@ export class MessageRenderer {
             bubble.classList.add('has-reply-quote');
         }
 
-        const initialAudioTime = isUploading ? '0%' : '0:00';
+        const initialAudioTime = isUploading
+            ? '0%'
+            : (metadata.duration && isFinite(Number(metadata.duration)) ? this._formatAudioDuration(Number(metadata.duration)) : '0:00');
         bubble.innerHTML = `${forwardedHtml}${replyHtml}<div class="audio-track-inner"><button type="button" class="${playBtnClass}" aria-label="${isNotDownloaded ? 'Download track' : 'Play track'}" title="${isNotDownloaded ? 'Download track' : 'Play track'}">${playIconHtml}</button><div class="audio-track-details"><div class="audio-track-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div><div class="audio-track-scrubber-track"><div class="audio-track-scrubber-fill" style="width: 0%;"></div></div><div class="audio-track-meta-row"><span class="audio-track-time">${initialAudioTime}</span>${sizeStr ? `<span class="audio-track-dot">•</span><span class="audio-track-size">${sizeStr}</span>` : ''}${isNotDownloaded ? `<span class="audio-track-status opacity-75 ms-1">• Tap to download</span>` : ''}</div></div><div class="audio-track-badge"><i class="bi bi-music-note-beamed"></i></div></div>${audioTag}`;
 
         this._bindAudioTrackEvents(bubble);
@@ -3670,7 +3843,7 @@ export class MessageRenderer {
      */
     _bindAudioTrackEvents(bubble) {
         const playBtn = bubble.querySelector('.audio-track-play-btn');
-        const playIcon = bubble.querySelector('.track-play-icon');
+        const getPlayIcon = () => bubble.querySelector('.track-play-icon');
         const audio = bubble.querySelector('.track-audio-el');
         const timer = bubble.querySelector('.audio-track-time');
         const fill = bubble.querySelector('.audio-track-scrubber-fill');
@@ -3678,8 +3851,22 @@ export class MessageRenderer {
 
         if (!playBtn || !audio) return;
 
+        const syncIdleDuration = () => {
+            if (!timer || !audio.paused || audio.currentTime > 0) return;
+            if (playBtn.querySelector('.spinner-border') || timer.textContent.includes('%')) return;
+            if (isFinite(audio.duration) && audio.duration > 0) {
+                timer.textContent = this._formatAudioDuration(audio.duration);
+            }
+        };
+
+        audio.addEventListener('loadedmetadata', syncIdleDuration);
+        audio.addEventListener('durationchange', syncIdleDuration);
+
         playBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (playBtn.querySelector('.spinner-border')) {
+                return;
+            }
             if (bubble.classList.contains('not-downloaded')) {
                 const messageId = bubble.getAttribute('data-message-id');
                 if (messageId) {
@@ -3700,11 +3887,11 @@ export class MessageRenderer {
                 });
 
                 audio.play().then(() => {
-                    playIcon.classList.replace('bi-play-fill', 'bi-pause-fill');
+                    getPlayIcon()?.classList.replace('bi-play-fill', 'bi-pause-fill');
                 }).catch(err => console.warn('[AUDIO_TRACK] Play blocked:', err));
             } else {
                 audio.pause();
-                playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+                getPlayIcon()?.classList.replace('bi-pause-fill', 'bi-play-fill');
             }
         });
 
@@ -3716,9 +3903,13 @@ export class MessageRenderer {
         });
 
         audio.addEventListener('ended', () => {
-            playIcon.classList.replace('bi-pause-fill', 'bi-play-fill');
+            getPlayIcon()?.classList.replace('bi-pause-fill', 'bi-play-fill');
             if (fill) fill.style.width = '0%';
-            if (timer) timer.textContent = '0:00';
+            if (timer) {
+                timer.textContent = (isFinite(audio.duration) && audio.duration > 0)
+                    ? this._formatAudioDuration(audio.duration)
+                    : '0:00';
+            }
             audio.currentTime = 0;
         });
 
@@ -4002,12 +4193,15 @@ export class MessageRenderer {
                 this.updateScrollToBottomButton();
             };
             applyScroll();
-            requestAnimationFrame(() => {
+            if (this._scrollBottomRaf) cancelAnimationFrame(this._scrollBottomRaf);
+            if (this._scrollBottomTimer) clearTimeout(this._scrollBottomTimer);
+            this._scrollBottomRaf = requestAnimationFrame(() => {
+                this._scrollBottomRaf = null;
                 applyScroll();
-                setTimeout(applyScroll, 25);
-                setTimeout(applyScroll, 80);
-                setTimeout(applyScroll, 200);
-                setTimeout(applyScroll, 500);
+                this._scrollBottomTimer = setTimeout(() => {
+                    this._scrollBottomTimer = null;
+                    applyScroll();
+                }, 60);
             });
         } else {
             this.updateScrollToBottomButton();

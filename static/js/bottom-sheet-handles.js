@@ -42,6 +42,49 @@
         delete panel.dataset.bottomSheetSize;
     }
 
+    function onPointerMove(event) {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        drag.deltaY = event.clientY - drag.startY;
+        if (drag.deltaY > 0) {
+            drag.panel.style.setProperty('transform', `translate3d(0, ${drag.deltaY}px, 0)`, 'important');
+        } else {
+            drag.panel.style.removeProperty('transform');
+            drag.panel.style.setProperty('height', `${Math.min(drag.maxHeight, drag.startHeight - drag.deltaY)}px`, 'important');
+            drag.panel.style.setProperty('max-height', `${drag.maxHeight}px`, 'important');
+        }
+        if (event.cancelable) event.preventDefault();
+    }
+
+    function detachActiveDragListeners() {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', finish);
+        document.removeEventListener('pointercancel', finish);
+    }
+
+    function finish(event) {
+        if (!drag || (event.pointerId !== undefined && event.pointerId !== drag.pointerId)) return;
+        const current = drag;
+        drag = null;
+        detachActiveDragListeners();
+        if (current.deltaY > 90) {
+            current.panel.style.setProperty('transition', 'transform 180ms ease-out', 'important');
+            dismiss(current.sheet);
+            return;
+        }
+        if (current.deltaY < -48) {
+            current.panel.style.removeProperty('transform');
+            current.panel.style.setProperty('transition', 'height 200ms ease-out', 'important');
+            current.panel.style.setProperty('height', `${current.maxHeight}px`, 'important');
+            current.panel.style.setProperty('max-height', `${current.maxHeight}px`, 'important');
+            current.panel.dataset.bottomSheetSize = 'expanded';
+            return;
+        }
+        current.panel.style.setProperty('transition', 'transform 160ms ease-out', 'important');
+        current.panel.style.removeProperty('transform');
+        if (current.deltaY >= 0) current.panel.style.removeProperty('height');
+        window.setTimeout(() => current.panel.classList.remove('bottom-sheet-is-dragged'), 180);
+    }
+
     document.addEventListener('pointerdown', (event) => {
         if (window.innerWidth >= 1200 || (event.pointerType === 'mouse' && event.button !== 0)) return;
         const handle = event.target.closest?.(HANDLE_SELECTOR);
@@ -62,50 +105,18 @@
         };
         sheet.panel.classList.add('bottom-sheet-is-dragged');
         sheet.panel.style.setProperty('transition', 'none', 'important');
-        event.preventDefault();
-    }, { passive: false });
+        try {
+            handle.setPointerCapture?.(event.pointerId);
+        } catch (_) {}
+        document.addEventListener('pointermove', onPointerMove, { passive: false });
+        document.addEventListener('pointerup', finish, { passive: true });
+        document.addEventListener('pointercancel', finish, { passive: true });
+    }, { passive: true });
 
-    document.addEventListener('pointermove', (event) => {
-        if (!drag || event.pointerId !== drag.pointerId) return;
-        drag.deltaY = event.clientY - drag.startY;
-        if (drag.deltaY > 0) {
-            drag.panel.style.setProperty('transform', `translate3d(0, ${drag.deltaY}px, 0)`, 'important');
-        } else {
-            drag.panel.style.removeProperty('transform');
-            drag.panel.style.setProperty('height', `${Math.min(drag.maxHeight, drag.startHeight - drag.deltaY)}px`, 'important');
-            drag.panel.style.setProperty('max-height', `${drag.maxHeight}px`, 'important');
-        }
-        event.preventDefault();
-    }, { passive: false });
-
-    function finish(event) {
-        if (!drag || (event.pointerId !== undefined && event.pointerId !== drag.pointerId)) return;
-        const current = drag;
-        drag = null;
-        if (current.deltaY > 90) {
-            current.panel.style.setProperty('transition', 'transform 180ms ease-out', 'important');
-            dismiss(current.sheet);
-            return;
-        }
-        if (current.deltaY < -48) {
-            current.panel.style.removeProperty('transform');
-            current.panel.style.setProperty('transition', 'height 200ms ease-out', 'important');
-            current.panel.style.setProperty('height', `${current.maxHeight}px`, 'important');
-            current.panel.style.setProperty('max-height', `${current.maxHeight}px`, 'important');
-            current.panel.dataset.bottomSheetSize = 'expanded';
-            return;
-        }
-        current.panel.style.setProperty('transition', 'transform 160ms ease-out', 'important');
-        current.panel.style.removeProperty('transform');
-        if (current.deltaY >= 0) current.panel.style.removeProperty('height');
-        window.setTimeout(() => current.panel.classList.remove('bottom-sheet-is-dragged'), 180);
-    }
-
-    document.addEventListener('pointerup', finish);
-    document.addEventListener('pointercancel', finish);
     document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape' || !drag) return;
         reset(drag.panel);
         drag = null;
+        detachActiveDragListeners();
     });
 })();

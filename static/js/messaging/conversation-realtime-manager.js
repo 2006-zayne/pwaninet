@@ -172,44 +172,167 @@
     // ─────────────────────────────────────────────────────────────
     // 2. REALTIME CONVERSATION UPDATE HANDLER
     // ─────────────────────────────────────────────────────────────
+    function buildSnippetHtml(data) {
+        const pType = data.preview_type || 'text';
+        const rawPreview = data.message_preview || '';
+        const cleanText = data.clean_preview || rawPreview.replace(/^[🎤📷🎥📄🔗😊🎬🚫🔒↪️]+\s*/, '').trim() || 'New message';
+
+        if (pType === 'deleted') {
+            return `<i class="bi bi-slash-circle text-muted me-1"></i> <em>${escapeHtml(cleanText)}</em>`;
+        }
+        if (pType === 'audio' || rawPreview.includes('🎤') || rawPreview.includes('🎵')) {
+            const iconClass = data.preview_icon || 'bi-mic-fill';
+            return `<i class="bi ${iconClass} text-primary me-1"></i> ${escapeHtml(cleanText)}`;
+        }
+        if (pType === 'image' || rawPreview.includes('📷')) {
+            const iconClass = data.preview_icon || 'bi-camera-fill';
+            return `<i class="bi ${iconClass} text-muted me-1"></i> ${escapeHtml(cleanText)}`;
+        }
+        if (pType === 'video' || rawPreview.includes('🎥')) {
+            return `<i class="bi bi-camera-video-fill text-muted me-1"></i> ${escapeHtml(cleanText)}`;
+        }
+        if (pType === 'document' || rawPreview.includes('📄')) {
+            return `<i class="bi bi-file-earmark-text-fill text-muted me-1"></i> ${escapeHtml(cleanText)}`;
+        }
+        if (pType === 'link' || rawPreview.includes('🔗')) {
+            return `<i class="bi bi-link-45deg text-muted me-1"></i> ${escapeHtml(cleanText)}`;
+        }
+        if (pType === 'sticker' || rawPreview.includes('😊')) {
+            return `<i class="bi bi-emoji-smile text-muted me-1"></i> ${escapeHtml(cleanText)}`;
+        }
+        if (pType === 'gif' || rawPreview.includes('🎬')) {
+            return `<i class="bi bi-filetype-gif text-muted me-1"></i> ${escapeHtml(cleanText)}`;
+        }
+        if (pType === 'reaction') {
+            return `<i class="bi bi-heart-fill text-danger me-1"></i> ${escapeHtml(cleanText)}`;
+        }
+        return escapeHtml(rawPreview || cleanText);
+    }
+
+    function createDynamicConversationNodes(data, isCurrentActive) {
+        const convId = String(data.conversation_id);
+        const convName = data.conversation_name || data.sender_display_name || data.sender_name || `Chat #${convId}`;
+        const convAvatar = data.conversation_avatar || data.sender_avatar || '/static/images/web-app-manifest-192x192-rounded.png';
+        const isGroup = data.conversation_type === 'group';
+        const unreadCount = isCurrentActive ? 0 : Number(data.unread_count || 0);
+        const displayCount = unreadCount > 99 ? '99+' : unreadCount;
+        const snippetHtml = buildSnippetHtml(data);
+        const targetUrl = data.target_url || `/messaging/conversation/${convId}/`;
+
+        // 1. Desktop / Refactored Left Rail (`#whatsappRailChatsList`)
+        const railList = document.getElementById('whatsappRailChatsList');
+        if (railList && !railList.querySelector(`[data-conversation-id="${convId}"]`)) {
+            const emptyState = railList.querySelector('.text-center.text-muted, .sidebar-empty');
+            if (emptyState) emptyState.remove();
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'whatsapp-chat-item-wrapper position-relative mb-1';
+            wrapper.innerHTML = `
+                <a href="${escapeHtml(targetUrl)}"
+                   class="whatsapp-chat-item d-flex align-items-center gap-2 px-2 py-2 text-decoration-none rounded-3"
+                   data-conversation-id="${escapeHtml(convId)}"
+                   data-is-pinned="false"
+                   hx-get="${escapeHtml(targetUrl)}"
+                   hx-target="#chatMainAreaWrapper"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-indicator="#chatSwitchProgress">
+                    <div class="position-relative flex-shrink-0">
+                        ${isGroup
+                            ? `<div class="chat-avatar bg-primary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;"><i class="bi bi-people-fill fs-5"></i></div>`
+                            : `<img src="${escapeHtml(convAvatar)}" class="chat-avatar rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="${escapeHtml(convName)}" onerror="this.src='/static/images/web-app-manifest-192x192-rounded.png'">`
+                        }
+                    </div>
+                    <div class="flex-grow-1 overflow-hidden d-flex flex-column justify-content-center" style="min-width: 0;">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="whatsapp-chat-name fw-semibold text-truncate text-body" style="font-size: 0.9rem;">${escapeHtml(convName)}</span>
+                            <div class="chat-meta d-flex align-items-center gap-1 flex-shrink-0 ms-2" style="padding-right: 22px;">
+                                <span class="whatsapp-chat-time text-muted" style="font-size: 0.72rem;">now</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between" style="padding-right: 22px;">
+                            <span class="whatsapp-chat-snippet text-truncate d-block ${unreadCount > 0 ? 'fw-bold text-body unread' : 'text-muted fw-normal'}" style="font-size: 0.8rem;">
+                                ${snippetHtml}
+                            </span>
+                            <span class="whatsapp-chat-unread-badge ms-2 flex-shrink-0 ${unreadCount > 0 ? '' : 'd-none'}">${displayCount}</span>
+                        </div>
+                    </div>
+                </a>
+            `;
+            railList.insertBefore(wrapper, railList.firstChild);
+            if (window.htmx && typeof window.htmx.process === 'function') {
+                window.htmx.process(wrapper);
+            }
+        }
+
+        // 2. Conversation List Page (`.chats-scroll`)
+        const chatsScroll = document.querySelector('.chats-scroll');
+        if (chatsScroll && !chatsScroll.querySelector(`[data-conversation-id="${convId}"]`)) {
+            const emptyState = chatsScroll.querySelector('.sidebar-empty');
+            if (emptyState) emptyState.remove();
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'chat-row-wrapper position-relative mb-1';
+            wrapper.innerHTML = `
+                <a href="${escapeHtml(targetUrl)}" class="chat-row" data-conversation-id="${escapeHtml(convId)}" data-is-pinned="false">
+                    ${isGroup
+                        ? `<div class="chat-icon"><i class="bi bi-people-fill"></i></div>`
+                        : `<div class="position-relative d-inline-block flex-shrink-0">
+                             <img src="${escapeHtml(convAvatar)}" class="chat-avatar" alt="${escapeHtml(convName)}" onerror="this.src='/static/images/web-app-manifest-192x192-rounded.png'">
+                           </div>`
+                    }
+                    <div class="chat-info flex-grow-1 overflow-hidden" style="min-width: 0;">
+                        <div class="chat-top-line d-flex align-items-center justify-content-between mb-1">
+                            <h4 class="chat-name fw-semibold text-truncate me-2 mb-0" style="font-size: 0.95rem;">
+                                <span title="${escapeHtml(convName)}">${escapeHtml(convName)}</span>
+                            </h4>
+                            <div class="chat-meta d-flex align-items-center gap-1 flex-shrink-0 ms-auto" style="padding-right: 26px;">
+                                <span class="chat-time text-muted small" style="font-size: 0.72rem;">now</span>
+                            </div>
+                        </div>
+                        <div class="chat-bottom-line d-flex align-items-center justify-content-between" style="padding-right: 26px;">
+                            <div class="chat-preview flex-grow-1 overflow-hidden" style="min-width: 0;">
+                                <span class="chat-preview-text text-truncate d-block ${unreadCount > 0 ? 'fw-bold text-body unread' : 'text-muted fw-normal'}">
+                                    ${snippetHtml}
+                                </span>
+                            </div>
+                            <span class="unread-badge ms-2 flex-shrink-0 ${unreadCount > 0 ? '' : 'd-none'}">${displayCount}</span>
+                        </div>
+                    </div>
+                </a>
+            `;
+            chatsScroll.insertBefore(wrapper, chatsScroll.firstChild);
+        }
+    }
+
     function updateConversationInList(data) {
         if (!data || !data.conversation_id) return;
         const convId = String(data.conversation_id);
         const activeContainer = document.getElementById('chatMainArea');
         const activeConvId = activeContainer?.dataset?.conversationId;
-        const isCurrentActive = Boolean(activeConvId && String(activeConvId) === convId);
+        const onThisChatUrl = window.location.pathname.indexOf('/messaging/conversation/' + convId) === 0;
+        const isCurrentActive = Boolean((activeConvId && String(activeConvId) === convId) || onThisChatUrl);
+        const isReadReceiptOnly = data.event_kind === 'read_receipt' || (!data.message_preview && !data.clean_preview);
 
         // Query conversation items in sidebar, mobile list, or cards
-        const items = document.querySelectorAll(`[data-conversation-id="${convId}"]`);
+        let items = document.querySelectorAll(`[data-conversation-id="${convId}"]`);
+        if ((!items || items.length === 0) && !isReadReceiptOnly) {
+            createDynamicConversationNodes(data, isCurrentActive);
+            items = document.querySelectorAll(`[data-conversation-id="${convId}"]`);
+        }
         if (!items || items.length === 0) return;
 
         items.forEach(item => {
-            // 1. Format snippet with rich icons
+            const unreadCount = isCurrentActive ? 0 : Number(data.unread_count || 0);
+
+            // 1. Format snippet with rich icons (only if this event carries a message preview)
             const snippetEl = item.querySelector('.whatsapp-chat-snippet, .chat-preview-text, .conversation-card-preview');
             if (snippetEl) {
-                let previewHtml = '';
-                const pType = data.preview_type || 'text';
-                const previewText = data.message_preview || 'New message';
-
-                if (pType === 'audio' || previewText.includes('Voice message') || previewText.includes('🎤')) {
-                    previewHtml = `<i class="bi bi-mic-fill text-primary me-1"></i> ${escapeHtml(previewText.replace('🎤', '').trim())}`;
-                } else if (pType === 'image' || previewText.includes('📷') || previewText.includes('Photo')) {
-                    previewHtml = `<i class="bi bi-camera-fill text-muted me-1"></i> ${escapeHtml(previewText.replace('📷', '').trim())}`;
-                } else if (pType === 'video' || previewText.includes('🎥') || previewText.includes('Video')) {
-                    previewHtml = `<i class="bi bi-camera-video-fill text-muted me-1"></i> ${escapeHtml(previewText.replace('🎥', '').trim())}`;
-                } else if (pType === 'document' || previewText.includes('📄') || previewText.includes('Document')) {
-                    previewHtml = `<i class="bi bi-file-earmark-text-fill text-muted me-1"></i> ${escapeHtml(previewText.replace('📄', '').trim())}`;
-                } else {
-                    previewHtml = escapeHtml(previewText);
+                if (!isReadReceiptOnly) {
+                    snippetEl.innerHTML = buildSnippetHtml(data);
                 }
 
-                snippetEl.innerHTML = previewHtml;
-
-                // Professional formatting:
-                // If user is currently in active conversation or unread_count is 0 -> muted normal font
-                // If message is unread and user is NOT active -> bold text and text-body
-                const unreadCountVal = isCurrentActive ? 0 : Number(data.unread_count || 0);
-                if (unreadCountVal > 0) {
+                if (unreadCount > 0) {
                     snippetEl.classList.remove('text-muted', 'fw-normal');
                     snippetEl.classList.add('fw-bold', 'text-body', 'unread');
                 } else {
@@ -218,28 +341,29 @@
                 }
             }
 
-            // 2. Update Timestamp
-            const timeEl = item.querySelector('.whatsapp-chat-time, .chat-time, .conversation-card-time');
-            if (timeEl) {
-                timeEl.textContent = 'now';
+            // 2. Update Timestamp (only on new message / edit / reaction / member_added)
+            if (!isReadReceiptOnly && data.event_kind !== 'delete') {
+                const timeEl = item.querySelector('.whatsapp-chat-time, .chat-time, .conversation-card-time');
+                if (timeEl) {
+                    timeEl.textContent = 'now';
+                }
             }
 
             // 3. Update Unread Badge accurately
             const badgeEl = item.querySelector('.whatsapp-chat-unread-badge, .unread-badge, .conversation-card-badge, .messaging-rail-unread-dot');
-            const unreadCount = isCurrentActive ? 0 : Number(data.unread_count || 0);
-
             if (unreadCount > 0) {
                 const displayCount = unreadCount > 99 ? '99+' : unreadCount;
                 if (badgeEl) {
-                    badgeEl.textContent = displayCount;
+                    if (!badgeEl.classList.contains('messaging-rail-unread-dot')) {
+                        badgeEl.textContent = displayCount;
+                    }
                     badgeEl.style.display = '';
                     badgeEl.classList.remove('d-none');
                 } else {
-                    // Create badge dynamically if it was not in DOM
-                    const badgeContainer = item.querySelector('.chat-meta') || item.querySelector('.d-flex.align-items-center.justify-content-between:last-child');
+                    const badgeContainer = item.querySelector('.chat-bottom-line') || item.querySelector('.chat-meta') || item.querySelector('.d-flex.align-items-center.justify-content-between:last-child');
                     if (badgeContainer) {
                         const newBadge = document.createElement('span');
-                        newBadge.className = 'whatsapp-chat-unread-badge ms-2 flex-shrink-0';
+                        newBadge.className = 'whatsapp-chat-unread-badge unread-badge ms-2 flex-shrink-0';
                         newBadge.textContent = displayCount;
                         badgeContainer.appendChild(newBadge);
                     }
@@ -249,13 +373,14 @@
                 badgeEl.classList.add('d-none');
             }
 
-            // 4. Reorder element with pinning priority (moves up immediately)
-            const isPinned = item.getAttribute('data-is-pinned') === 'true';
-            reorderConversationElement(item, isPinned);
+            // 4. Reorder element with pinning priority on new messages
+            if (!isReadReceiptOnly && data.event_kind !== 'delete' && data.event_kind !== 'edit') {
+                const isPinned = item.getAttribute('data-is-pinned') === 'true';
+                reorderConversationElement(item, isPinned);
 
-            // 5. Visual pulse animation
-            item.classList.add('chat-item-updated');
-            setTimeout(() => item.classList.remove('chat-item-updated'), 1200);
+                item.classList.add('chat-item-updated');
+                setTimeout(() => item.classList.remove('chat-item-updated'), 1200);
+            }
         });
     }
 
@@ -463,10 +588,25 @@
         cacheDOMConversations();
     }
 
-    // Mark conversation as active, reset unread state to muted, and move up under pinned
+    // Mark conversation as active, reset unread state to muted, and dismiss OS notifications
     function markConversationAsActive(convId) {
         if (!convId) return;
         const convStr = String(convId);
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(reg => {
+                if (reg && reg.active) {
+                    reg.active.postMessage({
+                        type: 'CLOSE_CHAT_NOTIFICATIONS',
+                        payload: {
+                            tag: `pwaninet-chat-${convStr}`,
+                            conversation_id: convStr
+                        }
+                    });
+                }
+            }).catch(() => {});
+        }
+
         document.querySelectorAll(`[data-conversation-id]`).forEach(item => {
             const rowConvId = String(item.dataset.conversationId || '');
             if (rowConvId === convStr) {

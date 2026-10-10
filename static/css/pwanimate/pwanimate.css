@@ -1546,8 +1546,10 @@ button.pwanimate-citation-badge {
     margin-left: auto;
     margin-right: auto;
     box-sizing: border-box;
+    transition: padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1);
 }
 
+html.keyboard-open .pwanimate-composer-wrapper,
 body.keyboard-open .pwanimate-composer-wrapper {
     padding-bottom: 0.5rem !important;
 }
@@ -2147,8 +2149,10 @@ body.is-standalone-pwa.pwanimate-active,
     height: 100% !important;
     height: 100dvh !important;
     max-height: 100dvh !important;
+    transition: padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1);
 }
 
+html.keyboard-open body.pwanimate-active,
 body.keyboard-open.pwanimate-active,
 body.keyboard-open.is-native-app.pwanimate-active,
 body.keyboard-open.is-standalone-pwa.pwanimate-active,

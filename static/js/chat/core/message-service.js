@@ -21,7 +21,39 @@ export class MessageService {
         
         // Track message states by temp_id for transition validation
         this.messageStates = new Map();
+        this.pendingAckTimers = new Map();
+        this.restFallbacksInFlight = new Set();
         this._isLoadingOlder = false;
+    }
+
+    /**
+     * Start a watchdog timer for WebSocket message ACK
+     * @param {string} tempId - Optimistic message ID
+     * @param {Function} onTimeout - Callback when ACK does not arrive in time
+     * @param {number} timeoutMs - Timeout in ms
+     */
+    _startAckTimer(tempId, onTimeout, timeoutMs = 4000) {
+        this._clearAckTimer(tempId);
+        const timer = setTimeout(() => {
+            this.pendingAckTimers.delete(tempId);
+            if (typeof onTimeout === 'function') {
+                onTimeout();
+            }
+        }, timeoutMs);
+        this.pendingAckTimers.set(tempId, timer);
+    }
+
+    /**
+     * Clear pending ACK timer for a tempId
+     * @param {string} tempId - Optimistic message ID
+     */
+    _clearAckTimer(tempId) {
+        if (!tempId) return;
+        const timer = this.pendingAckTimers.get(tempId);
+        if (timer) {
+            clearTimeout(timer);
+            this.pendingAckTimers.delete(tempId);
+        }
     }
 
     /**
@@ -150,14 +182,28 @@ export class MessageService {
             return;
         }
         
+        this._clearAckTimer(tempId);
+
         const serverMsg = Array.isArray(serverMessage) ? serverMessage[0] : serverMessage;
         const normalizedMessage = this.normalizeServerMessage(serverMsg);
+        normalizedMessage.status = normalizedMessage.status && normalizedMessage.status !== 'uploading' && normalizedMessage.status !== 'sending'
+            ? normalizedMessage.status
+            : 'sent';
+        normalizedMessage.isOptimistic = false;
         
         if (store.getMessageById(tempId)) {
             console.log('[MESSAGE_SERVICE] Rekeying optimistic message in-place:', tempId, '->', normalizedMessage.id);
-            store.updateMessageIdAndStatus(tempId, normalizedMessage.id, 'sent', normalizedMessage.timestamp);
+            store.updateMessageIdAndStatus(
+                tempId,
+                normalizedMessage.id,
+                normalizedMessage.status,
+                normalizedMessage.timestamp,
+                normalizedMessage
+            );
+        } else if (store.getMessageById(normalizedMessage.id)) {
+            console.log('[MESSAGE_SERVICE] Updating already-rekeyed server message in store:', normalizedMessage.id);
             store.updateMessage(normalizedMessage.id, normalizedMessage);
-        } else if (!store.getMessageById(normalizedMessage.id)) {
+        } else {
             console.log('[MESSAGE_SERVICE] Adding server message to store:', normalizedMessage.id);
             store.addMessage(normalizedMessage);
         }
@@ -515,7 +561,7 @@ export class MessageService {
 
 
     /**
-     * Send outgoing message (UI → MessageService → WebSocket → Store)
+     * Send outgoing message (UI → MessageService → WebSocket/HTTP → Store)
      * @param {string} content - Message content
      * @param {Object} options - Additional options
      */
@@ -539,18 +585,7 @@ export class MessageService {
             createdAt: Date.now()
         });
 
-        // Detect URLs in content and fetch metadata
-        const urls = this.extractUrls(cleanContent);
-        let linkMetadata = null;
-        if (urls.length > 0) {
-            try {
-                linkMetadata = await this.fetchLinkMetadata(urls[0]);
-            } catch (error) {
-                console.debug('Failed to fetch link metadata:', error);
-            }
-        }
-
-        // Instant optimistic message render (Telegram feel: 0ms!)
+        // Instant optimistic message render (0ms - never blocked by link metadata fetch)
         const optimisticMessage = this._createCanonicalMessage({
             id: tempId,
             conversationId: state.conversationId,
@@ -574,14 +609,43 @@ export class MessageService {
         // Add to store immediately
         store.addMessage(optimisticMessage);
 
+        // Detect URLs in content and fetch metadata with a short timeout
+        const urls = this.extractUrls(cleanContent);
+        let linkMetadata = null;
+        if (urls.length > 0) {
+            try {
+                linkMetadata = await Promise.race([
+                    this.fetchLinkMetadata(urls[0]),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Link metadata timeout')), 2000))
+                ]);
+                if (linkMetadata && store.getMessageById(tempId)) {
+                    store.updateMessage(tempId, {
+                        type: 'link',
+                        metadata: {
+                            link_url: linkMetadata.url,
+                            link_title: linkMetadata.title,
+                            link_description: linkMetadata.description,
+                            link_image: linkMetadata.image,
+                            link_type: linkMetadata.type
+                        }
+                    });
+                }
+            } catch (error) {
+                console.debug('Failed to fetch link metadata:', error);
+            }
+        }
+
         // Prepare message payload
         let messageData = {
             type: 'chat_message',
             temp_id: tempId,
             content: cleanContent,
             reply_to_id: options.reply_to_id || null,
-            message_type: options.type || 'text',
-            metadata: options.metadata || {}
+            message_type: options.type || (linkMetadata ? 'link' : 'text'),
+            metadata: {
+                ...(options.metadata || {}),
+                temp_id: tempId
+            }
         };
 
         if (linkMetadata) {
@@ -592,34 +656,108 @@ export class MessageService {
             messageData.link_type = linkMetadata.type;
         }
 
-        // Send immediately over WebSocket
-        webSocketManager.send(messageData).then(sent => {
-            if (!sent) {
-                // If WebSocket down, fallback to REST API
-                fetch('/messaging/v1/messages/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken()
-                    },
-                    body: JSON.stringify({
-                        conversation: state.conversationId,
-                        content: cleanContent,
-                        reply_to: options.reply_to_id || null
-                    })
-                }).then(res => {
-                    if (!res.ok) throw new Error('REST fallback failed');
-                    return res.json();
-                }).then(saved => {
-                    store.updateMessageIdAndStatus(tempId, saved.id, 'sent', saved.created_at);
-                }).catch(err => {
-                    store.updateMessageStatus(tempId, MESSAGE_STATE.FAILED_SEND);
-                    this.messageQueue.push({ ...messageData, tempId });
-                });
+        // Send immediately over WebSocket (synchronous boolean return)
+        const sent = webSocketManager.send(messageData);
+        if (sent) {
+            // Start watchdog timer: if server ACK or broadcast hasn't arrived within 4s, fallback to HTTP POST
+            this._startAckTimer(tempId, () => {
+                const msg = store.getMessageById(tempId);
+                if (msg && (msg.isOptimistic || msg.status === MESSAGE_STATE.SENDING)) {
+                    console.warn('[MESSAGE_SERVICE] WebSocket ACK timed out for', tempId, '— falling back to REST API');
+                    this._sendMessageViaRestFallback(tempId, state, cleanContent, options, linkMetadata, messageData);
+                }
+            }, 4000);
+        } else {
+            // WebSocket not open: trigger background reconnect and immediately send via HTTP REST fallback
+            if (!webSocketManager.isConnected() && !webSocketManager.paused) {
+                webSocketManager.connect();
             }
-        });
+            this._sendMessageViaRestFallback(tempId, state, cleanContent, options, linkMetadata, messageData);
+        }
 
         return tempId;
+    }
+
+    /**
+     * Fallback HTTP POST to guarantee message delivery when WebSocket is disconnected or unacknowledged
+     */
+    async _sendMessageViaRestFallback(tempId, state, cleanContent, options = {}, linkMetadata = null, messageData = null) {
+        if (this.restFallbacksInFlight.has(tempId)) return false;
+
+        const existing = store.getMessageById(tempId);
+        if (!existing) {
+            // Already reconciled by WebSocket ACK/broadcast
+            return true;
+        }
+
+        this.restFallbacksInFlight.add(tempId);
+        try {
+            const payload = {
+                conversation: state.conversationId,
+                content: cleanContent,
+                reply_to: options.reply_to_id || null,
+                temp_id: tempId,
+                message_type: options.type || (linkMetadata ? 'link' : 'text')
+            };
+            if (linkMetadata) {
+                payload.link_url = linkMetadata.url;
+                payload.link_title = linkMetadata.title;
+                payload.link_description = linkMetadata.description;
+                payload.link_image = linkMetadata.image;
+                payload.link_type = linkMetadata.type;
+            }
+
+            const res = await fetch('/messaging/v1/messages/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                throw new Error(`REST fallback failed with status ${res.status}`);
+            }
+
+            const saved = await res.json();
+            this._clearAckTimer(tempId);
+            this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
+
+            const savedId = saved.id || saved.message_id;
+            const normalized = saved.sender ? this.normalizeServerMessage(saved) : null;
+            if (normalized) {
+                normalized.status = normalized.status && normalized.status !== 'sending' ? normalized.status : 'sent';
+                normalized.isOptimistic = false;
+            }
+
+            if (savedId && store.getMessageById(tempId)) {
+                store.updateMessageIdAndStatus(
+                    tempId,
+                    savedId,
+                    saved.status || 'sent',
+                    saved.created_at || normalized?.timestamp,
+                    normalized
+                );
+            } else if ( store.getMessageById(tempId) ) {
+                store.updateMessageStatus(tempId, 'sent');
+            }
+
+            this.messageQueue = this.messageQueue.filter(m => m.tempId !== tempId);
+            return true;
+        } catch (err) {
+            console.error('[MESSAGE_SERVICE] REST fallback error:', err);
+            if (store.getMessageById(tempId)) {
+                this._transitionMessageState(tempId, MESSAGE_STATE.FAILED_SEND, err.message);
+                store.updateMessageStatus(tempId, MESSAGE_STATE.FAILED_SEND);
+                if (messageData && !this.messageQueue.some(m => m.tempId === tempId)) {
+                    this.messageQueue.push({ ...messageData, tempId, options, linkMetadata });
+                }
+            }
+            return false;
+        } finally {
+            this.restFallbacksInFlight.delete(tempId);
+        }
     }
 
     /**
@@ -680,8 +818,11 @@ export class MessageService {
             }
         };
 
-        const sent = await webSocketManager.send(messageData);
+        const sent = webSocketManager.send(messageData);
         if (!sent) {
+            if (!webSocketManager.isConnected() && !webSocketManager.paused) {
+                webSocketManager.connect();
+            }
             store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
             return false;
         }
@@ -699,7 +840,11 @@ export class MessageService {
         try {
             switch (data.type) {
                 case 'message_ack':
-                    // Instant server ACK: convert temp_id to real server ID with sent tick
+                    // Instant server ACK: clear watchdog and convert temp_id to real server ID with sent tick
+                    if (data.temp_id) {
+                        this._clearAckTimer(data.temp_id);
+                        this._transitionMessageState(data.temp_id, data.status || MESSAGE_STATE.SENT);
+                    }
                     store.updateMessageIdAndStatus(data.temp_id, data.message_id, data.status || 'sent', data.created_at);
                     break;
 
@@ -712,14 +857,19 @@ export class MessageService {
                                           Number(msgData.sender_id) === Number(currentUserId) ||
                                           Number(msgData.senderId) === Number(currentUserId);
 
-                    // Fallback reconciliation for own media/voice messages if temp_id is missing in WS payload
+                    // Fallback reconciliation for own messages if temp_id is missing in WS payload
                     if (!incomingTempId && isOwnMessage) {
                         const existingMsgs = store.getState().messages;
+                        const incomingContent = (msgData.content || '').trim();
                         const matchingOpt = existingMsgs.find(m => 
                             m.isOptimistic && (
+                                (incomingContent && (m.content || '').trim() === incomingContent) ||
                                 m.type === 'voice_note' || 
                                 m.metadata?.is_voice_note || 
+                                m.type === 'audio' ||
                                 m.type === 'media' || 
+                                m.type === 'media_group' ||
+                                m.type === 'file' ||
                                 m.type === msgData.message_type
                             )
                         );
@@ -728,16 +878,29 @@ export class MessageService {
                         }
                     }
 
+                    if (incomingTempId) {
+                        this._clearAckTimer(incomingTempId);
+                        this._transitionMessageState(incomingTempId, msgData.status || MESSAGE_STATE.SENT);
+                    }
+
+                    const canonical = this.normalizeServerMessage(msgData);
+                    if (isOwnMessage && (!canonical.status || canonical.status === 'sending' || canonical.status === 'uploading')) {
+                        canonical.status = 'sent';
+                    }
+                    canonical.isOptimistic = false;
+
                     if (incomingTempId && store.getMessageById(incomingTempId)) {
-                        store.updateMessageIdAndStatus(incomingTempId, msgData.id, msgData.status || 'sent', msgData.created_at);
-                        const canonical = this.normalizeServerMessage(msgData);
-                        store.updateMessage(String(msgData.id), canonical);
+                        store.updateMessageIdAndStatus(
+                            incomingTempId,
+                            canonical.id,
+                            canonical.status || 'sent',
+                            canonical.timestamp,
+                            canonical
+                        );
                     } else if (store.getMessageById(String(msgData.id))) {
-                        // Already stored (e.g., from HTTP response), update in-place
-                        const canonical = this.normalizeServerMessage(msgData);
+                        // Already stored (e.g., from ACK or HTTP response), update in-place with full canonical payload
                         store.updateMessage(String(msgData.id), canonical);
                     } else {
-                        const canonical = this.normalizeServerMessage(msgData);
                         store.addMessage(canonical);
                         // If sent by peer, send delivery ACK & play audio
                         if (Number(canonical.senderId) !== Number(currentUserId)) {
@@ -1018,37 +1181,56 @@ export class MessageService {
 
         const queue = [...this.messageQueue];
         this.messageQueue = []; // Clear queue
+        const state = store.getState();
         
         for (const queuedMessage of queue) {
             try {
                 const tempId = queuedMessage.tempId;
+                if (!store.getMessageById(tempId)) {
+                    continue;
+                }
                 
                 // Transition to RETRYING
                 this._transitionMessageState(tempId, MESSAGE_STATE.RETRYING);
                 store.updateMessage(tempId, { status: MESSAGE_STATE.RETRYING });
                 
                 const messageData = {
-                    type: queuedMessage.type,
+                    type: queuedMessage.type || 'chat_message',
                     temp_id: queuedMessage.tempId,
                     content: queuedMessage.content,
+                    reply_to_id: queuedMessage.reply_to_id || queuedMessage.options?.reply_to_id || null,
                     encrypted_content: queuedMessage.encrypted_content,
                     is_encrypted: queuedMessage.is_encrypted,
                     message_type: queuedMessage.message_type,
                     metadata: queuedMessage.metadata
                 };
 
-                const sent = await webSocketManager.send(messageData);
+                const sent = webSocketManager.send(messageData);
 
-                if (!sent) {
-                    // Re-queue if still not sent
-                    this.messageQueue.push(queuedMessage);
-                    // Transition back to FAILED_SEND
-                    this._transitionMessageState(tempId, MESSAGE_STATE.FAILED_SEND, 'Retry failed');
-                    store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
-                } else {
-                    // Transition to SENT
-                    this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
+                if (sent) {
                     this._log('QUEUED_MESSAGE_SENT', { tempId });
+                    this._startAckTimer(tempId, () => {
+                        const msg = store.getMessageById(tempId);
+                        if (msg && (msg.isOptimistic || msg.status === MESSAGE_STATE.RETRYING || msg.status === MESSAGE_STATE.SENDING)) {
+                            this._sendMessageViaRestFallback(
+                                tempId,
+                                state,
+                                queuedMessage.content,
+                                queuedMessage.options || {},
+                                queuedMessage.linkMetadata || null,
+                                queuedMessage
+                            );
+                        }
+                    }, 4000);
+                } else {
+                    await this._sendMessageViaRestFallback(
+                        tempId,
+                        state,
+                        queuedMessage.content,
+                        queuedMessage.options || {},
+                        queuedMessage.linkMetadata || null,
+                        queuedMessage
+                    );
                 }
             } catch (error) {
                 this._log('QUEUE_SEND_ERROR', { error, queuedMessage });
@@ -1139,34 +1321,46 @@ export class MessageService {
         store.updateMessage(tempId, { status: MESSAGE_STATE.RETRYING });
         
         try {
+            const state = store.getState();
             const messageData = {
-                type: queuedMessage.type,
+                type: queuedMessage.type || 'chat_message',
                 temp_id: queuedMessage.tempId,
                 content: queuedMessage.content,
+                reply_to_id: queuedMessage.reply_to_id || queuedMessage.options?.reply_to_id || null,
                 encrypted_content: queuedMessage.encrypted_content,
                 is_encrypted: queuedMessage.is_encrypted,
                 message_type: queuedMessage.message_type,
                 metadata: queuedMessage.metadata
             };
             
-            const sent = await webSocketManager.send(messageData);
+            const sent = webSocketManager.send(messageData);
             
             if (sent) {
-                // Transition to SENT
-                this._transitionMessageState(tempId, MESSAGE_STATE.SENT);
-                store.updateMessage(tempId, { status: MESSAGE_STATE.SENT });
-                
-                // Remove from queue
                 this.messageQueue = this.messageQueue.filter(m => m.tempId !== tempId);
-                
+                this._startAckTimer(tempId, () => {
+                    const msg = store.getMessageById(tempId);
+                    if (msg && (msg.isOptimistic || msg.status === MESSAGE_STATE.RETRYING || msg.status === MESSAGE_STATE.SENDING)) {
+                        this._sendMessageViaRestFallback(
+                            tempId,
+                            state,
+                            queuedMessage.content,
+                            queuedMessage.options || {},
+                            queuedMessage.linkMetadata || null,
+                            queuedMessage
+                        );
+                    }
+                }, 4000);
                 this._log('RETRY_SUCCESS', { tempId });
                 return true;
             } else {
-                // Transition back to FAILED_SEND
-                this._transitionMessageState(tempId, MESSAGE_STATE.FAILED_SEND, 'Retry failed');
-                store.updateMessage(tempId, { status: MESSAGE_STATE.FAILED_SEND });
-                this._log('RETRY_FAILED', { tempId });
-                return false;
+                return await this._sendMessageViaRestFallback(
+                    tempId,
+                    state,
+                    queuedMessage.content,
+                    queuedMessage.options || {},
+                    queuedMessage.linkMetadata || null,
+                    queuedMessage
+                );
             }
         } catch (error) {
             // Transition back to FAILED_SEND

@@ -160,55 +160,50 @@ export class UploadQueue {
             xhr.onload = () => {
                 this.activeUploads.delete(tempId);
                 if (xhr.status >= 200 && xhr.status < 300) {
-                    // Complete one full circle (100%)
-                    this._updateProgressUI(tempId, 100, false);
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        console.log('[UPLOAD_QUEUE] Server response parsed successfully:', data);
 
-                    setTimeout(() => {
-                        try {
-                            const data = JSON.parse(xhr.responseText);
-                            console.log('[UPLOAD_QUEUE] Server response parsed successfully:', data);
-
-                            if (Array.isArray(data)) {
-                                data.forEach((serverMsg, idx) => {
-                                    const currentTempId = idx === 0 ? tempId : `${tempId}_${idx}`;
-                                    if (serverMsg?.id) {
-                                        deviceMediaStore.rekeyMedia(currentTempId, serverMsg.id);
-                                        if (serverMsg?.attachments && Array.isArray(serverMsg.attachments)) {
-                                            serverMsg.attachments.forEach((att, attIdx) => {
-                                                if (att?.id) {
-                                                    deviceMediaStore.rekeyMedia(`${currentTempId}_${attIdx}`, att.id);
-                                                }
-                                            });
-                                        }
-                                    }
-                                    eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
-                                        tempId: currentTempId,
-                                        serverMessage: serverMsg
-                                    });
-                                });
-                            } else {
-                                if (data?.id) {
-                                    deviceMediaStore.rekeyMedia(tempId, data.id);
-                                    if (data?.attachments && Array.isArray(data.attachments)) {
-                                        data.attachments.forEach((att, attIdx) => {
+                        if (Array.isArray(data)) {
+                            data.forEach((serverMsg, idx) => {
+                                const currentTempId = idx === 0 ? tempId : `${tempId}_${idx}`;
+                                if (serverMsg?.id) {
+                                    deviceMediaStore.rekeyMedia(currentTempId, serverMsg.id);
+                                    if (serverMsg?.attachments && Array.isArray(serverMsg.attachments)) {
+                                        serverMsg.attachments.forEach((att, attIdx) => {
                                             if (att?.id) {
-                                                deviceMediaStore.rekeyMedia(`${tempId}_${attIdx}`, att.id);
-                                                deviceMediaStore.rekeyMedia(`${data.id}_${attIdx}`, att.id);
+                                                deviceMediaStore.rekeyMedia(`${currentTempId}_${attIdx}`, att.id);
                                             }
                                         });
                                     }
                                 }
                                 eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
-                                    tempId,
-                                    serverMessage: data
+                                    tempId: currentTempId,
+                                    serverMessage: serverMsg
                                 });
+                            });
+                        } else {
+                            if (data?.id) {
+                                deviceMediaStore.rekeyMedia(tempId, data.id);
+                                if (data?.attachments && Array.isArray(data.attachments)) {
+                                    data.attachments.forEach((att, attIdx) => {
+                                        if (att?.id) {
+                                            deviceMediaStore.rekeyMedia(`${tempId}_${attIdx}`, att.id);
+                                            deviceMediaStore.rekeyMedia(`${data.id}_${attIdx}`, att.id);
+                                        }
+                                    });
+                                }
                             }
-                            resolve(data);
-                        } catch (err) {
-                            console.error('[UPLOAD_QUEUE] JSON parse error:', err);
-                            reject(new Error('Invalid server response format'));
+                            eventBus.emit(EVENTS.MESSAGE_UPLOAD_SUCCESS, {
+                                tempId,
+                                serverMessage: data
+                            });
                         }
-                    }, 350); // Small pause to display 100% full circle completion
+                        resolve(data);
+                    } catch (err) {
+                        console.error('[UPLOAD_QUEUE] JSON parse error:', err);
+                        reject(new Error('Invalid server response format'));
+                    }
                 } else {
                     let errorData = null;
                     try {
@@ -241,15 +236,17 @@ export class UploadQueue {
         const msgEl = document.querySelector(`[data-message-id="${tempId}"]`);
         if (!msgEl) return;
 
-        // Update voice note upload indicator
+        // Update voice note upload indicator only while spinner is still active
         const vnTimer = msgEl.querySelector('.vn-timer');
-        if (vnTimer && msgEl.querySelector('.vn-bubble-container')) {
+        const vnSpinner = msgEl.querySelector('.vn-play-btn .spinner-border');
+        if (vnTimer && vnSpinner) {
             vnTimer.textContent = isProcessing ? 'Processing...' : `${percent}%`;
         }
 
-        // Update audio track upload indicator
+        // Update audio track upload indicator only while spinner is still active
         const audioTime = msgEl.querySelector('.audio-track-time');
-        if (audioTime && msgEl.querySelector('.audio-track-container')) {
+        const audioSpinner = msgEl.querySelector('.audio-track-play-btn .spinner-border');
+        if (audioTime && audioSpinner) {
             audioTime.textContent = isProcessing ? 'Processing...' : `${percent}%`;
         }
 

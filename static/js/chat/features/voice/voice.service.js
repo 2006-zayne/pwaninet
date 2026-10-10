@@ -569,15 +569,18 @@ export class VoiceService {
     const tempId = `temp_voice_${Date.now()}`;
 
     // Save sender voice note blob to local device storage (IndexedDB / Capacitor Filesystem)
+    const recordingBlob = this.audioBlob;
+    const recordingDuration = this.duration || 0;
     let localUrl = '';
     try {
       const { deviceMediaStore } = await import('../../core/device-media-store.js');
-      localUrl = await deviceMediaStore.saveSenderMedia(tempId, this.audioBlob, filename);
+      localUrl = await deviceMediaStore.saveSenderMedia(tempId, recordingBlob, filename);
     } catch (saveErr) {
       console.warn('[VOICE_SERVICE] Failed to save sender voice note locally:', saveErr);
     }
 
-    const audioUrl = localUrl || this.audioUrl || (this.audioBlob ? URL.createObjectURL(this.audioBlob) : '');
+    // Create a dedicated Blob URL for the chat bubble so discardRecording() revoking this.audioUrl does not break playback
+    const bubbleAudioUrl = localUrl || (recordingBlob ? URL.createObjectURL(recordingBlob) : '');
 
     // Pick up the active reply target (if the user is replying to a message)
     let replyContext = { reply_to_id: null, reply_to_details: null };
@@ -601,9 +604,10 @@ export class VoiceService {
       metadata: {
         type: 'voice_note',
         is_voice_note: true,
-        url: audioUrl,
-        size: this.audioBlob.size,
-        duration: this.duration || 0,
+        url: bubbleAudioUrl,
+        localBlobUrl: bubbleAudioUrl,
+        size: recordingBlob.size,
+        duration: recordingDuration,
         reply_to_id: replyContext.reply_to_id,
         reply_to_details: replyContext.reply_to_details
       },
@@ -614,11 +618,17 @@ export class VoiceService {
 
     try {
       const { attachmentService } = await import('../attachments/attachment.service.js');
-      await attachmentService.handleFileUpload(file, conversationId, {
+      const uploadedMsg = await attachmentService.handleFileUpload(file, conversationId, {
         isVoiceNote: true,
         tempId,
         replyToId: replyContext.reply_to_id
       });
+      if (uploadedMsg?.id && recordingBlob) {
+        try {
+          const { deviceMediaStore } = await import('../../core/device-media-store.js');
+          await deviceMediaStore.saveSenderMedia(uploadedMsg.id, recordingBlob, filename);
+        } catch (_) {}
+      }
       this.discardRecording();
     } catch (err) {
       console.error('[VOICE_SERVICE] Upload failed:', err);

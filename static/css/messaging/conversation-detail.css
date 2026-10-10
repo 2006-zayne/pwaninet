@@ -2650,7 +2650,7 @@ body.in-conversation-active .pwanimate-composer-wrapper,
   margin-right: auto !important;
   box-sizing: border-box !important;
   pointer-events: none !important;
-  transition: transform 0.3s ease;
+  transition: padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1), transform 0.25s cubic-bezier(0.2, 0, 0, 1) !important;
 }
 
 @media (max-width: 768px) {
@@ -2667,8 +2667,13 @@ body.in-conversation-active .pwanimate-composer-wrapper,
   }
 }
 
+html.keyboard-open .input-area,
 body.keyboard-open .input-area,
-body.keyboard-open .pwanimate-composer-wrapper {
+html.keyboard-open .pwanimate-composer-wrapper,
+body.keyboard-open .pwanimate-composer-wrapper,
+body.keyboard-open.in-conversation-active .pwanimate-composer-wrapper,
+body.keyboard-open .whatsapp-layout .pwanimate-composer-wrapper,
+body.keyboard-open .chat-container .pwanimate-composer-wrapper {
   padding-bottom: 0.35rem !important;
 }
 

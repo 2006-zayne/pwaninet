@@ -4040,6 +4040,9 @@
             }
 
             // 6. Bind Responsive Window Resize (dynamic viewport constraint handling)
+            if (this._onWindowResize) {
+                window.removeEventListener('resize', this._onWindowResize);
+            }
             this._onWindowResize = () => {
                 if (this.contextRailOpen && window.innerWidth >= 1200) {
                     this.updateContextRailWidth(false); // does NOT overwrite savedPreferredWidth
@@ -4053,6 +4056,31 @@
                 }
             };
             window.addEventListener('resize', this._onWindowResize);
+
+            // 7. Keep transcript anchored when virtual keyboard opens or composer expands
+            if (this._transcriptResizeObserver) {
+                try { this._transcriptResizeObserver.disconnect(); } catch (_) {}
+                this._transcriptResizeObserver = null;
+            }
+            if (this.transcript && typeof ResizeObserver !== 'undefined') {
+                let lastTranscriptHeight = this.transcript.clientHeight;
+                this._transcriptResizeObserver = new ResizeObserver(() => {
+                    if (!this.transcript) return;
+                    const newHeight = this.transcript.clientHeight;
+                    const deltaH = lastTranscriptHeight - newHeight;
+                    lastTranscriptHeight = newHeight;
+
+                    if (deltaH > 0) {
+                        const distFromBottomBefore = this.transcript.scrollHeight - this.transcript.scrollTop - newHeight - deltaH;
+                        if (distFromBottomBefore < 140) {
+                            this.transcript.scrollTop = this.transcript.scrollHeight;
+                        } else {
+                            this.transcript.scrollTop += deltaH;
+                        }
+                    }
+                });
+                this._transcriptResizeObserver.observe(this.transcript);
+            }
         }
 
         toggleLeftRail(collapsed) {
@@ -5401,6 +5429,10 @@
             if (this._onWindowResize) {
                 window.removeEventListener('resize', this._onWindowResize);
                 this._onWindowResize = null;
+            }
+            if (this._transcriptResizeObserver) {
+                try { this._transcriptResizeObserver.disconnect(); } catch (_) {}
+                this._transcriptResizeObserver = null;
             }
             if (typeof this._resizerCleanup === 'function') {
                 this._resizerCleanup();

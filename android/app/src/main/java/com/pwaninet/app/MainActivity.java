@@ -79,6 +79,8 @@ public class MainActivity extends BridgeActivity {
     private int lastSafeBottom = 0;
     private int lastSafeLeft = 0;
     private int lastSafeRight = 0;
+    private boolean lastImeVisible = false;
+    private int lastImeHeight = 0;
     private String pendingDeepLinkPath = null;
     private static final int REQUEST_SPEECH_AUDIO_PERMISSION = 4301;
     private static final int REQUEST_MEDIA_DOWNLOAD_PERMISSION = 4302;
@@ -1096,6 +1098,8 @@ public class MainActivity extends BridgeActivity {
             WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
         );
         Insets navBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
+        Insets imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+        boolean imeVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
 
         float density = getResources().getDisplayMetrics().density;
         if (density > 0) {
@@ -1103,6 +1107,7 @@ public class MainActivity extends BridgeActivity {
             int bottom = Math.round(Math.max(sysBars.bottom, navBars.bottom) / density);
             int left = Math.round(sysBars.left / density);
             int right = Math.round(sysBars.right / density);
+            int imeHeightDp = Math.max(0, Math.round(imeInsets.bottom / density));
 
             // Fallback for 3-button navigation if bottom reports 0 but system navigation bar exists
             if (bottom == 0 && hasNavigationBar()) {
@@ -1113,6 +1118,8 @@ public class MainActivity extends BridgeActivity {
             lastSafeBottom = bottom;
             lastSafeLeft = left;
             lastSafeRight = right;
+            lastImeVisible = imeVisible || imeHeightDp > bottom + 40;
+            lastImeHeight = Math.max(0, imeHeightDp - bottom);
 
             injectSafeAreaInsets();
         }
@@ -1145,10 +1152,14 @@ public class MainActivity extends BridgeActivity {
                         if (density > 0) {
                             Insets navBars = rootInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
                             Insets sysBars = rootInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                            Insets imeInsets = rootInsets.getInsets(WindowInsetsCompat.Type.ime());
                             int b = Math.round(Math.max(sysBars.bottom, navBars.bottom) / density);
                             if (b > 0) lastSafeBottom = b;
                             int t = Math.round(sysBars.top / density);
                             if (t > 0) lastSafeTop = t;
+                            int imeDp = Math.max(0, Math.round(imeInsets.bottom / density));
+                            lastImeVisible = rootInsets.isVisible(WindowInsetsCompat.Type.ime()) || imeDp > lastSafeBottom + 40;
+                            lastImeHeight = Math.max(0, imeDp - lastSafeBottom);
                         }
                     }
                     if (lastSafeBottom == 0 && hasNavigationBar()) {
@@ -1156,24 +1167,34 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
 
+                int effectiveSafeBottom = lastImeVisible ? 0 : lastSafeBottom;
+
                 String js = String.format(Locale.US,
                     "(function() {" +
                     "  var root = document.documentElement;" +
+                    "  var imeOpen = %s;" +
                     "  root.classList.add('is-capacitor', 'is-native-app');" +
+                    "  root.classList.toggle('keyboard-open', imeOpen);" +
+                    "  root.dataset.imeVisible = imeOpen ? 'true' : 'false';" +
                     "  root.style.setProperty('--pwaninet-safe-area-top', '%dpx');" +
                     "  root.style.setProperty('--pwaninet-safe-area-bottom', '%dpx');" +
                     "  root.style.setProperty('--pwaninet-safe-area-left', '%dpx');" +
                     "  root.style.setProperty('--pwaninet-safe-area-right', '%dpx');" +
+                    "  root.style.setProperty('--pwaninet-keyboard-height', '%dpx');" +
                     "  if (document.body) {" +
                     "    document.body.classList.add('is-capacitor', 'is-native-app');" +
+                    "    document.body.classList.toggle('keyboard-open', imeOpen);" +
                     "    document.body.style.setProperty('--pwaninet-safe-area-top', '%dpx');" +
                     "    document.body.style.setProperty('--pwaninet-safe-area-bottom', '%dpx');" +
                     "  }" +
-                    "  window.dispatchEvent(new CustomEvent('pwaninet:safe-area-changed', { detail: { top: %d, bottom: %d, left: %d, right: %d } }));" +
+                    "  window.dispatchEvent(new CustomEvent('pwaninet:safe-area-changed', { detail: { top: %d, bottom: %d, left: %d, right: %d, imeVisible: imeOpen, imeHeight: %d } }));" +
                     "})();",
-                    lastSafeTop, lastSafeBottom, lastSafeLeft, lastSafeRight,
-                    lastSafeTop, lastSafeBottom,
-                    lastSafeTop, lastSafeBottom, lastSafeLeft, lastSafeRight
+                    lastImeVisible ? "true" : "false",
+                    lastSafeTop, effectiveSafeBottom, lastSafeLeft, lastSafeRight,
+                    lastImeVisible ? lastImeHeight : 0,
+                    lastSafeTop, effectiveSafeBottom,
+                    lastSafeTop, effectiveSafeBottom, lastSafeLeft, lastSafeRight,
+                    lastImeVisible ? lastImeHeight : 0
                 );
                 getBridge().getWebView().evaluateJavascript(js, null);
             }
@@ -1412,14 +1433,14 @@ public class MainActivity extends BridgeActivity {
                             vibrator.vibrate(VibrationEffect.createPredefined(effectId));
                             vibratorHandled = true;
                         } catch (Exception e) {
-                            int amp = "light".equals(cleanStyle) ? 60 : ("heavy".equals(cleanStyle) ? 220 : 130);
-                            int dur = "light".equals(cleanStyle) ? 12 : ("heavy".equals(cleanStyle) ? 35 : 20);
+                            int amp = "light".equals(cleanStyle) ? 45 : ("heavy".equals(cleanStyle) ? 165 : 95);
+                            int dur = "light".equals(cleanStyle) ? 10 : ("heavy".equals(cleanStyle) ? 28 : 16);
                             vibrator.vibrate(VibrationEffect.createOneShot(dur, amp));
                             vibratorHandled = true;
                         }
                     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        int amplitude = "light".equals(cleanStyle) ? 60 : ("heavy".equals(cleanStyle) ? 220 : 130);
-                        int duration = "light".equals(cleanStyle) ? 12 : ("heavy".equals(cleanStyle) ? 35 : 20);
+                        int amplitude = "light".equals(cleanStyle) ? 45 : ("heavy".equals(cleanStyle) ? 165 : 95);
+                        int duration = "light".equals(cleanStyle) ? 10 : ("heavy".equals(cleanStyle) ? 28 : 16);
                         vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude));
                         vibratorHandled = true;
                     }
@@ -1436,7 +1457,7 @@ public class MainActivity extends BridgeActivity {
                         } else if ("heavy".equals(cleanStyle)) {
                             feedbackConstant = HapticFeedbackConstants.LONG_PRESS;
                         }
-                        view.performHapticFeedback(feedbackConstant, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+                        view.performHapticFeedback(feedbackConstant);
                     }
                 }
             } catch (Exception ignored) {}
@@ -1452,14 +1473,16 @@ public class MainActivity extends BridgeActivity {
                         vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK));
                         return;
                     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vibrator.vibrate(VibrationEffect.createOneShot(8, 50));
+                        vibrator.vibrate(VibrationEffect.createOneShot(6, 35));
                         return;
                     }
                 }
                 View view = getBridge() != null && getBridge().getWebView() != null 
                     ? getBridge().getWebView() 
                     : getWindow().getDecorView();
-                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+                if (view != null) {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                }
             } catch (Exception ignored) {}
         });
     }
@@ -1478,18 +1501,18 @@ public class MainActivity extends BridgeActivity {
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         if ("error".equals(cleanType)) {
-                            long[] timings = {0, 40, 60, 40, 60, 60};
-                            int[] amplitudes = {0, 200, 0, 200, 0, 255};
+                            long[] timings = {0, 35, 55, 35, 55, 45};
+                            int[] amplitudes = {0, 170, 0, 170, 0, 220};
                             vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1));
                             return;
                         } else if ("warning".equals(cleanType)) {
-                            long[] timings = {0, 50, 80, 50};
-                            int[] amplitudes = {0, 180, 0, 180};
+                            long[] timings = {0, 40, 70, 40};
+                            int[] amplitudes = {0, 150, 0, 150};
                             vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1));
                             return;
                         } else { // success
-                            long[] timings = {0, 20, 60, 30};
-                            int[] amplitudes = {0, 120, 0, 180};
+                            long[] timings = {0, 16, 55, 24};
+                            int[] amplitudes = {0, 100, 0, 150};
                             vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1));
                             return;
                         }
@@ -1498,7 +1521,9 @@ public class MainActivity extends BridgeActivity {
                 View view = getBridge() != null && getBridge().getWebView() != null 
                     ? getBridge().getWebView() 
                     : getWindow().getDecorView();
-                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+                if (view != null) {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                }
             } catch (Exception ignored) {}
         });
     }

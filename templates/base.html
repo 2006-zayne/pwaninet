@@ -3477,11 +3477,45 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     console.log('[GLOBAL] Received notification:', data);
 
                     if (data.type === 'conversation_update') {
-                        // Real-time conversation list updates (sidebar rail & mobile list)
+                        // 1. Update global navigation .messages-badge across all pages (Home, Groups, Courses, Profile, etc.)
+                        if (typeof data.total_unread_count === 'number') {
+                            updateUnreadCount(data.total_unread_count);
+                        }
+
+                        // 2. Retract OS Push Notifications when conversation is read or message deleted
+                        if (data.retract_tag && 'serviceWorker' in navigator) {
+                            navigator.serviceWorker.ready.then(reg => {
+                                if (reg && reg.active) {
+                                    reg.active.postMessage({
+                                        type: 'CLOSE_CHAT_NOTIFICATIONS',
+                                        payload: {
+                                            tag: data.retract_tag,
+                                            conversation_id: data.conversation_id
+                                        }
+                                    });
+                                }
+                            }).catch(() => {});
+                        }
+
+                        // 3. Real-time conversation list updates (sidebar rail & mobile list)
                         if (typeof window.updateConversationInList === 'function') {
                             window.updateConversationInList(data);
                         } else if (typeof updateConversationInList === 'function') {
                             updateConversationInList(data);
+                        }
+
+                        // 4. Show sleek floating in-app chat banner if user is NOT actively viewing this conversation
+                        if (data.should_alert && !data.is_sender) {
+                            const convIdStr = String(data.conversation_id || '');
+                            const activeChatEl = document.getElementById('chatMainArea');
+                            const activeConvId = activeChatEl && activeChatEl.dataset ? String(activeChatEl.dataset.conversationId || '') : '';
+                            const onThisChatUrl = window.location.pathname.indexOf('/messaging/conversation/' + convIdStr) === 0;
+                            const isViewingThisConversation = Boolean(
+                                convIdStr && (activeConvId === convIdStr || onThisChatUrl)
+                            );
+                            if (!isViewingThisConversation) {
+                                showChatNotificationBanner(data);
+                            }
                         }
                     } else if (data.type === 'notification') {
                         // Handle general notifications
@@ -3509,6 +3543,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         // Handle unread notification count update
                         console.log('[GLOBAL] Handling unread_count update:', data.count);
                         updateNotificationCount(data.count);
+                        if (typeof data.unread_messages_count === 'number') {
+                            updateUnreadCount(data.unread_messages_count);
+                        }
                         if (typeof refreshGroupNavDot === 'function') {
                             refreshGroupNavDot();
                         }
@@ -3556,17 +3593,117 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
     function updateUnreadCount(unreadCount) {
         // Update messages icon badge in navigation (desktop left rail, top nav, mobile bottom nav)
+        const count = Number(unreadCount) || 0;
         const messagesBadges = document.querySelectorAll('.messages-badge');
         messagesBadges.forEach(badge => {
-            if (unreadCount > 0) {
-                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+            if (count > 0) {
+                badge.textContent = count > 99 ? '99+' : count;
                 badge.style.display = 'inline-block';
+                badge.classList.remove('d-none');
             } else {
                 badge.textContent = '0';
                 badge.style.display = 'none';
             }
         });
     }
+    window.updateUnreadCount = updateUnreadCount;
+
+    function showChatNotificationBanner(data) {
+        if (!data || !data.conversation_id) return;
+        const convId = String(data.conversation_id);
+        const bannerId = 'pwaninet-chat-floating-banner';
+        const existing = document.getElementById(bannerId);
+        if (existing) {
+            existing.remove();
+        }
+
+        const title = data.banner_title || data.sender_display_name || data.sender_name || 'New Message';
+        const body = data.banner_body || data.message_preview || 'Sent you a message';
+        const avatar = data.sender_avatar || data.conversation_avatar || '/static/images/web-app-manifest-192x192-rounded.png';
+        const thumb = data.thumbnail_url || null;
+        const targetUrl = data.target_url || (`/messaging/conversation/${convId}/`);
+        const isGroup = data.conversation_type === 'group';
+
+        const escapeStr = (str) => {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        };
+
+        const banner = document.createElement('div');
+        banner.id = bannerId;
+        banner.setAttribute('role', 'alert');
+        banner.style.cssText = [
+            'position: fixed',
+            'top: calc(var(--pwaninet-safe-area-top, 0px) + 14px)',
+            'right: 16px',
+            'z-index: 10990',
+            'width: min(380px, calc(100vw - 24px))',
+            'background: var(--bg-card, #ffffff)',
+            'color: var(--text-primary, #0f172a)',
+            'border: 1px solid var(--border-color, rgba(148, 163, 184, 0.28))',
+            'border-left: 4px solid #2563eb',
+            'border-radius: 16px',
+            'box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08)',
+            'padding: 12px 14px',
+            'display: flex',
+            'align-items: center',
+            'gap: 12px',
+            'cursor: pointer',
+            'transition: opacity 0.22s ease, transform 0.22s ease',
+            'transform: translateY(-8px)',
+            'opacity: 0'
+        ].join(';');
+
+        banner.innerHTML = `
+            <div style="position: relative; flex-shrink: 0;">
+                <img src="${escapeStr(avatar)}" alt="" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(37,99,235,0.2);" onerror="this.src='/static/images/web-app-manifest-192x192-rounded.png'">
+                <span style="position: absolute; bottom: -2px; right: -2px; width: 18px; height: 18px; border-radius: 50%; background: #2563eb; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 2px solid var(--bg-card, #fff);">
+                    <i class="bi ${isGroup ? 'bi-people-fill' : 'bi-chat-dots-fill'}"></i>
+                </span>
+            </div>
+            <div style="flex: 1; min-width: 0; overflow: hidden;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 2px;">
+                    <span style="font-weight: 700; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeStr(title)}</span>
+                    <span style="font-size: 0.7rem; color: #2563eb; font-weight: 600; flex-shrink: 0;">now</span>
+                </div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary, #475569); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${escapeStr(body)}
+                </div>
+            </div>
+            ${thumb ? `<img src="${escapeStr(thumb)}" alt="" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0;">` : ''}
+            <button type="button" class="chat-banner-close" aria-label="Close" style="background: transparent; border: none; color: var(--text-muted, #94a3b8); padding: 4px; line-height: 1; font-size: 1rem; flex-shrink: 0;">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        `;
+
+        banner.addEventListener('click', function(ev) {
+            if (ev.target.closest('.chat-banner-close')) {
+                ev.stopPropagation();
+                banner.remove();
+                return;
+            }
+            banner.remove();
+            window.location.href = targetUrl;
+        });
+
+        document.body.appendChild(banner);
+        requestAnimationFrame(() => {
+            banner.style.transform = 'translateY(0)';
+            banner.style.opacity = '1';
+        });
+
+        setTimeout(() => {
+            if (banner.parentNode) {
+                banner.style.opacity = '0';
+                banner.style.transform = 'translateY(-8px)';
+                setTimeout(() => {
+                    if (banner.parentNode) banner.remove();
+                }, 220);
+            }
+        }, 4500);
+    }
+    window.showChatNotificationBanner = showChatNotificationBanner;
 
     function updateNotificationCount(count) {
         console.log('[GLOBAL] updateNotificationCount called with count:', count);
@@ -4506,7 +4643,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             evt.preventDefault();
             console.log('[HTMX Seamless Navigation] Intercepted link click:', targetPath);
 
-            if (window.Haptics && typeof window.Haptics.impactLight === 'function') {
+            if (!link.closest('.mobile-bottom-nav, [data-haptic]') && window.Haptics && typeof window.Haptics.impactLight === 'function') {
                 window.Haptics.impactLight();
             }
 
@@ -4663,18 +4800,25 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
         });
 
-        // 4. Awareness for upload banner: keep body.has-active-upload synced
+        // 4. Awareness for upload banner: keep body.has-active-upload synced without subtree class observation
+        let observedUploadBanner = null;
+        const bannerObserver = new MutationObserver(function() {
+            syncUploadBannerState();
+        });
+
         function syncUploadBannerState() {
             const banner = document.getElementById('upload-banner');
+            if (banner && banner !== observedUploadBanner) {
+                observedUploadBanner = banner;
+                bannerObserver.disconnect();
+                bannerObserver.observe(banner, { attributes: true, attributeFilter: ['class'] });
+            }
             const isVisible = banner && banner.classList.contains('visible');
             document.body.classList.toggle('has-active-upload', !!isVisible);
         }
 
-        const bannerObserver = new MutationObserver(function() {
-            syncUploadBannerState();
-        });
-        bannerObserver.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
         syncUploadBannerState();
+        document.body.addEventListener('htmx:afterSwap', syncUploadBannerState);
 
         // Initial check on load
         updateBackToTopVisibility();

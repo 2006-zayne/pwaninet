@@ -45,6 +45,15 @@
     pointer-events: none !important;
   }
 
+  .post-detail-composer-bar {
+    padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px));
+    transition: padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1);
+  }
+  html.keyboard-open .post-detail-composer-bar,
+  body.keyboard-open .post-detail-composer-bar {
+    padding-bottom: 0px !important;
+  }
+
   /* Post Detail Guest Sticky Bar (Light & Dark Mode Responsive) */
   .post-detail-guest-bar {
     z-index: 1000;
@@ -53,8 +62,8 @@
     -webkit-backdrop-filter: blur(16px);
     border-top: 1px solid var(--border, #e2e8f0);
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px));
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1);
   }
   .post-detail-guest-bar .guest-bar-title {
     color: var(--text-dark, #0f172a);

@@ -5186,6 +5186,20 @@
         });
 
         // Scrubber Dragging Listeners (Desktop Mouse Drag & Mobile Touch Scrubbing)
+        function onScrubberTouchMove(event) {
+            if (scrubberState.isDragging && event.touches.length > 0) {
+                if (event.cancelable) event.preventDefault();
+                updateScrubPosition(event.touches[0].clientX);
+            }
+        }
+
+        function finishTouchScrubbing() {
+            document.removeEventListener('touchmove', onScrubberTouchMove);
+            if (scrubberState.isDragging) {
+                stopScrubbing();
+            }
+        }
+
         document.addEventListener('mousedown', function(event) {
             const scrubber = event.target.closest('.reel-progress-container');
             if (scrubber) {
@@ -5200,8 +5214,9 @@
             if (scrubber && event.touches.length > 0) {
                 event.stopPropagation();
                 startScrubbing(scrubber, event.touches[0].clientX);
+                document.addEventListener('touchmove', onScrubberTouchMove, { passive: false });
             }
-        }, { passive: false });
+        }, { passive: true });
 
         document.addEventListener('mousemove', function(event) {
             if (scrubberState.isDragging) {
@@ -5210,78 +5225,79 @@
             }
         });
 
-        document.addEventListener('touchmove', function(event) {
-            if (scrubberState.isDragging && event.touches.length > 0) {
-                event.preventDefault();
-                updateScrubPosition(event.touches[0].clientX);
-            }
-        }, { passive: false });
-
         document.addEventListener('mouseup', function() {
             if (scrubberState.isDragging) {
                 stopScrubbing();
             }
         });
 
-        document.addEventListener('touchend', function() {
-            if (scrubberState.isDragging) {
-                stopScrubbing();
-            }
-        });
-
-        document.addEventListener('touchcancel', function() {
-            if (scrubberState.isDragging) {
-                stopScrubbing();
-            }
-        });
+        document.addEventListener('touchend', finishTouchScrubbing, { passive: true });
+        document.addEventListener('touchcancel', finishTouchScrubbing, { passive: true });
 
         // Long-press detection on reel cards and hitboxes
         let longPressTimer = null;
         let touchStartX = 0;
         let touchStartY = 0;
+        let longPressMoved = false;
+
+        function cancelReelLongPress() {
+            longPressMoved = true;
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }
 
         document.addEventListener('touchstart', function(event) {
+            cancelReelLongPress();
+            if (!event.touches || event.touches.length !== 1) return;
             const hitbox = event.target.closest('.reel-center-hitbox, .reel-tap-hitbox, .reel-stage-container, .reel-card-container');
             if (!hitbox) return;
 
             const touch = event.touches[0];
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
+            longPressMoved = false;
             state.hasLongPressed = false;
 
             longPressTimer = setTimeout(() => {
+                longPressTimer = null;
+                if (longPressMoved) return;
                 state.hasLongPressed = true;
-                if (navigator.vibrate) navigator.vibrate(35);
+                if (window.Haptics && typeof window.Haptics.impactMedium === 'function') {
+                    window.Haptics.impactMedium();
+                } else if (navigator.vibrate) {
+                    navigator.vibrate(20);
+                }
                 const postId = extractPostId(hitbox);
                 if (postId) {
                     openReelQuickTools(postId, hitbox);
                 }
-            }, 480);
+            }, 520);
         }, { passive: true });
 
         document.addEventListener('touchmove', function(event) {
-            if (!longPressTimer) return;
+            if (!longPressTimer || !event.touches || event.touches.length === 0) return;
             const touch = event.touches[0];
-            if (Math.abs(touch.clientX - touchStartX) > 12 || Math.abs(touch.clientY - touchStartY) > 12) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
+            if (Math.abs(touch.clientX - touchStartX) > 8 || Math.abs(touch.clientY - touchStartY) > 8) {
+                cancelReelLongPress();
             }
         }, { passive: true });
 
-        document.addEventListener('touchend', function() {
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-        }, { passive: true });
+        document.addEventListener('touchend', cancelReelLongPress, { passive: true });
+        document.addEventListener('touchcancel', cancelReelLongPress, { passive: true });
+        window.addEventListener('scroll', cancelReelLongPress, { capture: true, passive: true });
 
         // Right click context menu on desktop -> opens quick tools
         document.addEventListener('contextmenu', function(event) {
             const card = event.target.closest('.reel-stage-container, .reel-card-container, .reel-post-card, .reels-carousel-card');
             if (card) {
                 event.preventDefault();
-                const postId = extractPostId(card);
-                if (postId) openReelQuickTools(postId, card);
+                // Only open quick tools from a desktop mouse right-click, not touch scroll/hold
+                if (event.pointerType === 'mouse' || (!('ontouchstart' in window) && event.button === 2)) {
+                    const postId = extractPostId(card);
+                    if (postId) openReelQuickTools(postId, card);
+                }
             }
         });
 

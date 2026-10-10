@@ -436,34 +436,44 @@ def _academic_unit_members_recipient(event_data: Dict[str, Any]) -> List[int]:
 
 
 def _message_recipient_recipient(event_data: Dict[str, Any]) -> List[int]:
-    """Recipient: Message recipient."""
-    from messaging.models import Message
-    
+    """Recipient: Conversation members (excluding sender and muted members)."""
+    from messaging.models import Message, Conversation
+
     target_id = event_data.get('target_id')
+    target_type = str(event_data.get('target_type') or '').lower()
+    actor_id = event_data.get('actor_id')
     if not target_id:
         return []
-    
+
     try:
-        message = Message.objects.get(id=target_id)
-        # Get conversation members except the sender
-        conversation_members = message.conversation.members.exclude(
-            user=message.sender
-        )
-        return [m.user_id for m in conversation_members]
-    except Message.DoesNotExist:
+        if target_type == 'conversation':
+            conversation = Conversation.objects.get(id=target_id)
+            qs = conversation.members.filter(is_muted=False)
+            if actor_id:
+                qs = qs.exclude(user_id=actor_id)
+            return list(qs.values_list('user_id', flat=True))
+        else:
+            message = Message.objects.get(id=target_id)
+            qs = message.conversation.members.filter(is_muted=False).exclude(user=message.sender)
+            return list(qs.values_list('user_id', flat=True))
+    except (Message.DoesNotExist, Conversation.DoesNotExist, ValueError):
         return []
 
 
 def _conversation_member_recipient(event_data: Dict[str, Any]) -> List[int]:
-    """Recipient: Added conversation member."""
-    context_id = event_data.get('context_id')
+    """Recipient: Added conversation member (excluding actor if self-added)."""
+    metadata = event_data.get('metadata') or {}
+    context_id = event_data.get('context_id') or metadata.get('member_id')
+    actor_id = event_data.get('actor_id')
     if not context_id:
         return []
-    
+
     try:
         user = User.objects.get(id=context_id)
+        if actor_id and str(user.id) == str(actor_id):
+            return []
         return [user.id]
-    except User.DoesNotExist:
+    except (User.DoesNotExist, ValueError):
         return []
 
 
@@ -920,8 +930,8 @@ MESSAGE_SENT_RULE = NotificationRule(
     name="message_sent",
     trigger="messaging.message.sent",
     condition=None,
-    notification_type="WORKSPACE",
-    category="WORKSPACE",
+    notification_type="CHAT_MESSAGE",
+    category="MESSAGING",
     priority="HIGH",
     delivery_policy="IMMEDIATE",
     aggregation_policy="NEVER",
@@ -934,8 +944,8 @@ CONVERSATION_MEMBER_ADDED_RULE = NotificationRule(
     name="conversation_member_added",
     trigger="messaging.conversation.member_added",
     condition=None,
-    notification_type="WORKSPACE",
-    category="WORKSPACE",
+    notification_type="CHAT_MESSAGE",
+    category="MESSAGING",
     priority="NORMAL",
     delivery_policy="IMMEDIATE",
     aggregation_policy="ALLOWED",

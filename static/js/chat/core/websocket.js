@@ -25,6 +25,28 @@ export class WebSocketManager {
         this.HEARTBEAT_TIMEOUT_MS = 90000; // 90 seconds - allow some buffer beyond server's 60s timeout
         this.HEARTBEAT_SEND_INTERVAL_MS = 25000; // 25 seconds - send proactive heartbeat
         this.proactiveHeartbeatInterval = null;
+        this._setupNetworkRecovery();
+    }
+
+    /**
+     * Automatically reconnect when browser regains network or tab visibility
+     */
+    _setupNetworkRecovery() {
+        if (typeof window === 'undefined') return;
+        window.addEventListener('online', () => {
+            if (this.conversationId && !this.paused && !this.isConnected()) {
+                this.reconnectAttempts = 0;
+                this.reconnectInProgress = false;
+                this.connect();
+            }
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && this.conversationId && !this.paused && !this.isConnected()) {
+                this.reconnectAttempts = 0;
+                this.reconnectInProgress = false;
+                this.connect();
+            }
+        });
     }
 
     /**
@@ -70,13 +92,16 @@ export class WebSocketManager {
             const now = Date.now();
             const heartbeatAge = now - this.lastHeartbeatTime;
 
-            // Check if heartbeat is lost (3-minute timeout)
+            // Check if heartbeat is lost
             if (heartbeatAge > this.HEARTBEAT_TIMEOUT_MS) {
                 this._log('HEARTBEAT_LOST', { heartbeatAge });
                 console.warn('[WS] Heartbeat lost — reconnecting');
-                this.disconnect();
+                this.stopHeartbeat();
+                this._forceClose();
                 setTimeout(() => {
-                    this.connect();
+                    if (!this.paused) {
+                        this.connect();
+                    }
                 }, 500);
                 return;
             }
@@ -142,9 +167,15 @@ export class WebSocketManager {
      */
 
     connect() {
-        if (this.paused) return;
+        if (this.paused || !this.conversationId) return;
 
         this.shouldReconnect = true;
+        this.reconnectInProgress = false;
+
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
 
         if (this.socket) {
             this._forceClose();
@@ -209,12 +240,17 @@ export class WebSocketManager {
                 console.log('[WEBSOCKET] Parsed data:', JSON.stringify(data, null, 2));
 
                 this.lastMessageTime = Date.now();
+                this.lastHeartbeatTime = Date.now();
 
                 // Handle ping/pong heartbeat
                 if (data.type === 'ping') {
                     this.send({ type: 'pong' });
-                    this.lastHeartbeatTime = Date.now();
                     this._log('HEARTBEAT_RECEIVED');
+                    console.groupEnd();
+                    return;
+                }
+                if (data.type === 'pong' || data.type === 'heartbeat_ack') {
+                    this._log('HEARTBEAT_ACK_RECEIVED');
                     console.groupEnd();
                     return;
                 }
@@ -273,6 +309,7 @@ export class WebSocketManager {
      */
     disconnect() {
         this.shouldReconnect = false;
+        this.reconnectInProgress = false;
 
         this.stopHeartbeat();
 
@@ -305,15 +342,18 @@ export class WebSocketManager {
      */
 
     handleReconnect() {
-        if (this.reconnectInProgress) return;
-        if (this.reconnectAttempts >= 5) return;
+        if (this.reconnectInProgress || this.paused || !this.shouldReconnect) return;
 
         this.reconnectInProgress = true;
-        const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
+        const delay = Math.min(1000 * 2 ** Math.min(this.reconnectAttempts, 4), 15000);
         this.reconnectAttempts++;
 
         this.reconnectTimer = setTimeout(() => {
-            this.connect();
+            this.reconnectInProgress = false;
+            this.reconnectTimer = null;
+            if (this.shouldReconnect && !this.paused) {
+                this.connect();
+            }
         }, delay);
     }
 

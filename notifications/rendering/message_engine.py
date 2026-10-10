@@ -181,6 +181,14 @@ class NotificationMessageEngine:
                 "MANY": "{actors} added you to workspaces.",
                 "HISTORICAL": "{actors} added you to workspaces.",
             },
+            "CHAT_MESSAGE": {
+                "SINGLE": "{actor} sent you a message.",
+                "DUAL": "{actor1} and {actor2} sent you messages.",
+                "FEW": "{actors} and {others} others sent you messages.",
+                "MANY": "{actors} and {others} others sent you messages.",
+                "HISTORICAL": "{actors} sent you messages.",
+                "SUMMARY": "New message",
+            },
             "DOCUMENT": {
                 "SINGLE": "{actor} shared a document with you: {title}.",
                 "DUAL": "{actor1} and {actor2} shared documents with you.",

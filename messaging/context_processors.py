@@ -20,6 +20,7 @@ def get_cached_unread_message_count(user):
     total_unread = (
         Message.objects.filter(
             conversation__members__user=user,
+            is_deleted=False,
             id__gt=Coalesce(models.F('conversation__members__last_read_message_id'), 0),
         )
         .exclude(sender_id=user.id)

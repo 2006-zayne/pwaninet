@@ -170,6 +170,9 @@ function initNativeAppEnhancements() {
                      document.documentElement.classList.contains('is-capacitor') ||
                      document.documentElement.classList.contains('is-native-app');
 
+    // Initialize virtual keyboard (IME) viewport management for both native & mobile web/PWA
+    initKeyboardManager();
+
     if (!isNative) return;
 
     document.documentElement.classList.add('is-capacitor', 'is-native-app');
@@ -201,9 +204,6 @@ function initNativeAppEnhancements() {
     // Initialize native app update checks
     initNativeAppUpdates();
 
-    // Initialize virtual keyboard (IME) viewport management
-    initKeyboardManager();
-
     // Initialize native-like pull to refresh
     initPullToRefresh();
 
@@ -218,7 +218,7 @@ function initNativeAppEnhancements() {
 }
 
 /**
- * Instant button touch states - eliminates 300ms gesture delay and provides tactile feedback
+ * Native-grade button touch states with 80ms tap-slop delay so scrolling never feels like long-pressing
  */
 function initInstantTouchStates() {
     const clickableSelectors = [
@@ -227,28 +227,45 @@ function initInstantTouchStates() {
         'button',
         '.nav-chip',
         '.action-icon',
-        '.card-clickable',
         '.dropdown-item',
         '.reaction-chip',
-        '.cursor-pointer',
         '[data-clickable="true"]'
     ];
+    const selectorString = clickableSelectors.join(',');
 
     let touchTarget = null;
     let touchStartX = 0;
     let touchStartY = 0;
-    let touchStartTime = 0;
     let touchMoved = false;
+    let activationTimer = null;
+
+    function clearTouchFeedback() {
+        if (activationTimer) {
+            clearTimeout(activationTimer);
+            activationTimer = null;
+        }
+        if (touchTarget) {
+            touchTarget.classList.remove('activated');
+            touchTarget = null;
+        }
+    }
 
     document.addEventListener('touchstart', function(e) {
         if (!e.touches || e.touches.length !== 1) return;
-        touchTarget = e.target.closest(clickableSelectors.join(','));
+        clearTouchFeedback();
+        touchTarget = e.target.closest(selectorString);
         if (touchTarget) {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
-            touchStartTime = Date.now();
             touchMoved = false;
-            touchTarget.classList.add('activated');
+            const targetRef = touchTarget;
+            // 80ms tap-slop delay prevents elements from shrinking when the user starts a scroll gesture
+            activationTimer = setTimeout(function() {
+                activationTimer = null;
+                if (touchTarget === targetRef && !touchMoved) {
+                    targetRef.classList.add('activated');
+                }
+            }, 80);
         }
     }, { passive: true });
 
@@ -258,28 +275,42 @@ function initInstantTouchStates() {
             const dy = Math.abs(e.touches[0].clientY - touchStartY);
             if (dx > 8 || dy > 8) {
                 touchMoved = true;
-                touchTarget.classList.remove('activated');
+                clearTouchFeedback();
             }
         }
     }, { passive: true });
 
-    document.addEventListener('touchend', function() {
+    window.addEventListener('scroll', function() {
         if (touchTarget) {
-            touchTarget.classList.remove('activated');
-            const duration = Date.now() - touchStartTime;
-            // Only fire light haptic on a genuine tap release (not during a swipe or long hold)
-            if (!touchMoved && duration < 400 && !touchTarget.hasAttribute('data-haptic') && window.Haptics && typeof window.Haptics.impactLight === 'function') {
-                window.Haptics.impactLight();
-            }
-            touchTarget = null;
+            touchMoved = true;
+            clearTouchFeedback();
+        }
+    }, { capture: true, passive: true });
+
+    document.addEventListener('touchend', function() {
+        if (!touchTarget) return;
+        const targetRef = touchTarget;
+        const wasMoved = touchMoved;
+        const hadPendingTimer = Boolean(activationTimer);
+        if (activationTimer) {
+            clearTimeout(activationTimer);
+            activationTimer = null;
+        }
+        touchTarget = null;
+
+        if (!wasMoved && hadPendingTimer) {
+            // Quick tap (<80ms): show a brief, crisp visual press state without delaying navigation
+            targetRef.classList.add('activated');
+            setTimeout(function() {
+                targetRef.classList.remove('activated');
+            }, 65);
+        } else {
+            targetRef.classList.remove('activated');
         }
     }, { passive: true });
 
     document.addEventListener('touchcancel', function() {
-        if (touchTarget) {
-            touchTarget.classList.remove('activated');
-            touchTarget = null;
-        }
+        clearTouchFeedback();
     }, { passive: true });
 }
 
@@ -669,41 +700,98 @@ function dismissActiveOverlays() {
 
 /**
  * Virtual Keyboard (IME) Viewport Management
- * Hides floating bottom navigation when typing to prevent viewport overlap
+ * Tracks baseline viewport height per orientation so Android adjustResize and iOS visualViewport
+ * both keep body.keyboard-open stable without double-jumping safe-area bottom padding.
  */
 function initKeyboardManager() {
-    if (!window.visualViewport) return;
+    if (window._pwaninet_keyboard_manager_initialized) return;
+    window._pwaninet_keyboard_manager_initialized = true;
 
-    function handleViewportChange() {
-        const currentHeight = window.visualViewport.height;
-        const isKeyboardVisible = (window.innerHeight - currentHeight) > 150;
-        if (isKeyboardVisible) {
-            document.body.classList.add('keyboard-open');
-        } else {
-            document.body.classList.remove('keyboard-open');
+    const NON_TEXT_INPUT_TYPES = new Set([
+        'checkbox', 'radio', 'button', 'submit', 'reset',
+        'file', 'range', 'color', 'hidden', 'image'
+    ]);
+
+    function isTextEntryElement(el) {
+        if (!el || typeof el !== 'object') return false;
+        if (el.isContentEditable) return true;
+        const tag = el.tagName;
+        if (tag === 'TEXTAREA') return true;
+        if (tag === 'INPUT') {
+            const type = (el.getAttribute('type') || el.type || 'text').toLowerCase();
+            return !NON_TEXT_INPUT_TYPES.has(type) && !el.readOnly && !el.disabled;
+        }
+        return false;
+    }
+
+    function getViewportHeight() {
+        return window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    }
+
+    let maxViewportHeight = Math.max(window.innerHeight || 0, getViewportHeight() || 0);
+    let focusLockUntil = 0;
+
+    function setKeyboardState(isOpen, keyboardHeightPx) {
+        const root = document.documentElement;
+        const body = document.body;
+        const heightVal = Math.max(0, Math.round(keyboardHeightPx || 0));
+        if (root) {
+            root.style.setProperty('--pwaninet-keyboard-height', heightVal + 'px');
+            root.classList.toggle('keyboard-open', isOpen);
+        }
+        if (body) {
+            body.classList.toggle('keyboard-open', isOpen);
         }
     }
 
-    window.visualViewport.addEventListener('resize', handleViewportChange);
-    window.visualViewport.addEventListener('scroll', handleViewportChange);
+    function handleViewportChange() {
+        const currentHeight = getViewportHeight();
+        const layoutHeight = window.innerHeight || currentHeight;
+        if (currentHeight > maxViewportHeight || layoutHeight > maxViewportHeight) {
+            maxViewportHeight = Math.max(maxViewportHeight, currentHeight, layoutHeight);
+        }
+
+        const heightDrop = Math.max(0, maxViewportHeight - currentHeight);
+        const nativeImeOpen = document.documentElement.dataset.imeVisible === 'true';
+        const isKeyboardVisible = nativeImeOpen || heightDrop > 110;
+
+        if (isKeyboardVisible) {
+            setKeyboardState(true, heightDrop);
+        } else if (performance.now() >= focusLockUntil) {
+            setKeyboardState(false, 0);
+        }
+    }
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleViewportChange, { passive: true });
+        window.visualViewport.addEventListener('scroll', handleViewportChange, { passive: true });
+    }
+    window.addEventListener('resize', handleViewportChange, { passive: true });
+
+    window.addEventListener('orientationchange', function() {
+        setTimeout(function() {
+            maxViewportHeight = Math.max(window.innerHeight || 0, getViewportHeight() || 0);
+            handleViewportChange();
+        }, 180);
+    }, { passive: true });
 
     document.addEventListener('focusin', function(e) {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
-            setTimeout(() => {
-                document.body.classList.add('keyboard-open');
-            }, 60);
+        if (isTextEntryElement(e.target)) {
+            focusLockUntil = performance.now() + 380;
+            setKeyboardState(true, Math.max(0, maxViewportHeight - getViewportHeight()));
         }
-    });
+    }, { passive: true });
 
     document.addEventListener('focusout', function(e) {
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
-            setTimeout(() => {
-                if (window.visualViewport && (window.innerHeight - window.visualViewport.height) <= 150) {
-                    document.body.classList.remove('keyboard-open');
+        if (isTextEntryElement(e.target)) {
+            focusLockUntil = 0;
+            setTimeout(function() {
+                if (!isTextEntryElement(document.activeElement)) {
+                    handleViewportChange();
                 }
-            }, 100);
+            }, 80);
         }
-    });
+    }, { passive: true });
 }
 
 /**
@@ -736,12 +824,18 @@ function initPullToRefresh() {
      * We must NOT activate PTR in those cases.
      */
     function touchStartsInScrollableChild(target) {
+        const bodyClass = document.body.classList;
+        if (bodyClass.contains('in-conversation-active') ||
+            bodyClass.contains('pwanimate-active') ||
+            bodyClass.contains('modal-open')) {
+            return true;
+        }
         let el = target;
-        while (el && el !== document.body) {
-            const style = window.getComputedStyle(el);
-            const overflowY = style.overflowY;
-            const isScrollable = (overflowY === 'auto' || overflowY === 'scroll');
-            if (isScrollable && el.scrollHeight > el.clientHeight) return true;
+        while (el && el !== document.body && el !== document.documentElement) {
+            if (el.scrollHeight > el.clientHeight + 1) {
+                const overflowY = window.getComputedStyle(el).overflowY;
+                if (overflowY === 'auto' || overflowY === 'scroll') return true;
+            }
             el = el.parentElement;
         }
         return false;
@@ -788,6 +882,12 @@ function initPullToRefresh() {
         }
     }, { passive: true });
 
+    function resetPullIndicator() {
+        isPulling = false;
+        ptrIndicator.style.opacity = '0';
+        ptrIndicator.style.transform = 'translate(-50%, -150%)';
+    }
+
     document.addEventListener('touchend', function() {
         if (!isPulling) return;
         const diff = currentY - startY;
@@ -803,10 +903,11 @@ function initPullToRefresh() {
                 window.location.reload();
             }, 300);
         } else {
-            ptrIndicator.style.opacity = '0';
-            ptrIndicator.style.transform = 'translate(-50%, -150%)';
+            resetPullIndicator();
         }
     }, { passive: true });
+
+    document.addEventListener('touchcancel', resetPullIndicator, { passive: true });
 }
 
 /**
@@ -1537,6 +1638,17 @@ async function initNativePush(requestIfPrompt = false) {
 function showNativePushBanner(notification) {
     if (!notification) return;
 
+    const data = notification.data || {};
+    const convId = data.conversation_id ? String(data.conversation_id) : '';
+    if (convId) {
+        const activeChatEl = document.getElementById('chatMainArea');
+        const activeConvId = activeChatEl && activeChatEl.dataset ? String(activeChatEl.dataset.conversationId || '') : '';
+        const onThisChatUrl = window.location.pathname.indexOf('/messaging/conversation/' + convId) === 0;
+        if (activeConvId === convId || onThisChatUrl) {
+            return;
+        }
+    }
+
     // Trigger native haptic feedback
     try {
         if (window.AndroidBridge && typeof window.AndroidBridge.hapticNotification === 'function') {
@@ -1546,7 +1658,6 @@ function showNativePushBanner(notification) {
         }
     } catch (_) {}
 
-    const data = notification.data || {};
     const title = notification.title || data.title || 'PwaniNet';
     const body = notification.body || data.body || '';
 

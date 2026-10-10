@@ -210,9 +210,17 @@ export class Store {
                 existing.content !== validatedMessage.content ||
                 existing.editedAt !== validatedMessage.editedAt ||
                 existing.isDeleted !== validatedMessage.isDeleted ||
-                existing.status !== validatedMessage.status
+                existing.status !== validatedMessage.status ||
+                existing.isOptimistic !== validatedMessage.isOptimistic ||
+                existing.type !== validatedMessage.type ||
+                existing.metadata?.url !== validatedMessage.metadata?.url
             )) {
-                this._state.messages.set(idStr, { ...existing, ...validatedMessage, id: idStr });
+                this._state.messages.set(idStr, {
+                    ...existing,
+                    ...validatedMessage,
+                    metadata: { ...(existing.metadata || {}), ...(validatedMessage.metadata || {}) },
+                    id: idStr
+                });
                 this._notifySubscribers();
             }
             return;
@@ -266,9 +274,17 @@ export class Store {
                     existing.content !== validated.content ||
                     existing.editedAt !== validated.editedAt ||
                     existing.isDeleted !== validated.isDeleted ||
-                    existing.status !== validated.status
+                    existing.status !== validated.status ||
+                    existing.isOptimistic !== validated.isOptimistic ||
+                    existing.type !== validated.type ||
+                    existing.metadata?.url !== validated.metadata?.url
                 )) {
-                    this._state.messages.set(idStr, { ...existing, ...validated, id: idStr });
+                    this._state.messages.set(idStr, {
+                        ...existing,
+                        ...validated,
+                        metadata: { ...(existing.metadata || {}), ...(validated.metadata || {}) },
+                        id: idStr
+                    });
                     changedCount++;
                 }
                 continue;
@@ -447,7 +463,8 @@ export class Store {
         console.log('[STORE] Updating message status:', messageId, 'to:', status);
         this._logMutation('UPDATE_MESSAGE_STATUS', { messageId, status, metadata });
 
-        const existingMessage = this._state.messages.get(messageId);
+        const key = String(messageId);
+        const existingMessage = this._state.messages.get(key) || this._state.messages.get(messageId) || this._state.messages.get(Number(messageId));
         if (!existingMessage) {
             console.error('Store: Message not found for status update', messageId);
             return;
@@ -456,6 +473,7 @@ export class Store {
         // Update message with new status
         const updatedMessage = {
             ...existingMessage,
+            id: key,
             status: status,
             metadata: {
                 ...existingMessage.metadata,
@@ -470,7 +488,8 @@ export class Store {
             return;
         }
 
-        this._state.messages.set(messageId, validatedMessage);
+        this._state.messages.delete(Number(key));
+        this._state.messages.set(key, validatedMessage);
         this._notifySubscribers();
     }
 
@@ -591,24 +610,42 @@ export class Store {
      * @param {number|string} actualId - Real server ID
      * @param {string} status - New status ('sent')
      * @param {string} timestamp - Server timestamp
+     * @param {Object|null} fullUpdates - Optional full canonical message fields to merge atomically
      */
-    updateMessageIdAndStatus(tempId, actualId, status = 'sent', timestamp = null) {
-        const msg = this._state.messages.get(tempId);
+    updateMessageIdAndStatus(tempId, actualId, status = 'sent', timestamp = null, fullUpdates = null) {
+        const tempIdStr = String(tempId);
+        const msg = this._state.messages.get(tempIdStr) || this._state.messages.get(tempId);
         if (!msg) return;
 
         const actualIdStr = String(actualId);
-        const tempIdStr = String(tempId);
 
         this._state.messages.delete(tempIdStr);
+        this._state.messages.delete(tempId);
         this._state.processedMessageIds.delete(tempIdStr);
         this._state.processedMessageIds.add(actualIdStr);
 
+        const originalSortOrder = (typeof msg.sortOrder === 'number' && !isNaN(msg.sortOrder))
+            ? msg.sortOrder
+            : (msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now());
+
+        const mergedMetadata = {
+            ...(msg.metadata || {}),
+            ...(fullUpdates?.metadata || {})
+        };
+        // Preserve local blob URL / previewUrl if server URL is missing or keep localAudioUrl fallback
+        if (msg.metadata?.url && String(msg.metadata.url).startsWith('blob:') && !mergedMetadata.localBlobUrl) {
+            mergedMetadata.localBlobUrl = msg.metadata.url;
+        }
+
         const updated = {
             ...msg,
+            ...(fullUpdates || {}),
             id: actualIdStr,
-            status: status,
+            status: status || fullUpdates?.status || 'sent',
             isOptimistic: false,
-            timestamp: timestamp || msg.timestamp
+            timestamp: timestamp || fullUpdates?.timestamp || msg.timestamp,
+            sortOrder: originalSortOrder,
+            metadata: mergedMetadata
         };
 
         const tempIndex = this._state.messageOrder.indexOf(tempIdStr);

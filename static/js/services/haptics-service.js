@@ -11,8 +11,12 @@
         constructor() {
             this.enabled = true;
             this.lastTriggerTime = 0;
-            this.minIntervalMs = 25; // Cooldown between rapid haptics to prevent motor buzz
+            this.lastScrollTime = 0;
+            this.isTouchDragging = false;
+            this.minIntervalMs = 120; // Cooldown prevents touchend + click double-firing
+            this.scrollSuppressionMs = 160; // Suppress haptics during and immediately after scrolling
             this._initPreferences();
+            this._initScrollGuard();
         }
 
         _initPreferences() {
@@ -30,9 +34,51 @@
             } catch (e) {}
         }
 
+        _initScrollGuard() {
+            if (typeof window === 'undefined' || typeof document === 'undefined') return;
+            let startX = 0;
+            let startY = 0;
+
+            window.addEventListener('scroll', () => {
+                this.lastScrollTime = performance.now();
+            }, { capture: true, passive: true });
+
+            document.addEventListener('touchstart', (e) => {
+                if (e.touches && e.touches.length === 1) {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    this.isTouchDragging = false;
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchmove', (e) => {
+                if (e.touches && e.touches.length > 0) {
+                    const dx = Math.abs(e.touches[0].clientX - startX);
+                    const dy = Math.abs(e.touches[0].clientY - startY);
+                    if (dx > 8 || dy > 8) {
+                        this.isTouchDragging = true;
+                        this.lastScrollTime = performance.now();
+                    }
+                }
+            }, { passive: true });
+
+            const clearDrag = () => {
+                this.isTouchDragging = false;
+            };
+            document.addEventListener('touchend', clearDrag, { passive: true });
+            document.addEventListener('touchcancel', () => {
+                this.isTouchDragging = true;
+                this.lastScrollTime = performance.now();
+                setTimeout(clearDrag, 160);
+            }, { passive: true });
+        }
+
         _canTrigger() {
-            if (!this.enabled) return false;
+            if (!this.enabled || this.isTouchDragging) return false;
             const now = performance.now();
+            if (now - this.lastScrollTime < this.scrollSuppressionMs) {
+                return false;
+            }
             if (now - this.lastTriggerTime < this.minIntervalMs) {
                 return false;
             }
@@ -41,7 +87,7 @@
         }
 
         /**
-         * Light impact - optimal for bottom navigation tabs, buttons, likes, chips
+         * Light impact - optimal for bottom navigation tabs, likes, chips
          */
         impactLight() {
             if (!this._canTrigger()) return;
@@ -66,7 +112,7 @@
             // Tier 3: Web Vibration API fallback
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
                 try {
-                    navigator.vibrate(22);
+                    navigator.vibrate(10);
                 } catch (e) {}
             }
         }
@@ -94,7 +140,7 @@
 
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
                 try {
-                    navigator.vibrate(38);
+                    navigator.vibrate(20);
                 } catch (e) {}
             }
         }
@@ -122,7 +168,7 @@
 
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
                 try {
-                    navigator.vibrate(55);
+                    navigator.vibrate(35);
                 } catch (e) {}
             }
         }
@@ -150,7 +196,7 @@
 
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
                 try {
-                    navigator.vibrate(18);
+                    navigator.vibrate(8);
                 } catch (e) {}
             }
         }

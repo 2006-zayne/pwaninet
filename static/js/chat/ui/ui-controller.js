@@ -6,7 +6,7 @@
 
 import { store } from '../core/store.js';
 import { messageService } from '../core/message-service.js';
-import { MessageRenderer } from './renderer.js?v=42';
+import { MessageRenderer } from './renderer.js?v=43';
 import { contextMenuService } from '../features/context-menu/context-menu.service.js';
 import { messageSoundManager } from '../shared/message-sound.js';
 import { eventBus } from '../core/event-bus.js';
@@ -1341,18 +1341,17 @@ export class UIController {
      * @returns {string} Checksum string
      */
     _computeMessagesChecksum(messages) {
-        // Create a simple checksum based on message IDs and statuses
-        // This allows us to detect when a message status changes (e.g., sent -> read)
-        return messages.map(m => `${m.id}:${m.status || 'sent'}`).join('|');
+        // Create a checksum based on message IDs, statuses, optimistic state, and media URL
+        return messages.map(m => `${m.id}:${m.status || 'sent'}:${m.isOptimistic ? '1' : '0'}:${m.metadata?.url || ''}`).join('|');
     }
 
     /**
-     * Compute a checksum of message content, editedAt, and isDeleted
+     * Compute a checksum of message content, editedAt, isDeleted, type, and media URL
      * @param {Array} messages - Messages array
      * @returns {string} Checksum string
      */
     _computeContentChecksum(messages) {
-        return messages.map(m => `${m.id}:${m.editedAt || m.edited_at || ''}:${m.isDeleted ? '1' : '0'}:${m.content || ''}`).join('|');
+        return messages.map(m => `${m.id}:${m.status || 'sent'}:${m.isOptimistic ? '1' : '0'}:${m.type || ''}:${m.metadata?.url || ''}:${m.editedAt || m.edited_at || ''}:${m.isDeleted ? '1' : '0'}:${m.content || ''}`).join('|');
     }
 
     /**

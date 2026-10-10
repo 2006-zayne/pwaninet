@@ -192,6 +192,34 @@ class PresenceService:
         except Exception as e:
             print(f'[PRESENCE] Error getting connection count for user {user_id}: {e}')
             return 0
+
+    @staticmethod
+    def is_user_in_conversation(user_id: int, conversation_id: int) -> bool:
+        """
+        Check if user currently has an active WebSocket connection (fresh heartbeat)
+        specifically inside the given conversation room.
+        """
+        try:
+            redis_client = get_redis_client()
+            connections_key = PresenceService._get_connections_key(user_id)
+            connections = redis_client.hgetall(connections_key)
+            if not connections:
+                return False
+
+            now = time.time()
+            target_conv = str(conversation_id)
+            for _, conn_json in connections.items():
+                try:
+                    conn_data = json.loads(conn_json)
+                    last_heartbeat = float(conn_data.get('last_heartbeat', 0))
+                    conn_conv_id = str(conn_data.get('conversation_id', ''))
+                    if (now - last_heartbeat) <= HEARTBEAT_TIMEOUT and conn_conv_id == target_conv:
+                        return True
+                except (json.JSONDecodeError, ValueError, TypeError):
+                    continue
+            return False
+        except Exception:
+            return False
     
     @staticmethod
     def remove_connection(user_id: int, connection_id: str) -> None:

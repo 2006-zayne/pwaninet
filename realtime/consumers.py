@@ -54,11 +54,13 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
         # Send current unread count on connect
         unread_count = await self.get_unread_count()
+        unread_messages_count = await self.get_unread_messages_count()
         await self.send(text_data=json.dumps({
             'type': 'unread_count',
-            'count': unread_count
+            'count': unread_count,
+            'unread_messages_count': unread_messages_count,
         }))
-        print(f'[NOTIFICATIONS] Sent initial unread count: {unread_count}')
+        print(f'[NOTIFICATIONS] Sent initial unread count: {unread_count} (messages: {unread_messages_count})')
 
         # Register connection - FROZEN FOR MVP
         # from messaging.ws_middleware import WebSocketConnectionTracker
@@ -128,19 +130,41 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         }))
 
     async def conversation_update(self, event):
-        """Send conversation update to client for real-time list updates."""
+        """Send conversation update to client for real-time list, badge, and banner updates."""
         try:
-            await self.send(text_data=json.dumps({
+            payload = {
                 'type': 'conversation_update',
+                'event_kind': event.get('event_kind', 'message'),
                 'conversation_id': event.get('conversation_id'),
+                'conversation_type': event.get('conversation_type'),
+                'conversation_name': event.get('conversation_name'),
+                'conversation_avatar': event.get('conversation_avatar'),
+                'peer_id': event.get('peer_id'),
+                'peer_username': event.get('peer_username'),
+                'message_id': event.get('message_id'),
                 'message_preview': event.get('message_preview'),
+                'clean_preview': event.get('clean_preview'),
+                'banner_title': event.get('banner_title'),
+                'banner_body': event.get('banner_body'),
                 'preview_type': event.get('preview_type', 'text'),
+                'preview_icon': event.get('preview_icon'),
+                'thumbnail_url': event.get('thumbnail_url'),
                 'sender_name': event.get('sender_name'),
+                'sender_display_name': event.get('sender_display_name'),
+                'sender_avatar': event.get('sender_avatar'),
                 'sender_id': event.get('sender_id'),
                 'is_sender': event.get('is_sender', False),
+                'is_muted': event.get('is_muted', False),
+                'is_pinned': event.get('is_pinned', False),
+                'is_mention_or_reply': event.get('is_mention_or_reply', False),
+                'should_alert': event.get('should_alert', False),
+                'retract_tag': event.get('retract_tag'),
                 'timestamp': event.get('timestamp'),
                 'unread_count': event.get('unread_count', 0),
-            }))
+                'total_unread_count': event.get('total_unread_count'),
+                'target_url': event.get('target_url'),
+            }
+            await self.send(text_data=json.dumps(payload))
         except Exception as e:
             logger.error(f"Error sending conversation_update to user {getattr(self, 'user', None)}: {e}")
 
@@ -181,6 +205,12 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         """Get unread count for current user."""
         from notifications.services.notification_service import get_cached_unread_count
         return get_cached_unread_count(self.user)
+
+    @database_sync_to_async
+    def get_unread_messages_count(self):
+        """Get unread direct/group message count for current user."""
+        from messaging.context_processors import get_cached_unread_message_count
+        return get_cached_unread_message_count(self.user)
 
 
 

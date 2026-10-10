@@ -206,6 +206,7 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
         """Handle chat message."""
         content = data.get('content')
         message_type = data.get('message_type', 'text')
+        temp_id = data.get('temp_id')
 
         if not content and message_type == 'text':
             return
@@ -218,20 +219,32 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
             message_type=message_type
         )
 
+        # Send immediate ACK to sender so optimistic clock transitions to single check
+        if temp_id:
+            await self.send_json({
+                'type': 'message_ack',
+                'temp_id': temp_id,
+                'message_id': message.id,
+                'status': message.status or 'sent',
+                'created_at': message.created_at.isoformat()
+            })
+
         # Broadcast to group
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 'type': 'group_message',
+                'temp_id': temp_id,
                 'message': {
                     'id': message.id,
+                    'temp_id': temp_id,
                     'group_id': message.group_id,
                     'sender_id': message.sender_id,
                     'sender_username': self.user.username,
                     'content': message.content,
                     'message_type': message.message_type,
                     'created_at': message.created_at.isoformat(),
-                    'status': message.status
+                    'status': message.status or 'sent'
                 }
             }
         )
@@ -254,6 +267,7 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
         """Handle group message broadcast."""
         await self.send_json({
             'type': 'chat_message',
+            'temp_id': event.get('temp_id'),
             'message': event['message']
         })
 

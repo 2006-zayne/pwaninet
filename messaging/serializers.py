@@ -377,9 +377,10 @@ class MessageCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating messages."""
     class Meta:
         model = Message
-        fields = ['conversation', 'content', 'encrypted_content', 'is_encrypted', 'reply_to', 'attachment', 'attachment_type',
+        fields = ['id', 'status', 'created_at', 'conversation', 'content', 'encrypted_content', 'is_encrypted', 'reply_to', 'attachment', 'attachment_type',
                   'link_url', 'link_title', 'link_description', 'link_image', 'link_type',
                   'global_caption', 'message_type']
+        read_only_fields = ['id', 'status', 'created_at']
 
 
 class MessageAttachmentCreateSerializer(serializers.ModelSerializer):
@@ -435,15 +436,14 @@ class ConversationSerializer(serializers.ModelSerializer):
         return None
 
     def get_unread_count(self, obj):
-        """Get the count of unread messages for the current user."""
+        """Get the count of unread messages for the current user (excluding deleted messages)."""
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             member = obj.members.filter(user=request.user).first()
+            base_qs = obj.messages.filter(is_deleted=False).exclude(sender=request.user)
             if member and member.last_read_message_id:
-                return obj.messages.filter(
-                    id__gt=member.last_read_message_id
-                ).exclude(sender=request.user).count()
-            return obj.messages.exclude(sender=request.user).count()
+                return base_qs.filter(id__gt=member.last_read_message_id).count()
+            return base_qs.count()
         return 0
 
     def get_existing(self, obj):

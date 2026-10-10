@@ -783,13 +783,12 @@ body.is-native-app .badge {
     -webkit-touch-callout: none !important;
 }
 
-/* Allow text selection only on readable user content */
-body.is-native-app .post-content,
-body.is-native-app .post-content *,
-body.is-native-app .message-bubble,
-body.is-native-app .message-text,
+/* Allow text selection only on editable inputs, code blocks, and explicitly selectable text */
 body.is-native-app input,
 body.is-native-app textarea,
+body.is-native-app [contenteditable="true"],
+body.is-native-app .pwanimate-code-block pre,
+body.is-native-app .pwanimate-code-block code,
 body.is-native-app .selectable-text {
     -webkit-user-select: text !important;
     user-select: text !important;
@@ -814,6 +813,11 @@ body.is-native-app .card-clickable.activated {
 }
 
 /* Virtual Keyboard (IME) Active State - Smoothly tuck bottom nav offscreen */
+.mobile-bottom-nav {
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1), opacity 0.16s ease !important;
+}
+
+html.keyboard-open .mobile-bottom-nav,
 body.keyboard-open .mobile-bottom-nav {
     transform: translate(-50%, 160%) !important;
     opacity: 0 !important;
