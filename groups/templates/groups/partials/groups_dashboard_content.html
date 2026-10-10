@@ -139,6 +139,15 @@
     margin: 0;
   }
 
+  .page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex-shrink: 1;
+    flex-wrap: wrap;
+  }
+
   .btn-create {
     display: inline-flex;
     align-items: center;
@@ -163,6 +172,46 @@
     box-shadow: 0 6px 20px var(--brand-glow);
   }
   .btn-create i { font-size: 14px; }
+
+  @media (max-width: 768px) {
+    .page-eyebrow {
+      display: none !important;
+    }
+    .page-header {
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      flex-wrap: wrap !important;
+      gap: 0.75rem !important;
+      margin-bottom: 1.25rem !important;
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+    .page-header-left {
+      order: 1;
+      flex: 0 1 auto;
+    }
+    .page-title {
+      font-size: 1.5rem;
+      line-height: 1.2;
+    }
+    .page-header-actions {
+      display: contents !important;
+    }
+    .page-header .btn-create {
+      order: 2;
+      margin-left: auto;
+      padding: 0.5rem 1rem;
+      font-size: 0.78rem;
+      flex-shrink: 0;
+    }
+    .page-header .group-search-container {
+      order: 3;
+      flex: 0 0 100% !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+  }
 
   /* ── Two-column layout ── */
   .groups-layout {
@@ -675,7 +724,7 @@
       </div>
       <h1 class="page-title">Groups</h1>
     </div>
-    <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex-shrink: 1; flex-wrap: wrap;">
+    <div class="page-header-actions">
       {% include 'groups/partials/search_bar.html' with show_recent=True value=query %}
       <a href="{% url 'groups:create_group' %}"
          hx-get="{% url 'groups:create_group' %}"

@@ -34,6 +34,16 @@
                     <i class="bi bi-journal-bookmark-fill"></i>
                     <span>{% trans "My Library" %}</span>
                 </a>
+                <a href="{% url 'documents:academic:dashboard' %}"
+                   class="btn btn-outline-secondary w-100 rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2"
+                   hx-get="{% url 'documents:academic:dashboard' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <i class="bi bi-mortarboard-fill"></i>
+                    <span>{% trans "Academic & Units" %}</span>
+                </a>
                 {% else %}
                 <a href="{% url 'login' %}?next={% url 'documents:upload' %}"
                    class="btn btn-primary w-100 rounded-pill fw-semibold py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm">
@@ -70,6 +80,19 @@
         </div>
         <div class="card-body p-2 pt-0">
             <div class="d-flex flex-column">
+                <a href="{% url 'documents:academic:dashboard' %}"
+                   class="d-flex align-items-center justify-content-between p-2 rounded-3 text-decoration-none context-rail-item-hover text-dark"
+                   hx-get="{% url 'documents:academic:dashboard' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true">
+                    <span class="small d-flex align-items-center gap-2">
+                        <i class="bi bi-mortarboard-fill text-primary"></i>
+                        <span>{% trans "Academic & Units" %}</span>
+                    </span>
+                    <i class="bi bi-chevron-right text-muted small"></i>
+                </a>
                 <a href="{% url 'documents:my_uploads' %}"
                    class="d-flex align-items-center justify-content-between p-2 rounded-3 text-decoration-none context-rail-item-hover text-dark"
                    hx-get="{% url 'documents:my_uploads' %}"

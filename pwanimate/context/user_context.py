@@ -126,6 +126,9 @@ class UserContext:
     academic_level_name: Optional[str] = None
     academic_year: Optional[str] = None
     semester: Optional[int] = None
+    enrolled_units: List[Dict[str, Any]] = field(default_factory=list)
+    enrolled_unit_ids: List[int] = field(default_factory=list)
+    enrolled_unit_codes: List[str] = field(default_factory=list)
     interests: List[str] = field(default_factory=list)
     skills: List[str] = field(default_factory=list)
     collaboration_status: str = ""
@@ -152,6 +155,9 @@ class UserContext:
             "academic_level_name": self.academic_level_name,
             "academic_year": self.academic_year,
             "semester": self.semester,
+            "enrolled_units": list(self.enrolled_units),
+            "enrolled_unit_ids": list(self.enrolled_unit_ids),
+            "enrolled_unit_codes": list(self.enrolled_unit_codes),
             "interests": list(self.interests),
             "skills": list(self.skills),
             "collaboration_status": self.collaboration_status,
@@ -196,6 +202,16 @@ class UserContext:
             academic_parts.append(f"Year: {self.academic_year}")
         if self.semester is not None:
             academic_parts.append(f"Semester: {self.semester}")
+        if self.enrolled_units:
+            formatted_units = [
+                f"{u.get('code', '')} ({u.get('name', '')})".strip()
+                if u.get("name")
+                else str(u.get("code", ""))
+                for u in self.enrolled_units
+                if u.get("code") or u.get("name")
+            ]
+            if formatted_units:
+                academic_parts.append(f"Enrolled Units: {', '.join(formatted_units)}")
 
         if academic_parts:
             lines.append("Academic:")
@@ -334,6 +350,28 @@ class UserContextService:
         if semester:
             semester_num = getattr(semester, "number", None)
 
+        # 2b. Student Enrolled Units (Hybrid Auto-Sync + Custom Enrollment)
+        enrolled_units: List[Dict[str, Any]] = []
+        enrolled_unit_ids: List[int] = []
+        enrolled_unit_codes: List[str] = []
+        try:
+            from documents.academic.services import StudentAcademicEnrollmentService
+            active_enrollments = StudentAcademicEnrollmentService.get_active_enrollments(target_user)
+            for enr in active_enrollments:
+                unit = getattr(enr, "academic_unit", None)
+                if not unit:
+                    continue
+                enrolled_units.append({
+                    "id": unit.id,
+                    "code": unit.code,
+                    "name": unit.name,
+                    "source": getattr(enr, "source", "auto_programme"),
+                })
+                enrolled_unit_ids.append(unit.id)
+                enrolled_unit_codes.append(unit.code)
+        except Exception as exc:
+            logger.warning("Error loading enrolled units for user %s: %s", user_id, exc)
+
         # 3. Interests & Skills Normalization
         interests = normalize_interests(getattr(target_user, "interests", None))
         skills = normalize_skills(getattr(target_user, "skills", None))
@@ -374,6 +412,9 @@ class UserContextService:
             academic_level_name=academic_level_name,
             academic_year=academic_year_code,
             semester=semester_num,
+            enrolled_units=enrolled_units,
+            enrolled_unit_ids=enrolled_unit_ids,
+            enrolled_unit_codes=enrolled_unit_codes,
             interests=interests,
             skills=skills,
             collaboration_status=collaboration_status,

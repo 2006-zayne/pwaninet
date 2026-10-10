@@ -247,9 +247,13 @@ class MessageViewSet(viewsets.ModelViewSet):
         ).select_related(
             'sender',
             'conversation',
-            'reply_to'
+            'reply_to',
+            'reply_to__sender',
+            'link_preview',
         ).prefetch_related(
-            'reactions'
+            'attachments',
+            'reactions__user',
+            'conversation__members',
         ).distinct()
 
     def get_serializer_class(self):
@@ -281,7 +285,9 @@ class MessageViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
         
-        serializer = self.get_serializer(queryset, many=True)
+        messages_slice = list(queryset.order_by('-created_at')[:100])
+        messages_slice.reverse()
+        serializer = self.get_serializer(messages_slice, many=True)
         return Response(serializer.data)
 
     def perform_create(self, serializer):
@@ -394,17 +400,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         Get paginated messages for a conversation using cursor-based pagination.
         Uses before_message_id cursor strategy for efficient message history loading.
-        
-        Query parameters:
-            - conversation_id: Required ID of the conversation
-            - before_message_id: Optional cursor to load messages older than this ID
-            - limit: Number of messages to return (default 30, max 100)
-        
-        Returns:
-            - results: List of messages (newest first)
-            - has_more: Whether there are older messages available
-            - next_cursor: The before_message_id for the next page
-            - count: Number of messages in this batch
         """
         conversation_id = request.query_params.get('conversation_id')
         
@@ -421,14 +416,19 @@ class MessageViewSet(viewsets.ModelViewSet):
             members__user=request.user
         )
         
-        # Get messages for this conversation
+        # Get messages for this conversation with all relations needed by MessageSerializer
         messages = Message.objects.filter(
             conversation=conversation
         ).select_related(
             'sender',
-            'reply_to'
+            'conversation',
+            'reply_to',
+            'reply_to__sender',
+            'link_preview',
         ).prefetch_related(
-            'reactions'
+            'attachments',
+            'reactions__user',
+            'conversation__members',
         )
         
         # Apply cursor-based pagination
@@ -456,65 +456,153 @@ class MessageReactionViewSet(viewsets.ModelViewSet):
         ).distinct()
 
 
-# Template Views
-@login_required
-def conversation_list(request):
-    """Display list of user's conversations with optimized queries."""
-    # Fetch all conversations for the user with prefetched relations
-    conversations = Conversation.objects.filter(
-        members__user=request.user
-    ).prefetch_related(
-        'members__user',
-        'messages__sender'
-    ).annotate(
-        # Optimize: get last message in one query instead of N+1
-        last_msg_id=models.Max('messages__id'),
-        last_msg_time=models.Max('messages__created_at')
-    ).order_by('-last_msg_time').distinct()
+def _build_message_preview(last_msg, current_user, is_group=False):
+    """Build a lightweight preview dict for a conversation's last message without extra DB queries."""
+    if not last_msg:
+        return None
 
-    # Map memberships for current user
-    user_memberships = {
-        m.conversation_id: m
-        for m in ConversationMember.objects.filter(user=request.user)
+    icon = None
+    msg_type = 'text'
+    raw_text = (last_msg.content or last_msg.global_caption or '').strip()
+
+    att_type = getattr(last_msg, 'attachment_type', None)
+    m_type = getattr(last_msg, 'message_type', 'normal')
+
+    if att_type == 'audio' or m_type == 'voice':
+        icon = 'bi-mic-fill'
+        msg_type = 'audio'
+        label = raw_text or 'Voice message'
+    elif m_type == 'album':
+        icon = 'bi-images'
+        msg_type = 'image'
+        label = raw_text or 'Photo album'
+    elif att_type == 'image':
+        icon = 'bi-image'
+        msg_type = 'image'
+        label = raw_text or 'Photo'
+    elif att_type == 'video':
+        icon = 'bi-camera-video'
+        msg_type = 'video'
+        label = raw_text or 'Video'
+    elif att_type == 'document':
+        icon = 'bi-file-earmark-text'
+        msg_type = 'document'
+        label = raw_text or 'Document'
+    elif getattr(last_msg, 'link_url', None):
+        icon = 'bi-link-45deg'
+        msg_type = 'link'
+        label = raw_text or getattr(last_msg, 'link_title', None) or last_msg.link_url
+    else:
+        label = raw_text or 'Attachment'
+
+    if last_msg.sender_id == current_user.id:
+        prefix = 'You: '
+    elif is_group and getattr(last_msg, 'sender', None):
+        prefix = f"{last_msg.sender.username}: "
+    else:
+        prefix = ''
+
+    full_text = f"{prefix}{label}"
+    if len(full_text) > 55:
+        full_text = full_text[:52] + '...'
+
+    return {
+        'icon': icon,
+        'type': msg_type,
+        'text': full_text,
     }
 
-    # Calculate read status, unread count and pin status efficiently
+
+def build_user_conversation_data(user, active_conversation_id=None):
+    """
+    Fetch user's conversations, last messages, read statuses, and unread counts
+    in a constant 4 SQL queries instead of O(N) queries and full message table prefetches.
+    """
+    from django.db.models.functions import Coalesce
+
+    conversations = list(
+        Conversation.objects.filter(members__user=user)
+        .prefetch_related(
+            models.Prefetch(
+                'members',
+                queryset=ConversationMember.objects.select_related('user')
+            )
+        )
+        .annotate(
+            last_msg_id=models.Max('messages__id'),
+            last_msg_time=models.Max('messages__created_at'),
+        )
+        .order_by('-last_msg_time')
+        .distinct()
+    )
+
+    if not conversations:
+        return []
+
+    # Batch-fetch only the latest message per conversation (1 query)
+    last_msg_ids = [c.last_msg_id for c in conversations if c.last_msg_id]
+    last_messages_by_id = {}
+    if last_msg_ids:
+        for msg in Message.objects.filter(id__in=last_msg_ids).select_related('sender'):
+            last_messages_by_id[msg.id] = msg
+
+    # Batch-fetch unread counts per conversation in a single grouped SQL query (1 query)
+    unread_rows = (
+        Message.objects.filter(
+            conversation__members__user=user,
+            id__gt=Coalesce(models.F('conversation__members__last_read_message_id'), models.Value(0)),
+        )
+        .exclude(sender=user)
+        .values('conversation_id')
+        .annotate(cnt=models.Count('id', distinct=True))
+    )
+    unread_by_conv = {row['conversation_id']: row['cnt'] for row in unread_rows}
+
     conversation_data = []
-    for conversation in conversations:
-        # Get last message efficiently from the queryset
-        last_message = conversation.messages.order_by('-created_at').first()
-        
-        # Get read status from conversation model (which checks if other members have read)
+    for conv in conversations:
+        last_msg = last_messages_by_id.get(conv.last_msg_id)
+        conv._cached_last_message = last_msg
+
+        mem = next((m for m in conv.members.all() if m.user_id == user.id), None)
+
         read_status = None
-        if last_message and last_message.sender == request.user:
-            read_status = conversation.get_last_message_read_status(request.user) or 'sent'
-        
-        # Calculate unread count and pin status for this user
-        member = user_memberships.get(conversation.id)
-        if member and member.last_read_message_id:
-            unread_count = conversation.messages.filter(
-                id__gt=member.last_read_message_id
-            ).exclude(sender=request.user).count()
+        if last_msg and last_msg.sender_id == user.id:
+            read_status = conv.get_last_message_read_status(user) or 'sent'
+
+        if active_conversation_id and conv.id == int(active_conversation_id):
+            unread_count = 0
         else:
-            unread_count = conversation.messages.exclude(sender=request.user).count()
-        
-        is_pinned = bool(member and member.is_pinned)
-        pinned_at = member.pinned_at if member else None
+            unread_count = unread_by_conv.get(conv.id, 0)
+
+        is_pinned = bool(mem and mem.is_pinned)
+        pinned_at = mem.pinned_at if mem else None
 
         conversation_data.append({
-            'conversation': conversation,
+            'conversation': conv,
             'read_status': read_status,
             'unread_count': unread_count,
             'is_pinned': is_pinned,
             'pinned_at': pinned_at,
+            'preview': _build_message_preview(last_msg, user, is_group=(conv.type == 'group')),
         })
 
-    # Sort pinned conversations first, then by last message time
     conversation_data.sort(
         key=lambda item: (
             not item['is_pinned'],
             -(item['conversation'].last_msg_time.timestamp() if item['conversation'].last_msg_time else 0)
         )
+    )
+    return conversation_data
+
+
+# Template Views
+@login_required
+def conversation_list(request):
+    """Display list of user's conversations with optimized constant-query loading."""
+    active_conversation = request.GET.get('conversation')
+    conversation_data = build_user_conversation_data(
+        request.user,
+        active_conversation_id=active_conversation
     )
 
     from users.models import User, Follow
@@ -525,11 +613,14 @@ def conversation_list(request):
     ).exclude(id=request.user.id).distinct()
     suggested_users = get_friend_suggestions_for_user(request.user, limit=10)
 
-    # Friends not yet messaged in direct conversations
-    existing_direct_user_ids = set(ConversationMember.objects.filter(
-        conversation__type='direct',
-        conversation__members__user=request.user
-    ).exclude(user=request.user).values_list('user_id', flat=True))
+    # Extract existing direct chat user IDs from already-loaded conversation_data in memory
+    existing_direct_user_ids = set()
+    for item in conversation_data:
+        conv = item['conversation']
+        if conv.type == 'direct':
+            for m in conv.members.all():
+                if m.user_id != request.user.id:
+                    existing_direct_user_ids.add(m.user_id)
 
     unmessaged_friends = users.exclude(id__in=existing_direct_user_ids)
 
@@ -556,13 +647,6 @@ def conversation_list(request):
             'users': users,
             'unmessaged_friends': unmessaged_friends,
             'suggested_users': suggested_users,
-            'media_photos_videos': [],
-            'media_docs': [],
-            'media_audio': [],
-            'legacy_photos_videos': [],
-            'legacy_docs': [],
-            'legacy_audio': [],
-            'media_links': [],
             'today': today.strftime('%Y-%m-%d'),
             'yesterday': yesterday.strftime('%Y-%m-%d'),
         }
@@ -573,17 +657,14 @@ def conversation_list(request):
         follower=request.user
     ).values_list('followed_id', flat=True))
 
-    active_conversation = request.GET.get('conversation')
     active_conversation_obj = None
     messages = []
 
     if active_conversation:
-        active_conversation_obj = get_object_or_404(
-            Conversation,
-            id=active_conversation,
-            members__user=request.user
+        active_conversation_obj = next(
+            (item['conversation'] for item in conversation_data if str(item['conversation'].id) == str(active_conversation)),
+            None
         )
-        messages = active_conversation_obj.messages.all().order_by('created_at')
 
     context = {
         'conversation_data': conversation_data,
@@ -624,156 +705,129 @@ def search_followed_users(request):
 
 @login_required
 def conversation_detail(request, conversation_id):
-    """Display a specific conversation."""
+    """Display a specific conversation with fast O(1) query complexity."""
     from django.utils import timezone
     from datetime import timedelta
-    
+    import json
+
     conversation = get_object_or_404(
-        Conversation,
+        Conversation.objects.prefetch_related(
+            models.Prefetch(
+                'members',
+                queryset=ConversationMember.objects.select_related('user')
+            )
+        ),
         id=conversation_id,
         members__user=request.user
     )
-    
-    messages = conversation.messages.all().order_by('created_at')
-    
-    # Mark conversation as read
-    member = conversation.members.filter(user=request.user).first()
-    if member:
-        last_message = messages.last()
-        if last_message:
+
+    # Fetch the most recent 40 messages with all relations needed for serialization
+    recent_messages_qs = (
+        conversation.messages.select_related(
+            'sender',
+            'conversation',
+            'reply_to',
+            'reply_to__sender',
+            'link_preview',
+        )
+        .prefetch_related(
+            'attachments',
+            'reactions__user',
+        )
+        .order_by('-created_at')[:40]
+    )
+    recent_messages_list = list(reversed(list(recent_messages_qs)))
+    for msg in recent_messages_list:
+        msg.conversation = conversation
+
+    # Mark conversation as read only if there is a newer message than last_read_message_id
+    member = next((m for m in conversation.members.all() if m.user_id == request.user.id), None)
+    if member and recent_messages_list:
+        last_message = recent_messages_list[-1]
+        if member.last_read_message_id != last_message.id:
             member.last_read_message = last_message
             member.save(update_fields=['last_read_message'])
             Message.objects.filter(
                 conversation_id=conversation.id,
                 id__lte=last_message.id
-            ).exclude(sender=request.user).update(status='read')
-        from .context_processors import invalidate_unread_message_count_cache
-        invalidate_unread_message_count_cache(request.user.id)
-    
-    # Active conversation list for desktop WhatsApp left rail
-    conversations = Conversation.objects.filter(
-        members__user=request.user
-    ).prefetch_related(
-        'members__user',
-        'messages__sender'
-    ).annotate(
-        last_msg_id=models.Max('messages__id'),
-        last_msg_time=models.Max('messages__created_at')
-    ).order_by('-last_msg_time').distinct()
+            ).exclude(sender=request.user).exclude(status='read').update(status='read')
+            from .context_processors import invalidate_unread_message_count_cache
+            invalidate_unread_message_count_cache(request.user.id)
 
-    # Map memberships for current user
-    user_memberships = {
-        m.conversation_id: m
-        for m in ConversationMember.objects.filter(user=request.user)
-    }
+    # Calculate today and yesterday dates
+    today = timezone.now().date()
+    yesterday = today - timedelta(days=1)
 
-    conversation_data = []
-    for conv in conversations:
-        last_msg = conv.messages.order_by('-created_at').first()
-        read_status = None
-        if last_msg and last_msg.sender == request.user:
-            read_status = conv.get_last_message_read_status(request.user) or 'sent'
-        
-        mem = user_memberships.get(conv.id)
-        if conv.id == conversation.id:
-            unread_count = 0
-        elif mem and mem.last_read_message_id:
-            unread_count = conv.messages.filter(
-                id__gt=mem.last_read_message_id
-            ).exclude(sender=request.user).count()
-        else:
-            unread_count = conv.messages.exclude(sender=request.user).count()
-        
-        is_pinned = bool(mem and mem.is_pinned)
-        pinned_at = mem.pinned_at if mem else None
+    # Determine partner user for direct conversations using already-prefetched members
+    partner_user = None
+    partner_relationship = 'Connected on PwaniNet'
+    if conversation.type == 'direct':
+        partner_member = next((m for m in conversation.members.all() if m.user_id != request.user.id), None)
+        if partner_member:
+            partner_user = partner_member.user
+            try:
+                from users.models import Follow
+                follow_pairs = set(
+                    Follow.objects.filter(
+                        models.Q(follower=request.user, followed=partner_user) |
+                        models.Q(follower=partner_user, followed=request.user)
+                    ).values_list('follower_id', 'followed_id')
+                )
+                if (request.user.id, partner_user.id) in follow_pairs and (partner_user.id, request.user.id) in follow_pairs:
+                    partner_relationship = 'Mutual Follower'
+            except Exception:
+                pass
+            if getattr(request.user, 'course_id', None) and request.user.course_id == getattr(partner_user, 'course_id', None):
+                partner_relationship = 'Classmate'
 
-        conversation_data.append({
-            'conversation': conv,
-            'read_status': read_status,
-            'unread_count': unread_count,
-            'is_pinned': is_pinned,
-            'pinned_at': pinned_at,
-        })
-
-    # Sort pinned conversations first, then by last message time
-    conversation_data.sort(
-        key=lambda item: (
-            not item['is_pinned'],
-            -(item['conversation'].last_msg_time.timestamp() if item['conversation'].last_msg_time else 0)
-        )
+    # Serialize recent messages directly for 0ms DOM paint
+    initial_messages_json = json.dumps(
+        MessageSerializer(recent_messages_list, many=True, context={'request': request}).data
     )
 
-    # Pre-categorize media for the dynamic WhatsApp right media rail
-    attachments = MessageAttachment.objects.filter(
-        message__conversation=conversation
-    ).select_related('message')
-    
-    media_photos_videos = attachments.filter(file_type__in=['image', 'video']).order_by('-message__created_at')
-    media_docs = attachments.filter(file_type='document').order_by('-message__created_at')
-    media_audio = attachments.filter(file_type='audio').order_by('-message__created_at')
-    
-    # Legacy attachments fallback
-    legacy_attachments = messages.filter(attachment__isnull=False).exclude(attachment='')
-    legacy_photos_videos = legacy_attachments.filter(attachment_type__in=['image', 'video']).order_by('-created_at')
-    legacy_docs = legacy_attachments.filter(attachment_type='document').order_by('-created_at')
-    legacy_audio = legacy_attachments.filter(attachment_type='audio').order_by('-created_at')
-    
-    media_links = messages.filter(
-        models.Q(link_url__isnull=False) | models.Q(link_preview__isnull=False)
-    ).exclude(link_url='').select_related('link_preview').order_by('-created_at')
-    
-    # Followed friends for new conversation modal in left rail
+    is_htmx = bool(request.headers.get('HX-Request'))
+
+    # Fast path for HTMX chat switching (desktop middle pane or mobile instant chat):
+    # Skip querying all conversations, friend suggestions, and unmessaged friends!
+    if is_htmx:
+        context = {
+            'conversation': conversation,
+            'messages': recent_messages_list,
+            'initial_messages_json': initial_messages_json,
+            'partner_user': partner_user,
+            'partner_relationship': partner_relationship,
+            'today': today.strftime('%Y-%m-%d'),
+            'yesterday': yesterday.strftime('%Y-%m-%d'),
+        }
+        return render(request, 'messaging/partials/conversation_chat_partial.html', context)
+
+    # Full page load: populate left rail conversation list and new-chat modal data
+    conversation_data = build_user_conversation_data(
+        request.user,
+        active_conversation_id=conversation.id
+    )
+
     from users.models import User
     users = User.objects.filter(
         follower_relationships__follower=request.user
     ).exclude(id=request.user.id).distinct()
 
-    existing_direct_user_ids = set(ConversationMember.objects.filter(
-        conversation__type='direct',
-        conversation__members__user=request.user
-    ).exclude(user=request.user).values_list('user_id', flat=True))
+    existing_direct_user_ids = set()
+    for item in conversation_data:
+        conv = item['conversation']
+        if conv.type == 'direct':
+            for m in conv.members.all():
+                if m.user_id != request.user.id:
+                    existing_direct_user_ids.add(m.user_id)
 
     unmessaged_friends = users.exclude(id__in=existing_direct_user_ids)
 
     from users.services.friend_suggestion_service import get_friend_suggestions_for_user
     suggested_users = get_friend_suggestions_for_user(request.user, limit=10)
 
-    # Calculate today and yesterday dates
-    today = timezone.now().date()
-    yesterday = today - timedelta(days=1)
-
-    # Determine partner user for direct conversations
-    partner_user = None
-    partner_relationship = 'Connected on PwaniNet'
-    if conversation.type == 'direct':
-        partner_member = conversation.members.exclude(user=request.user).select_related('user').first()
-        if partner_member:
-            partner_user = partner_member.user
-            try:
-                from users.models import Follow
-                is_following = Follow.objects.filter(follower=request.user, following=partner_user).exists()
-                is_followed = Follow.objects.filter(follower=partner_user, following=request.user).exists()
-                if is_following and is_followed:
-                    partner_relationship = 'Mutual Follower'
-            except Exception:
-                pass
-            if hasattr(request.user, 'profile') and hasattr(partner_user, 'profile'):
-                try:
-                    if request.user.profile.course and request.user.profile.course == partner_user.profile.course:
-                        partner_relationship = 'Classmate'
-                except Exception:
-                    pass
-
-    # Aggressive instant caching: serialize recent messages directly for 0ms DOM paint
-    import json
-    from .serializers import MessageSerializer
-    recent_messages_qs = messages.order_by('-created_at')[:100]
-    recent_messages_list = list(reversed(recent_messages_qs))
-    initial_messages_json = json.dumps(MessageSerializer(recent_messages_list, many=True).data)
-
     context = {
         'conversation': conversation,
-        'messages': messages,
+        'messages': recent_messages_list,
         'initial_messages_json': initial_messages_json,
         'partner_user': partner_user,
         'partner_relationship': partner_relationship,
@@ -781,19 +835,9 @@ def conversation_detail(request, conversation_id):
         'users': users,
         'unmessaged_friends': unmessaged_friends,
         'suggested_users': suggested_users,
-        'media_photos_videos': media_photos_videos,
-        'media_docs': media_docs,
-        'media_audio': media_audio,
-        'legacy_photos_videos': legacy_photos_videos,
-        'legacy_docs': legacy_docs,
-        'legacy_audio': legacy_audio,
-        'media_links': media_links,
         'today': today.strftime('%Y-%m-%d'),
         'yesterday': yesterday.strftime('%Y-%m-%d'),
     }
-
-    if request.headers.get('HX-Request'):
-        return render(request, 'messaging/partials/conversation_chat_partial.html', context)
 
     return render(request, 'messaging/conversation_detail_refactored.html', context)
 
@@ -1736,20 +1780,9 @@ def unread_message_count(request):
     """Return HTML for unread message count badge (similar to notifications)."""
     if not request.user or not request.user.is_authenticated:
         return HttpResponse('<i class="bi bi-chat-dots-fill"></i>')
-    # Calculate total unread messages across all conversations
-    total_unread = 0
-    conversations = Conversation.objects.filter(members__user=request.user).prefetch_related('members', 'messages')
-    
-    for conversation in conversations:
-        member = conversation.members.filter(user=request.user).first()
-        if member and member.last_read_message_id:
-            unread = conversation.messages.filter(
-                id__gt=member.last_read_message_id
-            ).exclude(sender=request.user).count()
-        else:
-            unread = conversation.messages.exclude(sender=request.user).count()
-        total_unread += unread
-    
+    from .context_processors import get_cached_unread_message_count
+    total_unread = get_cached_unread_message_count(request.user)
+
     # Build HTML similar to notification badge
     html = '<i class="bi bi-chat-dots-fill"></i>'
     if total_unread > 0:
@@ -1759,7 +1792,7 @@ def unread_message_count(request):
                 {total_unread}
                 <span class="visually-hidden">unread messages</span>
             </span>'''
-    
+
     return HttpResponse(html)
 
 

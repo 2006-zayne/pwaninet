@@ -348,23 +348,32 @@ export class MessageService {
     async loadConversationHistory(conversationId) {
         console.log('[MESSAGE_SERVICE] Loading conversation history for:', conversationId);
         try {
-            // 1. Instant 0ms Paint from serialized DOM script if present
+            const INITIAL_BATCH_LIMIT = 40;
+            // 1. Instant 0ms Paint from fresh server-serialized DOM script if present
             const inlineScript = document.getElementById('initialConversationMessages');
-            let inlineLoaded = false;
+            let serverHydrated = false;
+            let cacheLoaded = false;
             if (inlineScript && inlineScript.textContent) {
                 try {
-                    const rawInitial = JSON.parse(inlineScript.textContent);
-                    if (Array.isArray(rawInitial) && rawInitial.length > 0) {
+                    const rawInitial = JSON.parse(inlineScript.textContent.trim());
+                    // Remove after consuming so subsequent programmatic calls don't read stale DOM scripts
+                    inlineScript.remove();
+                    if (Array.isArray(rawInitial)) {
                         const targetId = Number(conversationId);
-                        const convMatches = rawInitial.filter(m => Number(m.conversation_id ?? m.conversation ?? m.conversationId) === targetId);
-                        if (convMatches.length > 0) {
-                            console.log(`[MESSAGE_SERVICE] Instant 0ms DOM paint: ${convMatches.length} messages`);
-                            const normalized = convMatches.map(m => this.normalizeServerMessage(m));
+                        const convMatches = rawInitial.filter(
+                            m => Number(m.conversation_id ?? m.conversation ?? m.conversationId) === targetId
+                        );
+                        if (rawInitial.length === 0 || convMatches.length > 0) {
+                            const filteredInitial = this._filterDeletedForMe(convMatches, conversationId);
+                            const normalized = filteredInitial.map(m => this.normalizeServerMessage(m));
+                            store.setHasMoreOlderMessages(convMatches.length >= INITIAL_BATCH_LIMIT);
                             store.addMessages(normalized);
-                            inlineLoaded = true;
-                            if (window.offlineCache) {
+                            store.setInitialHistoryLoaded(true);
+                            serverHydrated = true;
+                            if (window.offlineCache && convMatches.length > 0) {
                                 window.offlineCache.saveMessages(convMatches).catch(() => {});
                             }
+                            return;
                         }
                     }
                 } catch (jsonErr) {
@@ -372,36 +381,30 @@ export class MessageService {
                 }
             }
 
-            // 2. Instant Paint from Offline Cache if not loaded from DOM
-            if (!inlineLoaded && window.offlineCache) {
+            // 2. Instant Paint from Offline Cache if not hydrated from server DOM
+            if (!serverHydrated && window.offlineCache) {
                 try {
                     if (!window.offlineCache.db) {
                         await window.offlineCache.init();
                     }
-                    const cachedMessages = await window.offlineCache.getMessages(conversationId, 100);
+                    const cachedMessages = await window.offlineCache.getMessages(conversationId, INITIAL_BATCH_LIMIT);
                     if (cachedMessages && cachedMessages.length > 0) {
-                        console.log(`[MESSAGE_SERVICE] Instant paint: ${cachedMessages.length} messages from offlineCache`);
-                        const normalizedCache = cachedMessages.map(m => this.normalizeServerMessage(m));
+                        const filteredCache = this._filterDeletedForMe(cachedMessages, conversationId);
+                        const normalizedCache = filteredCache.map(m => this.normalizeServerMessage(m));
                         store.addMessages(normalizedCache);
-                        inlineLoaded = true;
+                        store.setInitialHistoryLoaded(true);
+                        cacheLoaded = true;
                     }
                 } catch (cacheErr) {
                     console.warn('[MESSAGE_SERVICE] Error reading offline cache:', cacheErr);
                 }
             }
 
-            if (inlineLoaded) {
-                store.setInitialHistoryLoaded(true);
-            }
-
-            console.log('[MESSAGE_SERVICE] Syncing messages with server API (inlineLoaded:', inlineLoaded, ')');
-            
-            // Server fetch routine (stale-while-revalidate)
+            // 3. Server fetch routine (only when not already hydrated by fresh server HTML)
             const syncPromise = (async () => {
                 const isGroupChat = window.IS_GROUP_CHAT || false;
-                const PAGE_LIMIT = 100;
                 let apiUrl = isGroupChat ? `/groups/api/groups/${conversationId}/messages/` : `/messaging/v1/messages/`;
-                let queryParams = isGroupChat ? `?limit=${PAGE_LIMIT}` : `?conversation=${conversationId}&limit=${PAGE_LIMIT}`;
+                let queryParams = isGroupChat ? `?limit=${INITIAL_BATCH_LIMIT}` : `?conversation=${conversationId}&limit=${INITIAL_BATCH_LIMIT}`;
 
                 const res = await fetch(`${apiUrl}${queryParams}`, {
                     headers: {
@@ -413,20 +416,19 @@ export class MessageService {
 
                 const data = await res.json();
                 const messages = Array.isArray(data) ? data : (data.results || data.messages || []);
-                console.log('[MESSAGE_SERVICE] Server sync received', messages.length, 'messages');
 
                 if (window.offlineCache && messages.length > 0) {
                     window.offlineCache.saveMessages(messages).catch(e => console.warn('[OFFLINE_CACHE] Error caching messages:', e));
                 }
 
-                store.setHasMoreOlderMessages(messages.length >= PAGE_LIMIT);
+                store.setHasMoreOlderMessages(messages.length >= INITIAL_BATCH_LIMIT);
 
                 const filteredMessages = this._filterDeletedForMe(messages, conversationId);
                 const normalizedList = filteredMessages.map(raw => this.normalizeServerMessage(raw));
                 store.addMessages(normalizedList);
             })();
 
-            if (!inlineLoaded) {
+            if (!cacheLoaded) {
                 await syncPromise;
             } else {
                 syncPromise.catch(err => console.warn('[MESSAGE_SERVICE] Background sync error:', err));

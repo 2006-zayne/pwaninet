@@ -25,6 +25,7 @@ from .academic.models import (
     Programme,
     AcademicUnit,
     ProgrammeUnit,
+    StudentUnitEnrollment,
 )
 
 # Document Domain
@@ -92,6 +93,7 @@ __all__ = [
     'Programme',
     'AcademicUnit',
     'ProgrammeUnit',
+    'StudentUnitEnrollment',
     # Document Domain
     'Category',
     'Tag',

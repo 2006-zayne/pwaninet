@@ -51,7 +51,7 @@
         {% endif %}
 
         <a href="{% url 'documents:home' %}"
-           class="left-rail-link nav-chip {% if request.resolver_match.app_name == 'documents' and 'library' not in request.resolver_match.url_name %}active{% endif %}"
+           class="left-rail-link nav-chip {% if request.resolver_match.app_name == 'documents' and 'library' not in request.resolver_match.url_name and request.resolver_match.url_name != 'dashboard' %}active{% endif %}"
            hx-get="{% url 'documents:home' %}"
            hx-target="#page-content-target"
            hx-swap="innerHTML"
@@ -71,6 +71,17 @@
            hx-history="true">
             <i class="bi bi-journal-bookmark-fill left-rail-icon"></i>
             <span class="left-rail-label">{% trans "My Library" %}</span>
+        </a>
+
+        <a href="{% url 'documents:academic:dashboard' %}"
+           class="left-rail-link nav-chip {% if request.resolver_match.url_name == 'dashboard' and 'academic' in request.path %}active{% endif %}"
+           hx-get="{% url 'documents:academic:dashboard' %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true">
+            <i class="bi bi-mortarboard-fill left-rail-icon"></i>
+            <span class="left-rail-label">{% trans "Academic & Units" %}</span>
         </a>
         {% endif %}
 

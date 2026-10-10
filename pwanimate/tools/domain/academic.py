@@ -27,7 +27,7 @@ class AcademicLookupTool(BaseDomainTool):
         "properties": {
             "entity_type": {
                 "type": "string",
-                "enum": ["school", "department", "programme", "course", "all"],
+                "enum": ["school", "department", "programme", "course", "unit", "my_units", "all"],
                 "description": "The tier of academic hierarchy to query (default: all)",
                 "default": "all",
             },
@@ -37,7 +37,7 @@ class AcademicLookupTool(BaseDomainTool):
             },
             "code": {
                 "type": "string",
-                "description": "Exact code match (e.g. 'SPAS', 'COMP', 'BSC-CS')",
+                "description": "Exact code match (e.g. 'SPAS', 'COMP', 'BSC-CS', 'CSC221')",
             },
             "parent_id": {
                 "type": "integer",
@@ -67,14 +67,41 @@ class AcademicLookupTool(BaseDomainTool):
 
         results: List[Dict[str, Any]] = []
 
+        # 0. Student's Active Enrolled Units (when entity_type is 'my_units' or 'unit' or 'all')
+        if user and getattr(user, "is_authenticated", False) and entity_type in ("my_units", "unit", "all"):
+            try:
+                from documents.academic.services import StudentAcademicEnrollmentService
+                enrollments = StudentAcademicEnrollmentService.get_active_enrollments(user)
+                for enr in enrollments:
+                    unit = enr.academic_unit
+                    if code and unit.code.lower() != code.lower():
+                        continue
+                    if query and query.lower() not in unit.code.lower() and query.lower() not in unit.name.lower():
+                        if entity_type != "my_units":
+                            continue
+                    results.append({
+                        "entity_type": "enrolled_unit",
+                        "id": unit.id,
+                        "code": unit.code,
+                        "name": unit.name,
+                        "credit_hours": unit.credit_hours,
+                        "enrollment_source": enr.source,
+                        "academic_level": enr.academic_level.name if enr.academic_level else None,
+                        "semester": str(enr.semester) if enr.semester else None,
+                    })
+                    if len(results) >= limit:
+                        break
+            except Exception:
+                pass
+
         # 1. Schools
-        if entity_type in ("school", "all"):
+        if len(results) < limit and entity_type in ("school", "all"):
             qs = School.objects.filter(is_active=True)
             if code:
                 qs = qs.filter(code__iexact=code)
             if query:
                 qs = qs.filter(Q(name__icontains=query) | Q(code__icontains=query))
-            for item in qs[:limit]:
+            for item in qs[: limit - len(results)]:
                 results.append({
                     "entity_type": "school",
                     "id": item.id,
@@ -134,7 +161,34 @@ class AcademicLookupTool(BaseDomainTool):
                 if len(results) >= limit:
                     break
 
-        # 4. Courses
+        # 4. Academic Units (from documents.academic.models)
+        if len(results) < limit and entity_type in ("unit", "course", "all"):
+            try:
+                from documents.academic.models import AcademicUnit
+                u_qs = AcademicUnit.objects.filter(is_active=True)
+                if code:
+                    u_qs = u_qs.filter(code__iexact=code)
+                if query:
+                    u_qs = u_qs.filter(Q(name__icontains=query) | Q(code__icontains=query))
+                seen_codes = {r.get("code") for r in results if r.get("entity_type") == "enrolled_unit"}
+                for u_item in u_qs[: limit - len(results)]:
+                    if u_item.code in seen_codes:
+                        continue
+                    results.append({
+                        "entity_type": "academic_unit",
+                        "id": u_item.id,
+                        "code": u_item.code,
+                        "name": u_item.name,
+                        "slug": u_item.slug,
+                        "credit_hours": u_item.credit_hours,
+                        "description": u_item.description or "",
+                    })
+                    if len(results) >= limit:
+                        break
+            except Exception:
+                pass
+
+        # 5. Courses (legacy courses.models)
         if len(results) < limit and entity_type in ("course", "all"):
             qs = Course.objects.filter(is_active=True).select_related("programme", "department", "school")
             if code:

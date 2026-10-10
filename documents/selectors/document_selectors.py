@@ -179,59 +179,71 @@ class DocumentSelector:
     
     @staticmethod
     def _apply_student_relevance_sorting(documents: List[Document], user) -> List[Document]:
-        """Sort documents by student's academic relevance."""
+        """Sort documents by student's academic relevance, including shared units across programmes."""
         try:
-            # Use new User model fields directly
-            if not user or not user.programme:
+            if not user or not getattr(user, 'is_authenticated', False):
                 return documents
-            
-            # Get user's academic units with optimized query
+
             from ..academic.models import ProgrammeUnit
-            programme_units = ProgrammeUnit.objects.filter(
-                programme=user.programme
-            ).select_related('academic_unit').only('academic_unit__code')
-            user_unit_codes = {pu.academic_unit.code for pu in programme_units}
-            
+            from ..academic.services import StudentAcademicEnrollmentService
+
+            active_enrollments = StudentAcademicEnrollmentService.get_active_enrollments(user)
+            active_unit_codes = {
+                enr.academic_unit.code
+                for enr in active_enrollments
+                if getattr(enr, 'academic_unit', None)
+            }
+
+            user_unit_codes = set(active_unit_codes)
+            if getattr(user, 'programme_id', None):
+                programme_units = ProgrammeUnit.objects.filter(
+                    programme_id=user.programme_id
+                ).select_related('academic_unit').only('academic_unit__code')
+                user_unit_codes.update(pu.academic_unit.code for pu in programme_units)
+
             if not user_unit_codes:
                 return documents
-            
+
             # Score documents based on relevance
             def relevance_score(doc):
                 score = 0
                 doc_units = set(
-                    au.academic_unit.code 
+                    au.academic_unit.code
                     for au in doc.academic_units.all().only('academic_unit__code')
+                    if getattr(au, 'academic_unit', None)
                 )
-                
-                # High boost for matching academic units
-                if doc_units & user_unit_codes:
+
+                # Highest boost for active semester unit match (even if uploaded by another programme sharing the unit)
+                if doc_units & active_unit_codes:
+                    score += 18
+                elif doc_units & user_unit_codes:
                     score += 10
-                
+
                 # Medium boost for matching academic level
-                if user.academic_level:
+                if getattr(user, 'academic_level', None):
                     doc_levels = set(
-                        au.academic_level.level 
+                        au.academic_level.level
                         for au in doc.academic_units.all().only('academic_level__level')
+                        if getattr(au, 'academic_level', None)
                     )
                     if user.academic_level.level in doc_levels:
                         score += 5
-                
+
                 # Medium boost for matching semester
-                if user.semester:
-                    doc_semesters = set(
-                        au.semester.id 
-                        for au in doc.academic_units.all().only('semester__id')
+                if getattr(user, 'semester', None):
+                    doc_sem_nums = set(
+                        au.semester.number
+                        for au in doc.academic_units.all().only('semester__number')
+                        if getattr(au, 'semester', None)
                     )
-                    if user.semester.id in doc_semesters:
+                    if user.semester.number in doc_sem_nums:
                         score += 3
-                
+
                 return score
-            
-            # Sort by relevance score
+
             documents.sort(key=relevance_score, reverse=True)
-            
             return documents
-            
+
         except Exception:
             return documents
     

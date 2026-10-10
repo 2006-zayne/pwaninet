@@ -8,7 +8,7 @@ post privacy invariants, and engagement rank damping.
 import math
 import logging
 from typing import Dict, Any, List, Optional, Tuple
-from django.db.models import Q, F, Value, IntegerField, FloatField, Case, When, Count, Prefetch
+from django.db.models import Q, F, Value, IntegerField, FloatField, Case, When, Count, Prefetch, Exists, OuterRef
 from django.db.models.functions import Concat
 from django.contrib.postgres.search import SearchQuery, SearchRank, TrigramSimilarity
 
@@ -395,40 +395,96 @@ class UnifiedSearchService:
     # 2. Documents Adapter
     # --------------------------------------------------------------------------
     def _apply_student_interest_boost(self, queryset, user):
-        """Boost relevance ranking for documents matching student's enrolled programme."""
+        """Apply tiered soft relevance boost for documents matching student's enrolled units, level, and programme."""
         try:
-            profile = getattr(user, 'profile', None)
-            if not profile or not getattr(profile, 'programme', None):
-                return queryset
+            if not user or not getattr(user, 'is_authenticated', False):
+                return queryset.annotate(
+                    academic_relevance=Value(0.0, output_field=FloatField()),
+                    boosted_rank=F('relevance_rank'),
+                )
 
             from documents.academic.models import ProgrammeUnit
-            user_unit_codes = list(
-                ProgrammeUnit.objects.filter(programme=profile.programme)
-                .values_list('academic_unit__code', flat=True)
-            )
-            if not user_unit_codes:
-                return queryset
+            from documents.academic.services import StudentAcademicEnrollmentService
+            from documents.documents.models import DocumentAcademicUnit
 
-            unit_q = Q()
-            for code in user_unit_codes:
-                unit_q |= Q(academic_unit_codes__contains=code)
+            programme, academic_level, _, _ = StudentAcademicEnrollmentService.resolve_student_programme_and_level(user)
+            active_enrollments = StudentAcademicEnrollmentService.get_active_enrollments(user)
+            enrolled_unit_ids = [enr.academic_unit_id for enr in active_enrollments]
+            enrolled_unit_codes = [enr.academic_unit.code for enr in active_enrollments if getattr(enr, 'academic_unit', None)]
+
+            programme_level_unit_ids: List[int] = []
+            programme_unit_ids: List[int] = []
+            if programme:
+                programme_unit_ids = list(
+                    ProgrammeUnit.objects.filter(programme=programme)
+                    .values_list('academic_unit_id', flat=True)
+                )
+                if academic_level:
+                    programme_level_unit_ids = list(
+                        ProgrammeUnit.objects.filter(programme=programme, academic_level=academic_level)
+                        .values_list('academic_unit_id', flat=True)
+                    )
+
+            if not enrolled_unit_ids and not programme_unit_ids:
+                return queryset.annotate(
+                    academic_relevance=Value(0.0, output_field=FloatField()),
+                    boosted_rank=F('relevance_rank'),
+                )
+
+            when_clauses_boost = []
+            when_clauses_rel = []
+
+            if enrolled_unit_ids:
+                enrolled_q = Exists(
+                    DocumentAcademicUnit.objects.filter(
+                        document_id=OuterRef('document_id'),
+                        academic_unit_id__in=enrolled_unit_ids,
+                    )
+                )
+                for code in enrolled_unit_codes:
+                    enrolled_q |= Q(academic_unit_codes__contains=code)
+                when_clauses_boost.append(When(enrolled_q, then=Value(0.65)))
+                when_clauses_rel.append(When(enrolled_q, then=Value(1.0)))
+
+            if programme_level_unit_ids:
+                prog_lvl_q = Exists(
+                    DocumentAcademicUnit.objects.filter(
+                        document_id=OuterRef('document_id'),
+                        academic_unit_id__in=programme_level_unit_ids,
+                    )
+                )
+                when_clauses_boost.append(When(prog_lvl_q, then=Value(0.40)))
+                when_clauses_rel.append(When(prog_lvl_q, then=Value(0.75)))
+
+            if programme_unit_ids:
+                prog_q = Exists(
+                    DocumentAcademicUnit.objects.filter(
+                        document_id=OuterRef('document_id'),
+                        academic_unit_id__in=programme_unit_ids,
+                    )
+                )
+                when_clauses_boost.append(When(prog_q, then=Value(0.20)))
+                when_clauses_rel.append(When(prog_q, then=Value(0.5)))
 
             queryset = queryset.annotate(
                 academic_relevance=Case(
-                    When(unit_q, then=Value(1.0)),
+                    *when_clauses_rel,
                     default=Value(0.0),
-                    output_field=FloatField()
+                    output_field=FloatField(),
                 ),
                 boosted_rank=F('relevance_rank') + Case(
-                    When(unit_q, then=Value(0.5)),
+                    *when_clauses_boost,
                     default=Value(0.0),
-                    output_field=FloatField()
-                )
+                    output_field=FloatField(),
+                ),
             )
             return queryset
         except Exception as exc:
             logger.warning("Failed to apply student interest boost: %s", exc)
-            return queryset
+            return queryset.annotate(
+                academic_relevance=Value(0.0, output_field=FloatField()),
+                boosted_rank=F('relevance_rank'),
+            )
 
     def _build_document_queryset(
         self,
@@ -506,7 +562,14 @@ class UnifiedSearchService:
 
         semester = filters.get('semester')
         if semester:
-            base_qs = base_qs.filter(document__academic_units__semester__id=semester)
+            sem_str = str(semester).strip()
+            if sem_str in ('1', '2', '3'):
+                base_qs = base_qs.filter(
+                    Q(document__academic_units__semester__id=semester) |
+                    Q(document__academic_units__semester__number=int(sem_str))
+                )
+            else:
+                base_qs = base_qs.filter(document__academic_units__semester__id=semester)
 
         academic_year = filters.get('academic_year')
         if academic_year:
@@ -520,11 +583,15 @@ class UnifiedSearchService:
 
         school = filters.get('school')
         if school:
-            base_qs = base_qs.filter(document__academic_units__academic_unit__department__school_id=school)
+            base_qs = base_qs.filter(
+                document__academic_units__academic_unit__programme_units__programme__department__school_id=school
+            )
 
         department = filters.get('department')
         if department:
-            base_qs = base_qs.filter(document__academic_units__academic_unit__department_id=department)
+            base_qs = base_qs.filter(
+                document__academic_units__academic_unit__programme_units__programme__department_id=department
+            )
 
         file_type = filters.get('file_type')
         if file_type:
@@ -544,8 +611,7 @@ class UnifiedSearchService:
                 relevance_rank=SearchRank(F('search_vector'), search_query)
             ).filter(search_vector=search_query)
 
-            if user and getattr(user, 'is_authenticated', False):
-                fts_qs = self._apply_student_interest_boost(fts_qs, user)
+            fts_qs = self._apply_student_interest_boost(fts_qs, user)
 
             total = fts_qs.count()
             if total > 0:
@@ -559,6 +625,7 @@ class UnifiedSearchService:
                     text_sim=text_sim,
                     relevance_rank=title_sim * 1.5 + text_sim
                 ).filter(Q(title_sim__gte=0.25) | Q(text_sim__gte=0.25))
+                trgm_qs = self._apply_student_interest_boost(trgm_qs, user)
                 total = trgm_qs.count()
                 qs = trgm_qs
         else:
@@ -569,7 +636,7 @@ class UnifiedSearchService:
         sort_field = '-created_at'
         if sort_by == 'relevance':
             if has_query:
-                sort_field = '-relevance_rank'
+                sort_field = '-boosted_rank'
             else:
                 sort_field = '-created_at'
         elif sort_by == 'newest':
@@ -586,7 +653,7 @@ class UnifiedSearchService:
             sort_field = '-popularity_score'
 
         if has_query and sort_by == 'relevance':
-            ordered_qs = qs.order_by(sort_field, '-download_count', '-created_at')
+            ordered_qs = qs.order_by(sort_field, '-relevance_rank', '-download_count', '-created_at')
         else:
             ordered_qs = qs.order_by(sort_field)
 
@@ -785,6 +852,9 @@ class UnifiedSearchService:
                 if first_f and first_f.preview_path:
                     thumb_url = f"/media/{first_f.preview_path}"
 
+            effective_rank = getattr(idx, 'boosted_rank', None)
+            if effective_rank is None:
+                effective_rank = getattr(idx, 'relevance_rank', 0.0)
             items.append({
                 "id": doc.id,
                 "type": "document",
@@ -798,7 +868,8 @@ class UnifiedSearchService:
                 "download_count": idx.download_count,
                 "rating_average": float(idx.rating_average or 0.0),
                 "snippet": doc.description[:140] if doc.description else "",
-                "relevance_rank": float(getattr(idx, 'relevance_rank', 0.0) or 0.0),
+                "relevance_rank": float(effective_rank or 0.0),
+                "academic_relevance": float(getattr(idx, 'academic_relevance', 0.0) or 0.0),
                 "obj": doc,
             })
 

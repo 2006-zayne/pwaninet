@@ -823,7 +823,7 @@
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
     <link rel="stylesheet" href="{% static 'css/media-picker.css' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
-    <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
+    <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}?v=3">
     <link rel="stylesheet" href="{% static 'css/downloads/offline_media_viewer.css' %}">
     <link rel="stylesheet" id="pwanimate-css" href="{% static 'css/pwanimate/pwanimate.css' %}?v={{ pwanimate_version|default:'2.0.0' }}-20260929-3">
     {% block extra_css %}{% endblock %}
@@ -2894,8 +2894,13 @@
                 <a href="{% url 'messaging:conversation_list' %}"
                    class="nav-chip {% if request.resolver_match.app_name == 'messaging' %}active{% endif %}"
                    data-haptic="light"
-                   data-bypass-htmx="true"
-                   hx-boost="false"
+                   hx-get="{% url 'messaging:conversation_list' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   hx-sync="#page-content-target:replace"
+                   hx-trigger="click delay:10ms"
                    aria-label="{% trans 'Chats' %}">
                     <span class="position-relative d-inline-block">
                         <i class="bi bi-chat-dots-fill"></i>
@@ -3947,6 +3952,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
             const settingsNavChips = document.querySelectorAll('.nav-chip[href*="/users/settings"], .nav-chip[href*="/settings"]');
             settingsNavChips.forEach(chip => chip.classList.add('active'));
             console.log('[HTMX History] Set Settings nav chips as active');
+        } else if (pathname.startsWith('/messaging') || pathname.startsWith('/messages')) {
+            const chatsNavChips = document.querySelectorAll('.nav-chip[href*="/messaging"], .nav-chip[href*="/messages"]');
+            chatsNavChips.forEach(chip => chip.classList.add('active'));
+            console.log('[HTMX History] Set Chats nav chips as active');
         }
     }
 
@@ -4151,11 +4160,13 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 return;
             }
 
-            const isTargetMessaging = isMessagingPage(targetPath);
-            const isCurrentMessaging = isMessagingPage(window.location.pathname);
+            const isTargetWhatsappLayout = targetPath.startsWith('/messaging/conversation/') ||
+                                           (isMessagingPage(targetPath) && window.innerWidth >= 992 && !path.includes('view=list'));
+            const isCurrentWhatsappLayout = !!document.getElementById('whatsappLayout') ||
+                                            window.location.pathname.startsWith('/messaging/conversation/');
 
-            if (isPageTarget && (isTargetMessaging !== isCurrentMessaging)) {
-                // Crossing the boundary between PwaniNet and Messaging:
+            if (isPageTarget && (isTargetWhatsappLayout !== isCurrentWhatsappLayout)) {
+                // Crossing the boundary between App Shell (#page-content-target) and full-screen WhatsappLayout:
                 evt.preventDefault();
                 if (evt.detail && evt.detail.xhr && typeof evt.detail.xhr.abort === 'function') {
                     try { evt.detail.xhr.abort(); } catch (_) {}
@@ -4278,13 +4289,13 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         return;
                     }
 
-                    // Check if response crosses the PwaniNet ↔ Messaging boundary
-                    const incomingIsMessaging = responseText.includes('whatsappLayout') || (responseUrl && isMessagingPage(new URL(responseUrl, window.location.origin).pathname));
-                    const currentIsMessaging = isMessagingPage(window.location.pathname);
-                    if (incomingIsMessaging !== currentIsMessaging) {
+                    // Check if response crosses the App Shell ↔ full-screen WhatsappLayout boundary
+                    const incomingIsWhatsappLayout = responseText.includes('id="whatsappLayout"');
+                    const currentIsWhatsappLayout = !!document.getElementById('whatsappLayout');
+                    if (incomingIsWhatsappLayout !== currentIsWhatsappLayout) {
                         evt.detail.shouldSwap = false;
-                        const dest = responseUrl || (evt.detail.requestConfig && evt.detail.requestConfig.path) || (incomingIsMessaging ? '/messaging/' : '/');
-                        console.log('[Boundary Navigation] Crossing PwaniNet ↔ Messaging, forcing full-page navigation to:', dest);
+                        const dest = responseUrl || (evt.detail.requestConfig && evt.detail.requestConfig.path) || (incomingIsWhatsappLayout ? '/messaging/' : '/');
+                        console.log('[Boundary Navigation] Crossing App Shell ↔ WhatsappLayout, forcing full-page navigation to:', dest);
                         window.location.assign(dest);
                         return;
                     }

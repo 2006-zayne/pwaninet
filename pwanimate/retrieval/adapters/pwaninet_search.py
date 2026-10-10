@@ -301,6 +301,26 @@ class PwaniNetSearchAdapter:
                     full_name = f"{uploader.first_name or ''} {uploader.last_name or ''}".strip()
                     doc_author = full_name or getattr(uploader, "username", "") or ""
 
+            unit_codes = []
+            unit_names = []
+            if raw_doc and hasattr(raw_doc, "academic_units"):
+                for du in raw_doc.academic_units.all():
+                    if getattr(du, "academic_unit", None):
+                        unit_codes.append(du.academic_unit.code)
+                        unit_names.append(du.academic_unit.name)
+
+            acad_rel = float(item.get("academic_relevance", 0.0) or 0.0)
+            if acad_rel >= 0.99:
+                academic_match_tier = "enrolled_unit"
+            elif acad_rel >= 0.7:
+                academic_match_tier = "programme_level"
+            elif acad_rel >= 0.4:
+                academic_match_tier = "programme"
+            elif unit_codes:
+                academic_match_tier = "other_programme"
+            else:
+                academic_match_tier = "general"
+
             results.append(
                 RetrievalResult(
                     source=SourceType.DOCUMENT,
@@ -319,6 +339,9 @@ class PwaniNetSearchAdapter:
                         "media_url": doc_media,
                         "resource_type": "document",
                         "author": doc_author,
+                        "unit_codes": unit_codes,
+                        "unit_names": unit_names,
+                        "academic_match_tier": academic_match_tier,
                     },
                     raw_object=raw_doc,
                 )

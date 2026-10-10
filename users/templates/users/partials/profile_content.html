@@ -127,6 +127,15 @@
                                    class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
                                     <i class="bi bi-gear-wide-connected me-1"></i> {% trans "UPDATE PROFILE" %}
                                 </a>
+                                <a href="{% url 'documents:academic:dashboard' %}"
+                                   hx-get="{% url 'documents:academic:dashboard' %}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   hx-history="true"
+                                   class="btn btn-outline-primary rounded-pill fw-bold btn-sm">
+                                    <i class="bi bi-mortarboard me-1"></i> {% trans "ACADEMIC & UNITS" %}
+                                </a>
                                 <a href="{% url 'users:settings' %}" class="btn btn-outline-info rounded-pill fw-bold btn-sm" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
                                     <i class="bi bi-gear me-1"></i> {% trans "SETTINGS" %}
                                 </a>

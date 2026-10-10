@@ -1,8 +1,9 @@
 {% load static %}
 
-<link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}">
+<link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}?v=3">
 
 <div class="page-wrap">
+  <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 
   <!-- ── Page Header ── -->
   <div class="page-header">
@@ -13,27 +14,15 @@
       </div>
       <h1 class="page-title">Notifications</h1>
     </div>
-      <span id="unread-count-badge" style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); background: var(--border); padding: 6px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.06em; {% if not unread_notifications_count or unread_notifications_count == 0 %}display: none;{% endif %}">
-        {{ unread_notifications_count }} unread
-      </span>
+    <span id="unread-count-badge" style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); background: var(--border); padding: 6px 14px; border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: 0.06em; {% if not unread_notifications_count or unread_notifications_count == 0 %}display: none;{% endif %}">
+      {{ unread_notifications_count }} unread
+    </span>
   </div>
 
-  <!-- ── Search and Filter Bar ── -->
-  <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;">
-    <!-- Search Input -->
-    <div style="flex: 1; min-width: 280px; position: relative;">
-      <input type="text"
-             id="search-input"
-             class="filter-dropdown"
-             placeholder="Search notifications..."
-             value="{{ search_query }}"
-             style="padding-right: 2.5rem; background-image: none;"
-             onkeyup="handleSearch(event)">
-      <i class="bi bi-search" style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none;"></i>
-    </div>
-
+  <!-- ── Filter Bar & Actions Menu ── -->
+  <div class="notif-toolbar" id="notif-toolbar">
     <!-- Filter Dropdown -->
-    <div class="filter-dropdown-container" style="margin-bottom: 0; flex-shrink: 0;">
+    <div class="filter-dropdown-container">
       <select id="filter-select" class="filter-dropdown" onchange="handleFilterChange()">
         <option value="">All Notifications</option>
         <optgroup label="Grouping">
@@ -59,89 +48,83 @@
         </optgroup>
       </select>
     </div>
-  </div>
 
-  <!-- Quick Filter Chips -->
-  <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-    <button class="btn-action"
-            style="background: {% if filter_read == False %}var(--brand){% else %}var(--brand-light){% endif %}; color: {% if filter_read == False %}#fff{% else %}var(--brand){% endif %};"
-            onclick="applyQuickFilter('read=false')">
-      <i class="bi bi-envelope"></i> Unread
-    </button>
-    <button class="btn-action"
-            style="background: var(--brand-light); color: var(--brand);"
-            onclick="applyQuickFilter('type=INVITE')">
-      <i class="bi bi-envelope-plus"></i> Invites
-    </button>
-    <button class="btn-action"
-            style="background: var(--brand-light); color: var(--brand);"
-            onclick="applyQuickFilter('type=LIKE')">
-      <i class="bi bi-heart"></i> Likes
-    </button>
-    <button class="btn-action"
-            style="background: var(--brand-light); color: var(--brand);"
-            onclick="applyQuickFilter('type=FOLLOW')">
-      <i class="bi bi-person-plus"></i> Follows
-    </button>
-    <button class="btn-action"
-            style="background: var(--brand-light); color: var(--brand);"
-            onclick="toggleSelectionMode()">
-      <i class="bi bi-check2-square"></i> Select
-    </button>
-    {% if search_query %}
-      <button class="btn-action"
-              style="background: var(--danger-light); color: var(--danger); border-color: #fecaca;"
-              onclick="clearSearch()">
-        <i class="bi bi-x-lg"></i> Clear Search
+    <!-- Actions Dropdown Menu -->
+    <div class="dropdown notif-actions-dropdown" id="notif-actions-dropdown">
+      <button class="notif-menu-btn"
+              type="button"
+              id="notifActionsMenuBtn"
+              aria-expanded="false"
+              aria-label="Notification actions"
+              onclick="toggleNotifActionsMenu(event)">
+        <i class="bi bi-three-dots-vertical"></i>
       </button>
-    {% endif %}
+      <ul class="dropdown-menu dropdown-menu-end notif-dropdown-menu" id="notifActionsMenu" aria-labelledby="notifActionsMenuBtn">
+        <li>
+          <button type="button"
+                  class="dropdown-item notif-dropdown-item"
+                  onclick="closeNotifActionsMenu(); toggleSelectionMode(true);">
+            Select
+          </button>
+        </li>
+        <li>
+          <button type="button"
+                  class="dropdown-item notif-dropdown-item"
+                  onclick="closeNotifActionsMenu(); markAllNotificationsAsRead();">
+            Mark all as read
+          </button>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <button type="button"
+                  class="dropdown-item notif-dropdown-item danger"
+                  onclick="closeNotifActionsMenu(); deleteReadNotifications();">
+            Delete read
+          </button>
+        </li>
+        <li>
+          <button type="button"
+                  class="dropdown-item notif-dropdown-item danger"
+                  onclick="closeNotifActionsMenu(); deleteAllNotifications();">
+            Delete all
+          </button>
+        </li>
+      </ul>
+    </div>
   </div>
 
-  <!-- Selection Mode Bar -->
+  <!-- ── Selection Mode Bar (Replaces Toolbar When Active) ── -->
   <div id="selection-mode-bar" class="selection-mode-bar">
-    <div style="display: flex; align-items: center; gap: 1rem;">
-      <span class="selected-count">0 selected</span>
-      <button class="btn-selection" onclick="selectAllNotifications()">Select All</button>
-      <button class="btn-selection" onclick="deselectAllNotifications()">Deselect All</button>
+    <div class="selection-bar-left">
+      <input type="checkbox"
+             id="select-all-checkbox"
+             class="notification-checkbox master-checkbox"
+             onchange="toggleSelectAll(this.checked)"
+             aria-label="Select all notifications">
+      <label for="select-all-checkbox" class="selected-count" id="selected-count-label">0 selected</label>
     </div>
     <div class="selection-actions">
-      <button class="btn-selection" onclick="markSelectedAsRead()">
-        <i class="bi bi-check2"></i> Mark Read
+      <button type="button"
+              id="btn-mark-selected-read"
+              class="btn-selection-action"
+              onclick="markSelectedAsRead()"
+              disabled>
+        Mark read
       </button>
-      <button class="btn-selection danger" onclick="deleteSelected()">
-        <i class="bi bi-trash"></i> Delete
+      <button type="button"
+              id="btn-delete-selected"
+              class="btn-selection-action danger"
+              onclick="deleteSelected()"
+              disabled>
+        Delete
       </button>
-      <button class="btn-selection" onclick="toggleSelectionMode()">
-        <i class="bi bi-x-lg"></i> Cancel
+      <button type="button"
+              class="btn-selection-cancel"
+              onclick="toggleSelectionMode(false)">
+        Cancel
       </button>
     </div>
   </div>
-
-  {% if notifications or time_grouped %}
-    <div style="text-align: center; margin-bottom: 1.5rem; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
-      <button class="btn-clear"
-              hx-post="{% url 'notifications:mark_all_as_read' %}"
-              hx-target="#notification-list .card-body"
-              hx-swap="innerHTML">
-        <i class="bi bi-check2-all"></i> Mark all as read
-      </button>
-      <button class="btn-clear"
-              hx-post="{% url 'notifications:delete_read_notifications' %}"
-              hx-target="#notification-list .card-body"
-              hx-swap="innerHTML"
-              style="background: var(--danger-light); color: var(--danger); border-color: #fecaca;">
-        <i class="bi bi-trash"></i> Delete read
-      </button>
-      <button class="btn-clear"
-              hx-post="{% url 'notifications:delete_all_notifications' %}"
-              hx-confirm="Are you sure you want to delete all notifications?"
-              hx-target="#notification-list .card-body"
-              hx-swap="innerHTML"
-              style="background: var(--danger); color: #fff; border-color: var(--danger);">
-        <i class="bi bi-trash3"></i> Delete all
-      </button>
-    </div>
-  {% endif %}
 
   <!-- ── Notifications Card ── -->
   <div class="card" id="notification-list" data-skeleton="notifications">
@@ -163,14 +146,392 @@
 
   <!-- Loading Indicator -->
   <div id="loading-indicator" style="display: none; text-align: center; padding: 1rem;">
-    <i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite;"></i>
-    <span style="margin-left: 0.5rem; color: var(--text-muted);">Loading more notifications...</span>
+    <span style="color: var(--text-muted); font-size: 0.85rem;">Loading more notifications...</span>
   </div>
 
 </div>
 
 <script type="module">
-  import { initNotificationCenter } from "{% static 'notifications/js/notifications.js' %}";
-  console.log('Loading notifications module...');
+  import { initNotificationCenter } from "{% static 'notifications/js/notifications.js' %}?v=3";
   initNotificationCenter();
+</script>
+<script>
+  (function() {
+    function getNotifCsrfToken() {
+      var input = document.querySelector('[name="csrfmiddlewaretoken"]');
+      if (input && input.value) return input.value;
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      if (meta && meta.content) return meta.content;
+      var cookies = document.cookie.split(';');
+      for (var i = 0; i < cookies.length; i++) {
+        var parts = cookies[i].trim().split('=');
+        if (parts[0] === 'csrftoken') return decodeURIComponent(parts[1] || '');
+      }
+      return '';
+    }
+
+    function syncUnreadBadges(unreadCount) {
+      var updateDom = function(count) {
+        var badge = document.getElementById('unread-count-badge');
+        if (badge) {
+          if (count > 0) {
+            badge.textContent = count + ' unread';
+            badge.style.display = 'inline-block';
+          } else {
+            badge.style.display = 'none';
+          }
+        }
+        document.querySelectorAll('.notification-badge').forEach(function(nb) {
+          if (count > 0) {
+            nb.textContent = count > 99 ? '99+' : count;
+            nb.style.display = 'flex';
+          } else {
+            nb.textContent = '0';
+            nb.style.display = 'none';
+          }
+        });
+      };
+
+      if (typeof unreadCount === 'number') {
+        updateDom(unreadCount);
+      }
+
+      fetch('/notifications/unread-count/?format=json', {
+        headers: { 'Accept': 'application/json' }
+      })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (data && typeof data.unread_count === 'number') {
+            updateDom(data.unread_count);
+          }
+        })
+        .catch(function() {});
+    }
+
+    function renderEmptyNotificationsState() {
+      var cardBody = document.querySelector('#notification-list .card-body');
+      if (!cardBody) return;
+      if (!cardBody.querySelector('.notif-item, .sender-group-item')) {
+        cardBody.innerHTML = '<div class="empty-state"><div class="empty-title">No notifications</div><p class="empty-sub">You\'re all caught up.</p></div>';
+      }
+    }
+
+    window.toggleNotifActionsMenu = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      var menu = document.getElementById('notifActionsMenu');
+      var btn = document.getElementById('notifActionsMenuBtn');
+      if (!menu || !btn) return;
+      var isOpen = menu.classList.contains('show');
+      if (isOpen) {
+        menu.classList.remove('show');
+        btn.setAttribute('aria-expanded', 'false');
+      } else {
+        menu.classList.add('show');
+        btn.setAttribute('aria-expanded', 'true');
+      }
+    };
+
+    window.closeNotifActionsMenu = function() {
+      var menu = document.getElementById('notifActionsMenu');
+      var btn = document.getElementById('notifActionsMenuBtn');
+      if (menu) menu.classList.remove('show');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    };
+
+    if (!window._notifMenuOutsideClickBound) {
+      window._notifMenuOutsideClickBound = true;
+      document.addEventListener('click', function(e) {
+        var dropdown = document.getElementById('notif-actions-dropdown');
+        if (dropdown && !dropdown.contains(e.target)) {
+          window.closeNotifActionsMenu();
+        }
+      });
+    }
+
+    window.handleFilterChange = function() {
+      var select = document.getElementById('filter-select');
+      if (!select) return;
+      var value = select.value;
+      var url = new URL(window.location.href);
+      url.searchParams.delete('type');
+      url.searchParams.delete('read');
+      url.searchParams.delete('time');
+      url.searchParams.delete('grouped');
+      url.searchParams.delete('sender_grouped');
+      url.searchParams.delete('hybrid_grouped');
+      url.searchParams.delete('cursor');
+
+      if (value) {
+        var parts = value.split('=');
+        if (parts.length === 2) {
+          url.searchParams.set(parts[0], parts[1]);
+        }
+      }
+
+      if (window.htmx) {
+        htmx.ajax('GET', url.pathname + url.search, {
+          target: '#page-content-target',
+          swap: 'innerHTML'
+        });
+        window.history.pushState({}, '', url.pathname + url.search);
+      } else {
+        window.location.href = url.toString();
+      }
+    };
+
+    window.updateBulkActionButtons = function() {
+      var allCheckboxes = document.querySelectorAll('#notification-list .notification-checkbox');
+      var checkedBoxes = document.querySelectorAll('#notification-list .notification-checkbox:checked');
+      var total = allCheckboxes.length;
+      var selectedCount = checkedBoxes.length;
+
+      var countEl = document.getElementById('selected-count-label');
+      if (countEl) {
+        countEl.textContent = selectedCount + ' selected';
+      }
+
+      var masterCheckbox = document.getElementById('select-all-checkbox');
+      if (masterCheckbox) {
+        if (total === 0 || selectedCount === 0) {
+          masterCheckbox.checked = false;
+          masterCheckbox.indeterminate = false;
+        } else if (selectedCount === total) {
+          masterCheckbox.checked = true;
+          masterCheckbox.indeterminate = false;
+        } else {
+          masterCheckbox.checked = false;
+          masterCheckbox.indeterminate = true;
+        }
+      }
+
+      var markReadBtn = document.getElementById('btn-mark-selected-read');
+      var deleteBtn = document.getElementById('btn-delete-selected');
+      if (markReadBtn) markReadBtn.disabled = selectedCount === 0;
+      if (deleteBtn) deleteBtn.disabled = selectedCount === 0;
+    };
+
+    window.toggleSelection = function(notificationId, toggleCheckboxState) {
+      var checkbox = document.getElementById('select-' + notificationId);
+      if (!checkbox) return;
+      if (toggleCheckboxState) {
+        checkbox.checked = !checkbox.checked;
+      }
+      var card = checkbox.closest('.notif-item');
+      if (card) {
+        card.classList.toggle('selected', checkbox.checked);
+      }
+      window.updateBulkActionButtons();
+    };
+
+    window.selectAllNotifications = function() {
+      var checkboxes = document.querySelectorAll('#notification-list .notification-checkbox');
+      checkboxes.forEach(function(cb) {
+        cb.checked = true;
+        var card = cb.closest('.notif-item');
+        if (card) card.classList.add('selected');
+      });
+      window.updateBulkActionButtons();
+    };
+
+    window.deselectAllNotifications = function() {
+      var checkboxes = document.querySelectorAll('#notification-list .notification-checkbox');
+      checkboxes.forEach(function(cb) {
+        cb.checked = false;
+        var card = cb.closest('.notif-item');
+        if (card) card.classList.remove('selected');
+      });
+      window.updateBulkActionButtons();
+    };
+
+    window.toggleSelectAll = function(shouldSelectAll) {
+      if (shouldSelectAll) {
+        window.selectAllNotifications();
+      } else {
+        window.deselectAllNotifications();
+      }
+    };
+
+    window.toggleSelectionMode = function(forceState) {
+      var selectionBar = document.getElementById('selection-mode-bar');
+      var toolbar = document.getElementById('notif-toolbar');
+      var notifList = document.getElementById('notification-list');
+      if (!selectionBar || !notifList) return;
+
+      var willBeActive = typeof forceState === 'boolean'
+        ? forceState
+        : !selectionBar.classList.contains('active');
+
+      if (!willBeActive) {
+        selectionBar.classList.remove('active');
+        if (toolbar) toolbar.classList.remove('hidden');
+        notifList.classList.remove('selection-active');
+        window.deselectAllNotifications();
+      } else {
+        selectionBar.classList.add('active');
+        if (toolbar) toolbar.classList.add('hidden');
+        notifList.classList.add('selection-active');
+        window.updateBulkActionButtons();
+      }
+    };
+
+    window.markSelectedAsRead = function() {
+      var selectedIds = [];
+      document.querySelectorAll('#notification-list .notification-checkbox:checked').forEach(function(cb) {
+        if (cb.dataset.notificationId) {
+          selectedIds.push(cb.dataset.notificationId);
+        }
+      });
+      if (selectedIds.length === 0) return;
+
+      fetch('/notifications/bulk-action/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getNotifCsrfToken()
+        },
+        body: JSON.stringify({
+          action: 'mark_read',
+          notification_ids: selectedIds
+        })
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.success) {
+            selectedIds.forEach(function(id) {
+              var card = document.getElementById('notification-' + id);
+              if (card) {
+                card.classList.remove('unread-notification', 'selected');
+                card.classList.add('read-notification');
+                card.style.cursor = 'default';
+                card.removeAttribute('hx-post');
+              }
+            });
+            window.toggleSelectionMode(false);
+            syncUnreadBadges();
+          }
+        });
+    };
+
+    window.deleteSelected = function() {
+      var selectedIds = [];
+      document.querySelectorAll('#notification-list .notification-checkbox:checked').forEach(function(cb) {
+        if (cb.dataset.notificationId) {
+          selectedIds.push(cb.dataset.notificationId);
+        }
+      });
+      if (selectedIds.length === 0) return;
+
+      fetch('/notifications/bulk-action/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getNotifCsrfToken()
+        },
+        body: JSON.stringify({
+          action: 'delete',
+          notification_ids: selectedIds
+        })
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.success) {
+            selectedIds.forEach(function(id) {
+              var card = document.getElementById('notification-' + id);
+              if (card) {
+                var section = card.closest('.time-section');
+                card.remove();
+                if (section && !section.querySelector('.notif-item')) {
+                  section.remove();
+                }
+              }
+            });
+            window.toggleSelectionMode(false);
+            renderEmptyNotificationsState();
+            syncUnreadBadges();
+          }
+        });
+    };
+
+    window.markAllNotificationsAsRead = function() {
+      fetch('{% url "notifications:mark_all_as_read" %}', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getNotifCsrfToken(),
+          'HX-Request': 'true'
+        }
+      })
+        .then(function(r) { return r.ok ? r.text() : null; })
+        .then(function(html) {
+          var cardBody = document.querySelector('#notification-list .card-body');
+          if (cardBody && html !== null) {
+            cardBody.innerHTML = html;
+            if (window.htmx) htmx.process(cardBody);
+          } else {
+            document.querySelectorAll('#notification-list .unread-notification').forEach(function(card) {
+              card.classList.remove('unread-notification');
+              card.classList.add('read-notification');
+              card.style.cursor = 'default';
+              card.removeAttribute('hx-post');
+            });
+          }
+          window.toggleSelectionMode(false);
+          syncUnreadBadges(0);
+        });
+    };
+
+    window.deleteReadNotifications = function() {
+      fetch('{% url "notifications:delete_read_notifications" %}', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getNotifCsrfToken(),
+          'HX-Request': 'true'
+        }
+      })
+        .then(function(r) { return r.ok ? r.text() : null; })
+        .then(function(html) {
+          var cardBody = document.querySelector('#notification-list .card-body');
+          if (cardBody && html !== null) {
+            cardBody.innerHTML = html;
+            if (window.htmx) htmx.process(cardBody);
+          } else {
+            document.querySelectorAll('#notification-list .read-notification').forEach(function(card) {
+              var section = card.closest('.time-section');
+              card.remove();
+              if (section && !section.querySelector('.notif-item')) {
+                section.remove();
+              }
+            });
+          }
+          window.toggleSelectionMode(false);
+          renderEmptyNotificationsState();
+          syncUnreadBadges();
+        });
+    };
+
+    window.deleteAllNotifications = function() {
+      fetch('{% url "notifications:delete_all_notifications" %}', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getNotifCsrfToken(),
+          'HX-Request': 'true'
+        }
+      })
+        .then(function(r) { return r.ok ? r.text() : null; })
+        .then(function(html) {
+          var cardBody = document.querySelector('#notification-list .card-body');
+          if (cardBody && html !== null) {
+            cardBody.innerHTML = html;
+            if (window.htmx) htmx.process(cardBody);
+          }
+          var trigger = document.getElementById('load-more-trigger');
+          if (trigger) trigger.style.display = 'none';
+          window.toggleSelectionMode(false);
+          renderEmptyNotificationsState();
+          syncUnreadBadges(0);
+        });
+    };
+  })();
 </script>

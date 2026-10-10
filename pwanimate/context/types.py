@@ -197,7 +197,7 @@ class ContextItem:
     def format_data_block(self) -> str:
         """
         Format as an isolated XML-delimited data block.
-        Treats retrieved text strictly as untrusted data.
+        Treats retrieved text strictly as untrusted data while surfacing page and academic unit provenance.
         """
         src_str = self.source.value if isinstance(self.source, SourceType) else str(self.source)
         citation_str = f' citation="{self.citation}"' if self.citation else ""
@@ -205,8 +205,27 @@ class ContextItem:
         authority_str = f' authority="{self.authority_level.value}"' if isinstance(self.authority_level, AuthorityLevel) else ""
         explicit_str = ' explicitly_selected="true"' if self.explicitly_selected else ""
 
+        meta = self.metadata or {}
+        page_num = meta.get("active_viewer_page") or meta.get("page_number")
+        page_str = f' page="{page_num}"' if page_num else ""
+        mode = meta.get("retrieval_mode")
+        mode_str = f' mode="{mode}"' if mode else ""
+
+        unit_codes = meta.get("unit_codes") or []
+        unit_names = meta.get("unit_names") or []
+        units_str = ""
+        if unit_codes:
+            paired = [
+                f"{code} ({unit_names[idx]})" if idx < len(unit_names) and unit_names[idx] else str(code)
+                for idx, code in enumerate(unit_codes)
+            ]
+            units_str = f' units="{", ".join(paired)}"'
+
+        match_tier = meta.get("academic_match_tier")
+        match_str = f' academic_match="{match_tier}"' if match_tier else ""
+
         lines = [
-            f'<grounding_data source="{src_str}" id="{self.object_id}"{citation_str}{url_str}{authority_str}{explicit_str}>',
+            f'<grounding_data source="{src_str}" id="{self.object_id}"{citation_str}{url_str}{authority_str}{explicit_str}{page_str}{mode_str}{units_str}{match_str}>',
             f'  <title>{self.title}</title>',
             '  <content>',
             f'    {self.content}',
@@ -227,6 +246,10 @@ class StudentContext:
     Attributes:
         programme_name: Academic programme name (if relevant).
         level: Academic level (if relevant).
+        school_name: School name (if relevant).
+        department_name: Department name (if relevant).
+        semester: Semester number (if relevant).
+        enrolled_units: Active enrolled academic units (code and name).
         relevant_interests: Interests relevant to the current query.
         relevant_skills: Skills relevant to the current query.
         collaboration_status: Collaboration availability (if relevant).
@@ -237,6 +260,10 @@ class StudentContext:
     """
     programme_name: Optional[str] = None
     level: Optional[str] = None
+    school_name: Optional[str] = None
+    department_name: Optional[str] = None
+    semester: Optional[int] = None
+    enrolled_units: List[str] = field(default_factory=list)
     relevant_interests: List[str] = field(default_factory=list)
     relevant_skills: List[str] = field(default_factory=list)
     collaboration_status: Optional[str] = None
@@ -250,6 +277,10 @@ class StudentContext:
         return {
             "programme_name": self.programme_name,
             "level": self.level,
+            "school_name": self.school_name,
+            "department_name": self.department_name,
+            "semester": self.semester,
+            "enrolled_units": list(self.enrolled_units),
             "relevant_interests": list(self.relevant_interests),
             "relevant_skills": list(self.relevant_skills),
             "collaboration_status": self.collaboration_status,
@@ -268,8 +299,16 @@ class StudentContext:
         
         if self.programme_name:
             lines.append(f"Programme: {self.programme_name}")
+        if self.department_name:
+            lines.append(f"Department: {self.department_name}")
+        if self.school_name:
+            lines.append(f"School: {self.school_name}")
         if self.level:
             lines.append(f"Level: {self.level}")
+        if self.semester is not None:
+            lines.append(f"Semester: {self.semester}")
+        if self.enrolled_units:
+            lines.append(f"Enrolled Units: {', '.join(self.enrolled_units)}")
         if self.relevant_interests:
             lines.append(f"Interests: {', '.join(self.relevant_interests)}")
         if self.relevant_skills:
@@ -296,6 +335,10 @@ class StudentContext:
         return bool(
             self.programme_name or
             self.level or
+            self.school_name or
+            self.department_name or
+            self.semester is not None or
+            self.enrolled_units or
             self.relevant_interests or
             self.relevant_skills or
             self.collaboration_status or

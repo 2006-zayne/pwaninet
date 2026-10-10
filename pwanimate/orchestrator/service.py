@@ -158,10 +158,17 @@ def sanitize_llm_response(text: str) -> str:
     return result.strip()
 
 
-def extract_attachment_text(attachment: Any, max_chars: int = 15000, query: str = "") -> str:
+def extract_attachment_text(
+    attachment: Any,
+    max_chars: int = 15000,
+    query: str = "",
+    active_page: Optional[int] = None,
+) -> str:
     """
     Extract bounded textual content from an uploaded document attachment.
     Supports PDF, DOCX, PPTX, TXT, MD, CSV, etc. using Pwanimate extractors.
+    Prioritizes the currently open page (`active_page`) from the Right Context Rail
+    or an explicit page in `query`, alongside a whole-document structural overview.
     """
     file_obj = getattr(attachment, "file", None)
     file_name = getattr(attachment, "file_name", getattr(attachment, "name", "document"))
@@ -169,36 +176,96 @@ def extract_attachment_text(attachment: Any, max_chars: int = 15000, query: str 
     if getattr(attachment, "processing_status", None) == "ready":
         stored_chunks = list(attachment.chunks.all())
         if stored_chunks:
-            query_terms = set(re.findall(r"[a-z0-9]{3,}", (query or "").lower()))
-            page_match = re.search(r"\b(?:page|p\.)\s*(\d+)\b", query or "", re.IGNORECASE)
-            requested_page = int(page_match.group(1)) if page_match else None
-            ranked = sorted(
-                stored_chunks,
-                key=lambda chunk: (
-                    int(
-                        requested_page is not None
-                        and chunk.page_number is not None
-                        and chunk.page_number <= requested_page <= (chunk.page_end or chunk.page_number)
-                    ),
-                    sum(1 for term in query_terms if term in chunk.content.lower()),
-                    -(chunk.chunk_index),
-                ),
-                reverse=True,
+            query_str = query or ""
+            query_terms = set(re.findall(r"[a-z0-9]{3,}", query_str.lower()))
+            page_match = re.search(r"\b(?:page|p\.)\s*(\d+)\b", query_str, re.IGNORECASE)
+            explicit_query_page = int(page_match.group(1)) if page_match else None
+            effective_page = explicit_query_page
+            if effective_page is None and active_page is not None:
+                try:
+                    if int(active_page) > 0:
+                        effective_page = int(active_page)
+                except (ValueError, TypeError):
+                    effective_page = None
+
+            is_summary_query = bool(
+                re.search(
+                    r"\b(?:summar(?:ize|y|ise)|overview|table of contents|chapters?|whole (?:book|document|pdf)|about this (?:book|document|pdf)|structure)\b",
+                    query_str,
+                    re.IGNORECASE,
+                )
             )
-            selected = ranked[:6]
-            selected.sort(key=lambda chunk: chunk.chunk_index)
-            lines = []
-            remaining = max_chars
-            for chunk in selected:
-                page = f"page {chunk.page_number}" if chunk.page_number else "page not specified"
-                item = f"[{page}]\n{chunk.content.strip()}"
-                if len(item) > remaining:
-                    item = item[:remaining].rstrip()
-                if item:
-                    lines.append(item)
-                    remaining -= len(item)
-                if remaining <= 0:
-                    break
+            max_page = max((c.page_end or c.page_number or 1) for c in stored_chunks)
+
+            lines = [
+                f"[DOCUMENT OVERVIEW — '{file_name}' (Total pages: {max_page}, Total chunks: {len(stored_chunks)})]"
+            ]
+            remaining = max_chars - len(lines[0])
+            included_indices = set()
+
+            # 1. If a page is open in the Right Context Rail (or explicitly requested), include its full content
+            if effective_page is not None and not is_summary_query:
+                page_matching_chunks = [
+                    c for c in stored_chunks
+                    if c.page_number is not None
+                    and c.page_number <= effective_page <= (c.page_end or c.page_number)
+                ]
+                if page_matching_chunks:
+                    lines.append(f"[CURRENTLY OPEN PAGE IN VIEWER — PAGE {effective_page}]")
+                    for chunk in page_matching_chunks:
+                        page_lbl = f"page {chunk.page_number}"
+                        item = f"[{page_lbl}]\n{chunk.content.strip()}"
+                        if len(item) > remaining:
+                            item = item[:remaining].rstrip()
+                        if item:
+                            lines.append(item)
+                            remaining -= len(item)
+                            included_indices.add(chunk.chunk_index)
+                        if remaining <= 200:
+                            break
+
+            # 2. For whole-book summary queries (or supplementary context), include opening + sampled/ranked chunks
+            if remaining > 200:
+                if is_summary_query:
+                    sample_indices = set(range(min(3, len(stored_chunks))))
+                    if len(stored_chunks) > 3:
+                        step = max(1, (len(stored_chunks) - 3) // 5)
+                        for s in range(1, 5):
+                            sample_indices.add(min(len(stored_chunks) - 1, 2 + s * step))
+                    supplementary = [
+                        stored_chunks[i] for i in sorted(sample_indices)
+                        if stored_chunks[i].chunk_index not in included_indices
+                    ]
+                else:
+                    remaining_chunks = [c for c in stored_chunks if c.chunk_index not in included_indices]
+                    ranked = sorted(
+                        remaining_chunks,
+                        key=lambda chunk: (
+                            int(
+                                effective_page is not None
+                                and chunk.page_number is not None
+                                and abs(chunk.page_number - effective_page) <= 1
+                            ),
+                            sum(1 for term in query_terms if term in chunk.content.lower()),
+                            -(chunk.chunk_index),
+                        ),
+                        reverse=True,
+                    )
+                    supplementary = sorted(ranked[:5], key=lambda chunk: chunk.chunk_index)
+
+                if supplementary and included_indices:
+                    lines.append("[ADDITIONAL DOCUMENT CONTEXT]")
+                for chunk in supplementary:
+                    page = f"page {chunk.page_number}" if chunk.page_number else "page not specified"
+                    item = f"[{page}]\n{chunk.content.strip()}"
+                    if len(item) > remaining:
+                        item = item[:remaining].rstrip()
+                    if item:
+                        lines.append(item)
+                        remaining -= len(item)
+                    if remaining <= 0:
+                        break
+
             if getattr(attachment, "processing_error", ""):
                 lines.append(f"[Processing note: {attachment.processing_error}]")
             return "\n\n".join(lines)
@@ -272,12 +339,16 @@ class PwanimateOrchestrator:
         self.tool_selector = tool_selector or LLMToolSelector(self.gateway, self.tool_registry)
 
     def _process_attachments(
-        self, attachments: List[Any], query: str = ""
+        self,
+        attachments: List[Any],
+        query: str = "",
+        attachment_pages: Optional[Dict[str, int]] = None,
     ) -> Tuple[List[AttachmentData], Optional[str]]:
         """
         Process user attachments:
         - Image attachments become AttachmentData with raw bytes for multimodal models.
-        - Document attachments have text extracted and bounded into an XML context block.
+        - Document attachments have text extracted and bounded into an XML context block,
+          respecting any active page open in the Right Context Rail viewer.
         """
         if not attachments:
             return [], None
@@ -287,6 +358,7 @@ class PwanimateOrchestrator:
         max_chars = getattr(settings, "PWANIMATE_MAX_EXTRACT_CHARS", 15000)
         image_attachments: List[AttachmentData] = []
         doc_blocks: List[str] = []
+        pages_map = attachment_pages or {}
 
         for att in attachments:
             att_type = getattr(att, "attachment_type", None) or "document"
@@ -316,9 +388,16 @@ class PwanimateOrchestrator:
                 )
 
             elif att_type == "document":
-                extracted_text = extract_attachment_text(att, max_chars=max_chars, query=query)
+                active_page = pages_map.get(att_id)
+                extracted_text = extract_attachment_text(
+                    att,
+                    max_chars=max_chars,
+                    query=query,
+                    active_page=active_page,
+                )
+                page_attr = f' active_page="{active_page}"' if active_page else ""
                 block = [
-                    f'<attachment_context id="{att_id}" filename="{att_name}" type="{att_type}">',
+                    f'<attachment_context id="{att_id}" filename="{att_name}" type="{att_type}"{page_attr}>',
                     f'  <title>{att_name}</title>',
                     '  <content>',
                     f'    {extracted_text}',
@@ -330,8 +409,57 @@ class PwanimateOrchestrator:
         attachment_context_str = "\n\n".join(doc_blocks) if doc_blocks else None
         return image_attachments, attachment_context_str
 
-    def _resolve_context_resources(
+    def _resolve_context_attachments(
         self, user: Any, context_resources: List[Dict[str, Any]]
+    ) -> Tuple[List[Any], Dict[str, int]]:
+        """
+        Resolve any uploaded chat attachments (`PwanimateAttachment`) present in the
+        Right Context Rail along with their currently open viewer `pageNumber`.
+        """
+        if not context_resources or not isinstance(context_resources, list):
+            return [], {}
+
+        from pwanimate.services.attachment import AttachmentService
+
+        resolved_attachments: List[Any] = []
+        attachment_pages: Dict[str, int] = {}
+        seen_ids = set()
+
+        for res in context_resources:
+            if not isinstance(res, dict):
+                continue
+            source_type = str(res.get("source_type") or res.get("sourceType") or "").lower()
+            res_type = str(res.get("type") or res.get("category") or "").lower()
+            att_id = res.get("attachment_id") or res.get("attachmentId")
+            if not att_id and source_type == "attachment":
+                att_id = res.get("id")
+            if not att_id and res_type == "attachment":
+                att_id = res.get("id")
+            if not att_id:
+                continue
+
+            att = AttachmentService.get_authorized_attachment(user=user, attachment_id=att_id)
+            if not att:
+                continue
+
+            att_key = str(att.id)
+            if att_key not in seen_ids:
+                resolved_attachments.append(att)
+                seen_ids.add(att_key)
+
+            page_raw = res.get("page") or res.get("page_number") or res.get("pageNumber")
+            if page_raw is not None:
+                try:
+                    page_num = int(page_raw)
+                    if page_num > 0:
+                        attachment_pages[att_key] = page_num
+                except (ValueError, TypeError):
+                    pass
+
+        return resolved_attachments, attachment_pages
+
+    def _resolve_context_resources(
+        self, user: Any, context_resources: List[Dict[str, Any]], query: str = ""
     ) -> Tuple[List[int], List[Any], List[RetrievalResult], List[RetrievalResult]]:
         """
         Authorize and resolve client context resources (documents, pages, and posts).
@@ -344,7 +472,17 @@ class PwanimateOrchestrator:
         from pwanimate.retrieval.services.document_retrieval import DocumentSemanticRetrievalService
 
         doc_retrieval = DocumentSemanticRetrievalService()
-        candidate_qs = doc_retrieval.build_candidate_queryset(user=user)
+        authorized_chunk_qs = doc_retrieval.build_authorized_chunk_queryset(user=user)
+        query_str = query or ""
+        is_summary_query = bool(
+            re.search(
+                r"\b(?:summar(?:ize|y|ise)|overview|table of contents|chapters?|whole (?:book|document|pdf)|about this (?:book|document|pdf)|structure)\b",
+                query_str,
+                re.IGNORECASE,
+            )
+        )
+        explicit_page_match = re.search(r"\b(?:page|p\.)\s*(\d+)\b", query_str, re.IGNORECASE)
+        explicit_query_page = int(explicit_page_match.group(1)) if explicit_page_match else None
 
         filter_doc_ids: List[int] = []
         page_chunks: List[Any] = []
@@ -356,9 +494,8 @@ class PwanimateOrchestrator:
                 continue
             res_type = str(res.get("type") or res.get("category") or "").lower()
             source_type = str(res.get("source_type") or res.get("sourceType") or "").lower()
-            # Public web citations are previews in the context rail, not PwaniNet
-            # records. They must never be interpreted as document or post IDs.
-            if source_type in {"web", "web_search"} or res_type in {"web", "web_search"}:
+            # Public web citations and chat attachments are handled separately
+            if source_type in {"web", "web_search", "attachment"} or res_type in {"web", "web_search", "attachment"}:
                 continue
             resource_id = res.get("id")
             if res_type in ("document", "doc"):
@@ -379,7 +516,8 @@ class PwanimateOrchestrator:
                         if not share_id and res_type in ("document", "doc"):
                             share_id = resource_id
                 page_raw = (
-                    res.get("page")
+                    explicit_query_page
+                    or res.get("page")
                     or res.get("page_number")
                     or res.get("pageNumber")
                 )
@@ -400,8 +538,8 @@ class PwanimateOrchestrator:
                 if not doc_obj:
                     continue
 
-                # Verify authorized candidate queryset permits this document
-                is_authorized = candidate_qs.filter(document_id=doc_obj.id).exists()
+                # Verify authorized chunk queryset permits this document
+                is_authorized = authorized_chunk_qs.filter(document_id=doc_obj.id).exists()
                 if not is_authorized:
                     logger.warning(
                         "Context resource document %s not authorized for user %s",
@@ -413,7 +551,19 @@ class PwanimateOrchestrator:
                 if doc_obj.id not in filter_doc_ids:
                     filter_doc_ids.append(doc_obj.id)
 
-                # If page is specified, attempt page chunks retrieval
+                # Retrieve whole-document structural overview + active page chunks
+                doc_overview_chunks: List[RetrievalResult] = []
+                if doc_obj.share_id and hasattr(doc_retrieval, "get_document_overview_chunks"):
+                    try:
+                        doc_overview_chunks = doc_retrieval.get_document_overview_chunks(
+                            user=user,
+                            document_share_id=doc_obj.share_id,
+                            max_chunks=(5 if is_summary_query else 2),
+                        )
+                    except Exception as exc:
+                        logger.debug("Could not load document overview chunks for %s: %s", doc_obj.id, exc)
+
+                active_page_chunks: List[RetrievalResult] = []
                 if page_raw is not None:
                     try:
                         page_num = int(page_raw)
@@ -424,9 +574,21 @@ class PwanimateOrchestrator:
                                 page_number=page_num,
                             )
                             if chunks:
-                                page_chunks.extend(chunks)
+                                first_snippet = chunks[0].snippet or ""
+                                marker = f"[CURRENTLY OPEN PAGE IN VIEWER — PAGE {page_num}]"
+                                if marker not in first_snippet:
+                                    chunks[0].snippet = f"{marker}\n{first_snippet}"
+                                active_page_chunks.extend(chunks)
                     except (ValueError, TypeError):
                         pass
+
+                if is_summary_query:
+                    page_chunks.extend(doc_overview_chunks)
+                    page_chunks.extend(active_page_chunks)
+                else:
+                    page_chunks.extend(active_page_chunks)
+                    if doc_overview_chunks:
+                        page_chunks.extend(doc_overview_chunks[:1])
 
             post_id = res.get("post_id") or res.get("postId")
             if post_id or res_type == "post" or source_type == "post":
@@ -943,19 +1105,40 @@ class PwanimateOrchestrator:
         on_progress: Optional[Callable[[str], None]] = None,
     ) -> OrchestrationResponse:
         """Handle knowledge/retrieval-augmented dialogue turns."""
-        # 0. Process attachments (images for vision, docs for prompt context)
+        # 0. Resolve any attachments active in the Right Context Rail (including open page numbers)
+        rail_attachments, attachment_pages = self._resolve_context_attachments(
+            request.user, request.context_resources
+        )
+        effective_attachments = list(request.attachments or [])
+        seen_att_ids = {str(getattr(a, "id", "")) for a in effective_attachments}
+        for r_att in rail_attachments:
+            r_id = str(getattr(r_att, "id", ""))
+            if r_id and r_id not in seen_att_ids:
+                effective_attachments.append(r_att)
+                seen_att_ids.add(r_id)
+
+        # Process attachments (images for vision, docs for prompt context with active page awareness)
         has_document_attachment = any(
             (getattr(attachment, "attachment_type", None) or "document") == "document"
-            for attachment in request.attachments
+            for attachment in effective_attachments
         )
         if has_document_attachment and on_progress:
             on_progress("devouring_context")
-        image_attachments, attachment_context = self._process_attachments(request.attachments, query=query)
+        image_attachments, attachment_context = self._process_attachments(
+            effective_attachments,
+            query=query,
+            attachment_pages=attachment_pages,
+        )
 
         # 1. Resolve authorized context resources (active document / page filtering)
-        filter_doc_ids, page_chunks, selected_post_results, selected_user_results = self._resolve_context_resources(
-            request.user, request.context_resources
-        )
+        try:
+            filter_doc_ids, page_chunks, selected_post_results, selected_user_results = self._resolve_context_resources(
+                request.user, request.context_resources, query=query
+            )
+        except TypeError:
+            filter_doc_ids, page_chunks, selected_post_results, selected_user_results = self._resolve_context_resources(
+                request.user, request.context_resources
+            )
 
         # 2. Upstream Authorized Retrieval
         t_ret = time.perf_counter()

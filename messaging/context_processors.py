@@ -1,11 +1,13 @@
 from django.core.cache import cache
+from django.db import models
+from django.db.models.functions import Coalesce
 from .models import ConversationMember, Message
 
 
 def get_cached_unread_message_count(user):
     """
     Calculate and cache total unread direct message count for user.
-    Uses Message.id indexing and a 30s cache TTL to prevent repeated DB hits.
+    Uses a single indexed SQL query and a 30s cache TTL to prevent repeated DB hits.
     """
     if not user or not getattr(user, 'is_authenticated', False):
         return 0
@@ -15,13 +17,14 @@ def get_cached_unread_message_count(user):
     if cached is not None:
         return cached
 
-    total_unread = 0
-    members = ConversationMember.objects.filter(user=user).select_related('last_read_message')
-    for member in members:
-        qs = Message.objects.filter(conversation_id=member.conversation_id).exclude(sender_id=user.id)
-        if member.last_read_message_id:
-            qs = qs.filter(id__gt=member.last_read_message_id)
-        total_unread += qs.count()
+    total_unread = (
+        Message.objects.filter(
+            conversation__members__user=user,
+            id__gt=Coalesce(models.F('conversation__members__last_read_message_id'), 0),
+        )
+        .exclude(sender_id=user.id)
+        .count()
+    )
 
     cache.set(cache_key, total_unread, timeout=30)
     return total_unread

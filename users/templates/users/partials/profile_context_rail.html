@@ -105,6 +105,15 @@
                        class="btn btn-outline-secondary rounded-pill fw-bold btn-sm">
                         <i class="bi bi-gear-wide-connected me-1"></i> {% trans "UPDATE PROFILE" %}
                     </a>
+                    <a href="{% url 'documents:academic:dashboard' %}"
+                       hx-get="{% url 'documents:academic:dashboard' %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       hx-history="true"
+                       class="btn btn-outline-primary rounded-pill fw-bold btn-sm">
+                        <i class="bi bi-mortarboard me-1"></i> {% trans "ACADEMIC & UNITS" %}
+                    </a>
                     <a href="{% url 'users:settings' %}" class="btn btn-outline-info rounded-pill fw-bold btn-sm" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
                         <i class="bi bi-gear me-1"></i> {% trans "SETTINGS" %}
                     </a>
@@ -188,13 +197,27 @@
     </div>
 
     <!-- Academic Details Card -->
-    {% if is_limited_profile or profile_user.programme or profile_user.course or profile_user.year %}
+    {% if is_limited_profile or profile_user.programme or profile_user.course or profile_user.year or request.user == profile_user %}
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
         <div class="card-body p-3">
-            <h6 class="fw-bold mb-3 text-dark d-flex align-items-center gap-2" style="font-size: 0.92rem;">
-                <i class="bi bi-mortarboard-fill text-primary"></i>
-                {% trans "Academic Info" %}
-            </h6>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2" style="font-size: 0.92rem;">
+                    <i class="bi bi-mortarboard-fill text-primary"></i>
+                    {% trans "Academic Info" %}
+                </h6>
+                {% if request.user == profile_user %}
+                <a href="{% url 'documents:academic:dashboard' %}"
+                   hx-get="{% url 'documents:academic:dashboard' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   hx-history="true"
+                   class="small text-primary fw-semibold text-decoration-none"
+                   style="font-size: 0.78rem;">
+                    {% trans "Units Dashboard" %}
+                </a>
+                {% endif %}
+            </div>
             {% if is_limited_profile %}
             <div class="profile-private-scrim academic-private-scrim" aria-label="{% trans 'Academic details hidden by profile privacy' %}" title="{% trans 'This information is hidden by the profile owner.' %}">
                 <span></span><span></span><span></span><span></span>
@@ -211,6 +234,12 @@
                     <span class="text-muted">{% trans "Department" %}</span>
                     <span class="text-dark fw-semibold text-end" style="max-width: 60%;">{{ profile_user.programme.department.name }}</span>
                 </div>
+                {% if profile_user.programme.department.school %}
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span class="text-muted">{% trans "School" %}</span>
+                    <span class="text-dark fw-semibold text-end" style="max-width: 60%;">{{ profile_user.programme.department.school.name }}</span>
+                </div>
+                {% endif %}
                 {% endif %}
                 {% elif profile_user.course %}
                 <div class="d-flex justify-content-between py-1 border-bottom">
@@ -218,10 +247,21 @@
                     <span class="text-dark fw-semibold text-end" style="max-width: 60%;">{{ profile_user.course }}</span>
                 </div>
                 {% endif %}
-                {% if profile_user.academic_year or profile_user.year %}
+                {% if profile_user.academic_level %}
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span class="text-muted">{% trans "Year" %}</span>
+                    <span class="text-dark fw-semibold">{{ profile_user.academic_level.name }}</span>
+                </div>
+                {% elif profile_user.academic_year or profile_user.year %}
                 <div class="d-flex justify-content-between py-1 border-bottom">
                     <span class="text-muted">{% trans "Year" %}</span>
                     <span class="text-dark fw-semibold">Year {{ profile_user.academic_year|default:profile_user.year }}</span>
+                </div>
+                {% endif %}
+                {% if profile_user.semester %}
+                <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span class="text-muted">{% trans "Semester" %}</span>
+                    <span class="text-dark fw-semibold">Semester {{ profile_user.semester.number }}</span>
                 </div>
                 {% endif %}
                 <div class="d-flex justify-content-between py-1">

@@ -77,14 +77,24 @@ body { background: var(--page-bg); color: var(--text-primary); }
 
 /* ── Mobile Responsiveness ── */
 @media (max-width: 768px) {
+  .page-eyebrow {
+    display: none !important;
+  }
+
   .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    gap: 0.75rem !important;
+    margin-bottom: 1.25rem !important;
+    padding-left: 14px;
+    padding-right: 14px;
   }
   
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.5rem !important;
+    line-height: 1.2 !important;
   }
   
   .filter-dropdown {
@@ -491,51 +501,178 @@ body { background: var(--page-bg); color: var(--text-primary); }
   color: #fff;
 }
 
-/* Selection mode */
+/* ── Selection Mode ── */
+.notif-select-wrap {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex-shrink: 0;
+  padding-right: 0.15rem;
+}
+#notification-list.selection-active .notif-select-wrap {
+  display: flex;
+}
+#notification-list.selection-active .notif-item {
+  cursor: pointer !important;
+  user-select: none;
+}
+#notification-list.selection-active .notif-item a,
+#notification-list.selection-active .notif-item button {
+  pointer-events: none !important;
+}
+.notif-item.selected {
+  background-color: rgba(37, 99, 235, 0.08) !important;
+  border-left: 4px solid var(--brand) !important;
+}
+[data-theme="dark"] .notif-item.selected {
+  background-color: rgba(99, 102, 241, 0.18) !important;
+  border-left: 4px solid var(--brand) !important;
+}
+
 .notification-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
   width: 18px;
   height: 18px;
+  margin: 0;
+  border: 1.75px solid var(--text-muted);
+  border-radius: 5px;
+  background-color: var(--card-bg);
   cursor: pointer;
-  margin-right: 0.75rem;
+  position: relative;
   flex-shrink: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
+.notification-checkbox:hover {
+  border-color: var(--brand);
+}
+.notification-checkbox:checked,
+.notification-checkbox:indeterminate {
+  background-color: var(--brand);
+  border-color: var(--brand);
+}
+.notification-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1.5px;
+  width: 5px;
+  height: 9px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.notification-checkbox:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6.5px;
+  width: 9px;
+  height: 2px;
+  background-color: #ffffff;
+  border-radius: 1px;
+}
+
+.notif-toolbar.hidden {
+  display: none !important;
+}
+
 .selection-mode-bar {
   display: none;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
-  background: var(--brand);
-  color: #fff;
+  gap: 0.75rem;
+  min-height: 44px;
+  padding: 0.45rem 0.85rem;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 .selection-mode-bar.active {
   display: flex;
 }
+.selection-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.selected-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+}
 .selection-actions {
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
-.btn-selection {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 0.4rem 1rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
+.btn-selection-action,
+.btn-selection-cancel {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--page-bg);
+  color: var(--text-primary);
+  padding: 0.38rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
   font-weight: 700;
+  line-height: 1.2;
   cursor: pointer;
-  transition: all 0.18s var(--ease);
+  white-space: nowrap;
+  transition: all 0.15s var(--ease);
 }
-.btn-selection:hover {
-  background: rgba(255, 255, 255, 0.3);
+.btn-selection-action:hover:not(:disabled) {
+  background: var(--brand-light);
+  border-color: var(--brand-mid);
+  color: var(--brand);
 }
-.btn-selection.danger {
-  background: rgba(239, 68, 68, 0.3);
-  border-color: rgba(239, 68, 68, 0.5);
+.btn-selection-action.danger {
+  color: var(--danger);
+  border-color: rgba(220, 38, 38, 0.25);
+  background: var(--danger-light);
 }
-.btn-selection.danger:hover {
-  background: rgba(239, 68, 68, 0.5);
+.btn-selection-action.danger:hover:not(:disabled) {
+  border-color: var(--danger);
+}
+.btn-selection-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-selection-cancel {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+.btn-selection-cancel:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+@media (max-width: 768px) {
+  .selection-mode-bar {
+    margin-left: 14px;
+    margin-right: 14px;
+    margin-bottom: 0.85rem;
+    width: calc(100% - 28px);
+    min-height: 40px;
+    padding: 0.35rem 0.65rem;
+  }
+  .btn-selection-action,
+  .btn-selection-cancel {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+  }
 }
 
 /* Action buttons for invites */
@@ -875,6 +1012,120 @@ body { background: var(--page-bg); color: var(--text-primary); }
   background: var(--brand-mid);
   color: #0f172a;
   transform: translateY(-1px);
+}
+
+/* ── Filter Toolbar & Actions Dropdown ── */
+.notif-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  width: 100%;
+}
+.notif-toolbar .filter-dropdown-container {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.notif-toolbar .filter-dropdown {
+  max-width: 100%;
+  width: 100%;
+}
+.notif-actions-dropdown {
+  flex-shrink: 0;
+  position: relative;
+}
+.notif-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 1.15rem;
+  cursor: pointer;
+  transition: all 0.18s var(--ease);
+  flex-shrink: 0;
+}
+.notif-menu-btn:hover,
+.notif-menu-btn:focus,
+.notif-menu-btn[aria-expanded="true"] {
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-glow);
+  outline: none;
+}
+.notif-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 185px;
+  padding: 0.35rem;
+  margin: 0;
+  list-style: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-hover);
+  z-index: 1050;
+}
+.notif-dropdown-menu.show {
+  display: block;
+}
+.notif-dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.notif-dropdown-item i {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.notif-dropdown-item:hover,
+.notif-dropdown-item:focus {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+.notif-dropdown-item.danger {
+  color: var(--danger);
+}
+.notif-dropdown-item.danger:hover,
+.notif-dropdown-item.danger:focus {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+.notif-dropdown-menu .dropdown-divider {
+  margin: 0.35rem 0;
+  border-top-color: var(--border);
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .notif-toolbar {
+    padding-left: 14px;
+    padding-right: 14px;
+    margin-bottom: 0.85rem;
+  }
+  .notif-menu-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.05rem;
+  }
 }
 
 /* ── Filter Dropdown ── */

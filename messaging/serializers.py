@@ -1,8 +1,31 @@
 from rest_framework import serializers
+from django.conf import settings
 from django.core.validators import FileExtensionValidator
 import os
 from .models import Conversation, ConversationMember, Message, MessageAttachment, MessageReaction, ConversationTheme, LinkPreview
+from users.models import User
 from users.serializers import UserSerializer
+
+
+class ChatUserSerializer(serializers.ModelSerializer):
+    """Lightweight user serializer for chat messages, reactions, and members (zero N+1 queries)."""
+    profile_pic_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'first_name', 'second_name', 'last_name',
+            'profile_pic', 'profile_pic_url'
+        ]
+        read_only_fields = fields
+
+    def get_profile_pic_url(self, obj):
+        if obj.profile_pic and hasattr(obj.profile_pic, 'url'):
+            try:
+                return obj.profile_pic.url
+            except Exception:
+                pass
+        return f"{settings.STATIC_URL}images/default_pic1.jpg"
 
 
 class LinkPreviewSerializer(serializers.ModelSerializer):
@@ -44,7 +67,7 @@ class LinkPreviewSerializer(serializers.ModelSerializer):
 
 class MessageReactionSerializer(serializers.ModelSerializer):
     """Serializer for message reactions."""
-    user = UserSerializer(read_only=True)
+    user = ChatUserSerializer(read_only=True)
 
     class Meta:
         model = MessageReaction
@@ -76,7 +99,7 @@ class MessageAttachmentSerializer(serializers.ModelSerializer):
 
 class MessageSerializer(serializers.ModelSerializer):
     """Serializer for messages."""
-    sender = UserSerializer(read_only=True)
+    sender = ChatUserSerializer(read_only=True)
     reactions = MessageReactionSerializer(many=True, read_only=True)
     reply_to_details = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
@@ -105,10 +128,32 @@ class MessageSerializer(serializers.ModelSerializer):
         return bool(getattr(obj, 'is_forwarded', False) or getattr(obj, '_is_forwarded', False))
 
     def get_reply_to_details(self, obj):
-        """Get details of the message being replied to."""
-        if obj.reply_to:
-            return MessageSerializer(obj.reply_to).data
-        return None
+        """Get lightweight details of the message being replied to without recursive N+1 queries."""
+        if not obj.reply_to_id:
+            return None
+        reply = getattr(obj, 'reply_to', None)
+        if not reply:
+            return None
+        sender = getattr(reply, 'sender', None)
+        attachment_url = None
+        if reply.attachment:
+            try:
+                attachment_url = reply.attachment.url
+            except Exception:
+                pass
+        elif getattr(reply, 'attachment_type', None) in ('sticker', 'gif') and reply.link_image:
+            attachment_url = reply.link_image
+        return {
+            'id': reply.id,
+            'conversation': reply.conversation_id,
+            'sender': ChatUserSerializer(sender).data if sender else {'id': reply.sender_id, 'username': ''},
+            'content': 'This message was deleted' if reply.is_deleted else (reply.content or ''),
+            'attachment_type': reply.attachment_type,
+            'attachment_url': attachment_url,
+            'message_type': reply.message_type,
+            'is_deleted': reply.is_deleted,
+            'created_at': reply.created_at.isoformat() if reply.created_at else None,
+        }
 
     def get_attachment_url(self, obj):
         """Get the URL of the attachment (legacy single attachment, stickers, and GIFs)."""
@@ -134,53 +179,64 @@ class MessageSerializer(serializers.ModelSerializer):
                 return True
         return False
 
+    def _get_prefetched_attachments(self, obj):
+        """Return attachments from prefetch cache if available, avoiding extra DB queries."""
+        if 'attachments' in getattr(obj, '_prefetched_objects_cache', {}):
+            return list(obj.attachments.all())
+        return list(obj.attachments.all()[:1])
+
     def get_file_size(self, obj):
-        """Get byte size of attachment."""
+        """Get byte size of attachment without extra DB queries or unnecessary disk stat calls."""
+        atts = self._get_prefetched_attachments(obj)
+        if atts and atts[0].size:
+            return atts[0].size
         if obj.attachment:
             try:
                 return obj.attachment.size
             except Exception:
                 pass
-        first_att = obj.attachments.first()
-        if first_att:
-            return first_att.size
         return 0
 
     def get_file_name(self, obj):
-        """Get display file name of attachment."""
-        if obj.attachment:
-            import os
+        """Get display file name of attachment without extra DB queries."""
+        if obj.attachment and getattr(obj.attachment, 'name', None):
             return os.path.basename(obj.attachment.name)
-        first_att = obj.attachments.first()
-        if first_att and first_att.file:
-            import os
-            return os.path.basename(first_att.file.name)
+        atts = self._get_prefetched_attachments(obj)
+        if atts and atts[0].file and getattr(atts[0].file, 'name', None):
+            return os.path.basename(atts[0].file.name)
         return None
 
     def get_read_status(self, obj):
-        """Get the read status of the message using ConversationMember.last_read_message."""
+        """Get the read status of the message using prefetched ConversationMember.last_read_message_id."""
         request = self.context.get('request')
 
-        # If there's no request user, default to sent
+        # If there's no request user, fall back to message.status or sent
         if not request or not request.user.is_authenticated:
-            return 'sent'
+            return obj.status or 'sent'
+
+        conv = obj.conversation
+        if 'members' in getattr(conv, '_prefetched_objects_cache', {}):
+            members = list(conv.members.all())
+        else:
+            # Cache members on conversation instance to avoid per-message queries
+            if not hasattr(conv, '_cached_members_list'):
+                conv._cached_members_list = list(
+                    conv.members.only('id', 'user_id', 'last_read_message_id')
+                )
+            members = conv._cached_members_list
 
         # If the current user sent this message, check if others have read it
-        if obj.sender == request.user:
-            # Check if any other member has read this message using last_read_message
-            other_members = obj.conversation.members.exclude(user=request.user)
-            for member in other_members:
-                if member.last_read_message and member.last_read_message.id >= obj.id:
+        if obj.sender_id == request.user.id:
+            for member in members:
+                if member.user_id != request.user.id and member.last_read_message_id and member.last_read_message_id >= obj.id:
                     return 'read'
-            # If no one has read it, it's just 'sent'
             return 'sent'
 
         # If the current user received this message, check if they've read it
-        member = obj.conversation.members.filter(user=request.user).first()
-        if member and member.last_read_message and member.last_read_message.id >= obj.id:
-            return 'read'
+        for member in members:
+            if member.user_id == request.user.id and member.last_read_message_id and member.last_read_message_id >= obj.id:
+                return 'read'
 
-        # For the receiver, if they see the message but haven't read it, it's 'delivered'
         return 'delivered'
 
 
@@ -343,7 +399,7 @@ class MessageUpdateSerializer(serializers.ModelSerializer):
 
 class ConversationMemberSerializer(serializers.ModelSerializer):
     """Serializer for conversation members."""
-    user = UserSerializer(read_only=True)
+    user = ChatUserSerializer(read_only=True)
 
     class Meta:
         model = ConversationMember
@@ -373,7 +429,7 @@ class ConversationSerializer(serializers.ModelSerializer):
 
     def get_last_message(self, obj):
         """Get the last message in the conversation."""
-        last_message = obj.messages.last()
+        last_message = obj.last_message
         if last_message:
             return MessageSerializer(last_message).data
         return None

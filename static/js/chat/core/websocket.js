@@ -32,13 +32,22 @@ export class WebSocketManager {
      * @param {number} conversationId - Conversation ID
      * @param {string} customWsUrl - Optional custom WebSocket URL (for group chats)
      */
-    init(conversationId, customWsUrl = null) {
+    init(conversationId, customWsUrl = null, autoConnect = false) {
         this._log('WEBSOCKET_INIT', { conversationId, customWsUrl });
-        
+
+        const conversationChanged = this.conversationId !== conversationId;
         this.conversationId = conversationId;
-        this.customWsUrl = customWsUrl;
-        
-        this.connect();
+        if (customWsUrl !== null) {
+            this.customWsUrl = customWsUrl;
+        }
+
+        if (conversationChanged && this.socket) {
+            this._forceClose();
+        }
+
+        if (autoConnect) {
+            this.connect();
+        }
     }
 
 

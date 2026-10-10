@@ -34,18 +34,24 @@ class Conversation(models.Model):
     @property
     def last_message(self):
         """Get the most recent message in this conversation."""
+        if hasattr(self, '_cached_last_message'):
+            return self._cached_last_message
         return self.messages.order_by('-created_at').first()
 
     def get_last_message_read_status(self, user):
         """Get the read status of the last message for a specific user."""
         last_msg = self.last_message
-        if not last_msg or last_msg.sender != user:
+        if not last_msg or last_msg.sender_id != user.id:
             return None
 
-        # Check if any other member has read this message using ConversationMember.last_read_message
-        other_members = self.members.exclude(user=user)
+        # Check if any other member has read this message using prefetched members when available
+        if 'members' in getattr(self, '_prefetched_objects_cache', {}):
+            other_members = [m for m in self.members.all() if m.user_id != user.id]
+        else:
+            other_members = self.members.exclude(user=user).only('id', 'user_id', 'last_read_message_id')
+
         for member in other_members:
-            if member.last_read_message and member.last_read_message.id >= last_msg.id:
+            if member.last_read_message_id and member.last_read_message_id >= last_msg.id:
                 return 'read'
 
         # If message exists but hasn't been read yet, it's just 'sent'

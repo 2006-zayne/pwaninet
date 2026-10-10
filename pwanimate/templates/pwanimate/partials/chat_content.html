@@ -450,6 +450,46 @@
                     <h2 class="pwanimate-empty-title">Pwanimate</h2>
                     <p class="pwanimate-empty-greeting" id="pwanimate-empty-greeting" aria-live="polite"></p>
                     <p class="pwanimate-empty-question" id="pwanimate-empty-question"></p>
+
+                    <!-- Document Study Card (Shown when a repository book or PDF is open in Context Rail) -->
+                    <div class="pwanimate-document-study-card d-none" id="pwanimate-document-study-card" aria-live="polite">
+                        <div class="pwanimate-study-card-header">
+                            <div class="pwanimate-study-card-icon">
+                                <i class="bi bi-journal-bookmark-fill"></i>
+                            </div>
+                            <div class="pwanimate-study-card-info">
+                                <div class="pwanimate-study-card-badges">
+                                    <span class="badge rounded-pill bg-primary-subtle text-primary d-none" id="pwanimate-study-card-unit"></span>
+                                    <span class="badge rounded-pill bg-light text-dark border" id="pwanimate-study-card-page">
+                                        <i class="bi bi-file-earmark-richtext me-1"></i><span>Page 1</span>
+                                    </span>
+                                </div>
+                                <h3 class="pwanimate-study-card-title" id="pwanimate-study-card-title">Document</h3>
+                                <p class="pwanimate-study-card-subtitle mb-0" id="pwanimate-study-card-subtitle">
+                                    {% trans "Flip pages in the Context Rail to devour this document page by page with Pwanimate." %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="pwanimate-study-card-actions" id="pwanimate-study-card-actions">
+                            <button type="button" class="pwanimate-study-action-btn is-primary" data-study-action="summarize_book">
+                                <i class="bi bi-stars"></i>
+                                <span id="pwanimate-study-btn-summarize">{% trans "Summarize entire book" %}</span>
+                            </button>
+                            <button type="button" class="pwanimate-study-action-btn" data-study-action="explain_page">
+                                <i class="bi bi-book-half"></i>
+                                <span id="pwanimate-study-btn-explain">{% trans "Explain Page 1" %}</span>
+                            </button>
+                            <button type="button" class="pwanimate-study-action-btn" data-study-action="page_takeaways">
+                                <i class="bi bi-list-check"></i>
+                                <span id="pwanimate-study-btn-takeaways">{% trans "Key takeaways from Page 1" %}</span>
+                            </button>
+                            <button type="button" class="pwanimate-study-action-btn" data-study-action="quiz_page">
+                                <i class="bi bi-patch-question"></i>
+                                <span id="pwanimate-study-btn-quiz">{% trans "Quiz me on this page" %}</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="pwanimate-suggestion-grid" id="pwanimate-empty-suggestions" aria-label="Try asking Pwanimate">
                     </div>
                 </div>
@@ -462,6 +502,33 @@
 
         <!-- Composer Area -->
         <div class="pwanimate-composer-wrapper">
+            <!-- Live Page-by-Page Study Bar (Synced with active document & page in Right Context Rail) -->
+            <div class="pwanimate-live-page-bar d-none" id="pwanimate-live-page-bar" aria-live="polite">
+                <div class="pwanimate-live-page-info">
+                    <i class="bi bi-book-half text-primary"></i>
+                    <span class="pwanimate-live-page-title text-truncate" id="pwanimate-live-page-title">Document</span>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary d-none" id="pwanimate-live-page-unit"></span>
+                    <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis" id="pwanimate-live-page-badge">p. 1</span>
+                </div>
+                <div class="pwanimate-live-page-actions">
+                    <button type="button" class="pwanimate-live-page-pill" data-study-action="summarize_book" title="{% trans 'Get an overview summary of the entire document' %}">
+                        <i class="bi bi-stars"></i>
+                        <span>{% trans "Summarize book" %}</span>
+                    </button>
+                    <button type="button" class="pwanimate-live-page-pill" data-study-action="explain_page">
+                        <i class="bi bi-lightbulb"></i>
+                        <span id="pwanimate-live-pill-explain">{% trans "Explain Page 1" %}</span>
+                    </button>
+                    <button type="button" class="pwanimate-live-page-pill" data-study-action="page_takeaways">
+                        <i class="bi bi-list-check"></i>
+                        <span id="pwanimate-live-pill-takeaways">{% trans "Key takeaways (p. 1)" %}</span>
+                    </button>
+                    <button type="button" class="pwanimate-live-page-pill" data-study-action="quiz_page">
+                        <i class="bi bi-patch-question"></i>
+                        <span id="pwanimate-live-pill-quiz">{% trans "Quiz me on this page" %}</span>
+                    </button>
+                </div>
+            </div>
             <form id="pwanimate-composer-form" class="pwanimate-composer-box" onsubmit="return false;">
                 <!-- Staged Attachments Strip -->
                 <div class="pwanimate-composer-attachments d-none" id="pwanimate-composer-attachments"></div>

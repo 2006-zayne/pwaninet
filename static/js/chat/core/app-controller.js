@@ -114,10 +114,7 @@ export class AppController {
      * Setup mandatory data flow connections
      */
     _setupDataFlowConnections() {
-        // Init FIRST (so it doesn't wipe what we're about to set)
-        webSocketManager.init(this.config.conversationId);
-
-        // THEN set callbacks
+        // Configure callbacks on the already-initialized WebSocketManager
         webSocketManager.setMessageCallback((data) => {
             messageService.processIncomingMessage(data);
         });
@@ -126,7 +123,7 @@ export class AppController {
             this.handleConnectionChange(isConnected);
         });
 
-        // Initialize Notification & Push Handlers
+        // Initialize Notification & Push Handlers once
         this._setupNotificationHandlers();
 
         this._log('DATA_FLOW_CONNECTIONS_SETUP');
@@ -136,6 +133,9 @@ export class AppController {
      * Setup notification listeners and Web Push integration
      */
     _setupNotificationHandlers() {
+        if (this._notificationHandlersBound) return;
+        this._notificationHandlersBound = true;
+
         // Sync active Web Push subscription if permission already granted
         if (typeof window.PushSubscriptionManager !== 'undefined') {
             try {

@@ -16,17 +16,18 @@
      {% else %}
      style="cursor: default;"
      {% endif %}
-     onclick="if (document.getElementById('selection-mode-bar')?.classList.contains('active')) { const cb = this.querySelector('.notification-checkbox'); if (cb) { cb.checked = !cb.checked; toggleSelection('{{ payload.identity.notification_id }}'); } }">
+     onclick="if (document.getElementById('selection-mode-bar')?.classList.contains('active')) { event.preventDefault(); event.stopPropagation(); toggleSelection('{{ payload.identity.notification_id }}', true); }">
   
   <div class="d-flex align-items-start gap-3 w-100" style="width: 100%; min-width: 0;">
     {# Selection Checkbox #}
-    <input type="checkbox"
-           class="notification-checkbox form-check-input align-self-center me-1 flex-shrink-0"
-           id="select-{{ payload.identity.notification_id }}"
-           data-notification-id="{{ payload.identity.notification_id }}"
-           onchange="toggleSelection('{{ payload.identity.notification_id }}')"
-           onclick="event.stopPropagation()"
-           style="display: none;">
+    <div class="notif-select-wrap">
+      <input type="checkbox"
+             class="notification-checkbox"
+             id="select-{{ payload.identity.notification_id }}"
+             data-notification-id="{{ payload.identity.notification_id }}"
+             onchange="toggleSelection('{{ payload.identity.notification_id }}', false)"
+             onclick="event.stopPropagation()">
+    </div>
 
     {# Actor Stack / Avatar Column #}
     <div class="notif-avatar-col flex-shrink-0">
@@ -225,11 +226,11 @@
       {# Status Indicator #}
       {% if components.status and status %}
         <div class="status-indicator mb-2"
-             style="font-size: 0.78rem; padding: 2px 8px; border-radius: 4px; background-color: var(--bg-secondary); display: inline-block;">
-          {% if status.state and status.state == 'PENDING' %}🟡 Pending
-          {% elif status.state and status.state == 'APPROVED' %}🟢 Approved
-          {% elif status.state and status.state == 'REJECTED' %}🔴 Rejected
-          {% elif status.state and status.state == 'COMPLETED' %}✅ Completed
+             style="font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; background-color: var(--bg-secondary); display: inline-block;">
+          {% if status.state and status.state == 'PENDING' %}Pending
+          {% elif status.state and status.state == 'APPROVED' %}Approved
+          {% elif status.state and status.state == 'REJECTED' %}Rejected
+          {% elif status.state and status.state == 'COMPLETED' %}Completed
           {% else %}{{ status.state|default:'' }}
           {% endif %}
         </div>
@@ -348,7 +349,6 @@
 
         {% if payload.timestamps %}
           <small class="text-muted text-nowrap ms-auto notif-timestamp" style="font-size: 0.72rem;">
-            <i class="bi bi-clock me-1"></i>
             {% if payload.timestamps.updated_at %}
               {{ payload.timestamps.updated_at|timesince }} ago
             {% elif payload.timestamps.created_at %}

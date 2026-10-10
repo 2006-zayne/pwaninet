@@ -321,14 +321,37 @@ class User(AbstractUser):
                 })
 
     def save(self, *args, **kwargs):
-        # Only run full_clean if global_role is being changed
+        old_user = None
         if self.pk is not None:
             old_user = User.objects.filter(pk=self.pk).first()
             if old_user and old_user.global_role != self.global_role:
                 self.full_clean()
         else:
             self.full_clean()
+
+        academic_changed = (
+            old_user is None
+            or old_user.programme_id != self.programme_id
+            or old_user.academic_level_id != self.academic_level_id
+            or old_user.semester_id != self.semester_id
+            or old_user.academic_year_id != self.academic_year_id
+            or old_user.course_id != self.course_id
+            or old_user.year_id != self.year_id
+        )
+
         super().save(*args, **kwargs)
+
+        if academic_changed and (self.programme_id or self.course_id):
+            try:
+                from documents.academic.services import StudentAcademicEnrollmentService
+                StudentAcademicEnrollmentService.sync_student_units(self)
+            except Exception:
+                pass
+
+    def get_enrolled_units(self):
+        """Return active StudentUnitEnrollment records for this user (auto-syncing if needed)."""
+        from documents.academic.services import StudentAcademicEnrollmentService
+        return StudentAcademicEnrollmentService.get_active_enrollments(self)
 
     def __str__(self):
         return f"{self.first_name} {self.second_name}".strip() or self.username

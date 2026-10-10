@@ -24,59 +24,93 @@ function getCSRFToken() {
   return '';
 }
 
-// Start conversation functionality - use event delegation
-document.addEventListener('click', function(e) {
-  const btn = e.target.closest('.start-conversation');
-  if (btn) {
-    e.preventDefault();
-    e.stopPropagation();
-    const userId = btn.dataset.userId;
-    if (!userId) return;
+if (!window.__pwaniConvListDelegationBound) {
+  window.__pwaniConvListDelegationBound = true;
 
-    const csrfToken = getCSRFToken();
+  // Start conversation functionality - use event delegation
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.start-conversation');
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const userId = btn.dataset.userId;
+      if (!userId) return;
 
-    fetch('/messaging/v1/conversations/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken
-      },
-      body: JSON.stringify({
-        type: 'direct',
-        member_ids: [userId]
+      const csrfToken = getCSRFToken();
+
+      fetch('/messaging/v1/conversations/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+          type: 'direct',
+          member_ids: [userId]
+        })
       })
-    })
-    .then(response => {
-      if (!response.ok) {
-        return response.text().then(text => {
-          throw new Error(`HTTP ${response.status}: ${text}`);
-        });
-      }
-      return response.json();
-    })
-    .then(data => {
-      if (data.id) {
-        // Show notification if using existing conversation
-        if (data.existing) {
-          showNotification('Existing conversation found. Redirecting...', 'info');
+      .then(response => {
+        if (!response.ok) {
+          return response.text().then(text => {
+            throw new Error(`HTTP ${response.status}: ${text}`);
+          });
         }
-        window.location.href = `/messaging/conversation/${data.id}/`;
-      } else {
-        alert('Failed to create conversation. No ID in response.');
-      }
-    })
-    .catch(error => {
-      console.error('Error:', error);
-      alert('Failed to create conversation: ' + error.message);
-    });
-  }
-});
+        return response.json();
+      })
+      .then(data => {
+        if (data.id) {
+          if (data.existing) {
+            showNotification('Existing conversation found. Redirecting...', 'info');
+          }
+          window.location.href = `/messaging/conversation/${data.id}/`;
+        } else {
+          alert('Failed to create conversation. No ID in response.');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create conversation: ' + error.message);
+      });
+    }
+  });
+
+  // Follow button functionality - use event delegation
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.btn-follow');
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const userId = btn.dataset.userId;
+      if (!userId) return;
+      fetch(`/api/follows/${userId}/follow/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken()
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'followed') {
+          btn.classList.remove('btn-follow', 'btn-outline-primary');
+          btn.classList.add('btn-primary', 'start-conversation');
+          btn.innerHTML = '<i class="bi bi-chat-dots me-1"></i> Message';
+        } else if (data.status === 'unfollowed') {
+          btn.classList.remove('btn-primary', 'start-conversation');
+          btn.classList.add('btn-outline-primary', 'btn-follow');
+          btn.innerHTML = '<i class="bi bi-person-plus me-1"></i> Follow';
+        }
+      })
+      .catch(error => console.error('Error:', error));
+    }
+  });
+}
 
 // Helper function to show notifications
 function showNotification(message, type = 'info') {
   const notification = document.createElement('div');
   notification.className = `alert alert-${type === 'info' ? 'primary' : type} alert-dismissible fade show position-fixed`;
-  notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+  notification.style.cssText = 'top: 20px; right: 2px; z-index: 9999; min-width: 300px;';
   notification.innerHTML = `
     ${message}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -84,37 +118,6 @@ function showNotification(message, type = 'info') {
   document.body.appendChild(notification);
   setTimeout(() => notification.remove(), 3000);
 }
-
-// Follow button functionality - use event delegation
-document.addEventListener('click', function(e) {
-  const btn = e.target.closest('.btn-follow');
-  if (btn) {
-    e.preventDefault();
-    e.stopPropagation();
-    const userId = btn.dataset.userId;
-    if (!userId) return;
-    fetch(`/api/follows/${userId}/follow/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
-      }
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.status === 'followed') {
-        btn.classList.remove('btn-follow', 'btn-outline-primary');
-        btn.classList.add('btn-primary', 'start-conversation');
-        btn.innerHTML = '<i class="bi bi-chat-dots me-1"></i> Message';
-      } else if (data.status === 'unfollowed') {
-        btn.classList.remove('btn-primary', 'start-conversation');
-        btn.classList.add('btn-outline-primary', 'btn-follow');
-        btn.innerHTML = '<i class="bi bi-person-plus me-1"></i> Follow';
-      }
-    })
-    .catch(error => console.error('Error:', error));
-  }
-});
 </script>
 <style>
   /* ── Design Tokens (matches groups_dashboard.html) ── */
@@ -370,8 +373,21 @@ document.addEventListener('click', function(e) {
   }
   @media (max-width: 768px) {
     .messaging-layout { gap: 1rem; }
-    .page-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+    .page-eyebrow { display: none !important; }
+    .page-header {
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      flex-wrap: nowrap !important;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
     .page-title { font-size: 1.5rem; }
+    .btn-create,
+    .whatsapp-start-chat-btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.78rem;
+    }
   }
   .sidebar-sticky {
     position: static;
@@ -1150,13 +1166,11 @@ document.addEventListener('click', function(e) {
         <span class="eyebrow-dot"></span>
         Active Conversations
       </div>
-      <div style="display: flex; align-items: center; gap: 1rem;">
-        <h1 class="page-title">Messaging</h1>
-        <button class="btn-create whatsapp-start-chat-btn" data-bs-toggle="modal" data-bs-target="#newConversationModal">
-          <i class="bi bi-plus-lg"></i> Start New Chat
-        </button>
-      </div>
+      <h1 class="page-title">Messaging</h1>
     </div>
+    <button class="btn-create whatsapp-start-chat-btn" data-bs-toggle="modal" data-bs-target="#newConversationModal">
+      <i class="bi bi-plus-lg"></i> Start New Chat
+    </button>
   </div>
 
   <!-- ── View Toggle ── -->
@@ -1459,100 +1473,13 @@ document.addEventListener('click', function(e) {
 </div>
 </div>
 </div>
-<!-- Offline Messaging Support -->
-<script src="{% static 'js/messaging/offline-cache.js' %}"></script>
-<script src="{% static 'js/messaging/network-status.js' %}"></script>
-<script src="{% static 'js/messaging/sync-manager.js' %}"></script>
-<script src="{% static 'js/messaging/offline-ui.js' %}"></script>
-<script src="{% static 'js/messaging/offline-integration.js' %}"></script>
+<!-- Offline Messaging Cache -->
+<script src="{% static 'js/messaging/offline-cache.js' %}?v=47"></script>
 
 <script>
 // Conversation list specific functions for real-time updates
-// Note: WebSocket connection is now handled globally in base.html
-
-function updateConversationInList(updateData) {
-    const { conversation_id, message_preview, sender_name, timestamp, unread_count } = updateData;
-    
-    // Find conversation links in both sidebar and grid views
-    const conversationLinks = document.querySelectorAll(`a[href*="/messaging/conversation/${conversation_id}/"]`);
-    
-    conversationLinks.forEach(link => {
-        // Clear any existing typing indicator when new message arrives
-        clearTypingIndicator(conversation_id);
-        
-        // Update preview text
-        const previewElement = link.querySelector('.chat-preview-text, .conversation-card-preview');
-        if (previewElement) {
-            // Check if this is an unread message from someone else
-            const isUnread = unread_count > 0;
-            previewElement.textContent = message_preview;
-            previewElement.classList.toggle('unread', isUnread);
-            // Update the original content data attribute for typing indicator restoration
-            previewElement.dataset.originalContent = message_preview;
-        }
-        
-        // Update unread count badge
-        const badgeContainer = link.querySelector('.unread-badge, .conversation-card-badge');
-        if (unread_count > 0) {
-            if (badgeContainer) {
-                badgeContainer.textContent = unread_count > 99 ? '99+' : unread_count;
-                badgeContainer.style.display = 'flex';
-            } else {
-                // Create badge if it doesn't exist
-                const chatName = link.querySelector('.chat-name');
-                if (chatName) {
-                    const newBadge = document.createElement('a');
-                    newBadge.href = link.href;
-                    newBadge.className = 'unread-badge';
-                    newBadge.style.marginLeft = '8px';
-                    newBadge.style.textDecoration = 'none';
-                    newBadge.title = `${unread_count} unread messages`;
-                    newBadge.textContent = unread_count > 99 ? '99+' : unread_count;
-                    chatName.appendChild(newBadge);
-                }
-            }
-        } else {
-            if (badgeContainer) {
-                badgeContainer.style.display = 'none';
-            }
-        }
-        
-        // Update timestamp if available
-        const timeElement = link.querySelector('.chat-time, .conversation-card-time');
-        if (timeElement && timestamp) {
-            const time = new Date(timestamp);
-            const now = new Date();
-            const diffMs = now - time;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
-            
-            let timeText;
-            if (diffMins < 1) {
-                timeText = 'now';
-            } else if (diffMins < 60) {
-                timeText = `${diffMins}m ago`;
-            } else if (diffHours < 24) {
-                timeText = `${diffHours}h ago`;
-            } else if (diffDays < 7) {
-                timeText = `${diffDays}d ago`;
-            } else {
-                timeText = time.toLocaleDateString();
-            }
-            
-            timeElement.textContent = timeText;
-        }
-        
-        // Move conversation to top of list (most recent first)
-        const parent = link.parentNode;
-        if (parent) {
-            const grandParent = parent.parentNode;
-            if (grandParent) {
-                grandParent.insertBefore(parent, grandParent.firstChild);
-            }
-        }
-    });
-}
+// Note: WebSocket connection and online status are handled globally in base.html
+// and initial online status dots are rendered server-side.
 
 function updateTypingIndicator(typingData) {
     const { conversation_id, username, is_typing } = typingData;
@@ -1573,12 +1500,9 @@ function showTypingIndicator(link, username) {
     // Replace the preview text with typing indicator
     const previewElement = link.querySelector('.chat-preview-text, .conversation-card-preview');
     if (previewElement) {
-        // Store the original content to restore later
         if (!previewElement.dataset.originalContent) {
             previewElement.dataset.originalContent = previewElement.textContent;
         }
-        
-        // Show typing indicator in the preview
         previewElement.textContent = `${username} is typing...`;
         previewElement.classList.add('typing');
         previewElement.classList.remove('unread');
@@ -1586,9 +1510,7 @@ function showTypingIndicator(link, username) {
 }
 
 function clearTypingIndicator(conversation_id) {
-    // Find conversation links and restore original preview text
     const conversationLinks = document.querySelectorAll(`a[href*="/messaging/conversation/${conversation_id}/"]`);
-    
     conversationLinks.forEach(link => {
         const previewElement = link.querySelector('.chat-preview-text, .conversation-card-preview');
         if (previewElement && previewElement.dataset.originalContent) {
@@ -1599,65 +1521,12 @@ function clearTypingIndicator(conversation_id) {
     });
 }
 
-// Initialize conversation list functionality
-document.addEventListener('DOMContentLoaded', function() {
-    // Check online status for conversation participants
-    checkOnlineStatusForAvatars();
-    
-    // Load conversations from cache when offline
-    if (window.networkStatus && !window.networkStatus.isOnline) {
-        setTimeout(() => {
-            if (window.offlineIntegration) {
-                window.offlineIntegration.loadConversationsFromCache();
-            }
-        }, 1000);
-    }
-});
-
-function checkOnlineStatusForAvatars() {
-    const avatars = document.querySelectorAll('.chat-avatar[data-user-id], .conversation-card-avatar[data-user-id]');
-    
-    avatars.forEach(avatar => {
-        const userId = avatar.dataset.userId;
-        if (userId) {
-            checkUserOnlineStatus(userId, avatar);
-        }
-    });
-}
-
-async function checkUserOnlineStatus(userId, avatarElement) {
-    try {
-        const response = await fetch(`/users/api/users/${userId}/online-status/`);
-        if (response.ok) {
-            const data = await response.json();
-            const isOnline = Boolean(data.is_online);
-            if (avatarElement) {
-                if (isOnline) avatarElement.classList.add('online');
-                else avatarElement.classList.remove('online');
-            }
-            const dots = document.querySelectorAll(`[data-user-status-id="${userId}"]`);
-            dots.forEach(dot => {
-                if (isOnline) {
-                    dot.classList.add('online');
-                    dot.style.display = '';
-                } else {
-                    dot.classList.remove('online');
-                    dot.style.display = 'none';
-                }
-            });
-        }
-    } catch (error) {
-        // Silent fail - don't show errors in console
-    }
-}
-
 // Handle real-time user status updates from WebSocket
 function handleUserStatusUpdate(userData) {
     if (!userData) return;
     const { user_id, is_online } = userData;
     const online = Boolean(is_online);
     
-    // Update all avatars for this user
     const avatars = document.querySelectorAll(`.chat-avatar[data-user-id="${user_id}"], .conversation-card-avatar[data-user-id="${user_id}"]`);
     avatars.forEach(avatar => {
         if (online) {
@@ -1667,7 +1536,6 @@ function handleUserStatusUpdate(userData) {
         }
     });
 
-    // Update all status dots for this user
     const dots = document.querySelectorAll(`[data-user-status-id="${user_id}"]`);
     dots.forEach(dot => {
         if (online) {
@@ -1681,7 +1549,7 @@ function handleUserStatusUpdate(userData) {
 }
 window.handleUserStatusUpdate = handleUserStatusUpdate;
 </script>
-<script src="{% static 'js/messaging/conversation-realtime-manager.js' %}?v=4"></script>
+<script src="{% static 'js/messaging/conversation-realtime-manager.js' %}?v=5"></script>
 <script src="{% static 'js/chat-theme-handler.js' %}?v=28"></script>
 
 {% endblock %}

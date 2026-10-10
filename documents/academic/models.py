@@ -7,6 +7,7 @@ Hierarchy:
 Faculty → School → Department → Programme → Academic Unit → Semester → Academic Year
 """
 
+from django.conf import settings
 from django.db import models
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
@@ -407,10 +408,31 @@ class AcademicUnit(models.Model):
     def __str__(self):
         return f"{self.code} - {self.name}"
     
+    @staticmethod
+    def format_canonical_code(raw_code: str) -> str:
+        import re
+        compact = re.sub(r'[\s\-_\.]+', '', str(raw_code or '')).upper()
+        m = re.match(r'^([A-Z]{3})([A-Z]\d{3})$', compact)
+        if m:
+            return f"{m.group(1)} {m.group(2)}"
+        return ' '.join(str(raw_code or '').strip().upper().split())
+
+    def clean(self):
+        super().clean()
+        if self.code:
+            self.code = self.format_canonical_code(self.code)
+        if self.name:
+            self.name = ' '.join(str(self.name).strip().split())
+
     def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.format_canonical_code(self.code)
+        if self.name:
+            self.name = ' '.join(str(self.name).strip().split())
         if not self.slug:
             self.slug = slugify(f"{self.code} {self.name}")
         super().save(*args, **kwargs)
+
 
 
 class ProgrammeUnit(models.Model):
@@ -477,3 +499,84 @@ class ProgrammeUnit(models.Model):
     
     def __str__(self):
         return f"{self.programme.code} - {self.academic_unit.code} ({self.academic_level}, {self.semester})"
+
+
+class StudentUnitEnrollment(models.Model):
+    """Links an authenticated student to their active AcademicUnits.
+
+    Supports hybrid auto-synchronization from ProgrammeUnit (based on the student's
+    programme, academic_level, and semester) alongside custom student selections
+    for electives, carry-overs/retakes, or explicit opt-outs.
+    """
+
+    ENROLLMENT_SOURCE_CHOICES = [
+        ('auto_programme', 'Auto-Synced from Programme & Year'),
+        ('custom_elective', 'Student Added (Elective)'),
+        ('retake', 'Student Added (Retake / Carry-over)'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='unit_enrollments',
+        help_text="The student enrolled in this academic unit",
+    )
+    academic_unit = models.ForeignKey(
+        AcademicUnit,
+        on_delete=models.CASCADE,
+        related_name='student_enrollments',
+        help_text="The academic unit the student is enrolled in",
+    )
+    academic_level = models.ForeignKey(
+        AcademicLevel,
+        on_delete=models.SET_NULL,
+        related_name='student_unit_enrollments',
+        null=True,
+        blank=True,
+        help_text="Academic level (Year) associated with this enrollment",
+    )
+    semester = models.ForeignKey(
+        Semester,
+        on_delete=models.SET_NULL,
+        related_name='student_unit_enrollments',
+        null=True,
+        blank=True,
+        help_text="Semester associated with this enrollment",
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.SET_NULL,
+        related_name='student_unit_enrollments',
+        null=True,
+        blank=True,
+        help_text="Academic year associated with this enrollment",
+    )
+    source = models.CharField(
+        max_length=20,
+        choices=ENROLLMENT_SOURCE_CHOICES,
+        default='auto_programme',
+        db_index=True,
+        help_text="How this unit enrollment was created",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Whether this unit is currently active for the student",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['academic_unit__code']
+        unique_together = ['user', 'academic_unit']
+        verbose_name = "Student Unit Enrollment"
+        verbose_name_plural = "Student Unit Enrollments"
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+            models.Index(fields=['academic_unit', 'is_active']),
+            models.Index(fields=['user', 'source']),
+        ]
+
+    def __str__(self):
+        return f"{getattr(self.user, 'username', self.user_id)} -> {self.academic_unit.code} ({'active' if self.is_active else 'inactive'})"
+

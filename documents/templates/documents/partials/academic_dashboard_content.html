@@ -1,0 +1,969 @@
+{% load static %}
+
+<style>
+    .acad-dash-wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding-bottom: 48px;
+    }
+
+    .acad-panel {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        margin-bottom: 22px;
+        overflow: hidden;
+    }
+
+    .acad-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .acad-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0 0 3px 0;
+        letter-spacing: -0.01em;
+    }
+
+    .acad-subtitle {
+        font-size: 0.86rem;
+        color: var(--text-secondary);
+        margin: 0;
+    }
+
+    .acad-panel-title {
+        font-size: 0.98rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* Profile Metadata Strip */
+    .acad-profile-strip {
+        display: grid;
+        grid-template-columns: 1.5fr 1.4fr 1fr 0.9fr;
+    }
+
+    .acad-profile-cell {
+        padding: 15px 22px;
+        border-right: 1px solid var(--border);
+        min-width: 0;
+    }
+
+    .acad-profile-cell:last-child {
+        border-right: none;
+    }
+
+    .acad-cell-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+    }
+
+    .acad-cell-value {
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .acad-cell-sub {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+
+    @media (max-width: 860px) {
+        .acad-profile-strip {
+            grid-template-columns: 1fr 1fr;
+        }
+        .acad-profile-cell:nth-child(2) {
+            border-right: none;
+        }
+        .acad-profile-cell:nth-child(1),
+        .acad-profile-cell:nth-child(2) {
+            border-bottom: 1px solid var(--border);
+        }
+    }
+
+    @media (max-width: 540px) {
+        .acad-profile-strip {
+            grid-template-columns: 1fr;
+        }
+        .acad-profile-cell {
+            border-right: none !important;
+            border-bottom: 1px solid var(--border);
+        }
+        .acad-profile-cell:last-child {
+            border-bottom: none;
+        }
+    }
+
+    /* Clean Divided List / Table */
+    .acad-list-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .acad-list-head {
+        display: grid;
+        grid-template-columns: 120px 1fr auto;
+        gap: 16px;
+        padding: 10px 22px;
+        background: var(--background);
+        border-bottom: 1px solid var(--border);
+        font-size: 0.73rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+    }
+
+    .acad-list-row {
+        display: grid;
+        grid-template-columns: 120px 1fr auto;
+        gap: 16px;
+        align-items: center;
+        padding: 13px 22px;
+        border-bottom: 1px solid var(--border);
+        transition: background-color 0.12s ease;
+    }
+
+    .acad-list-row:last-child {
+        border-bottom: none;
+    }
+
+    .acad-list-row:hover {
+        background: var(--background);
+    }
+
+    .acad-unit-code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: var(--primary);
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    .acad-unit-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
+    .acad-unit-title {
+        font-size: 0.92rem;
+        font-weight: 500;
+        color: var(--text-dark);
+        line-height: 1.35;
+    }
+
+    .acad-shared-pill {
+        font-size: 0.73rem;
+        color: var(--text-secondary);
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        background: var(--background);
+        white-space: nowrap;
+    }
+
+    .acad-row-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-shrink: 0;
+        font-size: 0.82rem;
+    }
+
+    .acad-doc-count {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+    }
+
+    .acad-row-link {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.81rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: color 0.12s ease;
+        white-space: nowrap;
+    }
+
+    .acad-row-link:hover {
+        color: var(--primary);
+    }
+
+    .acad-row-link.primary {
+        color: var(--primary);
+    }
+
+    /* Year & Semester Toolbar */
+    .acad-curriculum-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 12px 22px;
+        background: var(--background);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .acad-year-tabs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .acad-year-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 13px;
+        border-radius: 7px;
+        font-size: 0.83rem;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        color: var(--text-secondary);
+        transition: all 0.12s ease;
+    }
+
+    .acad-year-tab:hover {
+        color: var(--text-dark);
+        border-color: var(--primary);
+    }
+
+    .acad-year-tab.active {
+        background: var(--primary);
+        color: #ffffff;
+        border-color: var(--primary);
+    }
+
+    .acad-year-tab-count {
+        font-size: 0.72rem;
+        opacity: 0.85;
+    }
+
+    .acad-sem-switch {
+        display: inline-flex;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 2px;
+        gap: 2px;
+    }
+
+    .acad-sem-link {
+        padding: 5px 12px;
+        border-radius: 5px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-decoration: none;
+        color: var(--text-secondary);
+        transition: all 0.12s ease;
+    }
+
+    .acad-sem-link:hover {
+        color: var(--text-dark);
+    }
+
+    .acad-sem-link.active {
+        background: var(--primary);
+        color: #ffffff;
+    }
+
+    /* Subtle Footer & Buttons */
+    .acad-list-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 22px;
+        background: var(--background);
+        border-top: 1px solid var(--border);
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .acad-subtle-link {
+        background: none;
+        border: none;
+        padding: 2px 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .acad-subtle-link:hover {
+        color: var(--primary);
+        text-decoration: underline;
+    }
+
+    .acad-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 13px;
+        border-radius: 7px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        background: var(--background);
+        color: var(--text-dark);
+        cursor: pointer;
+        transition: all 0.12s ease;
+    }
+
+    .acad-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .acad-btn-primary {
+        background: var(--primary);
+        color: #ffffff;
+        border-color: var(--primary);
+    }
+
+    .acad-btn-primary:hover {
+        color: #ffffff;
+        opacity: 0.92;
+    }
+
+    /* Form Controls */
+    .acad-input,
+    .acad-select {
+        width: 100%;
+        padding: 8px 11px;
+        border-radius: 7px;
+        border: 1px solid var(--border);
+        background: var(--background);
+        color: var(--text-dark);
+        font-size: 0.88rem;
+    }
+
+    .acad-input:focus,
+    .acad-select:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .acad-form-row {
+        display: grid;
+        grid-template-columns: 170px 1fr auto;
+        gap: 10px;
+        align-items: start;
+        margin-bottom: 8px;
+    }
+
+    .acad-lookup-hint {
+        grid-column: 1 / -1;
+        font-size: 0.79rem;
+        padding: 6px 10px;
+        border-radius: 6px;
+        margin-top: -2px;
+        margin-bottom: 4px;
+        display: none;
+    }
+
+    .acad-lookup-hint.shared {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(13, 110, 253, 0.08);
+        border: 1px solid rgba(13, 110, 253, 0.25);
+        color: var(--text-dark);
+    }
+
+    .acad-lookup-hint.invalid {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(220, 53, 69, 0.08);
+        border: 1px solid rgba(220, 53, 69, 0.25);
+        color: #dc3545;
+    }
+
+    @media (max-width: 640px) {
+        .acad-list-head {
+            display: none;
+        }
+        .acad-list-row {
+            grid-template-columns: 1fr;
+            gap: 6px;
+            padding: 12px 16px;
+        }
+        .acad-row-actions {
+            justify-content: flex-start;
+            padding-top: 4px;
+        }
+        .acad-form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="acad-dash-wrap">
+    <!-- Back Link -->
+    <div style="margin-bottom: 16px;">
+        <a href="{% url 'documents:home' %}"
+           hx-get="{% url 'documents:home' %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           hx-history="true"
+           style="display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); text-decoration: none; font-weight: 500; font-size: 0.86rem;">
+            <i class="bi bi-arrow-left"></i>
+            Back to Document Repository
+        </a>
+    </div>
+
+    {% include 'documents/partials/library_tabs.html' with active_tab='academic' %}
+
+    <!-- 1. Academic Profile Panel (Read-Only from Student Record & System Timetable) -->
+    <div class="acad-panel">
+        <div class="acad-panel-header">
+            <div>
+                <h1 class="acad-title">Academic &amp; Units Dashboard</h1>
+                <p class="acad-subtitle">
+                    Enrolled programme details, active timetable semester units, and programme curriculum registry.
+                </p>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <a href="{% url 'documents:upload' %}"
+                   hx-get="{% url 'documents:upload' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   class="acad-btn acad-btn-primary">
+                    <i class="bi bi-upload"></i>
+                    Upload Document
+                </a>
+            </div>
+        </div>
+
+        <div class="acad-profile-strip">
+            <div class="acad-profile-cell">
+                <div class="acad-cell-label">Programme</div>
+                {% if academic_summary.programme %}
+                    <div class="acad-cell-value">{{ academic_summary.programme.name }}</div>
+                    <div class="acad-cell-sub">{{ academic_summary.programme.code }}</div>
+                {% else %}
+                    <div class="acad-cell-value" style="color: var(--text-secondary);">Not assigned</div>
+                    <div class="acad-cell-sub">Set via student registration</div>
+                {% endif %}
+            </div>
+
+            <div class="acad-profile-cell">
+                <div class="acad-cell-label">School &amp; Department</div>
+                {% if academic_summary.school or academic_summary.department %}
+                    <div class="acad-cell-value">{{ academic_summary.school.name|default:"—" }}</div>
+                    <div class="acad-cell-sub">{{ academic_summary.department.name|default:"" }}</div>
+                {% else %}
+                    <div class="acad-cell-value" style="color: var(--text-secondary);">—</div>
+                    <div class="acad-cell-sub">Linked via programme</div>
+                {% endif %}
+            </div>
+
+            <div class="acad-profile-cell">
+                <div class="acad-cell-label">Current Level &amp; Semester</div>
+                <div class="acad-cell-value">
+                    {{ academic_summary.academic_level.name|default:"Year 1" }}, Semester {{ academic_summary.semester_number|default:"1" }}
+                </div>
+                <div class="acad-cell-sub">
+                    {% if academic_summary.academic_year %}
+                        Active Timetable &middot; {{ academic_summary.academic_year.code }}
+                    {% else %}
+                        Active System Timetable
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="acad-profile-cell">
+                <div class="acad-cell-label">Active Units</div>
+                <div class="acad-cell-value">{{ academic_summary.enrolled_count }} Unit{{ academic_summary.enrolled_count|pluralize }}</div>
+                <div class="acad-cell-sub">Synced with Pwanimate</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Current Semester Units List -->
+    {% if academic_summary.programme %}
+    <div class="acad-panel">
+        <div class="acad-panel-header">
+            <h2 class="acad-panel-title">
+                <span>Current Semester Enrolled Units</span>
+                <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">
+                    ({{ academic_summary.academic_level.name|default:"Year 1" }}, Semester {{ academic_summary.semester_number|default:"1" }})
+                </span>
+            </h2>
+            <span style="font-size: 0.78rem; color: var(--text-secondary);">
+                Active units for your repository feed &amp; Pwanimate
+            </span>
+        </div>
+
+        {% if academic_summary.enrolled_units %}
+            <div class="acad-list-head">
+                <div>Unit Code</div>
+                <div>Unit Name</div>
+                <div>Actions</div>
+            </div>
+            <div>
+                {% for item in academic_summary.enrolled_units %}
+                    <div class="acad-list-row">
+                        <div class="acad-unit-code">{{ item.code }}</div>
+                        <div class="acad-unit-title-wrap">
+                            <span class="acad-unit-title">{{ item.name }}</span>
+                        </div>
+                        <div class="acad-row-actions">
+                            <a href="{% url 'documents:search' %}?unit={{ item.code|urlencode }}"
+                               hx-get="{% url 'documents:search' %}?unit={{ item.code|urlencode }}"
+                               hx-target="#page-content-target"
+                               hx-swap="innerHTML"
+                               hx-push-url="true"
+                               class="acad-row-link primary">
+                                <i class="bi bi-file-earmark-text"></i>
+                                Documents
+                            </a>
+                            <a href="{% url 'documents:upload' %}?unit={{ item.id }}"
+                               hx-get="{% url 'documents:upload' %}?unit={{ item.id }}"
+                               hx-target="#page-content-target"
+                               hx-swap="innerHTML"
+                               hx-push-url="true"
+                               class="acad-row-link">
+                                <i class="bi bi-upload"></i>
+                                Upload
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="padding: 20px 22px; font-size: 0.88rem; color: var(--text-secondary);">
+                No units have been recorded yet for {{ academic_summary.programme.code }} ({{ academic_summary.academic_level.name|default:"Year 1" }}, Semester {{ academic_summary.semester_number|default:"1" }}). Use the curriculum section below to add them.
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 3. Programme Curriculum Registry (All Years & Semesters) -->
+    {% if selected_programme %}
+    <div class="acad-panel" id="curriculum-browser-card">
+        <div class="acad-panel-header">
+            <div>
+                <h2 class="acad-panel-title">
+                    Programme Curriculum Registry &mdash; {{ selected_programme.name }} ({{ selected_programme.code }})
+                </h2>
+            </div>
+            <span style="font-size: 0.78rem; color: var(--text-secondary);">
+                Select any year or semester to view or add programme units
+            </span>
+        </div>
+
+        <!-- Year Tabs + Semester Switcher -->
+        <div class="acad-curriculum-bar">
+            <div class="acad-year-tabs">
+                {% for tab in year_tabs %}
+                    <a href="{% url 'documents:academic:dashboard' %}?year={{ tab.year_number }}&semester={{ selected_sem_num }}"
+                       hx-get="{% url 'documents:academic:dashboard' %}?year={{ tab.year_number }}&semester={{ selected_sem_num }}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       class="acad-year-tab {% if tab.is_selected %}active{% endif %}">
+                        <span>{{ tab.label }}</span>
+                        <span class="acad-year-tab-count">({{ tab.total_count }})</span>
+                    </a>
+                {% endfor %}
+            </div>
+
+            <div class="acad-sem-switch">
+                <a href="{% url 'documents:academic:dashboard' %}?year={{ selected_year_num }}&semester=1"
+                   hx-get="{% url 'documents:academic:dashboard' %}?year={{ selected_year_num }}&semester=1"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   class="acad-sem-link {% if selected_sem_num == 1 %}active{% endif %}">
+                    Semester 1 ({{ selected_sem1_count }})
+                </a>
+                <a href="{% url 'documents:academic:dashboard' %}?year={{ selected_year_num }}&semester=2"
+                   hx-get="{% url 'documents:academic:dashboard' %}?year={{ selected_year_num }}&semester=2"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   class="acad-sem-link {% if selected_sem_num == 2 %}active{% endif %}">
+                    Semester 2 ({{ selected_sem2_count }})
+                </a>
+            </div>
+        </div>
+
+        <!-- Units List for Selected (Programme, Year, Semester) -->
+        <div id="context-units-container">
+            {% if context_units %}
+                <div class="acad-list-head">
+                    <div>Unit Code</div>
+                    <div>Official Unit Name</div>
+                    <div>Repository</div>
+                </div>
+                <div>
+                    {% for unit in context_units %}
+                        <div class="acad-list-row">
+                            <div class="acad-unit-code">{{ unit.code }}</div>
+                            <div class="acad-unit-title-wrap">
+                                <span class="acad-unit-title">{{ unit.name }}</span>
+                                {% if unit.shared_programme_codes %}
+                                    <span class="acad-shared-pill" title="Shared unit across programmes">
+                                        Shared: {{ unit.shared_programme_codes|join:", " }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="acad-row-actions">
+                                <span class="acad-doc-count">
+                                    {{ unit.document_count }} doc{{ unit.document_count|pluralize }}
+                                </span>
+                                <a href="{% url 'documents:search' %}?unit={{ unit.code|urlencode }}"
+                                   hx-get="{% url 'documents:search' %}?unit={{ unit.code|urlencode }}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   class="acad-row-link primary">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                    View
+                                </a>
+                                <a href="{% url 'documents:upload' %}?programme={{ selected_programme.id }}&level={{ selected_year_num }}&semester={{ selected_sem_num }}&unit={{ unit.id }}"
+                                   hx-get="{% url 'documents:upload' %}?programme={{ selected_programme.id }}&level={{ selected_year_num }}&semester={{ selected_sem_num }}&unit={{ unit.id }}"
+                                   hx-target="#page-content-target"
+                                   hx-swap="innerHTML"
+                                   hx-push-url="true"
+                                   class="acad-row-link">
+                                    <i class="bi bi-upload"></i>
+                                    Upload
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Subtle Footer Link when units are already populated -->
+                <div class="acad-list-footer">
+                    <span>
+                        {{ context_units_count }} unit{{ context_units_count|pluralize }} listed for Year {{ selected_year_num }}, Semester {{ selected_sem_num }}.
+                    </span>
+                    <button type="button" class="acad-subtle-link" onclick="toggleAddUnitDrawer()">
+                        + Add missing unit
+                    </button>
+                </div>
+            {% else %}
+                <div style="padding: 20px 22px; border-bottom: 1px solid var(--border); font-size: 0.88rem; color: var(--text-secondary);">
+                    No units recorded yet for <strong style="color: var(--text-dark);">Year {{ selected_year_num }}, Semester {{ selected_sem_num }}</strong>. Add the units from the student portal below.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Add Unit Drawer (Expanded automatically ONLY when 0 units exist; collapsed when units exist) -->
+        <div id="add-unit-drawer"
+             style="display: {% if context_units %}none{% else %}block{% endif %}; padding: 18px 22px; background: var(--card-bg); border-top: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-dark);">
+                        Add Units &mdash; {{ selected_programme.code }} (Year {{ selected_year_num }}, Semester {{ selected_sem_num }})
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+                        Format: <strong>3 letters, space, 1 letter and 3 numbers</strong> (e.g., <code>SCS B121</code>). Shared units across programmes are linked automatically.
+                    </div>
+                </div>
+                {% if context_units %}
+                <button type="button" onclick="toggleAddUnitDrawer()" class="acad-subtle-link">
+                    Hide form
+                </button>
+                {% endif %}
+            </div>
+
+            <form id="add-programme-units-form" onsubmit="submitAddProgrammeUnits(event)">
+                {% csrf_token %}
+                <input type="hidden" id="add-unit-programme-id" value="{{ selected_programme.id }}">
+                <input type="hidden" id="add-unit-year" value="{{ selected_year_num }}">
+                <input type="hidden" id="add-unit-semester" value="{{ selected_sem_num }}">
+
+                <div id="unit-rows-wrapper">
+                    <div class="acad-form-row unit-entry-row">
+                        <div>
+                            <input type="text"
+                                   name="unit_code"
+                                   class="acad-input unit-code-input"
+                                   placeholder="Code (e.g. SCS B121)"
+                                   maxlength="12"
+                                   autocomplete="off"
+                                   onblur="handleUnitCodeLookup(this)"
+                                   oninput="handleUnitCodeInput(this)"
+                                   required>
+                        </div>
+                        <div>
+                            <input type="text"
+                                   name="unit_name"
+                                   class="acad-input unit-name-input"
+                                   placeholder="Official Unit Name as in Student Portal"
+                                   maxlength="200"
+                                   required>
+                        </div>
+                        <div>
+                            <button type="button"
+                                    onclick="removeUnitEntryRow(this)"
+                                    class="acad-btn"
+                                    style="padding: 8px 10px; color: var(--text-secondary);"
+                                    title="Remove row">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                        <div class="acad-lookup-hint"></div>
+                    </div>
+                </div>
+
+                <div id="add-unit-error-box"
+                     style="display: none; margin: 8px 0; padding: 8px 12px; border-radius: 6px; background: rgba(220, 53, 69, 0.08); border: 1px solid rgba(220, 53, 69, 0.25); color: #dc3545; font-size: 0.82rem;">
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 10px;">
+                    <button type="button" onclick="appendUnitEntryRow()" class="acad-btn">
+                        <i class="bi bi-plus-lg"></i>
+                        Add row
+                    </button>
+
+                    <button type="submit" id="submit-units-btn" class="acad-btn acad-btn-primary">
+                        Save to Year {{ selected_year_num }}, Semester {{ selected_sem_num }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    function toggleAddUnitDrawer() {
+        var drawer = document.getElementById('add-unit-drawer');
+        if (!drawer) return;
+        var isHidden = (drawer.style.display === 'none' || !drawer.style.display);
+        drawer.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) {
+            var firstInput = drawer.querySelector('.unit-code-input');
+            if (firstInput) firstInput.focus();
+        }
+    }
+
+    function formatCanonicalUnitCodeClient(raw) {
+        if (!raw) return '';
+        var compact = String(raw).replace(/[\s\-_\.]+/g, '').toUpperCase();
+        var match = compact.match(/^([A-Z]{3})([A-Z]\d{3})$/);
+        if (match) {
+            return match[1] + ' ' + match[2];
+        }
+        return String(raw).toUpperCase().replace(/\s+/g, ' ').trim();
+    }
+
+    function handleUnitCodeInput(inputEl) {
+        var row = inputEl.closest('.unit-entry-row');
+        var hint = row ? row.querySelector('.acad-lookup-hint') : null;
+        if (hint) {
+            hint.className = 'acad-lookup-hint';
+            hint.style.display = 'none';
+            hint.textContent = '';
+        }
+    }
+
+    function handleUnitCodeLookup(inputEl) {
+        var raw = inputEl.value.trim();
+        if (!raw) return;
+
+        var formatted = formatCanonicalUnitCodeClient(raw);
+        inputEl.value = formatted;
+
+        var row = inputEl.closest('.unit-entry-row');
+        var nameInput = row ? row.querySelector('.unit-name-input') : null;
+        var hint = row ? row.querySelector('.acad-lookup-hint') : null;
+
+        var validPattern = /^[A-Z]{3} [A-Z]\d{3}$/;
+        if (!validPattern.test(formatted)) {
+            if (hint) {
+                hint.className = 'acad-lookup-hint invalid';
+                hint.style.display = 'flex';
+                hint.innerHTML = '<i class="bi bi-exclamation-circle"></i><span>Use canonical format: 3 letters, space, 1 letter + 3 digits (e.g. <strong>SCS B121</strong>).</span>';
+            }
+            return;
+        }
+
+        fetch("{% url 'documents:academic:lookup_unit' %}?code=" + encodeURIComponent(formatted), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!hint) return;
+            if (data.found) {
+                inputEl.value = data.canonical_code;
+                if (nameInput && !nameInput.value.trim()) {
+                    nameInput.value = data.name;
+                }
+                var sharedCodes = (data.shared_programmes || []).map(function(p) { return p.code; }).join(', ');
+                hint.className = 'acad-lookup-hint shared';
+                hint.style.display = 'flex';
+                var sharedMsg = sharedCodes
+                    ? 'Shared unit in ' + sharedCodes + ' (' + (data.document_count || 0) + ' existing document(s)). Linking to your programme shares all unit documents automatically.'
+                    : 'Canonical unit "' + data.name + '" found in registry. Official name filled automatically.';
+                hint.innerHTML = '<i class="bi bi-link-45deg"></i><span>' + sharedMsg + '</span>';
+            } else {
+                hint.className = 'acad-lookup-hint';
+                hint.style.display = 'none';
+            }
+        })
+        .catch(function() {});
+    }
+
+    function appendUnitEntryRow() {
+        var wrapper = document.getElementById('unit-rows-wrapper');
+        if (!wrapper) return;
+        var row = document.createElement('div');
+        row.className = 'acad-form-row unit-entry-row';
+        row.innerHTML = ''
+            + '<div>'
+            + '  <input type="text" name="unit_code" class="acad-input unit-code-input" placeholder="Code (e.g. SCS B121)" maxlength="12" autocomplete="off" onblur="handleUnitCodeLookup(this)" oninput="handleUnitCodeInput(this)" required>'
+            + '</div>'
+            + '<div>'
+            + '  <input type="text" name="unit_name" class="acad-input unit-name-input" placeholder="Official Unit Name as in Student Portal" maxlength="200" required>'
+            + '</div>'
+            + '<div>'
+            + '  <button type="button" onclick="removeUnitEntryRow(this)" class="acad-btn" style="padding: 8px 10px; color: var(--text-secondary);" title="Remove row"><i class="bi bi-x-lg"></i></button>'
+            + '</div>'
+            + '<div class="acad-lookup-hint"></div>';
+        wrapper.appendChild(row);
+        var codeInput = row.querySelector('.unit-code-input');
+        if (codeInput) codeInput.focus();
+    }
+
+    function removeUnitEntryRow(btn) {
+        var wrapper = document.getElementById('unit-rows-wrapper');
+        if (!wrapper) return;
+        var rows = wrapper.querySelectorAll('.unit-entry-row');
+        if (rows.length <= 1) {
+            var row = rows[0];
+            row.querySelector('.unit-code-input').value = '';
+            row.querySelector('.unit-name-input').value = '';
+            var hint = row.querySelector('.acad-lookup-hint');
+            if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
+            return;
+        }
+        var targetRow = btn.closest('.unit-entry-row');
+        if (targetRow) targetRow.remove();
+    }
+
+    function getCsrfToken() {
+        var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (input && input.value) return input.value;
+        var match = document.cookie.match(/csrftoken=([^;]+)/);
+        return match ? match[1] : '{{ csrf_token }}';
+    }
+
+    function reloadDashboardWithParams(programmeId, yearNum, semNum) {
+        var url = "{% url 'documents:academic:dashboard' %}?year=" + encodeURIComponent(yearNum)
+            + "&semester=" + encodeURIComponent(semNum);
+        if (window.htmx) {
+            window.htmx.ajax('GET', url, { target: '#page-content-target', swap: 'innerHTML' });
+            window.history.pushState({}, '', url);
+        } else {
+            window.location.href = url;
+        }
+    }
+
+    function submitAddProgrammeUnits(event) {
+        event.preventDefault();
+        var errorBox = document.getElementById('add-unit-error-box');
+        var submitBtn = document.getElementById('submit-units-btn');
+        if (errorBox) { errorBox.style.display = 'none'; errorBox.textContent = ''; }
+
+        var progId = document.getElementById('add-unit-programme-id').value;
+        var yearNum = document.getElementById('add-unit-year').value;
+        var semNum = document.getElementById('add-unit-semester').value;
+
+        var rows = document.querySelectorAll('#unit-rows-wrapper .unit-entry-row');
+        var units = [];
+        for (var i = 0; i < rows.length; i++) {
+            var codeEl = rows[i].querySelector('.unit-code-input');
+            var nameEl = rows[i].querySelector('.unit-name-input');
+            var formattedCode = formatCanonicalUnitCodeClient(codeEl ? codeEl.value : '');
+            if (codeEl) codeEl.value = formattedCode;
+            var nameVal = nameEl ? nameEl.value.trim() : '';
+            if (formattedCode || nameVal) {
+                units.push({ code: formattedCode, name: nameVal });
+            }
+        }
+
+        if (!units.length) {
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.textContent = 'Please enter at least one canonical unit code (e.g., SCS B121) and unit name.';
+            }
+            return;
+        }
+
+        if (submitBtn) submitBtn.disabled = true;
+
+        fetch("{% url 'documents:academic:add_programme_unit' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                programme_id: progId,
+                academic_level: yearNum,
+                semester: semNum,
+                units: units
+            })
+        })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(res) {
+            if (submitBtn) submitBtn.disabled = false;
+            if (!res.ok || !res.data.success) {
+                if (errorBox) {
+                    errorBox.style.display = 'block';
+                    errorBox.textContent = (res.data && res.data.error) || 'Failed to save unit(s). Please check the unit code format (e.g., SCS B121).';
+                }
+                return;
+            }
+            reloadDashboardWithParams(progId, yearNum, semNum);
+        })
+        .catch(function() {
+            if (submitBtn) submitBtn.disabled = false;
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.textContent = 'A network error occurred while saving units.';
+            }
+        });
+    }
+</script>

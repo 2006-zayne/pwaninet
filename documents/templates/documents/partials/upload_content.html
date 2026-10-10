@@ -35,6 +35,7 @@
     <!-- Stage 1: File Selection -->
     <div class="doc-upload-stage" id="upload-stage-1">
         <form id="upload-form" enctype="multipart/form-data">
+            {% csrf_token %}
             <div class="doc-drop-zone" 
                  style="border: 3px dashed var(--border); border-radius: 20px; 
                         padding: 60px 40px; text-align: center; background: var(--card-bg); 
@@ -143,92 +144,159 @@
         
         <!-- Shared Metadata -->
         <div class="doc-shared-metadata" 
+             data-other-category-id="{{ other_category_id }}"
              style="background: var(--card-bg); border: 1px solid var(--border); 
                     border-radius: 16px; padding: 24px; margin-bottom: 24px;">
-            <h3 style="font-size: 1.1rem; font-weight: 600; margin: 0 0 20px 0; color: var(--text-dark);">
-                Shared Metadata (applies to all files)
-            </h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 18px;">
+                <div>
+                    <h3 style="font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--text-dark);">
+                        Academic Context &amp; Shared Metadata
+                    </h3>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 4px 0 0 0;">
+                        Defaults to your enrolled programme, year, and semester. Change any field if uploading for another class.
+                    </p>
+                </div>
+                <a href="{% url 'documents:academic:dashboard' %}"
+                   hx-get="{% url 'documents:academic:dashboard' %}"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   style="font-size: 0.82rem; font-weight: 600; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                    <i class="bi bi-mortarboard"></i>
+                    Academic &amp; Units Dashboard
+                </a>
+            </div>
             
+            <!-- Row 1: Programme (Searchable) -->
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
+                    Programme
+                </label>
+                <input type="text"
+                       id="programme-search-input"
+                       class="form-control"
+                       placeholder="Search programme by name or code..."
+                       style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; margin-bottom: 8px; background: var(--card-bg); color: var(--text-dark);">
+                <select name="programme" id="upload-programme-select" class="form-select"
+                        style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-dark);">
+                    <option value="">Select Programme</option>
+                    {% for prog in programmes %}
+                    <option value="{{ prog.id }}" {% if selected_programme and selected_programme.id == prog.id %}selected{% endif %}>
+                        {{ prog.name }} ({{ prog.code }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Row 2: Year of Study & Semester -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                 <div>
                     <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
-                        Academic Unit
+                        Year of Study
                     </label>
+                    <select name="academic_level" id="upload-level-select" class="form-select" 
+                            style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
+                                   background: var(--card-bg); color: var(--text-dark);">
+                        {% for level in academic_levels %}
+                        <option value="{{ level.level }}" {% if selected_level_num == level.level %}selected{% endif %}>{{ level.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
+                        Semester
+                    </label>
+                    <select name="semester" id="upload-semester-select" class="form-select" 
+                            style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
+                                   background: var(--card-bg); color: var(--text-dark);">
+                        <option value="1" {% if selected_semester_num != 2 %}selected{% endif %}>Semester 1</option>
+                        <option value="2" {% if selected_semester_num == 2 %}selected{% endif %}>Semester 2</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Row 3: Academic Unit & Document Category -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin: 0;">
+                            Academic Unit
+                        </label>
+                        <span id="upload-unit-count-badge" style="font-size: 0.76rem; color: var(--text-secondary);">
+                            {{ context_units|length }} unit{{ context_units|length|pluralize }} in semester
+                        </span>
+                    </div>
                     <div style="position: relative;">
                         <input type="text" 
                                class="form-control academic-unit-search" 
-                               placeholder="Search units..." 
+                               placeholder="Filter semester units..." 
                                id="academic-unit-search"
-                               style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.875rem; margin-bottom: 8px; background: var(--card-bg); color: var(--text-dark);">
+                               style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; margin-bottom: 8px; background: var(--card-bg); color: var(--text-dark);">
                         <select name="academic_unit" class="form-select" id="academic-unit-select"
                                 style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
                                        background: var(--card-bg); color: var(--text-dark);">
                             <option value="">Select Unit</option>
-                            {% for unit in academic_units %}
-                            <option value="{{ unit.id }}">{{ unit.code }} - {{ unit.name }}</option>
+                            {% for unit in context_units %}
+                            <option value="{{ unit.id }}" {% if selected_unit_id and selected_unit_id == unit.id %}selected{% endif %}>{{ unit.code }} - {{ unit.name }}</option>
                             {% endfor %}
+                            <option value="other">Other (Memo / Announcement / General Resource)</option>
                         </select>
+                    </div>
+                    <div style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+                        <button type="button"
+                                id="toggle-inline-add-unit-btn"
+                                style="background: none; border: none; padding: 0; font-size: 0.78rem; color: var(--text-secondary); cursor: pointer; text-decoration: underline;">
+                            + Unit not listed for this semester? Add it
+                        </button>
                     </div>
                 </div>
                 <div>
                     <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
                         Category
                     </label>
-                    <select name="category" class="form-select" 
+                    <select name="category" id="upload-category-select" class="form-select" 
                             style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
                                    background: var(--card-bg); color: var(--text-dark);">
                         <option value="">Select Category</option>
                         {% for cat in categories %}
-                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        <option value="{{ cat.id }}" data-code="{{ cat.code|lower }}">{{ cat.name }}</option>
                         {% endfor %}
                     </select>
+                    <p id="other-category-hint" style="display: none; font-size: 0.78rem; color: var(--text-secondary); margin: 6px 0 0 0;">
+                        Non-unit document selected (Memo, Announcement, or General Reference).
+                    </p>
                 </div>
             </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                <div>
-                    <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
-                        Academic Level
-                    </label>
-                    <select name="academic_level" class="form-select" 
-                            style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
-                                   background: var(--card-bg); color: var(--text-dark);">
-                        <option value="">Select Level</option>
-                        {% for level in academic_levels %}
-                        <option value="{{ level.id }}">{{ level.name }}</option>
-                        {% endfor %}
-                    </select>
+
+            <!-- Subtle Inline Quick-Add Unit Box (when a semester's unit hasn't been added yet) -->
+            <div id="upload-inline-add-unit-box"
+                 style="display: none; background: var(--background); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+                <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-dark); margin-bottom: 8px;">
+                    Add Missing Unit to Selected Programme, Year &amp; Semester
                 </div>
-                <div>
-                    <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
-                        Academic Year
-                    </label>
-                    <select name="academic_year" class="form-select" 
-                            style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
-                                   background: var(--card-bg); color: var(--text-dark);">
-                        <option value="">Select Year</option>
-                        {% for year in academic_years %}
-                        <option value="{{ year.id }}">{{ year.code }}</option>
-                        {% endfor %}
-                    </select>
+                <div style="display: grid; grid-template-columns: 160px 1fr auto; gap: 8px; align-items: center;">
+                    <input type="text"
+                           id="inline-new-unit-code"
+                           class="form-control"
+                           placeholder="SCS B121"
+                           maxlength="12"
+                           style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-dark); font-size: 0.85rem;">
+                    <input type="text"
+                           id="inline-new-unit-name"
+                           class="form-control"
+                           placeholder="Official Unit Name as in Portal"
+                           maxlength="200"
+                           style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-dark); font-size: 0.85rem;">
+                    <button type="button"
+                            id="inline-save-unit-btn"
+                            style="padding: 8px 14px; border-radius: 8px; background: var(--primary); color: #ffffff; border: none; font-size: 0.82rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                        Add &amp; Select
+                    </button>
                 </div>
+                <div id="inline-unit-feedback" style="font-size: 0.78rem; margin-top: 6px; display: none;"></div>
             </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                <div>
-                    <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
-                        Semester
-                    </label>
-                    <select name="semester" class="form-select" 
-                            style="padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); 
-                                   background: var(--card-bg); color: var(--text-dark);">
-                        <option value="">Select Semester</option>
-                        {% for sem in semesters %}
-                        <option value="{{ sem.id }}" style="color: var(--text-dark);">{{ sem.get_number_display }} - {{ sem.academic_year }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
+
+            <input type="hidden" name="academic_year" value="">
             
             <div>
                 <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; display: block;">
@@ -662,16 +730,34 @@
                 return;
             }
 
-            const academicUnit = document.querySelector('select[name="academic_unit"]').value;
-            const category = document.querySelector('select[name="category"]').value;
-            const academicLevel = document.querySelector('select[name="academic_level"]').value;
-            const academicYear = document.querySelector('select[name="academic_year"]').value;
-            const semester = document.querySelector('select[name="semester"]').value;
+            const academicUnitEl = document.querySelector('select[name="academic_unit"]');
+            const categoryEl = document.querySelector('select[name="category"]');
+            const academicLevelEl = document.querySelector('select[name="academic_level"]');
+            const academicYearEl = document.querySelector('input[name="academic_year"], select[name="academic_year"]');
+            const semesterEl = document.querySelector('select[name="semester"]');
+            const sharedMetaEl = document.querySelector('.doc-shared-metadata');
+            const otherCatId = sharedMetaEl ? (sharedMetaEl.dataset.otherCategoryId || '') : '';
+
+            const academicUnit = academicUnitEl ? academicUnitEl.value : '';
+            let category = categoryEl ? categoryEl.value : '';
+            const academicLevel = academicLevelEl ? academicLevelEl.value : '';
+            const academicYear = academicYearEl ? academicYearEl.value : '';
+            const semester = semesterEl ? semesterEl.value : '';
             const tagsInput = document.querySelector('input[placeholder="e.g., database, SQL, normalization"]');
             const tags = tagsInput ? tagsInput.value : '';
 
+            if (academicUnit === 'other' && !category && otherCatId) {
+                category = otherCatId;
+                if (categoryEl) categoryEl.value = otherCatId;
+            }
+
+            if (!academicUnit) {
+                alert('Please select an Academic Unit (or select "Other" for non-unit documents).');
+                return;
+            }
+
             if (!category) {
-                alert('Please select a category');
+                alert('Please select a document category');
                 return;
             }
 
@@ -679,8 +765,13 @@
             uploadBtn.disabled = true;
             uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Uploading...';
             
+            const csrfToken = getCsrfToken();
+
             // Create FormData with files and metadata
             const formData = new FormData();
+            if (csrfToken) {
+                formData.append('csrfmiddlewaretoken', csrfToken);
+            }
             selectedFiles.forEach(file => {
                 formData.append('files', file);
             });
@@ -815,7 +906,9 @@
             });
 
             xhr.open('POST', '{% url "documents:upload" %}', true);
-            xhr.setRequestHeader('X-CSRFToken', getCookie('csrftoken'));
+            if (csrfToken) {
+                xhr.setRequestHeader('X-CSRFToken', csrfToken);
+            }
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             xhr.send(formData);
         });
@@ -895,38 +988,259 @@
         });
     }
 
-    // Academic unit search functionality
+    // Programme search & dynamic (Programme, Year, Semester) unit dropdown loading
+    const programmeSearchInput = document.getElementById('programme-search-input');
+    const programmeSelect = document.getElementById('upload-programme-select');
+    const levelSelect = document.getElementById('upload-level-select');
+    const semesterSelect = document.getElementById('upload-semester-select');
     const academicUnitSearch = document.getElementById('academic-unit-search');
     const academicUnitSelect = document.getElementById('academic-unit-select');
+    const categorySelect = document.getElementById('upload-category-select');
+    const unitCountBadge = document.getElementById('upload-unit-count-badge');
+    const otherCategoryHint = document.getElementById('other-category-hint');
+    const sharedMetadataEl = document.querySelector('.doc-shared-metadata');
+    const otherCategoryId = sharedMetadataEl ? (sharedMetadataEl.dataset.otherCategoryId || '') : '';
 
+    if (programmeSearchInput && programmeSelect) {
+        programmeSearchInput.addEventListener('input', function() {
+            const term = this.value.toLowerCase().trim();
+            const options = programmeSelect.querySelectorAll('option');
+            options.forEach(function(opt) {
+                if (!opt.value) {
+                    opt.style.display = '';
+                    return;
+                }
+                const matches = opt.textContent.toLowerCase().includes(term);
+                opt.style.display = (!term || matches) ? '' : 'none';
+            });
+        });
+    }
+
+    function populateUnitSelectOptions(units, preselectUnitId) {
+        if (!academicUnitSelect) return;
+        const previousVal = preselectUnitId || academicUnitSelect.value;
+        academicUnitSelect.innerHTML = '';
+
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = units.length > 0 ? 'Select Unit' : 'No units added for this semester yet — choose Other or add below';
+        academicUnitSelect.appendChild(defaultOpt);
+
+        units.forEach(function(u) {
+            const opt = document.createElement('option');
+            opt.value = String(u.id);
+            opt.textContent = u.code + ' - ' + u.name;
+            if (String(previousVal) === String(u.id)) {
+                opt.selected = true;
+            }
+            academicUnitSelect.appendChild(opt);
+        });
+
+        const otherOpt = document.createElement('option');
+        otherOpt.value = 'other';
+        otherOpt.textContent = 'Other (Memo / Announcement / General Resource)';
+        if (previousVal === 'other') {
+            otherOpt.selected = true;
+        }
+        academicUnitSelect.appendChild(otherOpt);
+
+        if (unitCountBadge) {
+            unitCountBadge.textContent = units.length + ' unit' + (units.length === 1 ? '' : 's') + ' in semester';
+        }
+    }
+
+    function refreshUnitsForSelectedContext(preselectUnitId) {
+        const progId = programmeSelect ? programmeSelect.value : '';
+        const lvlVal = levelSelect ? levelSelect.value : '';
+        const semVal = semesterSelect ? semesterSelect.value : '';
+
+        if (!progId) {
+            populateUnitSelectOptions([], preselectUnitId);
+            return;
+        }
+
+        const url = "{% url 'documents:academic:units_for_context' %}?programme="
+            + encodeURIComponent(progId)
+            + "&level=" + encodeURIComponent(lvlVal)
+            + "&semester=" + encodeURIComponent(semVal);
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && Array.isArray(data.units)) {
+                    populateUnitSelectOptions(data.units, preselectUnitId);
+                }
+            })
+            .catch(function() {});
+    }
+
+    if (programmeSelect) {
+        programmeSelect.addEventListener('change', function() { refreshUnitsForSelectedContext(); });
+    }
+    if (levelSelect) {
+        levelSelect.addEventListener('change', function() { refreshUnitsForSelectedContext(); });
+    }
+    if (semesterSelect) {
+        semesterSelect.addEventListener('change', function() { refreshUnitsForSelectedContext(); });
+    }
+
+    // Sync 'Other' between Academic Unit and Category
+    if (academicUnitSelect && categorySelect) {
+        academicUnitSelect.addEventListener('change', function() {
+            if (this.value === 'other') {
+                if (otherCategoryId) {
+                    categorySelect.value = otherCategoryId;
+                } else {
+                    const otherOpt = Array.from(categorySelect.options).find(o => (o.dataset.code === 'other' || o.textContent.trim().toLowerCase() === 'other'));
+                    if (otherOpt) categorySelect.value = otherOpt.value;
+                }
+                if (otherCategoryHint) otherCategoryHint.style.display = 'block';
+            } else {
+                if (otherCategoryHint) otherCategoryHint.style.display = 'none';
+            }
+        });
+
+        categorySelect.addEventListener('change', function() {
+            const selectedOpt = categorySelect.options[categorySelect.selectedIndex];
+            const isOtherCat = (this.value && String(this.value) === String(otherCategoryId)) ||
+                (selectedOpt && (selectedOpt.dataset.code === 'other' || selectedOpt.textContent.trim().toLowerCase() === 'other'));
+            if (isOtherCat && !academicUnitSelect.value) {
+                academicUnitSelect.value = 'other';
+                if (otherCategoryHint) otherCategoryHint.style.display = 'block';
+            }
+        });
+    }
+
+    // Inline quick-add unit on upload page
+    const toggleInlineAddBtn = document.getElementById('toggle-inline-add-unit-btn');
+    const inlineAddBox = document.getElementById('upload-inline-add-unit-box');
+    const inlineCodeInput = document.getElementById('inline-new-unit-code');
+    const inlineNameInput = document.getElementById('inline-new-unit-name');
+    const inlineSaveBtn = document.getElementById('inline-save-unit-btn');
+    const inlineFeedback = document.getElementById('inline-unit-feedback');
+
+    function formatCanonicalCodeUpload(raw) {
+        if (!raw) return '';
+        const compact = String(raw).replace(/[\s\-_\.]+/g, '').toUpperCase();
+        const m = compact.match(/^([A-Z]{3})([A-Z]\d{3})$/);
+        if (m) return m[1] + ' ' + m[2];
+        return String(raw).toUpperCase().replace(/\s+/g, ' ').trim();
+    }
+
+    if (toggleInlineAddBtn && inlineAddBox) {
+        toggleInlineAddBtn.addEventListener('click', function() {
+            const hidden = inlineAddBox.style.display === 'none' || !inlineAddBox.style.display;
+            inlineAddBox.style.display = hidden ? 'block' : 'none';
+            if (hidden && inlineCodeInput) inlineCodeInput.focus();
+        });
+    }
+
+    if (inlineCodeInput) {
+        inlineCodeInput.addEventListener('blur', function() {
+            const code = formatCanonicalCodeUpload(this.value);
+            this.value = code;
+            if (!/^[A-Z]{3} [A-Z]\d{3}$/.test(code)) return;
+            fetch("{% url 'documents:academic:lookup_unit' %}?code=" + encodeURIComponent(code), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && data.found && inlineNameInput && !inlineNameInput.value.trim()) {
+                    inlineNameInput.value = data.name;
+                }
+            })
+            .catch(function() {});
+        });
+    }
+
+    if (inlineSaveBtn) {
+        inlineSaveBtn.addEventListener('click', function() {
+            const progId = programmeSelect ? programmeSelect.value : '';
+            const lvlVal = levelSelect ? levelSelect.value : '';
+            const semVal = semesterSelect ? semesterSelect.value : '';
+            const codeVal = formatCanonicalCodeUpload(inlineCodeInput ? inlineCodeInput.value : '');
+            const nameVal = inlineNameInput ? inlineNameInput.value.trim() : '';
+
+            if (inlineCodeInput) inlineCodeInput.value = codeVal;
+            if (!progId) {
+                if (inlineFeedback) {
+                    inlineFeedback.style.display = 'block';
+                    inlineFeedback.style.color = '#dc3545';
+                    inlineFeedback.textContent = 'Please select a programme first.';
+                }
+                return;
+            }
+            if (!/^[A-Z]{3} [A-Z]\d{3}$/.test(codeVal) || !nameVal) {
+                if (inlineFeedback) {
+                    inlineFeedback.style.display = 'block';
+                    inlineFeedback.style.color = '#dc3545';
+                    inlineFeedback.textContent = 'Enter a valid canonical code (e.g., SCS B121) and the official unit name.';
+                }
+                return;
+            }
+
+            inlineSaveBtn.disabled = true;
+            fetch("{% url 'documents:academic:add_programme_unit' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    programme_id: progId,
+                    academic_level: lvlVal,
+                    semester: semVal,
+                    code: codeVal,
+                    name: nameVal
+                })
+            })
+            .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+            .then(function(res) {
+                inlineSaveBtn.disabled = false;
+                if (!res.ok || !res.data.success) {
+                    if (inlineFeedback) {
+                        inlineFeedback.style.display = 'block';
+                        inlineFeedback.style.color = '#dc3545';
+                        inlineFeedback.textContent = (res.data && res.data.error) || 'Could not add unit.';
+                    }
+                    return;
+                }
+                const addedId = (res.data.added_units && res.data.added_units[0]) ? res.data.added_units[0].id : null;
+                populateUnitSelectOptions(res.data.units || [], addedId);
+                if (inlineCodeInput) inlineCodeInput.value = '';
+                if (inlineNameInput) inlineNameInput.value = '';
+                if (inlineFeedback) {
+                    inlineFeedback.style.display = 'block';
+                    inlineFeedback.style.color = 'var(--primary)';
+                    inlineFeedback.textContent = 'Unit added and selected.';
+                }
+                setTimeout(function() {
+                    if (inlineAddBox) inlineAddBox.style.display = 'none';
+                    if (inlineFeedback) inlineFeedback.style.display = 'none';
+                }, 1200);
+            })
+            .catch(function() {
+                inlineSaveBtn.disabled = false;
+            });
+        });
+    }
+
+    // Academic unit search functionality
     if (academicUnitSearch && academicUnitSelect) {
         academicUnitSearch.addEventListener('input', function() {
             const searchTerm = this.value.toLowerCase();
             const options = academicUnitSelect.querySelectorAll('option');
 
             options.forEach(function(option) {
+                if (!option.value || option.value === 'other') {
+                    option.style.display = '';
+                    return;
+                }
                 const unitName = option.textContent.toLowerCase();
                 const matches = unitName.includes(searchTerm);
-                
-                if (searchTerm === '') {
-                    // Show all options when search is empty
-                    option.style.display = '';
-                } else {
-                    // Filter based on search term
-                    option.style.display = matches ? '' : 'none';
-                }
+                option.style.display = (searchTerm === '' || matches) ? '' : 'none';
             });
-
-            // If the currently selected option is hidden, select the first visible option
-            if (academicUnitSelect.selectedIndex >= 0) {
-                const selectedOption = academicUnitSelect.options[academicUnitSelect.selectedIndex];
-                if (selectedOption.style.display === 'none') {
-                    const firstVisibleOption = Array.from(options).find(opt => opt.style.display !== 'none');
-                    if (firstVisibleOption) {
-                        academicUnitSelect.value = firstVisibleOption.value;
-                    }
-                }
-            }
         });
     }
     
@@ -965,6 +1279,16 @@
             }
         }
         return cookieValue;
+    }
+
+    function getCsrfToken() {
+        const inputEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (inputEl && inputEl.value) return inputEl.value;
+        const metaEl = document.querySelector('meta[name="csrf-token"]');
+        if (metaEl && metaEl.getAttribute('content')) return metaEl.getAttribute('content');
+        const cookieToken = getCookie('csrftoken');
+        if (cookieToken) return cookieToken;
+        return '{{ csrf_token }}';
     }
     } // End initDocumentUpload
 

@@ -204,10 +204,14 @@
                 this.normalizeResource(resource.mediaUrl || resource.url, resource.title, resource)
             );
             this.addImageAttachmentsToContext(this.transcript, false);
-            if (!this.contextResources.length) return;
+            if (!this.contextResources.length) {
+                this.syncDocumentStudyUI();
+                return;
+            }
 
             this.activeContextIndex = 0;
             this.updateContextCountBadges();
+            this.syncDocumentStudyUI();
 
             // Reveal the desktop rail before creating its viewer so the viewer
             // measures its final width on the first render. switchWorkspaceTab()
@@ -231,7 +235,7 @@
         addImageAttachmentsToContext(root, openRail = true) {
             if (!root || !root.querySelectorAll) return false;
             let added = false;
-            root.querySelectorAll('.pwanimate-message-attachment[data-preview-type="image"]').forEach((link) => {
+            root.querySelectorAll('.pwanimate-message-attachment[data-preview-type="image"], .pwanimate-message-attachment[data-preview-type="document"], .pwanimate-message-attachment[data-preview-type="pdf"]').forEach((link) => {
                 const url = link.dataset.mediaUrl || link.getAttribute('href') || '';
                 if (!url) return;
                 const attachmentId = link.dataset.attachmentId || '';
@@ -240,15 +244,19 @@
                     item.mediaUrl === url || item.url === url
                 );
                 if (exists) return;
-                const name = link.dataset.fileName || 'Image attachment';
+                const previewType = (link.dataset.previewType || 'document').toLowerCase();
+                const isImage = previewType === 'image';
+                const name = link.dataset.fileName || (isImage ? 'Image attachment' : 'Document attachment');
+                const fileType = (link.dataset.fileType || (name.includes('.') ? name.split('.').pop() : (isImage ? 'jpg' : 'pdf'))).toLowerCase();
                 const resource = this.normalizeResource(url, name, {
                     sourceType: 'attachment',
-                    resourceType: 'image',
-                    fileType: link.dataset.fileType || '',
+                    resourceType: isImage ? 'image' : 'document',
+                    fileType: fileType,
                     mediaUrl: url,
                     attachmentId: attachmentId,
+                    pageNumber: isImage ? null : 1,
                 });
-                resource.icon = 'bi-image-fill';
+                resource.icon = isImage ? 'bi-image-fill' : 'bi-file-earmark-pdf-fill';
                 this.contextResources.push(resource);
                 added = true;
             });
@@ -258,6 +266,7 @@
                 this.updateContextCountBadges();
                 this.updateAddToContextButtons();
                 this.syncContextView();
+                this.syncDocumentStudyUI();
                 this.switchWorkspaceTab('context');
                 if (openRail) {
                     if (window.innerWidth >= 1200) this.openContextRail();
@@ -280,13 +289,17 @@
                 clearTimeout(this.contextDocumentSearchTimer);
                 const query = this.contextDocumentSearchInput.value.trim();
                 if (this.contextDocumentSearchController) this.contextDocumentSearchController.abort();
+                if (query.length === 0) {
+                    this.contextDocumentSearchTimer = setTimeout(() => this.searchContextDocuments('', true), 120);
+                    return;
+                }
                 if (query.length < 2) {
                     this.contextDocumentSearchResults = [];
                     this.contextDocumentResultsEl.innerHTML = '<div class="text-center text-muted small py-4">Type at least two characters to search the repository.</div>';
                     return;
                 }
                 this.contextDocumentResultsEl.innerHTML = '<div class="text-center text-muted small py-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Searching books…</div>';
-                this.contextDocumentSearchTimer = setTimeout(() => this.searchContextDocuments(query), 250);
+                this.contextDocumentSearchTimer = setTimeout(() => this.searchContextDocuments(query, false), 250);
             });
 
             this.contextDocumentResultsEl.addEventListener('click', (event) => {
@@ -296,6 +309,9 @@
                 const result = this.contextDocumentSearchResults[index];
                 if (!result) return;
 
+                const unitCitation = result.unit_code
+                    ? (result.unit_name ? `${result.unit_code} — ${result.unit_name}` : result.unit_code)
+                    : result.category;
                 const resource = this.normalizeResource(result.media_url, result.title, {
                     sourceType: 'document',
                     resourceType: 'document',
@@ -306,44 +322,56 @@
                     fileType: result.file_type,
                     mediaUrl: result.media_url,
                     thumbnailUrl: result.thumbnail_url,
-                    citation: result.category,
+                    citation: unitCitation,
+                    unitCode: result.unit_code || '',
+                    unitName: result.unit_name || '',
+                    pageNumber: 1,
                 });
                 const modal = window.bootstrap && this.contextDocumentModalEl
                     ? window.bootstrap.Modal.getInstance(this.contextDocumentModalEl)
                     : null;
                 if (modal) modal.hide();
                 this.addResourceToContext(resource);
+                if (window.innerWidth >= 1200) {
+                    this.openContextRail();
+                }
             });
         }
 
-        async searchContextDocuments(query) {
+        async searchContextDocuments(query, recommended = false) {
             if (!this.contextDocumentResultsEl) return;
             const controller = new AbortController();
             this.contextDocumentSearchController = controller;
             try {
-                const response = await fetch(`/api/pwanimate/context/documents/?q=${encodeURIComponent(query)}`, {
+                const url = recommended && !query
+                    ? '/api/pwanimate/context/documents/?recommended=1'
+                    : `/api/pwanimate/context/documents/?q=${encodeURIComponent(query)}`;
+                const response = await fetch(url, {
                     credentials: 'same-origin',
                     headers: { 'Accept': 'application/json' },
                     signal: controller.signal,
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || 'Could not search the document repository.');
-                if (this.contextDocumentSearchInput.value.trim() !== query) return;
+                if (!recommended && this.contextDocumentSearchInput.value.trim() !== query) return;
                 this.contextDocumentSearchResults = Array.isArray(data.results) ? data.results : [];
                 if (!this.contextDocumentSearchResults.length) {
-                    this.contextDocumentResultsEl.innerHTML = '<div class="text-center text-muted small py-4">No books found. Try another title or topic.</div>';
+                    this.contextDocumentResultsEl.innerHTML = recommended
+                        ? '<div class="text-center text-muted small py-4">Type at least two characters to search books by title, topic, or unit code.</div>'
+                        : '<div class="text-center text-muted small py-4">No books found. Try another title, unit code, or topic.</div>';
                     return;
                 }
                 this.contextDocumentResultsEl.innerHTML = this.contextDocumentSearchResults.map((book, index) => {
                     const title = escapeHtml(book.title || 'Untitled book');
                     const category = escapeHtml(book.category || 'Document');
+                    const unitBadge = book.unit_code ? `${escapeHtml(book.unit_code)} · ` : '';
                     const fileType = escapeHtml((book.file_type || 'file').toUpperCase());
                     const thumbnail = book.thumbnail_url
                         ? `<img src="${escapeHtml(book.thumbnail_url)}" alt="" class="pwanimate-context-book-thumbnail">`
                         : '<span class="pwanimate-context-book-icon"><i class="bi bi-journal-bookmark-fill"></i></span>';
                     return `<button type="button" class="pwanimate-context-book-result" data-context-document-index="${index}">
                         ${thumbnail}
-                        <span class="pwanimate-context-book-copy"><strong>${title}</strong><small>${category} · ${fileType}</small></span>
+                        <span class="pwanimate-context-book-copy"><strong>${title}</strong><small>${unitBadge}${category} · ${fileType}</small></span>
                         <i class="bi bi-arrow-up-right pwanimate-context-book-open"></i>
                     </button>`;
                 }).join('');
@@ -1232,6 +1260,13 @@
                     return;
                 }
 
+                const studyActionBtn = e.target.closest('[data-study-action]');
+                if (studyActionBtn) {
+                    e.preventDefault();
+                    this.triggerDocumentStudyAction(studyActionBtn.dataset.studyAction);
+                    return;
+                }
+
                 const mobileContextSheetBtn = e.target.closest('#pwanimateMobileContextSheetBtn');
                 if (mobileContextSheetBtn) {
                     e.preventDefault();
@@ -2041,8 +2076,13 @@
                 (previewType === 'post' ? 'Discussion post on PwaniNet.' :
                 (previewType === 'profile' ? [person.headline, person.academic_level, person.programme_name, person.bio].filter(Boolean).join('\n') : 'Resource referenced in this conversation.')));
 
+            const attachmentId = meta.attachmentId || meta.attachment_id || '';
+            const unitCode = meta.unitCode || meta.unit_code || '';
+            const unitName = meta.unitName || meta.unit_name || '';
+            const totalPages = meta.totalPages || meta.total_pages || meta.pageCount || meta.page_count || null;
+
             return {
-                id: documentShareId || postId || person.id || person.username || cleanUrl,
+                id: documentShareId || attachmentId || postId || person.id || person.username || cleanUrl,
                 type: previewType,
                 sourceType: sourceType,
                 resourceType: resourceType,
@@ -2059,8 +2099,12 @@
                 documentShareId: documentShareId,
                 documentVersionId: documentVersionId,
                 fileId: fileId,
+                attachmentId: attachmentId,
                 fileType: fileType,
                 pageNumber: pageNumber,
+                totalPages: totalPages,
+                unitCode: unitCode,
+                unitName: unitName,
                 description: description,
                 author: meta.author || '',
                 citation: meta.citation || '',
@@ -2095,6 +2139,7 @@
                 this.previewResourceState.previewType === 'document' && resource.previewType === 'document' &&
                 ((resource.documentShareId && this.previewResourceState.documentShareId === resource.documentShareId) ||
                  (resource.documentId && this.previewResourceState.documentId === resource.documentId) ||
+                 (resource.attachmentId && this.previewResourceState.attachmentId === resource.attachmentId) ||
                  (resource.mediaUrl && this.previewResourceState.mediaUrl === resource.mediaUrl && resource.mediaUrl !== ''))
             );
 
@@ -2134,6 +2179,7 @@
             }
 
             this.updateAddToContextButtons();
+            this.syncDocumentStudyUI();
         }
 
         switchWorkspaceTab(tabName) {
@@ -2194,6 +2240,7 @@
                     });
                 }
             }
+            this.syncDocumentStudyUI();
         }
 
 
@@ -2203,12 +2250,16 @@
             // Deduplicate
             const existingIndex = this.contextResources.findIndex(item =>
                 (resource.documentId && item.documentId === resource.documentId) ||
+                (resource.attachmentId && item.attachmentId === resource.attachmentId) ||
                 (resource.mediaUrl && item.mediaUrl === resource.mediaUrl) ||
                 (resource.url && item.url === resource.url && item.title === resource.title)
             );
 
             if (existingIndex >= 0) {
                 this.activeContextIndex = existingIndex;
+                if (resource.pageNumber) {
+                    this.contextResources[existingIndex].pageNumber = resource.pageNumber;
+                }
             } else {
                 const contextItem = Object.assign({}, resource, {
                     pageNumber: resource.pageNumber || 1
@@ -2220,6 +2271,7 @@
             this.updateContextCountBadges();
             this.updateAddToContextButtons();
             this.syncContextView();
+            this.syncDocumentStudyUI();
             this.switchWorkspaceTab('context');
         }
 
@@ -2231,6 +2283,7 @@
             const alreadyIncluded = resources.some(item =>
                 (preview.documentId && item.documentId === preview.documentId) ||
                 (preview.documentShareId && item.documentShareId === preview.documentShareId) ||
+                (preview.attachmentId && item.attachmentId === preview.attachmentId) ||
                 (preview.mediaUrl && item.mediaUrl === preview.mediaUrl) ||
                 (preview.url && item.url === preview.url)
             );
@@ -2259,6 +2312,7 @@
             this.updateContextCountBadges();
             this.updateAddToContextButtons();
             this.syncContextView();
+            this.syncDocumentStudyUI();
             if (this.contextResources.length === 0 && !this.previewResourceState) {
                 this.closeContextRail();
             }
@@ -2270,6 +2324,122 @@
 
             this.activeContextIndex = index;
             this.syncContextView();
+            this.syncDocumentStudyUI();
+        }
+
+        getActiveStudyDocument() {
+            if (this.activeContextIndex >= 0 && this.activeContextIndex < this.contextResources.length) {
+                const candidate = this.contextResources[this.activeContextIndex];
+                if (candidate && candidate.previewType === 'document') {
+                    return candidate;
+                }
+            }
+            const firstContextDoc = (this.contextResources || []).find(item => item && item.previewType === 'document');
+            if (firstContextDoc) return firstContextDoc;
+            if (this.previewResourceState && this.previewResourceState.previewType === 'document') {
+                return this.previewResourceState;
+            }
+            return null;
+        }
+
+        syncDocumentStudyUI() {
+            const docResource = this.getActiveStudyDocument();
+            const studyCard = document.getElementById('pwanimate-document-study-card');
+            const liveBar = document.getElementById('pwanimate-live-page-bar');
+
+            if (!docResource) {
+                if (studyCard) studyCard.classList.add('d-none');
+                if (liveBar) liveBar.classList.add('d-none');
+                return;
+            }
+
+            const page = Math.max(1, parseInt(docResource.pageNumber || 1, 10));
+            const totalPages = docResource.totalPages ? parseInt(docResource.totalPages, 10) : null;
+            const title = docResource.title || 'Document';
+            const unitCode = (docResource.unitCode || '').trim();
+            const unitName = (docResource.unitName || '').trim();
+            const unitBadgeText = unitCode
+                ? (unitName ? `${unitCode} · ${unitName}` : unitCode)
+                : ((docResource.citation && docResource.citation !== 'Document') ? docResource.citation : '');
+
+            if (studyCard) {
+                studyCard.classList.remove('d-none');
+                const cardTitle = document.getElementById('pwanimate-study-card-title');
+                const cardUnit = document.getElementById('pwanimate-study-card-unit');
+                const cardPage = document.getElementById('pwanimate-study-card-page');
+                const btnExplain = document.getElementById('pwanimate-study-btn-explain');
+                const btnTakeaways = document.getElementById('pwanimate-study-btn-takeaways');
+                const btnQuiz = document.getElementById('pwanimate-study-btn-quiz');
+
+                if (cardTitle) cardTitle.textContent = title;
+                if (cardUnit) {
+                    if (unitBadgeText) {
+                        cardUnit.textContent = unitBadgeText;
+                        cardUnit.classList.remove('d-none');
+                    } else {
+                        cardUnit.classList.add('d-none');
+                    }
+                }
+                if (cardPage) {
+                    const pageLabel = totalPages ? `Viewing Page ${page} of ${totalPages}` : `Viewing Page ${page}`;
+                    cardPage.innerHTML = `<i class="bi bi-file-earmark-richtext me-1"></i><span>${escapeHtml(pageLabel)}</span>`;
+                }
+                if (btnExplain) btnExplain.textContent = `Explain Page ${page}`;
+                if (btnTakeaways) btnTakeaways.textContent = `Key takeaways from Page ${page}`;
+                if (btnQuiz) btnQuiz.textContent = `Quiz me on Page ${page}`;
+            }
+
+            if (liveBar) {
+                liveBar.classList.remove('d-none');
+                const barTitle = document.getElementById('pwanimate-live-page-title');
+                const barUnit = document.getElementById('pwanimate-live-page-unit');
+                const barBadge = document.getElementById('pwanimate-live-page-badge');
+                const pillExplain = document.getElementById('pwanimate-live-pill-explain');
+                const pillTakeaways = document.getElementById('pwanimate-live-pill-takeaways');
+                const pillQuiz = document.getElementById('pwanimate-live-pill-quiz');
+
+                if (barTitle) {
+                    barTitle.textContent = title;
+                    barTitle.title = title;
+                }
+                if (barUnit) {
+                    if (unitCode) {
+                        barUnit.textContent = unitCode;
+                        barUnit.classList.remove('d-none');
+                    } else {
+                        barUnit.classList.add('d-none');
+                    }
+                }
+                if (barBadge) {
+                    barBadge.textContent = totalPages ? `p. ${page} / ${totalPages}` : `p. ${page}`;
+                }
+                if (pillExplain) pillExplain.textContent = `Explain Page ${page}`;
+                if (pillTakeaways) pillTakeaways.textContent = `Key takeaways (p. ${page})`;
+                if (pillQuiz) pillQuiz.textContent = `Quiz Page ${page}`;
+            }
+        }
+
+        triggerDocumentStudyAction(actionType) {
+            if (this.isGenerating || !this.input) return;
+            const docResource = this.getActiveStudyDocument();
+            const page = Math.max(1, parseInt((docResource && docResource.pageNumber) || 1, 10));
+            const title = (docResource && docResource.title) ? docResource.title : 'this document';
+
+            let prompt = '';
+            if (actionType === 'summarize_book') {
+                prompt = `Give me a comprehensive summary of the entire book "${title}", including its overall structure, main sections, and core takeaways.`;
+            } else if (actionType === 'explain_page') {
+                prompt = `Explain the concepts and content on Page ${page} of "${title}" clearly step by step.`;
+            } else if (actionType === 'page_takeaways') {
+                prompt = `What are the key takeaways, definitions, and important points on Page ${page} of "${title}"?`;
+            } else if (actionType === 'quiz_page') {
+                prompt = `Quiz me on the material from Page ${page} of "${title}" with 3 focused practice questions.`;
+            }
+            if (!prompt) return;
+
+            this.input.value = prompt;
+            this.updateSendButtonState();
+            this.handleSend();
         }
 
         updateContextCountBadges() {
@@ -2288,6 +2458,7 @@
         updateAddToContextButtons() {
             const isAdded = Boolean(this.previewResourceState && this.contextResources.some(item =>
                 (this.previewResourceState.documentId && item.documentId === this.previewResourceState.documentId) ||
+                (this.previewResourceState.attachmentId && item.attachmentId === this.previewResourceState.attachmentId) ||
                 (this.previewResourceState.mediaUrl && item.mediaUrl === this.previewResourceState.mediaUrl) ||
                 (this.previewResourceState.url && item.url === this.previewResourceState.url && item.title === this.previewResourceState.title)
             ));
@@ -2332,6 +2503,7 @@
                     try { this.contextDocViewer.destroy(); } catch (e) {}
                     this.contextDocViewer = null;
                 }
+                this.syncDocumentStudyUI();
                 return;
             }
 
@@ -2369,6 +2541,7 @@
                     this.renderSurface('mobileContext', activeResource, true);
                 }
             }
+            this.syncDocumentStudyUI();
         }
 
         renderSurface(prefix, details, isContext = false) {
@@ -2406,7 +2579,7 @@
             if (locBadge && locText) {
                 if (details.pageNumber) {
                     locBadge.classList.remove('d-none');
-                    locText.textContent = `p. ${details.pageNumber}`;
+                    locText.textContent = details.totalPages ? `p. ${details.pageNumber} / ${details.totalPages}` : `p. ${details.pageNumber}`;
                 } else {
                     locBadge.classList.add('d-none');
                 }
@@ -2529,10 +2702,12 @@
                     showFullscreen: true,
                     onPageChange: (page, totalPages) => {
                         details.pageNumber = page;
+                        if (totalPages) details.totalPages = totalPages;
                         if (locBadge && locText) {
                             locBadge.classList.remove('d-none');
                             locText.textContent = totalPages ? `p. ${page} / ${totalPages}` : `p. ${page}`;
                         }
+                        this.syncDocumentStudyUI();
                     }
                 };
                 const viewerInstance = new window.DocumentViewer(
@@ -2550,6 +2725,13 @@
                     this.previewDocViewer = viewerInstance;
                 }
                 viewerInstance.initialize().then(() => {
+                    if (typeof viewerInstance.getTotalPages === 'function') {
+                        const tp = viewerInstance.getTotalPages();
+                        if (tp) {
+                            details.totalPages = tp;
+                            this.syncDocumentStudyUI();
+                        }
+                    }
                     if (window.ResizeObserver && !docViewer._resizeObs) {
                         docViewer._resizeObs = new ResizeObserver(() => {
                             if (typeof viewerInstance.handleResize === 'function') {
@@ -2695,6 +2877,7 @@
                 try { this.previewDocViewer.destroy(); } catch (e) {}
                 this.previewDocViewer = null;
             }
+            this.syncDocumentStudyUI();
 
             // Desktop
             const emptyState = document.getElementById('desktopPreviewEmpty');
@@ -3385,8 +3568,15 @@
                     removeBtn.className = 'pwanimate-staged-remove';
                     removeBtn.setAttribute('aria-label', `Remove ${data.file_name}`);
                     removeBtn.innerHTML = '<i class="bi bi-x-lg"></i>';
-                    removeBtn.addEventListener('click', () => {
+                    removeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
                         this.stagedAttachments = this.stagedAttachments.filter(a => a.id !== data.id);
+                        if (data.attachment_type === 'document' && data.id) {
+                            const matchRes = this.contextResources.find(r => r.attachmentId === data.id);
+                            if (matchRes) {
+                                this.removeContextResource(matchRes.key);
+                            }
+                        }
                         if (chip && chip.parentNode) chip.parentNode.removeChild(chip);
                         if (this._composerAttachmentsEl && !this._composerAttachmentsEl.querySelector('.pwanimate-staged-chip')) {
                             this._composerAttachmentsEl.classList.add('d-none');
@@ -3394,6 +3584,30 @@
                         this.updateSendButtonState();
                     });
                     chip.appendChild(removeBtn);
+                }
+
+                if (data.attachment_type === 'document' && data.url) {
+                    const ext = ((data.file_name || '').split('.').pop() || 'pdf').toLowerCase();
+                    const docRes = this.normalizeResource(data.url, data.file_name, {
+                        sourceType: 'attachment',
+                        resourceType: 'document',
+                        attachmentId: data.id,
+                        fileType: ext,
+                        mediaUrl: data.url,
+                        pageNumber: 1,
+                    });
+                    this.addResourceToContext(docRes);
+                    if (window.innerWidth >= 1200) {
+                        this.openContextRail();
+                    }
+                    if (chip) {
+                        chip.style.cursor = 'pointer';
+                        chip.title = 'Click to view in Context Rail';
+                        chip.addEventListener('click', () => {
+                            this.setActiveContextResource(docRes.key);
+                            this.openContextRail();
+                        });
+                    }
                 }
 
                 if (data.attachment_type === 'document' && stagedAttachment.processing_status !== 'ready') {

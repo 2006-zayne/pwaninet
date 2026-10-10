@@ -59,6 +59,10 @@ class ContextEngine:
         # Determine which fields are relevant based on intent
         programme_name = None
         level = None
+        school_name = None
+        department_name = None
+        semester = None
+        enrolled_units: List[str] = []
         relevant_interests = []
         relevant_skills = []
         collaboration_status = ""
@@ -77,12 +81,33 @@ class ContextEngine:
         if hasattr(user_context, 'personal_instructions'):
             personal_instructions = user_context.personal_instructions or ""
         
-        # Programme/level relevant for academic queries
-        if intent in [IntentCategory.PWANINET_KNOWLEDGE, IntentCategory.PERSONALIZED_DISCOVERY, IntentCategory.MIXED]:
+        # Programme, level, school, semester, and enrolled units keep Pwanimate natively grounded in the student's academic context
+        if intent in [
+            IntentCategory.PWANINET_KNOWLEDGE,
+            IntentCategory.PERSONALIZED_DISCOVERY,
+            IntentCategory.MIXED,
+            IntentCategory.GENERAL_KNOWLEDGE,
+        ]:
             if hasattr(user_context, 'programme_name') and user_context.programme_name:
                 programme_name = user_context.programme_name
             if hasattr(user_context, 'academic_level_name') and user_context.academic_level_name:
                 level = user_context.academic_level_name
+            if hasattr(user_context, 'school_name') and user_context.school_name:
+                school_name = user_context.school_name
+            if hasattr(user_context, 'department_name') and user_context.department_name:
+                department_name = user_context.department_name
+            if hasattr(user_context, 'semester') and user_context.semester is not None:
+                semester = user_context.semester
+            if hasattr(user_context, 'enrolled_units') and user_context.enrolled_units:
+                for u in user_context.enrolled_units:
+                    if isinstance(u, dict):
+                        code = u.get('code', '')
+                        name = u.get('name', '')
+                        label = f"{code} ({name})" if code and name else (code or name)
+                        if label:
+                            enrolled_units.append(label)
+                    elif isinstance(u, str) and u.strip():
+                        enrolled_units.append(u.strip())
         
         # Interests relevant for personalized discovery
         if intent == IntentCategory.PERSONALIZED_DISCOVERY:
@@ -105,6 +130,10 @@ class ContextEngine:
         student_ctx = StudentContext(
             programme_name=programme_name,
             level=level,
+            school_name=school_name,
+            department_name=department_name,
+            semester=semester,
+            enrolled_units=enrolled_units,
             relevant_interests=relevant_interests,
             relevant_skills=relevant_skills,
             collaboration_status=collaboration_status,

@@ -4637,3 +4637,196 @@ body.pwanimate-active .pwanimate-settings-mobile,
     width: 92px;
     height: 92px;
 }
+
+/* ==========================================================================
+   Document Study Card (Empty State) & Live Page-by-Page Study Bar
+   ========================================================================== */
+.pwanimate-document-study-card {
+    width: 100%;
+    max-width: 640px;
+    margin: 0.75rem auto 1.25rem auto;
+    padding: 1.1rem 1.2rem;
+    border-radius: 18px;
+    background: var(--pwanimate-card-bg, #ffffff);
+    border: 1px solid var(--pwanimate-border, #e2e8f0);
+    box-shadow: 0 6px 20px -4px rgba(15, 23, 42, 0.08);
+    text-align: left;
+}
+
+[data-theme="dark"] .pwanimate-document-study-card,
+[data-bs-theme="dark"] .pwanimate-document-study-card {
+    box-shadow: 0 6px 22px -4px rgba(0, 0, 0, 0.35);
+}
+
+.pwanimate-study-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    margin-bottom: 0.95rem;
+}
+
+.pwanimate-study-card-icon {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 12px;
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary, #2563eb);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+[data-theme="dark"] .pwanimate-study-card-icon,
+[data-bs-theme="dark"] .pwanimate-study-card-icon {
+    background: rgba(99, 102, 241, 0.18);
+    color: #818cf8;
+}
+
+.pwanimate-study-card-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.pwanimate-study-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+}
+
+.pwanimate-study-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--pwanimate-asst-text, #0f172a);
+    margin: 0 0 0.2rem 0;
+    line-height: 1.3;
+}
+
+.pwanimate-study-card-subtitle {
+    font-size: 0.8rem;
+    color: var(--pwanimate-muted, #64748b);
+    line-height: 1.4;
+}
+
+.pwanimate-study-card-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+@media (max-width: 575.98px) {
+    .pwanimate-study-card-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pwanimate-study-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid var(--pwanimate-border, #e2e8f0);
+    background: var(--pwanimate-bg, #f8fafc);
+    color: var(--pwanimate-asst-text, #0f172a);
+    font-size: 0.83rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.pwanimate-study-action-btn i {
+    color: var(--primary, #2563eb);
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.pwanimate-study-action-btn.is-primary {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="dark"] .pwanimate-study-action-btn.is-primary,
+[data-bs-theme="dark"] .pwanimate-study-action-btn.is-primary {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.35);
+}
+
+.pwanimate-study-action-btn:hover {
+    border-color: var(--primary, #2563eb);
+    background: var(--pwanimate-hover-bg, #f1f5f9);
+    transform: translateY(-1px);
+}
+
+.pwanimate-live-page-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    padding: 0.45rem 0.75rem;
+    margin-bottom: 0.45rem;
+    border-radius: 16px;
+    background: var(--pwanimate-composer-bg, #ffffff);
+    border: 1px solid var(--pwanimate-border, #e2e8f0);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.pwanimate-live-page-info {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.8rem;
+}
+
+.pwanimate-live-page-title {
+    font-weight: 600;
+    color: var(--pwanimate-asst-text, #0f172a);
+    max-width: 200px;
+}
+
+.pwanimate-live-page-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+}
+
+.pwanimate-live-page-actions::-webkit-scrollbar {
+    display: none;
+}
+
+.pwanimate-live-page-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.24rem 0.62rem;
+    border-radius: 999px;
+    border: 1px solid var(--pwanimate-border, #cbd5e1);
+    background: var(--pwanimate-bg, #f8fafc);
+    color: var(--pwanimate-asst-text, #1e293b);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.pwanimate-live-page-pill i {
+    color: var(--primary, #2563eb);
+}
+
+.pwanimate-live-page-pill:hover {
+    border-color: var(--primary, #2563eb);
+    color: var(--primary, #2563eb);
+    background: var(--pwanimate-hover-bg, #f1f5f9);
+}
+

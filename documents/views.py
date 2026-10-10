@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.db import models
+from django.db.models import Q
 from django.core.cache import cache
 from django.utils import timezone
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -138,13 +139,18 @@ def search_results(request):
     if request.user.is_authenticated:
         if my_programme and request.user.programme:
             filters['programme'] = request.user.programme.id
-        if my_units and request.user.programme:
-            from .academic.models import ProgrammeUnit
-            user_units = ProgrammeUnit.objects.filter(
-                programme=request.user.programme
-            ).values_list('academic_unit_id', flat=True)
-            if user_units:
-                filters['academic_units'] = list(user_units)
+        if my_units:
+            from .academic.services import StudentAcademicEnrollmentService
+            active_enrollments = StudentAcademicEnrollmentService.get_active_enrollments(request.user)
+            if active_enrollments:
+                filters['academic_units'] = [enr.academic_unit_id for enr in active_enrollments]
+            elif request.user.programme:
+                from .academic.models import ProgrammeUnit
+                user_units = ProgrammeUnit.objects.filter(
+                    programme=request.user.programme
+                ).values_list('academic_unit_id', flat=True)
+                if user_units:
+                    filters['academic_units'] = list(user_units)
         if my_semester and request.user.semester:
             filters['semester'] = request.user.semester.id
         if my_level and request.user.academic_level:
@@ -463,33 +469,18 @@ def edit_document(request, share_id):
         document.language = language
     document.save()
 
-    # Update academic unit
+    # Update academic unit resiliently
     if academic_unit_id:
-        try:
-            unit = AcademicUnit.objects.get(id=academic_unit_id)
-            doc_unit = document.academic_units.filter(is_primary=True).first()
-            if doc_unit:
-                doc_unit.academic_unit = unit
-                doc_unit.save(update_fields=['academic_unit'])
-            else:
-                from .academic.models import Semester, AcademicYear as AcadYear
-                current_semester = Semester.objects.filter(is_current=True).first()
-                current_year = AcadYear.objects.filter(is_current=True).first()
-                if current_semester and current_year:
-                    DocumentAcademicUnit.objects.create(
-                        document=document,
-                        academic_unit=unit,
-                        semester=current_semester,
-                        academic_year=current_year,
-                        is_primary=True
-                    )
-                else:
-                    logger.warning(
-                        f"Cannot create DocumentAcademicUnit for document {document.id}: "
-                        "no current semester or academic year configured"
-                    )
-        except AcademicUnit.DoesNotExist:
-            pass
+        from .academic.services import DocumentAcademicLinkService
+        DocumentAcademicLinkService.link_document_to_unit(
+            document=document,
+            academic_unit_id=academic_unit_id,
+            academic_level_id=request.POST.get('academic_level'),
+            semester_id=request.POST.get('semester'),
+            academic_year_id=request.POST.get('academic_year'),
+            uploader=request.user,
+            replace_existing=True,
+        )
 
     # Update search index
     try:
@@ -639,26 +630,60 @@ from django.views.decorators.http import require_http_methods
 @login_required
 def upload_document(request):
     """
-    Multi-stage upload flow for documents.
+    Multi-stage upload flow for documents with student academic defaults.
     """
+    from .academic.models import AcademicUnit, Semester, AcademicYear, AcademicLevel, Programme
+    from .academic.services import StudentAcademicEnrollmentService, DocumentAcademicLinkService
+
+    # Ensure an 'Other' category is available for memos / announcements / general documents
+    other_cat = Category.objects.filter(Q(code__iexact='other') | Q(name__iexact='Other')).first()
+    if not other_cat:
+        try:
+            other_cat = Category.objects.create(
+                name='Other',
+                code='other',
+                description='General announcements, memos, and non-unit documents',
+                is_active=True,
+            )
+        except Exception:
+            other_cat = Category.objects.filter(is_active=True).last()
+
     if request.method == 'POST':
         # Handle file upload
         files = request.FILES.getlist('files')
-        academic_unit_id = request.POST.get('academic_unit')
-        category_id = request.POST.get('category')
-        academic_year_id = request.POST.get('academic_year')
-        semester_id = request.POST.get('semester')
-        academic_level_id = request.POST.get('academic_level')
+        raw_academic_unit = (request.POST.get('academic_unit') or '').strip()
+        raw_category = (request.POST.get('category') or '').strip()
+        academic_year_id = (request.POST.get('academic_year') or '').strip() or None
+        raw_semester = (request.POST.get('semester') or '').strip()
+        raw_level = (request.POST.get('academic_level') or '').strip()
         tags = request.POST.get('tags', '')
-        
+
+        is_other_unit = raw_academic_unit.lower() == 'other'
+        academic_unit_id = None if (not raw_academic_unit or is_other_unit) else raw_academic_unit
+
+        if (not raw_category or raw_category.lower() == 'other') and other_cat:
+            category_id = other_cat.id
+        elif is_other_unit and other_cat and not raw_category:
+            category_id = other_cat.id
+        else:
+            category_id = raw_category
+
         if not files:
             from django.http import JsonResponse
             return JsonResponse({'success': False, 'error': 'No files uploaded'}, status=400)
-        
+
         if not category_id:
             from django.http import JsonResponse
             return JsonResponse({'success': False, 'error': 'Category is required'}, status=400)
-        
+
+        # Resolve level & semester (accepts either level number 1..4 / semester number 1..2 or model PKs)
+        resolved_level = StudentAcademicEnrollmentService.resolve_or_ensure_academic_level(raw_level) if raw_level else None
+        resolved_sem = StudentAcademicEnrollmentService.resolve_or_ensure_semester(raw_semester) if raw_semester else None
+        academic_level_id = resolved_level.id if resolved_level else None
+        semester_id = resolved_sem.id if resolved_sem else None
+        if not academic_year_id and resolved_sem and resolved_sem.academic_year_id:
+            academic_year_id = resolved_sem.academic_year_id
+
         from .services.upload_service import UploadService
         upload_service = UploadService()
         for file in files:
@@ -670,11 +695,10 @@ def upload_document(request):
         try:
             # Create documents with status 'processing'
             from .models import Document, DocumentFile, DocumentVersion, DocumentAcademicUnit, DocumentTag, Tag
-            from .academic.models import AcademicUnit, Semester, AcademicYear, AcademicLevel
-            
+
             created_documents = []
             skipped_documents = []
-            
+
             for index, file in enumerate(files):
                 # Get individual file metadata if provided
                 raw_title = request.POST.get(f'file_{index}_title')
@@ -683,14 +707,14 @@ def upload_document(request):
                 else:
                     title = file.name.rsplit('.', 1)[0] if '.' in file.name else file.name
                 description = request.POST.get(f'file_{index}_description', '')
-                
+
                 # Check if document with same title already exists for this user; ensure unique title
                 base_title = title
                 counter = 1
                 while Document.objects.filter(title=title, uploaded_by=request.user).exists():
                     title = f"{base_title} ({counter})"
                     counter += 1
-                
+
                 # Create document (without academic unit/year/semester - those go in junction table)
                 document = Document.objects.create(
                     title=title,
@@ -700,7 +724,7 @@ def upload_document(request):
                     visibility='public',
                     category_id=category_id
                 )
-                
+
                 # Create document version
                 document_version = DocumentVersion.objects.create(
                     document=document,
@@ -708,7 +732,7 @@ def upload_document(request):
                     is_latest=True,
                     created_by=request.user
                 )
-                
+
                 # Create document file
                 document_file = DocumentFile.objects.create(
                     document_version=document_version,
@@ -722,18 +746,19 @@ def upload_document(request):
                     processing_status='pending',
                     checksum=None  # Will be generated by background processing
                 )
-                
-                # Create academic unit relationship if provided
-                if academic_unit_id and semester_id and academic_year_id and academic_level_id:
-                    DocumentAcademicUnit.objects.create(
+
+                # Create academic unit relationship resiliently when a unit is selected (not 'other')
+                if academic_unit_id:
+                    DocumentAcademicLinkService.link_document_to_unit(
                         document=document,
                         academic_unit_id=academic_unit_id,
+                        academic_level_id=academic_level_id,
                         semester_id=semester_id,
                         academic_year_id=academic_year_id,
-                        academic_level_id=academic_level_id,
-                        is_primary=True
+                        uploader=request.user,
+                        replace_existing=False,
                     )
-                
+
                 # Create tag relationships if tags provided
                 if tags:
                     tag_names = [tag.strip() for tag in tags.split(',') if tag.strip()]
@@ -743,44 +768,112 @@ def upload_document(request):
                             defaults={'slug': tag_name.lower().replace(' ', '-')}
                         )
                         DocumentTag.objects.create(document=document, tag=tag)
-                
+
                 created_documents.append(document)
-            
+
             # Trigger Celery background processing for each document
             from .tasks.processing import process_document
             task_ids = []
             for document in created_documents:
                 task = process_document.delay(document.id)
                 task_ids.append(task.id)
-            
+
             from django.http import JsonResponse
             return JsonResponse({
-                'success': True, 
+                'success': True,
                 'document_count': len(created_documents),
                 'skipped_count': len(skipped_documents),
                 'skipped_documents': skipped_documents,
                 'task_ids': task_ids
             })
-            
+
         except Exception as e:
             import traceback
             from django.http import JsonResponse
             return JsonResponse({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}, status=500)
-    
-    # GET request - show upload form
-    # Get categories and academic units for the form
-    categories = Category.objects.filter(is_active=True)
-    
-    from .academic.models import AcademicUnit, Semester, AcademicYear, AcademicLevel
-    academic_units = AcademicUnit.objects.filter(is_active=True)[:50]
+
+    # GET request - show upload form with student's Programme, Year, Semester, and Units pre-selected
+    categories = Category.objects.filter(is_active=True).order_by('name')
+    summary = StudentAcademicEnrollmentService.get_student_academic_summary(request.user)
+
+    req_prog = request.GET.get('programme')
+    if req_prog and str(req_prog).isdigit():
+        selected_programme = Programme.objects.filter(pk=int(req_prog), is_active=True).first() or summary['programme']
+    else:
+        selected_programme = summary['programme']
+
+    req_level = request.GET.get('level') or request.GET.get('year')
+    if req_level and str(req_level).isdigit():
+        selected_level_obj = StudentAcademicEnrollmentService.resolve_or_ensure_academic_level(int(req_level))
+    else:
+        selected_level_obj = summary['academic_level'] or StudentAcademicEnrollmentService.resolve_or_ensure_academic_level(1)
+
+    req_sem = request.GET.get('semester')
+    if req_sem and str(req_sem).isdigit() and int(req_sem) in (1, 2):
+        selected_semester_num = int(req_sem)
+    else:
+        selected_semester_num = summary['semester_number'] if summary['semester_number'] in (1, 2) else 1
+
+    req_unit_id = request.GET.get('unit')
+    selected_unit_id = int(req_unit_id) if (req_unit_id and str(req_unit_id).isdigit()) else None
+
+    if selected_unit_id and selected_programme and not (req_level or req_sem):
+        from .academic.models import ProgrammeUnit
+        pu_match = (
+            ProgrammeUnit.objects.filter(programme=selected_programme, academic_unit_id=selected_unit_id)
+            .select_related('academic_level', 'semester')
+            .first()
+        )
+        if pu_match:
+            if pu_match.academic_level:
+                selected_level_obj = pu_match.academic_level
+            if pu_match.semester and pu_match.semester.number in (1, 2):
+                selected_semester_num = pu_match.semester.number
+
+    # Ensure Year 1..4 AcademicLevel rows exist
+    academic_levels = []
+    for yr_num in range(1, 5):
+        lvl = StudentAcademicEnrollmentService.resolve_or_ensure_academic_level(yr_num)
+        if lvl:
+            academic_levels.append(lvl)
+
+    context_units = []
+    if selected_programme:
+        context_units = StudentAcademicEnrollmentService.get_units_for_context(
+            programme_id=selected_programme.id,
+            academic_level_ident=selected_level_obj.level if selected_level_obj else 1,
+            semester_ident=selected_semester_num,
+        )
+
+    if selected_unit_id and not any(u['id'] == selected_unit_id for u in context_units):
+        explicit_unit = AcademicUnit.objects.filter(pk=selected_unit_id, is_active=True).first()
+        if explicit_unit:
+            context_units.insert(0, {
+                'id': explicit_unit.id,
+                'code': explicit_unit.code,
+                'name': explicit_unit.name,
+                'is_elective': False,
+                'shared_programme_codes': [],
+                'document_count': 0,
+            })
+
+    programmes = Programme.objects.filter(is_active=True).select_related('department__school').order_by('name')
     semesters = Semester.objects.all()
     academic_years = AcademicYear.objects.all()
-    academic_levels = AcademicLevel.objects.filter(is_active=True)
-    
+
     context = {
         'page_title': 'Upload Document',
         'categories': categories,
-        'academic_units': academic_units,
+        'other_category_id': other_cat.id if other_cat else '',
+        'programmes': programmes,
+        'academic_summary': summary,
+        'selected_programme': selected_programme,
+        'selected_level_obj': selected_level_obj,
+        'selected_level_num': selected_level_obj.level if selected_level_obj else 1,
+        'selected_semester_num': selected_semester_num,
+        'selected_unit_id': selected_unit_id,
+        'context_units': context_units,
+        'academic_units': context_units,
         'semesters': semesters,
         'academic_years': academic_years,
         'academic_levels': academic_levels,

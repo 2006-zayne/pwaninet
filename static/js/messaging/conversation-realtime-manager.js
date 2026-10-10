@@ -11,6 +11,14 @@
 (function() {
     'use strict';
 
+    if (window.__pwaniConvRealtimeManagerLoaded) {
+        if (typeof window.cacheDOMConversations === 'function') {
+            window.cacheDOMConversations();
+        }
+        return;
+    }
+    window.__pwaniConvRealtimeManagerLoaded = true;
+
     // Helper to get CSRF token
     function getCsrfToken() {
         const input = document.querySelector('[name="csrfmiddlewaretoken"]');
@@ -684,6 +692,7 @@
     });
 
     // Expose functions globally on window
+    window.cacheDOMConversations = cacheDOMConversations;
     window.updateConversationInList = updateConversationInList;
     window.togglePinConversation = togglePin;
     window.markConversationAsActive = markConversationAsActive;

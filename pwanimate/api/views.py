@@ -548,15 +548,26 @@ class PwanimateContextDocumentSearchView(APIView):
 
     def get(self, request):
         query = (request.query_params.get("q") or "").strip()
-        if len(query) < 2:
+        recommended = request.query_params.get("recommended") in {"1", "true", "yes"}
+        if len(query) < 2 and not recommended:
             return Response({"results": []})
 
         documents = Document.objects.filter(
             status="ready",
             is_available=True,
-        ).select_related("category", "uploaded_by").order_by("title")
+        ).select_related("category", "uploaded_by").prefetch_related("academic_units__academic_unit")
 
         user = request.user
+        enrolled_unit_ids = set()
+        if hasattr(user, "get_enrolled_units"):
+            try:
+                enrolled_unit_ids = {
+                    e.academic_unit_id for e in user.get_enrolled_units(auto_sync=False)
+                }
+            except Exception:
+                enrolled_unit_ids = set()
+
+        programme = getattr(user, "programme", None)
         is_admin_or_leader = (
             user.is_staff
             or user.is_superuser
@@ -565,7 +576,10 @@ class PwanimateContextDocumentSearchView(APIView):
         if not is_admin_or_leader:
             visibility_q = Q(visibility="public") | Q(uploaded_by=user)
             restricted_q = Q(visibility="restricted")
-            programme = getattr(user, "programme", None)
+            if enrolled_unit_ids:
+                visibility_q |= restricted_q & Q(
+                    academic_units__academic_unit_id__in=enrolled_unit_ids
+                )
             if programme:
                 visibility_q |= restricted_q & Q(
                     academic_units__academic_unit__programme_units__programme=programme
@@ -576,12 +590,36 @@ class PwanimateContextDocumentSearchView(APIView):
                 )
             documents = documents.filter(visibility_q).distinct()
 
-        documents = documents.filter(
-            Q(title__icontains=query) | Q(description__icontains=query)
-        )[:20]
+        if len(query) >= 2:
+            documents = documents.filter(
+                Q(title__icontains=query)
+                | Q(description__icontains=query)
+                | Q(academic_units__academic_unit__code__icontains=query)
+                | Q(academic_units__academic_unit__name__icontains=query)
+            ).distinct()
+        elif recommended:
+            if enrolled_unit_ids:
+                documents = documents.filter(
+                    academic_units__academic_unit_id__in=enrolled_unit_ids
+                ).distinct()
+            elif programme:
+                documents = documents.filter(
+                    academic_units__academic_unit__programme_units__programme=programme
+                ).distinct()
+
+        candidate_docs = list(documents.order_by("title")[:40])
+
+        def _rank_doc(doc):
+            unit_links = list(doc.academic_units.all())
+            doc_unit_ids = {u.academic_unit_id for u in unit_links if u.academic_unit_id}
+            if enrolled_unit_ids and (doc_unit_ids & enrolled_unit_ids):
+                return (0, doc.title.lower())
+            return (1, doc.title.lower())
+
+        candidate_docs.sort(key=_rank_doc)
 
         results = []
-        for document in documents:
+        for document in candidate_docs[:20]:
             version = document.latest_version
             document_file = version.files.first() if version else None
             if not document_file or not document_file.file:
@@ -590,6 +628,14 @@ class PwanimateContextDocumentSearchView(APIView):
                 media_url = document_file.file.url
             except (ValueError, OSError):
                 continue
+            unit_links = list(document.academic_units.all())
+            first_unit = unit_links[0].academic_unit if unit_links and unit_links[0].academic_unit_id else None
+            unit_code = first_unit.code if first_unit else ""
+            unit_name = first_unit.name if first_unit else ""
+            is_enrolled = bool(
+                enrolled_unit_ids
+                and any(u.academic_unit_id in enrolled_unit_ids for u in unit_links)
+            )
             results.append({
                 "document_id": str(document.share_id),
                 "document_share_id": str(document.share_id),
@@ -597,6 +643,9 @@ class PwanimateContextDocumentSearchView(APIView):
                 "file_id": str(document_file.id),
                 "title": document.title,
                 "category": document.category.name if document.category_id else "Document",
+                "unit_code": unit_code,
+                "unit_name": unit_name,
+                "is_enrolled_unit": is_enrolled,
                 "file_type": (document_file.extension or "").lstrip(".").lower(),
                 "media_url": media_url,
                 "thumbnail_url": document_file.preview_url or "",

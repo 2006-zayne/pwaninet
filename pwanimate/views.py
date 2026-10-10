@@ -99,7 +99,7 @@ class PwanimateUIView(View):
                 share_id=context_document_id,
                 status="ready",
                 is_available=True,
-            )
+            ).select_related("category", "uploaded_by")
             user = request.user
             is_admin_or_leader = (
                 user.is_staff
@@ -109,6 +109,18 @@ class PwanimateUIView(View):
             if not is_admin_or_leader:
                 visibility_q = Q(visibility="public") | Q(uploaded_by=user)
                 restricted_q = Q(visibility="restricted")
+                enrolled_unit_ids = []
+                if hasattr(user, "get_enrolled_units"):
+                    try:
+                        enrolled_unit_ids = [
+                            e.academic_unit_id for e in user.get_enrolled_units(auto_sync=False)
+                        ]
+                    except Exception:
+                        enrolled_unit_ids = []
+                if enrolled_unit_ids:
+                    visibility_q |= restricted_q & Q(
+                        academic_units__academic_unit_id__in=enrolled_unit_ids
+                    )
                 programme = getattr(user, "programme", None)
                 if programme:
                     visibility_q |= restricted_q & Q(
@@ -135,6 +147,31 @@ class PwanimateUIView(View):
                         page_number = max(1, int(request.GET.get("page", "1")))
                     except (TypeError, ValueError):
                         page_number = 1
+
+                    doc_unit_link = (
+                        context_document.academic_units.select_related("academic_unit").first()
+                    )
+                    unit_code = (
+                        doc_unit_link.academic_unit.code
+                        if doc_unit_link and doc_unit_link.academic_unit_id
+                        else ""
+                    )
+                    unit_name = (
+                        doc_unit_link.academic_unit.name
+                        if doc_unit_link and doc_unit_link.academic_unit_id
+                        else ""
+                    )
+                    category_name = (
+                        context_document.category.name
+                        if context_document.category_id
+                        else "Document"
+                    )
+                    citation_label = (
+                        f"{unit_code} — {unit_name}"
+                        if unit_code and unit_name
+                        else (unit_code or category_name)
+                    )
+
                     initial_context_resources.append({
                         "resourceType": "document",
                         "sourceType": "document",
@@ -144,7 +181,12 @@ class PwanimateUIView(View):
                         "fileId": str(first_file.id),
                         "fileType": (first_file.extension or "").lstrip("."),
                         "mediaUrl": media_url,
+                        "thumbnailUrl": first_file.preview_url or "",
                         "title": context_document.title,
+                        "category": category_name,
+                        "citation": citation_label,
+                        "unitCode": unit_code,
+                        "unitName": unit_name,
                         "url": reverse(
                             "documents:document_detail",
                             args=[context_document.share_id],

@@ -51,16 +51,31 @@ def get_for_you_documents(user, limit=8, use_cache=True):
     programme_unit_ids = []
     department_unit_ids = []
 
+    try:
+        from documents.academic.services import StudentAcademicEnrollmentService
+        active_enrollments = StudentAcademicEnrollmentService.get_active_enrollments(user)
+        for enr in active_enrollments:
+            if enr.academic_unit_id and enr.academic_unit_id not in user_unit_map:
+                user_unit_ids.append(enr.academic_unit_id)
+                user_unit_map[enr.academic_unit_id] = enr.academic_unit.code
+    except Exception:
+        pass
+
     if getattr(user, 'programme_id', None):
         pu_qs = ProgrammeUnit.objects.filter(programme_id=user.programme_id)
         if getattr(user, 'academic_level_id', None):
             pu_qs = pu_qs.filter(academic_level_id=user.academic_level_id)
         if getattr(user, 'semester_id', None):
-            pu_qs = pu_qs.filter(semester_id=user.semester_id)
+            sem_num = getattr(user.semester, 'number', None) if getattr(user, 'semester', None) else None
+            if sem_num:
+                pu_qs = pu_qs.filter(Q(semester_id=user.semester_id) | Q(semester__number=sem_num))
+            else:
+                pu_qs = pu_qs.filter(semester_id=user.semester_id)
 
         for pu in pu_qs.select_related('academic_unit'):
-            user_unit_ids.append(pu.academic_unit_id)
-            user_unit_map[pu.academic_unit_id] = pu.academic_unit.code
+            if pu.academic_unit_id not in user_unit_map:
+                user_unit_ids.append(pu.academic_unit_id)
+                user_unit_map[pu.academic_unit_id] = pu.academic_unit.code
 
         # All units under this programme
         programme_unit_ids = list(
@@ -104,9 +119,15 @@ def get_for_you_documents(user, limit=8, use_cache=True):
         )
 
     if getattr(user, 'semester_id', None):
-        academic_clauses.append(
-            When(academic_units__semester_id=user.semester_id, then=Value(15))
-        )
+        sem_num = getattr(user.semester, 'number', None) if getattr(user, 'semester', None) else None
+        if sem_num:
+            academic_clauses.append(
+                When(Q(academic_units__semester_id=user.semester_id) | Q(academic_units__semester__number=sem_num), then=Value(15))
+            )
+        else:
+            academic_clauses.append(
+                When(academic_units__semester_id=user.semester_id, then=Value(15))
+            )
 
     if department_unit_ids:
         academic_clauses.append(

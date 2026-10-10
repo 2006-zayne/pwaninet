@@ -380,16 +380,16 @@ export function loadMoreNotifications() {
 /**
  * Toggle selection of a notification
  */
-export function toggleSelection(notificationId) {
+export function toggleSelection(notificationId, toggleCheckboxState) {
   const checkbox = document.getElementById(`select-${notificationId}`);
-  const card = checkbox.closest('.notif-item');
-  
-  if (checkbox.checked) {
-    card.classList.add('selected');
-  } else {
-    card.classList.remove('selected');
+  if (!checkbox) return;
+  if (toggleCheckboxState) {
+    checkbox.checked = !checkbox.checked;
   }
-  
+  const card = checkbox.closest('.notif-item');
+  if (card) {
+    card.classList.toggle('selected', checkbox.checked);
+  }
   updateBulkActionButtons();
 }
 
@@ -397,7 +397,7 @@ export function toggleSelection(notificationId) {
  * Select all notifications
  */
 export function selectAllNotifications() {
-  const checkboxes = document.querySelectorAll('.notification-checkbox');
+  const checkboxes = document.querySelectorAll('#notification-list .notification-checkbox');
   checkboxes.forEach(checkbox => {
     checkbox.checked = true;
     const card = checkbox.closest('.notif-item');
@@ -410,7 +410,7 @@ export function selectAllNotifications() {
  * Deselect all notifications
  */
 export function deselectAllNotifications() {
-  const checkboxes = document.querySelectorAll('.notification-checkbox');
+  const checkboxes = document.querySelectorAll('#notification-list .notification-checkbox');
   checkboxes.forEach(checkbox => {
     checkbox.checked = false;
     const card = checkbox.closest('.notif-item');
@@ -423,40 +423,58 @@ export function deselectAllNotifications() {
  * Update bulk action buttons visibility based on selection
  */
 export function updateBulkActionButtons() {
-  const selectedCount = document.querySelectorAll('.notification-checkbox:checked').length;
-  const bulkActionBar = document.getElementById('selection-mode-bar');
-  
-  if (bulkActionBar) {
-    const countEl = bulkActionBar.querySelector('.selected-count');
-    if (countEl) {
-      countEl.textContent = `${selectedCount} selected`;
+  const allCheckboxes = document.querySelectorAll('#notification-list .notification-checkbox');
+  const checkedBoxes = document.querySelectorAll('#notification-list .notification-checkbox:checked');
+  const total = allCheckboxes.length;
+  const selectedCount = checkedBoxes.length;
+
+  const countEl = document.getElementById('selected-count-label') || document.querySelector('#selection-mode-bar .selected-count');
+  if (countEl) {
+    countEl.textContent = `${selectedCount} selected`;
+  }
+
+  const masterCheckbox = document.getElementById('select-all-checkbox');
+  if (masterCheckbox) {
+    if (total === 0 || selectedCount === 0) {
+      masterCheckbox.checked = false;
+      masterCheckbox.indeterminate = false;
+    } else if (selectedCount === total) {
+      masterCheckbox.checked = true;
+      masterCheckbox.indeterminate = false;
+    } else {
+      masterCheckbox.checked = false;
+      masterCheckbox.indeterminate = true;
     }
   }
+
+  const markReadBtn = document.getElementById('btn-mark-selected-read');
+  const deleteBtn = document.getElementById('btn-delete-selected');
+  if (markReadBtn) markReadBtn.disabled = selectedCount === 0;
+  if (deleteBtn) deleteBtn.disabled = selectedCount === 0;
 }
 
 /**
  * Toggle selection mode
  */
-export function toggleSelectionMode() {
+export function toggleSelectionMode(forceState) {
   const selectionBar = document.getElementById('selection-mode-bar');
-  const checkboxes = document.querySelectorAll('.notification-checkbox');
-  
-  if (selectionBar && selectionBar.classList.contains('active')) {
-    // Exit selection mode
+  const toolbar = document.getElementById('notif-toolbar');
+  const notifList = document.getElementById('notification-list');
+  if (!selectionBar || !notifList) return;
+
+  const willBeActive = typeof forceState === 'boolean'
+    ? forceState
+    : !selectionBar.classList.contains('active');
+
+  if (!willBeActive) {
     selectionBar.classList.remove('active');
-    checkboxes.forEach(cb => {
-      cb.checked = false;
-      cb.style.display = 'none';
-      const card = cb.closest('.notif-item');
-      if (card) card.classList.remove('selected');
-    });
-    updateBulkActionButtons();
-  } else if (selectionBar) {
-    // Enter selection mode
+    if (toolbar) toolbar.classList.remove('hidden');
+    notifList.classList.remove('selection-active');
+    deselectAllNotifications();
+  } else {
     selectionBar.classList.add('active');
-    checkboxes.forEach(cb => {
-      cb.style.display = 'inline-block';
-    });
+    if (toolbar) toolbar.classList.add('hidden');
+    notifList.classList.add('selection-active');
     updateBulkActionButtons();
   }
 }
@@ -466,7 +484,7 @@ export function toggleSelectionMode() {
  */
 export function markSelectedAsRead() {
   const selectedIds = [];
-  document.querySelectorAll('.notification-checkbox:checked').forEach(checkbox => {
+  document.querySelectorAll('#notification-list .notification-checkbox:checked').forEach(checkbox => {
     if (checkbox.dataset.notificationId) {
       selectedIds.push(checkbox.dataset.notificationId);
     }
@@ -474,7 +492,6 @@ export function markSelectedAsRead() {
   
   if (selectedIds.length === 0) return;
   
-  // Send bulk action request
   fetch('/notifications/bulk-action/', {
     method: 'POST',
     headers: {
@@ -487,16 +504,18 @@ export function markSelectedAsRead() {
     })
   }).then(response => response.json())
     .then(data => {
-      if (data.success) {
-        toggleSelectionMode();
-        if (window.htmx) {
-          htmx.ajax('GET', window.location.pathname + window.location.search, {
-            target: '#page-content-target',
-            swap: 'innerHTML'
-          });
-        } else {
-          window.location.reload();
-        }
+      if (data && data.success) {
+        selectedIds.forEach(id => {
+          const card = document.getElementById(`notification-${id}`);
+          if (card) {
+            card.classList.remove('unread-notification', 'selected');
+            card.classList.add('read-notification');
+            card.style.cursor = 'default';
+            card.removeAttribute('hx-post');
+          }
+        });
+        toggleSelectionMode(false);
+        document.body.dispatchEvent(new CustomEvent('updateUnreadCount'));
       }
     });
 }
@@ -506,7 +525,7 @@ export function markSelectedAsRead() {
  */
 export function deleteSelected() {
   const selectedIds = [];
-  document.querySelectorAll('.notification-checkbox:checked').forEach(checkbox => {
+  document.querySelectorAll('#notification-list .notification-checkbox:checked').forEach(checkbox => {
     if (checkbox.dataset.notificationId) {
       selectedIds.push(checkbox.dataset.notificationId);
     }
@@ -514,9 +533,6 @@ export function deleteSelected() {
   
   if (selectedIds.length === 0) return;
   
-  if (!confirm(`Delete ${selectedIds.length} notification(s)?`)) return;
-  
-  // Send bulk action request
   fetch('/notifications/bulk-action/', {
     method: 'POST',
     headers: {
@@ -529,24 +545,35 @@ export function deleteSelected() {
     })
   }).then(response => response.json())
     .then(data => {
-      if (data.success) {
-        toggleSelectionMode();
-        if (window.htmx) {
-          htmx.ajax('GET', window.location.pathname + window.location.search, {
-            target: '#page-content-target',
-            swap: 'innerHTML'
-          });
-        } else {
-          window.location.reload();
+      if (data && data.success) {
+        selectedIds.forEach(id => {
+          const card = document.getElementById(`notification-${id}`);
+          if (card) {
+            const section = card.closest('.time-section');
+            card.remove();
+            if (section && !section.querySelector('.notif-item')) {
+              section.remove();
+            }
+          }
+        });
+        toggleSelectionMode(false);
+        const cardBody = document.querySelector('#notification-list .card-body');
+        if (cardBody && !cardBody.querySelector('.notif-item, .sender-group-item')) {
+          cardBody.innerHTML = '<div class="empty-state"><div class="empty-title">No notifications</div><p class="empty-sub">You\'re all caught up.</p></div>';
         }
+        document.body.dispatchEvent(new CustomEvent('updateUnreadCount'));
       }
     });
 }
 
 /**
- * Get CSRF token from cookie
+ * Get CSRF token from DOM input, meta tag, or cookie
  */
 function getCsrfToken() {
+  const input = document.querySelector('[name="csrfmiddlewaretoken"]');
+  if (input && input.value) return input.value;
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta && meta.content) return meta.content;
   const cookies = document.cookie.split(';');
   for (let cookie of cookies) {
     const [name, value] = cookie.trim().split('=');

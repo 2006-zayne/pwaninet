@@ -620,12 +620,16 @@ class DocumentAcademicUnit(models.Model):
         'documents.Semester',
         on_delete=models.PROTECT,
         related_name='documents',
+        null=True,
+        blank=True,
         help_text="The semester this document is relevant to"
     )
     academic_year = models.ForeignKey(
         'documents.AcademicYear',
         on_delete=models.PROTECT,
         related_name='documents',
+        null=True,
+        blank=True,
         help_text="The academic year this document is relevant to"
     )
     is_primary = models.BooleanField(
