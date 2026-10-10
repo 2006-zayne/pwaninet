@@ -26,6 +26,9 @@ from pwanimate.ai.gateway.types import AttachmentData
 from pwanimate.context import ContextEngine, ContextPackage, ContextRequest, GroundingMode
 from pwanimate.context.types import AuthorityLevel, ContextItem
 from pwanimate.orchestrator.prompts import (
+    STUDY_MODE_ADAPTIVE_TEACHING_ADDENDUM,
+    STUDY_MODE_INSTRUCTION_ADDENDUM,
+    UNAVAILABLE_SOURCE_INSTRUCTION_ADDENDUM,
     get_system_instruction,
 )
 from pwanimate.orchestrator.types import OrchestrationRequest, OrchestrationResponse
@@ -727,6 +730,107 @@ class PwanimateOrchestrator:
             return instruction
         return f"{instruction}\n\nCurrent user local time: {local_time} ({zone}). Use this as the current time."
 
+    def _collect_source_warnings(
+        self,
+        request: OrchestrationRequest,
+        effective_attachments: Optional[List[Any]] = None,
+        attachment_context: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Inspect currently open documents/pages and attachments for missing or failed
+        text extraction so Pwanimate warns the user honestly instead of guessing.
+        """
+        warnings: List[Dict[str, Any]] = []
+        if request.context_resources:
+            try:
+                from pwanimate.services.study_session import inspect_open_document_availability
+                warnings.extend(
+                    inspect_open_document_availability(
+                        user=request.user,
+                        context_resources=request.context_resources,
+                    )
+                )
+            except Exception as exc:
+                logger.debug("Could not inspect open document availability: %s", exc)
+
+        if effective_attachments:
+            for att in effective_attachments:
+                att_type = getattr(att, "attachment_type", None) or "document"
+                if att_type != "document":
+                    continue
+                att_name = getattr(att, "file_name", getattr(att, "name", "attachment"))
+                att_id = str(getattr(att, "id", ""))
+                status = getattr(att, "processing_status", None)
+                if status == "failed":
+                    warnings.append({
+                        "code": "attachment_extraction_failed",
+                        "attachment_id": att_id,
+                        "title": att_name,
+                        "message": (
+                            f"Text extraction failed for uploaded file '{att_name}'. "
+                            "Pwanimate cannot read its contents directly."
+                        ),
+                    })
+                elif attachment_context and f"[No extractable text could be found in '{att_name}']" in attachment_context:
+                    warnings.append({
+                        "code": "attachment_no_extracted_text",
+                        "attachment_id": att_id,
+                        "title": att_name,
+                        "message": (
+                            f"No extractable text was found in '{att_name}'. "
+                            "If this is a scanned document, please upload a clear page image or paste the text."
+                        ),
+                    })
+        return warnings
+
+    def _apply_study_and_warning_context(
+        self,
+        request: OrchestrationRequest,
+        query: str,
+        context_pkg: Optional[ContextPackage],
+        system_instruction: str,
+        source_warnings: List[Dict[str, Any]],
+    ) -> Tuple[Optional[ContextPackage], str]:
+        """
+        Inject Study Mode checkpoint/session continuity and unavailable-source notices
+        into the ContextPackage and system instruction.
+        """
+        blocks: List[str] = []
+        if request.study_mode:
+            system_instruction = (
+                f"{system_instruction}\n\n"
+                f"{STUDY_MODE_INSTRUCTION_ADDENDUM}\n\n"
+                f"{STUDY_MODE_ADAPTIVE_TEACHING_ADDENDUM}"
+            )
+            if request.study_context is not None:
+                if hasattr(request.study_context, "format_prompt_block"):
+                    block = request.study_context.format_prompt_block()
+                else:
+                    block = str(request.study_context or "").strip()
+                if block:
+                    blocks.append(block)
+
+        if source_warnings:
+            system_instruction = f"{system_instruction}\n\n{UNAVAILABLE_SOURCE_INSTRUCTION_ADDENDUM}"
+            notice_lines = ["<unavailable_source_notice>"]
+            for w in source_warnings:
+                msg = str(w.get("message") or "").strip()
+                if msg:
+                    notice_lines.append(f"  - {msg}")
+            notice_lines.append("</unavailable_source_notice>")
+            blocks.append("\n".join(notice_lines))
+
+        if blocks:
+            if context_pkg is None:
+                context_pkg = ContextPackage(query=query, user_context=request.user_context)
+            combined = "\n\n".join(blocks)
+            if context_pkg.study_context_block:
+                context_pkg.study_context_block = f"{context_pkg.study_context_block}\n\n{combined}"
+            else:
+                context_pkg.study_context_block = combined
+
+        return context_pkg, system_instruction
+
     def run(
         self,
         request: OrchestrationRequest,
@@ -812,7 +916,7 @@ class PwanimateOrchestrator:
             return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
         # 4. Conversational turns can skip platform retrieval after tool choice.
-        is_conversational = not has_attachments_or_context and (
+        is_conversational = not has_attachments_or_context and not request.study_mode and (
             request.task == "general" or self.is_conversational_intent(query)
         )
         if is_conversational:
@@ -867,13 +971,23 @@ class PwanimateOrchestrator:
         if request.user_context:
             context_pkg = ContextPackage(query=query, user_context=request.user_context)
 
+        source_warnings = self._collect_source_warnings(request)
+        base_instruction = self._with_local_time(get_system_instruction("conversational"), request)
+        context_pkg, system_instruction = self._apply_study_and_warning_context(
+            request=request,
+            query=query,
+            context_pkg=context_pkg,
+            system_instruction=base_instruction,
+            source_warnings=source_warnings,
+        )
+
         effective_max_tokens = self._resolve_effective_budget(request, "conversational")
 
         llm_request = LLMRequest(
             task="general",
             messages=messages,
             context=context_pkg,
-            system_instruction=self._with_local_time(get_system_instruction("conversational"), request),
+            system_instruction=system_instruction,
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
@@ -911,6 +1025,16 @@ class PwanimateOrchestrator:
             total_time_ms,
         )
 
+        metadata = {
+            "intent": "conversational",
+            "thoughts_tokens": thoughts_tokens,
+            "total_output_tokens": total_output_tokens,
+            "max_output_tokens": max_output_tokens,
+            "study_mode": bool(request.study_mode),
+        }
+        if source_warnings:
+            metadata["warnings"] = source_warnings
+
         return OrchestrationResponse(
             answer=sanitized_ans,
             citations=[],
@@ -923,14 +1047,10 @@ class PwanimateOrchestrator:
             retrieval_time_ms=0.0,
             generation_time_ms=gen_time_ms,
             total_time_ms=total_time_ms,
-            metadata={
-                "intent": "conversational",
-                "thoughts_tokens": thoughts_tokens,
-                "total_output_tokens": total_output_tokens,
-                "max_output_tokens": max_output_tokens,
-            },
+            metadata=metadata,
             quota_info=quota_info,
             finish_reason=llm_response.finish_reason,
+            warnings=source_warnings,
         )
 
     def _run_tool(
@@ -1010,16 +1130,26 @@ class PwanimateOrchestrator:
 
         messages = list(request.history) + [ChatMessage(role="user", content=query)]
 
+        source_warnings = self._collect_source_warnings(request)
+        base_instruction = self._with_local_time(
+            get_system_instruction("optional" if tool_route.tool_name == "web_search" else "required"),
+            request,
+        )
+        context_pkg, system_instruction = self._apply_study_and_warning_context(
+            request=request,
+            query=query,
+            context_pkg=context_pkg,
+            system_instruction=base_instruction,
+            source_warnings=source_warnings,
+        )
+
         effective_max_tokens = self._resolve_effective_budget(request, "tool")
 
         llm_request = LLMRequest(
             task="tool",
             messages=messages,
             context=context_pkg,
-            system_instruction=self._with_local_time(
-                get_system_instruction("optional" if tool_route.tool_name == "web_search" else "required"),
-                request,
-            ),
+            system_instruction=system_instruction,
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
@@ -1069,6 +1199,20 @@ class PwanimateOrchestrator:
             total_time_ms,
         )
 
+        metadata = {
+            "intent": "tool",
+            "tool_name": tool_route.tool_name,
+            "tool_success": tool_result.success,
+            "matched_intent": tool_route.matched_intent,
+            "context_items_count": context_pkg.total_items,
+            "thoughts_tokens": thoughts_tokens,
+            "total_output_tokens": total_output_tokens,
+            "max_output_tokens": max_output_tokens,
+            "study_mode": bool(request.study_mode),
+        }
+        if source_warnings:
+            metadata["warnings"] = source_warnings
+
         return OrchestrationResponse(
             answer=sanitized_ans,
             citations=citations,
@@ -1082,18 +1226,10 @@ class PwanimateOrchestrator:
             retrieval_time_ms=tool_time_ms,
             generation_time_ms=gen_time_ms,
             total_time_ms=total_time_ms,
-            metadata={
-                "intent": "tool",
-                "tool_name": tool_route.tool_name,
-                "tool_success": tool_result.success,
-                "matched_intent": tool_route.matched_intent,
-                "context_items_count": context_pkg.total_items,
-                "thoughts_tokens": thoughts_tokens,
-                "total_output_tokens": total_output_tokens,
-                "max_output_tokens": max_output_tokens,
-            },
+            metadata=metadata,
             quota_info=quota_info,
             finish_reason=llm_response.finish_reason,
+            warnings=source_warnings,
         )
 
     def _run_rag(
@@ -1246,6 +1382,20 @@ class PwanimateOrchestrator:
         if attachment_context:
             context_pkg.attachment_context = attachment_context
 
+        source_warnings = self._collect_source_warnings(
+            request=request,
+            effective_attachments=effective_attachments,
+            attachment_context=attachment_context,
+        )
+        base_instruction = self._with_local_time(get_system_instruction(context_pkg.grounding_mode), request)
+        context_pkg, system_instruction = self._apply_study_and_warning_context(
+            request=request,
+            query=query,
+            context_pkg=context_pkg,
+            system_instruction=base_instruction,
+            source_warnings=source_warnings,
+        )
+
         # Extract source summaries (deduplicated & enriched)
         sources_summary = self._build_sources_summary(context_pkg.items)
 
@@ -1260,7 +1410,7 @@ class PwanimateOrchestrator:
             task="rag",
             messages=messages,
             context=context_pkg,
-            system_instruction=self._with_local_time(get_system_instruction(context_pkg.grounding_mode), request),
+            system_instruction=system_instruction,
             provider=("gemini" if is_multimodal_turn else request.provider),
             model=(
                 getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.6-flash")
@@ -1359,6 +1509,18 @@ class PwanimateOrchestrator:
             total_time_ms,
         )
 
+        metadata = {
+            "intent": "rag",
+            "retrieved_count": len(retrieval_resp.results),
+            "context_items_count": context_pkg.total_items,
+            "thoughts_tokens": thoughts_tokens,
+            "total_output_tokens": total_output_tokens,
+            "max_output_tokens": max_output_tokens,
+            "study_mode": bool(request.study_mode),
+        }
+        if source_warnings:
+            metadata["warnings"] = source_warnings
+
         return OrchestrationResponse(
             answer=sanitized_ans,
             citations=citations,
@@ -1371,16 +1533,10 @@ class PwanimateOrchestrator:
             retrieval_time_ms=ret_time_ms,
             generation_time_ms=gen_time_ms,
             total_time_ms=total_time_ms,
-            metadata={
-                "intent": "rag",
-                "retrieved_count": len(retrieval_resp.results),
-                "context_items_count": context_pkg.total_items,
-                "thoughts_tokens": thoughts_tokens,
-                "total_output_tokens": total_output_tokens,
-                "max_output_tokens": max_output_tokens,
-            },
+            metadata=metadata,
             quota_info=quota_info,
             finish_reason=llm_response.finish_reason,
+            warnings=source_warnings,
         )
 
     def _build_sources_summary(self, context_items: list) -> List[Dict[str, Any]]:

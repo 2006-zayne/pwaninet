@@ -269,3 +269,18 @@ class AttachmentService:
             qs = qs.filter(user=user)
 
         return qs.first()
+
+    @classmethod
+    def link_attachments_to_message(cls, attachments, message, conversation=None) -> None:
+        """
+        Link one or more PwanimateAttachment instances to a message and conversation.
+        """
+        if not attachments or not message:
+            return
+        target_conv = conversation or getattr(message, "conversation", None)
+        for att in attachments:
+            att.message = message
+            if target_conv and not att.conversation_id:
+                att.conversation = target_conv
+            att.save(update_fields=["message", "conversation"])
+

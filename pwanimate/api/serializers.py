@@ -54,6 +54,8 @@ class MessageSerializer(serializers.ModelSerializer):
 class ConversationListSerializer(serializers.ModelSerializer):
     """Serializer for listing user conversations."""
 
+    study_session = serializers.SerializerMethodField()
+
     class Meta:
         model = PwanimateConversation
         fields = [
@@ -61,14 +63,26 @@ class ConversationListSerializer(serializers.ModelSerializer):
             "title",
             "created_at",
             "updated_at",
+            "study_session",
         ]
         read_only_fields = fields
+
+    def get_study_session(self, obj):
+        try:
+            session = obj.study_session
+        except Exception:
+            session = None
+        if not session:
+            return None
+        from pwanimate.services.study_session import StudySessionService
+        return StudySessionService.serialize_session(session)
 
 
 class ConversationDetailSerializer(serializers.ModelSerializer):
     """Serializer for full conversation thread with messages."""
 
     messages = MessageSerializer(many=True, read_only=True)
+    study_session = serializers.SerializerMethodField()
 
     class Meta:
         model = PwanimateConversation
@@ -78,5 +92,16 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "messages",
+            "study_session",
         ]
         read_only_fields = fields
+
+    def get_study_session(self, obj):
+        try:
+            session = obj.study_session
+        except Exception:
+            session = None
+        if not session:
+            return None
+        from pwanimate.services.study_session import StudySessionService
+        return StudySessionService.serialize_session(session)

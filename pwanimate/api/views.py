@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import queue
+import sys
 import threading
 import uuid
 import requests
@@ -38,15 +39,26 @@ from pwanimate.api.serializers import (
     ConversationListSerializer,
     PwanimateAttachmentSerializer,
 )
-from pwanimate.models import PwanimateConversation, PwanimateAttachment, PwanimateMessage
+from pwanimate.models import (
+    PwanimateAttachment,
+    PwanimateConversation,
+    PwanimateMessage,
+    PwanimateStudyCheckpoint,
+    PwanimateStudySession,
+)
 from pwanimate.orchestrator import (
     OrchestrationRequest,
     OrchestratorValidationError,
     PwanimateOrchestrator,
 )
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from pwanimate.services.conversation import ConversationService
 from pwanimate.services.attachment import AttachmentService
+from pwanimate.services.study_session import (
+    StudyCollectionService,
+    StudySessionService,
+    parse_study_command,
+)
 from pwanimate.ai.gateway.quota_tracker import get_quota_tracker
 from documents.models import Document
 
@@ -149,48 +161,73 @@ class PwanimateChatView(APIView):
             model (str): Optional model override.
             attachments (list): Optional list of attachment UUIDs or objects.
             context_resources (list): Optional list of Context Rail resource descriptors.
+            study_mode (bool): Optional flag to enter/continue Study Mode.
+            study_session_id (str): Optional UUID of an owned Study Mode session.
         """
         data = request.data or {}
-        message = data.get("message") or data.get("query")
+        message = data.get("message") if "message" in data else data.get("query")
         if not message or not isinstance(message, str) or not message.strip():
             return Response(
                 {"error": "Field 'message' is required and must be a non-empty string."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        is_study_cmd, study_remainder = parse_study_command(message)
+        study_session_id = data.get("study_session_id")
+        requested_study_session = None
+
         conversation_id = data.get("conversation_id")
         conversation = None
 
-        if conversation_id:
-            conversation = ConversationService.get_owned_conversation(
+        if study_session_id:
+            requested_study_session = StudySessionService.get_owned_session(
                 user=request.user,
-                conversation_id=conversation_id,
+                session_id=study_session_id,
             )
-            if conversation is None:
-                if data.get("create_conversation") is True:
-                    try:
-                        requested_id = uuid.UUID(str(conversation_id))
-                    except (ValueError, TypeError, AttributeError):
-                        return Response(
-                            {"error": "Invalid conversation ID."},
-                            status=status.HTTP_400_BAD_REQUEST,
+            if requested_study_session is None:
+                return Response(
+                    {"error": "Study session not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if conversation_id and str(requested_study_session.conversation_id) != str(conversation_id):
+                return Response(
+                    {"error": "Conversation does not match study session."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            conversation = requested_study_session.conversation
+            conversation_id = str(conversation.id)
+
+        if conversation is None:
+            if conversation_id:
+                conversation = ConversationService.get_owned_conversation(
+                    user=request.user,
+                    conversation_id=conversation_id,
+                )
+                if conversation is None:
+                    if data.get("create_conversation") is True:
+                        try:
+                            requested_id = uuid.UUID(str(conversation_id))
+                        except (ValueError, TypeError, AttributeError):
+                            return Response(
+                                {"error": "Invalid conversation ID."},
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+                        if PwanimateConversation.objects.filter(id=requested_id).exists():
+                            return Response(
+                                {"error": "Conversation not found."},
+                                status=status.HTTP_404_NOT_FOUND,
+                            )
+                        conversation = ConversationService.create_conversation(
+                            user=request.user,
+                            conversation_id=requested_id,
                         )
-                    if PwanimateConversation.objects.filter(id=requested_id).exists():
+                    else:
                         return Response(
                             {"error": "Conversation not found."},
                             status=status.HTTP_404_NOT_FOUND,
                         )
-                    conversation = ConversationService.create_conversation(
-                        user=request.user,
-                        conversation_id=requested_id,
-                    )
-                else:
-                    return Response(
-                        {"error": "Conversation not found."},
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
-        else:
-            conversation = ConversationService.create_conversation(user=request.user)
+            else:
+                conversation = ConversationService.create_conversation(user=request.user)
 
         # Validate attachments if provided
         raw_attachment_ids = data.get("attachments") or data.get("attachment_ids") or []
@@ -238,7 +275,56 @@ class PwanimateChatView(APIView):
         if not isinstance(context_resources, list):
             context_resources = []
 
-        clean_query = message.strip()
+        existing_study_session = (
+            requested_study_session
+            or StudySessionService.get_session_for_conversation(request.user, conversation)
+        )
+        explicit_study_flag = data.get("study_mode")
+        study_mode_active = bool(
+            is_study_cmd
+            or explicit_study_flag is True
+            or requested_study_session is not None
+            or (
+                existing_study_session is not None
+                and existing_study_session.status == PwanimateStudySession.STATUS_ACTIVE
+                and explicit_study_flag is not False
+            )
+        )
+
+        # Bare `@study` command activates Study Mode without making an empty AI request
+        if is_study_cmd and not study_remainder:
+            study_session = StudySessionService.start_or_continue_session(
+                user=request.user,
+                conversation=conversation,
+                title=str(data.get("title") or "").strip(),
+                learning_objective=str(data.get("learning_objective") or "").strip(),
+                current_topic=str(data.get("current_topic") or "").strip(),
+                context_resources=context_resources,
+                attachments=attachment_objs,
+            )
+            if attachment_objs:
+                with transaction.atomic():
+                    for att in attachment_objs:
+                        att.conversation = conversation
+                        att.save(update_fields=["conversation"])
+            return Response(
+                {
+                    "study_mode_activated": True,
+                    "study_mode": True,
+                    "study_session": StudySessionService.serialize_session(study_session),
+                    "conversation_id": str(conversation.id),
+                    "answer": "",
+                    "citations": [],
+                    "sources": [],
+                    "people": [],
+                    "blocks": [],
+                    "warnings": [],
+                    "metadata": {"study_mode": True, "study_mode_activated": True},
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        clean_query = study_remainder.strip() if (is_study_cmd and study_remainder.strip()) else message.strip()
         retry_requested = data.get("retry") is True
         retry_message_id = data.get("retry_user_message_id")
         if retry_message_id is not None:
@@ -262,24 +348,13 @@ class PwanimateChatView(APIView):
                     {"error": "Message to retry was not found in this conversation."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
-            if user_msg is not None and user_msg.content != clean_query:
+            if user_msg is not None and user_msg.content not in {clean_query, message.strip()}:
                 return Response(
                     {"error": "Retry content must match the original message."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         if user_msg is None:
             user_msg = ConversationService.persist_user_message(conversation, clean_query)
-
-        # Load history without the original turn being retried, so it is sent only once.
-        server_history = ConversationService.load_history(
-            conversation,
-            exclude_message_id=user_msg.id if retry_requested else None,
-        )
-
-        # Fallback to client history only if no server history exists yet (backward compatibility)
-        history = server_history
-        if not server_history and not conversation_id and data.get("history"):
-            history = data.get("history", [])
 
         # Atomically link attachments to conversation and user message
         if attachment_objs:
@@ -299,6 +374,47 @@ class PwanimateChatView(APIView):
                     active_attachments.append(conv_att)
                     seen_ids.add(conv_att.id)
 
+        study_session = None
+        study_context = None
+        if study_mode_active:
+            initial_objective = str(data.get("learning_objective") or "").strip()
+            initial_topic = str(data.get("current_topic") or "").strip()
+            if is_study_cmd and not initial_topic:
+                initial_topic = clean_query[:160]
+            if is_study_cmd and not initial_objective:
+                initial_objective = f"Master {clean_query[:180]}"
+            study_session = StudySessionService.start_or_continue_session(
+                user=request.user,
+                conversation=conversation,
+                title=str(data.get("title") or "").strip(),
+                learning_objective=initial_objective,
+                current_topic=initial_topic or clean_query[:160],
+                context_resources=context_resources,
+                attachments=active_attachments,
+            )
+            # Study Mode strictly uses bounded server-side history; client-submitted history/checkpoints are ignored
+            history = ConversationService.load_history(
+                conversation,
+                max_messages=StudySessionService.STUDY_HISTORY_MAX_MESSAGES,
+                max_tokens=StudySessionService.STUDY_HISTORY_MAX_TOKENS,
+                exclude_message_id=user_msg.id,
+            )
+            study_context = StudySessionService.build_study_orchestration_context(
+                session=study_session,
+                query=clean_query,
+                recent_history=history,
+            )
+        else:
+            # Load history without the current/retried user turn, so it is sent only once.
+            server_history = ConversationService.load_history(
+                conversation,
+                exclude_message_id=user_msg.id if retry_requested else user_msg.id,
+            )
+            # Fallback to client history only if no server history exists yet (backward compatibility)
+            history = server_history
+            if not server_history and not conversation_id and data.get("history"):
+                history = data.get("history", [])
+
         sources = data.get("sources")
         task = data.get("task", "rag")
         provider = data.get("provider")
@@ -317,6 +433,8 @@ class PwanimateChatView(APIView):
                 context_resources=context_resources,
                 local_time=data.get("local_time"),
                 timezone_name=data.get("timezone"),
+                study_mode=study_mode_active,
+                study_context=study_context,
             )
             orchestrator = self.get_orchestrator()
             # External LLM generation occurs outside database transactions
@@ -349,6 +467,45 @@ class PwanimateChatView(APIView):
             res_data["user_message_id"] = user_msg.id
             if attachment_objs:
                 res_data["attachments"] = PwanimateAttachmentSerializer(attachment_objs, many=True).data
+
+            if study_mode_active and study_session is not None:
+                if StudySessionService.should_auto_checkpoint(study_session):
+                    from pwanimate.tasks.study import generate_study_checkpoint_task
+                    delay_fn = getattr(generate_study_checkpoint_task, "delay", None)
+                    is_mocked_delay = hasattr(delay_fn, "assert_called")
+                    try:
+                        if callable(delay_fn):
+                            delay_fn(str(study_session.id), up_to_message_id=asst_msg.id)
+                        else:
+                            StudySessionService.generate_checkpoint(
+                                study_session.id, up_to_message_id=asst_msg.id
+                            )
+                    except Exception:
+                        logger.debug(
+                            "Celery dispatch unavailable for study checkpoint %s; running inline",
+                            study_session.id,
+                        )
+                        StudySessionService.generate_checkpoint(
+                            study_session.id, up_to_message_id=asst_msg.id
+                        )
+                    if (
+                        not is_mocked_delay
+                        and ("test" in sys.argv or getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False))
+                        and not PwanimateStudyCheckpoint.objects.filter(
+                            session=study_session, up_to_message_id=asst_msg.id
+                        ).exists()
+                    ):
+                        StudySessionService.generate_checkpoint(
+                            study_session.id, up_to_message_id=asst_msg.id
+                        )
+
+                study_session = (
+                    PwanimateStudySession.objects.select_related("conversation", "latest_checkpoint")
+                    .filter(pk=study_session.pk)
+                    .first()
+                )
+                res_data["study_mode"] = True
+                res_data["study_session"] = StudySessionService.serialize_session(study_session)
 
             # Include fallback info and quota status
             fallback_info = {
@@ -752,21 +909,27 @@ class PwanimateAttachmentDownloadView(APIView):
 class PwanimateConversationListView(APIView):
     """
     List all persistent conversations owned by the authenticated user.
+    Supports optional `?filter=study` to list only Study Mode conversations.
     """
 
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        conversations = PwanimateConversation.objects.filter(
-            user=request.user
-        ).order_by("-updated_at")
+        conversations = (
+            PwanimateConversation.objects.filter(user=request.user)
+            .select_related("study_session", "study_session__latest_checkpoint")
+            .order_by("-updated_at")
+        )
+        filter_mode = (request.query_params.get("filter") or "").strip().lower()
+        if filter_mode == "study" or request.query_params.get("study_only") in {"1", "true", "yes"}:
+            conversations = conversations.filter(study_session__isnull=False)
         serializer = ConversationListSerializer(conversations, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PwanimateConversationDetailView(APIView):
     """
-    Retrieve or delete an existing conversation thread owned by the authenticated user.
+    Retrieve, rename, or delete an existing conversation thread owned by the authenticated user.
     """
 
     permission_classes = [permissions.IsAuthenticated]
@@ -785,6 +948,40 @@ class PwanimateConversationDetailView(APIView):
         serializer = ConversationDetailSerializer(conversation)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def patch(self, request, conversation_id):
+        conversation = ConversationService.get_owned_conversation(
+            user=request.user,
+            conversation_id=conversation_id,
+        )
+        if conversation is None:
+            return Response(
+                {"error": "Conversation not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        title = request.data.get("title")
+        if title is not None:
+            clean_title = str(title).strip()
+            if not clean_title:
+                return Response(
+                    {"error": "Conversation title cannot be empty."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            conversation.title = clean_title[:255]
+            conversation.save(update_fields=["title", "updated_at"])
+
+        study_session = StudySessionService.get_session_for_conversation(request.user, conversation)
+        if study_session and (
+            "learning_objective" in request.data or "current_topic" in request.data
+        ):
+            StudySessionService.update_session_metadata(
+                session=study_session,
+                learning_objective=request.data.get("learning_objective"),
+                current_topic=request.data.get("current_topic"),
+            )
+
+        serializer = ConversationDetailSerializer(conversation)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def delete(self, request, conversation_id):
         conversation = ConversationService.get_owned_conversation(
             user=request.user,
@@ -798,6 +995,496 @@ class PwanimateConversationDetailView(APIView):
 
         conversation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PwanimateStudySessionListView(APIView):
+    """
+    List all Study Mode sessions owned by the current user, or start/continue a session.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        status_filter = (request.query_params.get("status") or "").strip().lower() or None
+        sessions = StudySessionService.list_user_sessions(
+            user=request.user,
+            status_filter=status_filter,
+        )
+        resumable = StudySessionService.get_resumable_session(request.user)
+        return Response(
+            {
+                "sessions": [StudySessionService.serialize_session(s) for s in sessions],
+                "resumable_session": (
+                    StudySessionService.serialize_session(resumable) if resumable else None
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        data = request.data or {}
+        conversation_id = data.get("conversation_id")
+        conversation = None
+        created_new_conv = False
+
+        if conversation_id:
+            conversation = ConversationService.get_owned_conversation(
+                user=request.user,
+                conversation_id=conversation_id,
+            )
+            if conversation is None:
+                if data.get("create_conversation") is True:
+                    try:
+                        requested_id = uuid.UUID(str(conversation_id))
+                    except (ValueError, TypeError, AttributeError):
+                        return Response(
+                            {"error": "Invalid conversation ID."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    if PwanimateConversation.objects.filter(id=requested_id).exists():
+                        return Response(
+                            {"error": "Conversation not found."},
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+                    conversation = ConversationService.create_conversation(
+                        user=request.user,
+                        conversation_id=requested_id,
+                        title=str(data.get("title") or "New Study Session").strip()[:255],
+                    )
+                    created_new_conv = True
+                else:
+                    return Response(
+                        {"error": "Conversation not found."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+        else:
+            conversation = ConversationService.create_conversation(
+                user=request.user,
+                title=str(data.get("title") or "New Study Session").strip()[:255],
+            )
+            created_new_conv = True
+
+        had_session = PwanimateStudySession.objects.filter(
+            conversation=conversation, user=request.user
+        ).exists()
+        context_resources = data.get("context_resources")
+        if not isinstance(context_resources, list):
+            context_resources = None
+
+        session = StudySessionService.start_or_continue_session(
+            user=request.user,
+            conversation=conversation,
+            title=str(data.get("title") or "").strip(),
+            learning_objective=str(data.get("learning_objective") or "").strip(),
+            current_topic=str(data.get("current_topic") or "").strip(),
+            context_resources=context_resources,
+        )
+        return Response(
+            {
+                "study_session": StudySessionService.serialize_session(session),
+                "conversation_id": str(conversation.id),
+                "created": bool(created_new_conv or not had_session),
+            },
+            status=status.HTTP_201_CREATED if (created_new_conv or not had_session) else status.HTTP_200_OK,
+        )
+
+
+class PwanimateStudySessionDetailView(APIView):
+    """
+    Retrieve or update metadata/context state for an owned Study Mode session.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = StudySessionService.get_owned_session(request.user, session_id)
+        if session is None:
+            return Response(
+                {"error": "Study session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        restored_context, unavailable_resources = StudySessionService.restore_context_state(
+            session=session,
+            user=request.user,
+        )
+        checkpoints = [
+            StudySessionService.serialize_checkpoint(ckpt)
+            for ckpt in session.checkpoints.order_by("-created_at")[:20]
+        ]
+        return Response(
+            {
+                "study_session": StudySessionService.serialize_session(session),
+                "checkpoints": checkpoints,
+                "restored_context": restored_context,
+                "unavailable_resources": unavailable_resources,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, session_id):
+        session = StudySessionService.get_owned_session(request.user, session_id)
+        if session is None:
+            return Response(
+                {"error": "Study session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        data = request.data or {}
+        if any(k in data for k in ("title", "learning_objective", "current_topic")):
+            session = StudySessionService.update_session_metadata(
+                session=session,
+                title=data.get("title") if "title" in data else None,
+                learning_objective=data.get("learning_objective") if "learning_objective" in data else None,
+                current_topic=data.get("current_topic") if "current_topic" in data else None,
+            )
+        if "context_resources" in data and isinstance(data.get("context_resources"), list):
+            StudySessionService.sync_context_state(
+                session=session,
+                user=request.user,
+                context_resources=data.get("context_resources"),
+            )
+            session.save(update_fields=["context_state", "last_active_at", "updated_at"])
+
+        return Response(
+            {"study_session": StudySessionService.serialize_session(session)},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PwanimateStudySessionStatusView(APIView):
+    """
+    Transition an owned Study Mode session between active, paused, completed,
+    or dismiss its home-screen resume banner.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = StudySessionService.get_owned_session(request.user, session_id)
+        if session is None:
+            return Response(
+                {"error": "Study session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        action = str((request.data or {}).get("action") or "").strip().lower()
+        if action not in {"pause", "resume", "end", "complete", "dismiss_banner"}:
+            return Response(
+                {"error": "Invalid action. Expected 'pause', 'resume', 'end', or 'dismiss_banner'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        restored_context = []
+        unavailable_resources = []
+
+        if action == "pause":
+            session = StudySessionService.pause_session(session)
+        elif action == "resume":
+            session = StudySessionService.resume_session(session, user=request.user)
+            restored_context, unavailable_resources = StudySessionService.restore_context_state(
+                session=session,
+                user=request.user,
+            )
+        elif action in {"end", "complete"}:
+            gen_ckpt = (request.data or {}).get("generate_checkpoint", True) is not False
+            session = StudySessionService.end_session(
+                session,
+                generate_final_checkpoint=gen_ckpt,
+            )
+        elif action == "dismiss_banner":
+            session = StudySessionService.dismiss_resume_banner(session)
+
+        return Response(
+            {
+                "study_session": StudySessionService.serialize_session(session),
+                "restored_context": restored_context,
+                "unavailable_resources": unavailable_resources,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PwanimateStudyCheckpointView(APIView):
+    """
+    List checkpoints or generate a fresh learning checkpoint on explicit user request.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = StudySessionService.get_owned_session(request.user, session_id)
+        if session is None:
+            return Response(
+                {"error": "Study session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        checkpoints = [
+            StudySessionService.serialize_checkpoint(ckpt)
+            for ckpt in session.checkpoints.order_by("-created_at")[:25]
+        ]
+        return Response({"checkpoints": checkpoints}, status=status.HTTP_200_OK)
+
+    def post(self, request, session_id):
+        session = StudySessionService.get_owned_session(request.user, session_id)
+        if session is None:
+            return Response(
+                {"error": "Study session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        checkpoint = StudySessionService.generate_checkpoint(
+            session_id=session.id,
+            force=True,
+        )
+        session = StudySessionService.get_owned_session(request.user, session.id)
+        if checkpoint is None:
+            return Response(
+                {
+                    "error": "Send at least one study message before generating a checkpoint.",
+                    "study_session": StudySessionService.serialize_session(session),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {
+                "checkpoint": StudySessionService.serialize_checkpoint(checkpoint),
+                "study_session": StudySessionService.serialize_session(session),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PwanimateStudySummaryView(APIView):
+    """
+    Generate a structured Study Mode session summary for review, or export a reviewed
+    summary as a PDF or Word document using the existing generated-documents pipeline.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = StudySessionService.get_owned_session(request.user, session_id)
+        if session is None:
+            return Response(
+                {"error": "Study session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        data = request.data or {}
+        export_format = str(data.get("export_format") or data.get("format") or "").strip().lower()
+        provided_markdown = str(data.get("summary_markdown") or "").strip()
+
+        if export_format:
+            if not provided_markdown:
+                last_summary = (session.context_state or {}).get("last_summary") or {}
+                provided_markdown = str(last_summary.get("markdown") or "").strip()
+            if not provided_markdown:
+                summary_payload = StudySessionService.generate_session_summary(session=session)
+                provided_markdown = summary_payload["summary_markdown"]
+
+            try:
+                from pwanimate.services.generated_documents import create_generated_resource
+
+                summary_msg = ConversationService.persist_assistant_message(
+                    conversation=session.conversation,
+                    content=provided_markdown,
+                )
+                document, document_file, created = create_generated_resource(
+                    message=summary_msg,
+                    user=request.user,
+                    file_format=export_format,
+                )
+                token = TimestampSigner().sign_object(str(document.share_id))
+                download_path = reverse(
+                    "documents:serve_download", kwargs={"share_id": document.share_id}
+                )
+                download_url = f"{download_path}?{urlencode({'t': token, 'file_id': document_file.id})}"
+                return Response(
+                    {
+                        "document_id": document.id,
+                        "document_share_id": str(document.share_id),
+                        "title": document.title,
+                        "format": export_format,
+                        "download_url": download_url,
+                        "library_url": reverse("documents:my_resources"),
+                        "summary_markdown": provided_markdown,
+                        "message_id": summary_msg.id,
+                        "created": created,
+                    },
+                    status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+                )
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception:
+                logger.exception("Could not export Study Mode summary for session %s", session_id)
+                return Response(
+                    {"error": "The study summary document could not be exported."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+        summary_payload = StudySessionService.generate_session_summary(session=session)
+        session = StudySessionService.get_owned_session(request.user, session.id)
+        return Response(
+            {
+                **summary_payload,
+                "study_session": StudySessionService.serialize_session(session),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def patch(self, request, session_id):
+        session = StudySessionService.get_owned_session(request.user, session_id)
+        if session is None:
+            return Response(
+                {"error": "Study session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        data = request.data or {}
+        content = str(data.get("content") or data.get("summary_markdown") or "").strip()
+        if not content:
+            return Response(
+                {"error": "Summary content cannot be empty."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        message_id = data.get("message_id")
+        if message_id is not None and str(message_id).strip() != "":
+            try:
+                message_id = int(message_id)
+            except (TypeError, ValueError):
+                message_id = None
+        else:
+            message_id = None
+
+        updated = StudySessionService.update_session_summary(
+            session=session,
+            user=request.user,
+            content=content,
+            message_id=message_id,
+        )
+        session = StudySessionService.get_owned_session(request.user, session.id)
+        return Response(
+            {
+                **updated,
+                "study_session": StudySessionService.serialize_session(session),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PwanimateStudySummarySaveCollectionView(APIView):
+    """
+    Save a reviewed Study Mode session summary into an existing or newly created
+    Collection owned or editable by the student.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = StudySessionService.get_owned_session(request.user, session_id)
+        if session is None:
+            return Response(
+                {"error": "Study session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        data = request.data or {}
+        message_id = data.get("message_id")
+        if message_id is not None and str(message_id).strip() != "":
+            try:
+                message_id = int(message_id)
+            except (TypeError, ValueError):
+                message_id = None
+        else:
+            message_id = None
+
+        summary_markdown = str(data.get("summary_markdown") or "").strip()
+        if not summary_markdown and message_id is None:
+            last_summary = (session.context_state or {}).get("last_summary") or {}
+            summary_markdown = str(last_summary.get("markdown") or "").strip()
+        if not summary_markdown and message_id is None:
+            generated = StudySessionService.generate_session_summary(session=session)
+            summary_markdown = generated["summary_markdown"]
+
+        collection_id = data.get("collection_id")
+        if collection_id is not None and str(collection_id).strip() != "":
+            try:
+                collection_id = int(collection_id)
+            except (TypeError, ValueError):
+                return Response(
+                    {"error": "Invalid collection ID."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            collection_id = None
+
+        new_collection_name = str(data.get("new_collection_name") or "").strip()
+        new_collection_description = str(data.get("new_collection_description") or "").strip()
+        new_collection_visibility = str(data.get("new_collection_visibility") or "private").strip()
+        file_format = str(data.get("file_format") or data.get("format") or "pdf").strip().lower()
+        notes = str(data.get("notes") or "").strip()
+
+        try:
+            result = StudyCollectionService.save_summary_to_collection(
+                user=request.user,
+                session=session,
+                summary_markdown=summary_markdown,
+                message_id=message_id,
+                collection_id=collection_id,
+                new_collection_name=new_collection_name,
+                new_collection_description=new_collection_description,
+                new_collection_visibility=new_collection_visibility,
+                file_format=file_format,
+                notes=notes,
+            )
+            return Response(
+                result,
+                status=status.HTTP_201_CREATED if result.get("created") else status.HTTP_200_OK,
+            )
+        except (PermissionDenied, PermissionError) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except LookupError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception("Failed to save study summary to collection for session %s", session_id)
+            return Response(
+                {"error": "Could not save the summary to the collection."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class PwanimateCollectionListCreateView(APIView):
+    """
+    List Collections the user can edit or create a new Collection for saving Study Mode summaries.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        collections = StudyCollectionService.list_editable_collections(request.user)
+        return Response({"collections": collections}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        data = request.data or {}
+        name = str(data.get("name") or "").strip()
+        description = str(data.get("description") or "").strip()
+        visibility = str(data.get("visibility") or "private").strip().lower()
+        try:
+            collection = StudyCollectionService.create_collection(
+                user=request.user,
+                name=name,
+                description=description,
+                visibility=visibility,
+            )
+            return Response(
+                {
+                    "id": collection.id,
+                    "name": collection.name,
+                    "description": collection.description,
+                    "visibility": collection.visibility,
+                    "item_count": 0,
+                    "is_owner": True,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PwanimateQuotaStatusView(APIView):

@@ -70,12 +70,19 @@ class PwanimateUIView(View):
 
     @method_decorator(login_required)
     def get(self, request: HttpRequest, conversation_id=None) -> HttpResponse:
+        from pwanimate.services.study_session import StudySessionService
+
         active_conversation = None
         messages = []
+        active_study_session = None
+        resumable_study_session = None
+        unavailable_resource_notices = []
 
         if conversation_id:
             try:
-                active_conversation = PwanimateConversation.objects.get(
+                active_conversation = PwanimateConversation.objects.select_related(
+                    "study_session", "study_session__latest_checkpoint"
+                ).get(
                     id=conversation_id,
                     user=request.user,
                 )
@@ -83,14 +90,24 @@ class PwanimateUIView(View):
             except PwanimateConversation.DoesNotExist:
                 raise Http404("Conversation not found.")
 
-        user_conversations = PwanimateConversation.objects.filter(
-            user=request.user
-        ).order_by("-updated_at")
+        history_filter = (
+            "study"
+            if (request.GET.get("filter") or "").strip().lower() == "study"
+            else "all"
+        )
+        user_conversations = (
+            PwanimateConversation.objects.filter(user=request.user)
+            .select_related("study_session", "study_session__latest_checkpoint")
+            .order_by("-updated_at")
+        )
+        if history_filter == "study":
+            user_conversations = user_conversations.filter(study_session__isnull=False)
 
         paginator = Paginator(user_conversations, 15)
         page_obj = paginator.get_page(1)
 
         initial_prompt = request.GET.get("prompt", "").strip()
+        initial_study_mode = request.GET.get("study", "").strip().lower() in {"1", "true", "yes"}
 
         initial_context_resources = []
         context_document_id = request.GET.get("context_document", "").strip()
@@ -194,6 +211,42 @@ class PwanimateUIView(View):
                         "pageNumber": page_number,
                     })
 
+        if active_conversation:
+            study_session_obj = StudySessionService.get_session_for_conversation(
+                request.user, active_conversation
+            )
+            if study_session_obj:
+                if (
+                    request.GET.get("resume", "").strip().lower() in {"1", "true", "yes"}
+                    and study_session_obj.status == "paused"
+                ):
+                    study_session_obj = StudySessionService.resume_session(
+                        study_session_obj, user=request.user
+                    )
+                restored_resources, unavailable_resource_notices = (
+                    StudySessionService.restore_context_state(
+                        session=study_session_obj,
+                        user=request.user,
+                    )
+                )
+                existing_keys = {
+                    (r.get("sourceType"), r.get("documentShareId") or r.get("attachmentId"))
+                    for r in initial_context_resources
+                }
+                for item in restored_resources:
+                    key = (
+                        item.get("sourceType"),
+                        item.get("documentShareId") or item.get("attachmentId"),
+                    )
+                    if key not in existing_keys:
+                        initial_context_resources.append(item)
+                        existing_keys.add(key)
+                active_study_session = StudySessionService.serialize_session(study_session_obj)
+        else:
+            resumable_obj = StudySessionService.get_resumable_session(request.user)
+            if resumable_obj:
+                resumable_study_session = StudySessionService.serialize_session(resumable_obj)
+
         settings_ctx = _get_settings_context(request)
         context = {
             **settings_ctx,
@@ -204,7 +257,12 @@ class PwanimateUIView(View):
             "active_conversation_id": str(active_conversation.id) if active_conversation else "",
             "messages": messages,
             "initial_prompt": initial_prompt,
+            "initial_study_mode": initial_study_mode,
             "initial_context_resources": initial_context_resources,
+            "active_study_session": active_study_session,
+            "resumable_study_session": resumable_study_session,
+            "unavailable_resource_notices": unavailable_resource_notices,
+            "history_filter": history_filter,
         }
 
         if request.headers.get("HX-Request"):
@@ -220,17 +278,26 @@ class PwanimateUIView(View):
 class PwanimateConversationHistoryView(View):
     """
     Paginated conversation history partial endpoint for infinite scroll lazy loading.
-    Accepts page and active_id query parameters.
+    Accepts page, active_id, and filter query parameters.
     """
 
     @method_decorator(login_required)
     def get(self, request: HttpRequest) -> HttpResponse:
         page = request.GET.get("page", 1)
         active_id = request.GET.get("active_id", "").strip()
+        history_filter = (
+            "study"
+            if (request.GET.get("filter") or "").strip().lower() == "study"
+            else "all"
+        )
 
-        user_conversations = PwanimateConversation.objects.filter(
-            user=request.user
-        ).order_by("-updated_at")
+        user_conversations = (
+            PwanimateConversation.objects.filter(user=request.user)
+            .select_related("study_session", "study_session__latest_checkpoint")
+            .order_by("-updated_at")
+        )
+        if history_filter == "study":
+            user_conversations = user_conversations.filter(study_session__isnull=False)
 
         paginator = Paginator(user_conversations, 15)
         try:
@@ -243,6 +310,7 @@ class PwanimateConversationHistoryView(View):
             "has_next": page_obj.has_next(),
             "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
             "active_conversation_id": active_id,
+            "history_filter": history_filter,
             "is_paginated_chunk": True,
         }
         return render(request, "pwanimate/partials/conversation_list.html", context)

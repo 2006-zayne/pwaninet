@@ -40,6 +40,8 @@ class OrchestrationRequest:
     context_resources: List[Dict[str, Any]] = field(default_factory=list)
     local_time: Optional[str] = None
     timezone_name: Optional[str] = None
+    study_mode: bool = False
+    study_context: Optional[Any] = None
 
     def __post_init__(self):
         if not isinstance(self.query, str) or not self.query.strip():
@@ -113,6 +115,7 @@ class OrchestrationResponse:
     quota_info: Optional[Dict[str, Any]] = None
     people: List[Dict[str, Any]] = field(default_factory=list)
     finish_reason: Optional[str] = None
+    warnings: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert response to clean JSON-serializable dictionary."""
@@ -134,6 +137,7 @@ class OrchestrationResponse:
             },
             "metadata": dict(self.metadata),
             "quota_info": dict(self.quota_info) if self.quota_info else None,
+            "warnings": list(self.warnings),
         }
         if self.people:
             d["blocks"] = [{"type": "people", "people": list(self.people)}]

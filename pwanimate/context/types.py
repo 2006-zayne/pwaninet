@@ -417,6 +417,7 @@ class ContextPackage:
     tool_results: List[ToolResult] = field(default_factory=list)
     conversation: List[Any] = field(default_factory=list)
     attachment_context: Optional[str] = None
+    study_context_block: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -437,6 +438,8 @@ class ContextPackage:
         
         if self.attachment_context:
             data["attachment_context"] = self.attachment_context
+        if self.study_context_block:
+            data["study_context_block"] = self.study_context_block
         if self.user_context and hasattr(self.user_context, "to_dict"):
             data["user_context"] = self.user_context.to_dict()
         elif self.user_context is not None:
@@ -469,6 +472,10 @@ class ContextPackage:
             user_text = self.user_context.format_context_block()
             if user_text:
                 sections.append(user_text)
+
+        # Study Mode session continuity & learning checkpoint context
+        if self.study_context_block:
+            sections.append(self.study_context_block)
 
         # Explicit resources (highest priority)
         if self.explicit_resources:
@@ -511,6 +518,7 @@ class ContextPackage:
             self.tool_results or
             self.conversation or
             self.attachment_context or
+            self.study_context_block or
             self.student_context or
             self.user_context
         )

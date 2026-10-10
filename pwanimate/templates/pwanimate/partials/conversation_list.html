@@ -1,41 +1,72 @@
 {% load i18n %}
 {% if conversations %}
     {% for conv in conversations %}
-        <div class="pwanimate-conversation-item {% if active_conversation and active_conversation.id == conv.id or active_conversation_id and active_conversation_id == conv.id|stringformat:'s' %}active{% endif %}"
+        <div class="pwanimate-conversation-item {% if conv.study_session %}is-study-session{% endif %} {% if active_conversation and active_conversation.id == conv.id or active_conversation_id and active_conversation_id == conv.id|stringformat:'s' %}active{% endif %}"
              data-id="{{ conv.id }}"
-             hx-get="{% url 'pwanimate:conversation_detail' conv.id %}"
+             {% if conv.study_session %}
+             data-study-session-id="{{ conv.study_session.id }}"
+             data-study-status="{{ conv.study_session.status }}"
+             {% endif %}
+             hx-get="{% url 'pwanimate:conversation_detail' conv.id %}{% if history_filter == 'study' %}?filter=study{% endif %}"
              hx-target="#page-content-target"
              hx-swap="innerHTML"
              hx-push-url="true"
              role="button"
              tabindex="0">
             <div class="pwanimate-conversation-info">
-                <div class="pwanimate-conversation-title" title="{{ conv.title }}">
-                    {{ conv.title|default:_("New Conversation") }}
+                <div class="pwanimate-conversation-title d-flex align-items-center gap-1" title="{{ conv.title }}">
+                    {% if conv.study_session %}
+                        <i class="bi bi-mortarboard-fill text-primary flex-shrink-0" title="{% trans 'Study Mode Session' %}"></i>
+                    {% endif %}
+                    <span class="text-truncate">{{ conv.title|default:_("New Conversation") }}</span>
                 </div>
+                {% if conv.study_session %}
+                    <div class="pwanimate-conversation-study-meta d-flex align-items-center gap-1 mt-1">
+                        <span class="badge rounded-pill pwanimate-study-status-badge status-{{ conv.study_session.status }}">
+                            {% if conv.study_session.status == 'active' %}
+                                {% trans "Active" %}
+                            {% elif conv.study_session.status == 'paused' %}
+                                {% trans "Paused" %}
+                            {% else %}
+                                {% trans "Completed" %}
+                            {% endif %}
+                        </span>
+                        {% if conv.study_session.current_topic %}
+                            <span class="text-muted text-truncate" style="font-size: 0.7rem; max-width: 115px;" title="{{ conv.study_session.current_topic }}">
+                                {{ conv.study_session.current_topic }}
+                            </span>
+                        {% endif %}
+                    </div>
+                {% endif %}
                 <div class="pwanimate-conversation-time">
                     <time data-ts="{{ conv.updated_at|date:'c' }}">{{ conv.updated_at|timesince }} {% trans "ago" %}</time>
                 </div>
             </div>
-            <button type="button"
-                    class="pwanimate-conversation-delete"
-                    data-conversation-id="{{ conv.id }}"
-                    aria-label="{% trans 'Delete conversation' %}"
-                    title="{% trans 'Delete conversation' %}"
-                    onclick="event.stopPropagation(); event.preventDefault(); window.handleDeletePwanimateConversation('{{ conv.id }}');">
-                <i class="bi bi-trash3"></i>
-            </button>
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                <button type="button"
+                        class="pwanimate-conversation-delete"
+                        data-conversation-id="{{ conv.id }}"
+                        aria-label="{% trans 'Delete conversation' %}"
+                        title="{% trans 'Delete conversation' %}"
+                        onclick="event.stopPropagation(); event.preventDefault(); window.handleDeletePwanimateConversation('{{ conv.id }}');">
+                    <i class="bi bi-trash3"></i>
+                </button>
+            </div>
         </div>
     {% endfor %}
 {% elif not is_paginated_chunk %}
     <div class="text-center text-muted p-3 x-small">
-        {% trans "No conversations yet. Ask a question to start one!" %}
+        {% if history_filter == 'study' %}
+            {% trans "No study sessions yet. Toggle Study Mode or type @study to begin!" %}
+        {% else %}
+            {% trans "No conversations yet. Ask a question to start one!" %}
+        {% endif %}
     </div>
 {% endif %}
 
 {% if has_next %}
 <div class="pwanimate-history-sentinel text-center py-2"
-     hx-get="{% url 'pwanimate:conversation_history' %}?page={{ next_page }}{% if active_conversation_id %}&active_id={{ active_conversation_id }}{% endif %}"
+     hx-get="{% url 'pwanimate:conversation_history' %}?page={{ next_page }}{% if active_conversation_id %}&active_id={{ active_conversation_id }}{% endif %}{% if history_filter == 'study' %}&filter=study{% endif %}"
      hx-trigger="revealed"
      hx-swap="outerHTML">
     <div class="spinner-border spinner-border-sm text-primary opacity-50" role="status" style="width: 1rem; height: 1rem;">

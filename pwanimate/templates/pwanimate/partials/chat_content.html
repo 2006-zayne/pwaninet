@@ -1,8 +1,16 @@
 {% load i18n %}
 {% load static %}
 
-<div class="pwanimate-workspace" id="pwanimate-workspace" data-conversation-id="{{ active_conversation_id }}">
+<div class="pwanimate-workspace"
+     id="pwanimate-workspace"
+     data-conversation-id="{{ active_conversation_id }}"
+     data-initial-study-mode="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}true{% else %}false{% endif %}"
+     data-study-mode="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}true{% else %}false{% endif %}"
+     data-study-session-id="{{ active_study_session.id|default:'' }}">
     {{ initial_context_resources|json_script:"pwanimate-initial-context-resources" }}
+    {{ active_study_session|json_script:"pwanimate-active-study-session" }}
+    {{ resumable_study_session|json_script:"pwanimate-resumable-study-session" }}
+    {{ unavailable_resource_notices|json_script:"pwanimate-unavailable-resource-notices" }}
     <!-- Mobile Hamburger Menu Offcanvas (Aligned to d-xl-none to match desktop rail collapse <1200px) -->
     <div class="offcanvas offcanvas-end pwanimate-offcanvas d-xl-none" tabindex="-1" id="pwanimateMobileMenu" aria-labelledby="pwanimateMobileMenuLabel">
         <div class="offcanvas-header border-bottom">
@@ -48,10 +56,10 @@
                 </div>
             </div>
 
-            <!-- New Chat Button -->
-            <div class="mb-3 flex-shrink-0">
+            <!-- New Chat / Study Buttons -->
+            <div class="mb-3 d-flex gap-2 flex-shrink-0">
                 <a href="{% url 'pwanimate:index' %}"
-                   class="btn btn-primary w-100 btn-sm d-flex align-items-center justify-content-center gap-2"
+                   class="btn btn-primary flex-grow-1 btn-sm d-flex align-items-center justify-content-center gap-1"
                    data-bs-dismiss="offcanvas"
                    hx-get="{% url 'pwanimate:index' %}"
                    hx-target="#page-content-target"
@@ -60,10 +68,40 @@
                     <i class="bi bi-plus-lg"></i>
                     <span class="fw-semibold">{% trans "New Chat" %}</span>
                 </a>
+                <a href="{% url 'pwanimate:index' %}?study=1"
+                   class="btn btn-outline-primary btn-sm d-flex align-items-center justify-content-center gap-1 px-3"
+                   data-bs-dismiss="offcanvas"
+                   hx-get="{% url 'pwanimate:index' %}?study=1"
+                   hx-target="#page-content-target"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
+                    <i class="bi bi-mortarboard-fill"></i>
+                    <span class="fw-semibold">{% trans "Study" %}</span>
+                </a>
             </div>
 
             <!-- Chat History -->
-            <h6 class="fw-bold mb-2 mt-2 text-muted small text-uppercase flex-shrink-0">{% trans "Chat History" %}</h6>
+            <div class="d-flex align-items-center justify-content-between mb-2 mt-2 flex-shrink-0">
+                <h6 class="fw-bold mb-0 text-muted small text-uppercase">{% trans "History" %}</h6>
+                <div class="btn-group btn-group-sm pwanimate-history-filter-group" role="group" aria-label="{% trans 'Filter mobile conversations' %}">
+                    <button type="button"
+                            class="btn btn-xs {% if history_filter != 'study' %}btn-primary active{% else %}btn-outline-secondary{% endif %}"
+                            hx-get="{% url 'pwanimate:conversation_history' %}?page=1&filter=all{% if active_conversation_id %}&active_id={{ active_conversation_id }}{% endif %}"
+                            hx-target="#pwanimate-mobile-list"
+                            hx-swap="innerHTML"
+                            onclick="this.parentElement.querySelectorAll('button').forEach(b => { b.classList.remove('btn-primary', 'active'); b.classList.add('btn-outline-secondary'); }); this.classList.remove('btn-outline-secondary'); this.classList.add('btn-primary', 'active');">
+                        {% trans "All" %}
+                    </button>
+                    <button type="button"
+                            class="btn btn-xs {% if history_filter == 'study' %}btn-primary active{% else %}btn-outline-secondary{% endif %}"
+                            hx-get="{% url 'pwanimate:conversation_history' %}?page=1&filter=study{% if active_conversation_id %}&active_id={{ active_conversation_id }}{% endif %}"
+                            hx-target="#pwanimate-mobile-list"
+                            hx-swap="innerHTML"
+                            onclick="this.parentElement.querySelectorAll('button').forEach(b => { b.classList.remove('btn-primary', 'active'); b.classList.add('btn-outline-secondary'); }); this.classList.remove('btn-outline-secondary'); this.classList.add('btn-primary', 'active');">
+                        <i class="bi bi-mortarboard-fill me-1"></i>{% trans "Study" %}
+                    </button>
+                </div>
+            </div>
             <div class="flex-grow-1 pwanimate-left-rail-list" id="pwanimate-mobile-list" style="min-height: 0; overflow-y: auto;">
                 {% include 'pwanimate/partials/conversation_list.html' %}
             </div>
@@ -131,7 +169,7 @@
                                 <i class="bi bi-file-earmark me-1" id="previewSheetCategoryIcon"></i>
                                 <span id="previewSheetCategoryText">{% trans "Document" %}</span>
                             </span>
-                            <span class="badge rounded-pill bg-light text-dark border d-none" id="previewSheetLocationBadge">
+                            <span class="badge rounded-pill pwanimate-meta-pill d-none" id="previewSheetLocationBadge">
                                 <i class="bi bi-bookmark me-1"></i><span id="previewSheetLocationText">p. 1</span>
                             </span>
                         </div>
@@ -225,7 +263,7 @@
                                     <i class="bi bi-file-earmark me-1" id="mobileContextCategoryIcon"></i>
                                     <span id="mobileContextCategoryText">{% trans "Document" %}</span>
                                 </span>
-                                <span class="badge rounded-pill bg-light text-dark border" id="mobileContextLocationBadge">
+                                <span class="badge rounded-pill pwanimate-meta-pill" id="mobileContextLocationBadge">
                                     <i class="bi bi-bookmark me-1"></i><span id="mobileContextLocationText">p. 1</span>
                                 </span>
                             </div>
@@ -299,6 +337,100 @@
                 <i class="bi bi-layout-sidebar-reverse"></i>
                 <span class="small ms-1">{% trans "Context" %}</span>
             </button>
+        </div>
+
+        <!-- Persistent Study Session Header Bar (Single Thin Row below Global Pwanimate Header) -->
+        <div class="pwanimate-study-session-banner {% if not active_study_session and not initial_study_mode %}d-none{% endif %}"
+             id="pwanimate-study-session-banner"
+             data-session-id="{{ active_study_session.id|default:'' }}"
+             data-study-session-id="{{ active_study_session.id|default:'' }}"
+             data-session-status="{{ active_study_session.status|default:'active' }}"
+             aria-live="polite">
+            <div class="pwanimate-study-banner-main">
+                <span class="badge rounded-pill pwanimate-study-status-badge status-{{ active_study_session.status|default:'active' }}" id="pwanimateStudyBannerStatusBadge">
+                    <i class="bi bi-mortarboard-fill"></i>
+                    <span id="pwanimateStudyBannerStatusText" class="pwanimate-study-status-label">
+                        {% if active_study_session.status == 'paused' %}
+                            {% trans "Paused" %}
+                        {% elif active_study_session.status == 'completed' %}
+                            {% trans "Completed" %}
+                        {% else %}
+                            {% trans "Study" %}
+                        {% endif %}
+                    </span>
+                </span>
+                <span class="pwanimate-study-banner-title text-truncate" id="pwanimateStudyBannerTitle">
+                    {% if active_study_session %}
+                        {{ active_study_session.title|default:_("Study Session") }}
+                    {% else %}
+                        {% trans "New Study Session" %}
+                    {% endif %}
+                </span>
+                <span class="pwanimate-study-banner-topic d-none d-md-inline text-truncate {% if not active_study_session.current_topic and not active_study_session.learning_objective %}d-none{% endif %}" id="pwanimateStudyBannerTopic">
+                    • {% if active_study_session %}{% if active_study_session.current_topic %}{{ active_study_session.current_topic }}{% elif active_study_session.learning_objective %}{{ active_study_session.learning_objective }}{% endif %}{% endif %}
+                </span>
+                <span class="pwanimate-study-banner-next d-none d-xl-inline-flex align-items-center text-truncate {% if not active_study_session.latest_checkpoint or not active_study_session.latest_checkpoint.recommended_next_step %}d-none{% endif %}" id="pwanimateStudyBannerNextStep">
+                    <i class="bi bi-compass text-primary me-1"></i>
+                    <span id="pwanimateStudyBannerNextStepText">{{ active_study_session.latest_checkpoint.recommended_next_step|default:'' }}</span>
+                </span>
+            </div>
+            <div class="pwanimate-study-banner-actions">
+                <button type="button"
+                        class="pwanimate-study-header-btn"
+                        id="pwanimateStudyCheckpointBtn"
+                        title="{% trans 'View or save learning checkpoint' %}"
+                        aria-label="{% trans 'Checkpoint' %}">
+                    <i class="bi bi-flag-fill"></i>
+                    <span class="pwanimate-study-btn-label">{% trans "Checkpoint" %}</span>
+                </button>
+                <button type="button"
+                        class="pwanimate-study-header-btn"
+                        id="pwanimateStudySummaryBtn"
+                        title="{% trans 'Generate study summary, export PDF/Word, or save to Collection' %}"
+                        aria-label="{% trans 'Summary & Save' %}">
+                    <i class="bi bi-journal-text"></i>
+                    <span class="pwanimate-study-btn-label">{% trans "Summary" %}</span>
+                </button>
+                <button type="button"
+                        class="pwanimate-study-header-btn is-muted"
+                        id="pwanimateStudyPauseResumeBtn"
+                        data-action="{% if active_study_session.status == 'paused' %}resume{% else %}pause{% endif %}"
+                        data-study-status-action="{% if active_study_session.status == 'paused' %}resume{% else %}pause{% endif %}"
+                        title="{% if active_study_session.status == 'paused' %}{% trans 'Resume study session' %}{% else %}{% trans 'Pause study session' %}{% endif %}"
+                        aria-label="{% if active_study_session.status == 'paused' %}{% trans 'Resume' %}{% else %}{% trans 'Pause' %}{% endif %}">
+                    <i class="bi {% if active_study_session.status == 'paused' %}bi-play-fill{% else %}bi-pause-fill{% endif %}" id="pwanimateStudyPauseResumeIcon"></i>
+                    <span class="pwanimate-study-btn-label" id="pwanimateStudyPauseResumeText">
+                        {% if active_study_session.status == 'paused' %}{% trans "Resume" %}{% else %}{% trans "Pause" %}{% endif %}
+                    </span>
+                </button>
+                <button type="button"
+                        class="pwanimate-study-header-btn is-danger {% if active_study_session.status == 'completed' %}d-none{% endif %}"
+                        id="pwanimateStudyEndBtn"
+                        title="{% trans 'End study session (preserves full history)' %}"
+                        aria-label="{% trans 'End session' %}">
+                    <i class="bi bi-check2-circle"></i>
+                    <span class="pwanimate-study-btn-label">{% trans "End" %}</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Unavailable Source / Missing Extraction Notice Banner -->
+        <div class="pwanimate-unavailable-source-banner {% if not unavailable_resource_notices %}d-none{% endif %}"
+             id="pwanimate-unavailable-source-banner"
+             role="status"
+             aria-live="polite">
+            <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-warning mt-1 flex-shrink-0"></i>
+                <div class="flex-grow-1 small" id="pwanimate-unavailable-source-list">
+                    {% for notice in unavailable_resource_notices %}
+                        <div>{{ notice.message }}</div>
+                    {% endfor %}
+                </div>
+                <button type="button"
+                        class="btn-close btn-sm"
+                        aria-label="{% trans 'Dismiss notice' %}"
+                        onclick="document.getElementById('pwanimate-unavailable-source-banner').classList.add('d-none');"></button>
+            </div>
         </div>
 
         <!-- Transcript Area -->
@@ -377,15 +509,15 @@
                                                                data-page-number="{{ src.page_number|default:'' }}"
                                                                data-document-id="{{ src.document_id|default:'' }}"
                                                                data-document-share-id="{{ src.document_share_id|default:'' }}"
-                                                               data-file-type="{{ src.file_type|default:src.file_extension|default:'' }}"
+                                                               data-file-type="{% if src.file_type %}{{ src.file_type }}{% elif src.file_extension %}{{ src.file_extension }}{% endif %}"
                                                                {% if src.person %}
                                                                data-username="{{ src.person.username|default:''|escape }}"
                                                                data-profile-url="{{ src.person.profile_url|default:''|escape }}"
                                                                data-profile-card-url="{{ src.person.profile_card_url|default:''|escape }}"
-                                                               data-avatar-url="{{ src.person.avatar_url|default:src.person.profile_photo_url|default:''|escape }}"
+                                                               data-avatar-url="{% if src.person.avatar_url %}{{ src.person.avatar_url|escape }}{% elif src.person.profile_photo_url %}{{ src.person.profile_photo_url|escape }}{% endif %}"
                                                                data-headline="{{ src.person.headline|default:''|escape }}"
                                                                data-academic-level="{{ src.person.academic_level|default:''|escape }}"
-                                                               data-programme-name="{{ src.person.programme_name|default:src.person.programme|default:''|escape }}"
+                                                               data-programme-name="{% if src.person.programme_name %}{{ src.person.programme_name|escape }}{% elif src.person.programme %}{{ src.person.programme|escape }}{% endif %}"
                                                                data-bio="{{ src.person.bio|default:''|escape }}"
                                                                {% endif %}
                                                                aria-label="View {% if src.title %}{{ src.title|escape }}{% elif src.citation %}{{ src.citation|escape }}{% else %}{% trans 'Document' %}{% endif %}">
@@ -451,6 +583,94 @@
                     <p class="pwanimate-empty-greeting" id="pwanimate-empty-greeting" aria-live="polite"></p>
                     <p class="pwanimate-empty-question" id="pwanimate-empty-question"></p>
 
+                    <!-- Resumable Study Session Banner Card (Shown on home screen when an active or paused session exists) -->
+                    {% if resumable_study_session and not initial_study_mode %}
+                    <div class="pwanimate-resume-study-card"
+                         id="pwanimate-resume-study-card"
+                         data-session-id="{{ resumable_study_session.id }}"
+                         data-study-session-id="{{ resumable_study_session.id }}"
+                         data-conversation-id="{{ resumable_study_session.conversation_id }}"
+                         aria-live="polite">
+                        <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                            <div class="d-flex align-items-center gap-2 min-w-0">
+                                <div class="pwanimate-resume-study-icon flex-shrink-0">
+                                    <i class="bi bi-mortarboard-fill"></i>
+                                </div>
+                                <div class="text-start min-w-0">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="badge rounded-pill pwanimate-study-status-badge status-{{ resumable_study_session.status }}">
+                                            {% if resumable_study_session.status == 'active' %}
+                                                {% trans "Active Study Session" %}
+                                            {% else %}
+                                                {% trans "Paused Study Session" %}
+                                            {% endif %}
+                                        </span>
+                                        {% if resumable_study_session.context_state.active_document_title %}
+                                            <span class="badge rounded-pill pwanimate-meta-pill text-truncate" style="max-width: 220px;">
+                                                <i class="bi bi-book-half me-1 text-primary"></i>{{ resumable_study_session.context_state.active_document_title }}
+                                                {% if resumable_study_session.context_state.active_page %}
+                                                    (p. {{ resumable_study_session.context_state.active_page }})
+                                                {% endif %}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <h3 class="pwanimate-resume-study-title text-truncate mb-0 mt-1">
+                                        {{ resumable_study_session.title|default:_("Study Session") }}
+                                    </h3>
+                                </div>
+                            </div>
+                            <button type="button"
+                                    class="btn btn-sm pwanimate-resume-dismiss-btn p-1 flex-shrink-0"
+                                    id="pwanimateDismissResumeBannerBtn"
+                                    data-session-id="{{ resumable_study_session.id }}"
+                                    data-study-session-id="{{ resumable_study_session.id }}"
+                                    title="{% trans 'Dismiss banner' %}"
+                                    aria-label="{% trans 'Dismiss banner' %}">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+
+                        {% if resumable_study_session.current_topic or resumable_study_session.learning_objective %}
+                            <p class="pwanimate-resume-focus-text small text-start mb-2">
+                                <strong>{% trans "Focus:" %}</strong>
+                                {% if resumable_study_session.current_topic %}{{ resumable_study_session.current_topic }}{% elif resumable_study_session.learning_objective %}{{ resumable_study_session.learning_objective }}{% endif %}
+                            </p>
+                        {% endif %}
+
+                        {% if resumable_study_session.latest_checkpoint and resumable_study_session.latest_checkpoint.recommended_next_step %}
+                            <div class="pwanimate-resume-next-step text-start small mb-3">
+                                <i class="bi bi-compass-fill text-primary me-1"></i>
+                                <strong>{% trans "Recommended next step:" %}</strong>
+                                <span>{{ resumable_study_session.latest_checkpoint.recommended_next_step }}</span>
+                            </div>
+                        {% endif %}
+
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <a href="{% url 'pwanimate:conversation_detail' resumable_study_session.conversation_id %}?resume=1"
+                               class="btn btn-primary btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1"
+                               id="pwanimateResumeStudySessionBtn"
+                               data-session-id="{{ resumable_study_session.id }}"
+                               data-study-session-id="{{ resumable_study_session.id }}"
+                               data-conversation-id="{{ resumable_study_session.conversation_id }}"
+                               hx-get="{% url 'pwanimate:conversation_detail' resumable_study_session.conversation_id %}?resume=1"
+                               hx-target="#page-content-target"
+                               hx-swap="innerHTML"
+                               hx-push-url="true">
+                                <i class="bi bi-play-circle-fill"></i>
+                                <span>{% trans "Resume Session" %}</span>
+                            </a>
+                            <button type="button"
+                                    class="btn btn-outline-primary btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1"
+                                    id="pwanimateStartNewStudySessionBtn"
+                                    data-session-id="{{ resumable_study_session.id }}"
+                                    data-study-session-id="{{ resumable_study_session.id }}">
+                                <i class="bi bi-plus-circle"></i>
+                                <span>{% trans "Start New Study Session" %}</span>
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <!-- Document Study Card (Shown when a repository book or PDF is open in Context Rail) -->
                     <div class="pwanimate-document-study-card d-none" id="pwanimate-document-study-card" aria-live="polite">
                         <div class="pwanimate-study-card-header">
@@ -460,7 +680,7 @@
                             <div class="pwanimate-study-card-info">
                                 <div class="pwanimate-study-card-badges">
                                     <span class="badge rounded-pill bg-primary-subtle text-primary d-none" id="pwanimate-study-card-unit"></span>
-                                    <span class="badge rounded-pill bg-light text-dark border" id="pwanimate-study-card-page">
+                                    <span class="badge rounded-pill pwanimate-meta-pill" id="pwanimate-study-card-page">
                                         <i class="bi bi-file-earmark-richtext me-1"></i><span>Page 1</span>
                                     </span>
                                 </div>
@@ -508,7 +728,7 @@
                     <i class="bi bi-book-half text-primary"></i>
                     <span class="pwanimate-live-page-title text-truncate" id="pwanimate-live-page-title">Document</span>
                     <span class="badge rounded-pill bg-primary-subtle text-primary d-none" id="pwanimate-live-page-unit"></span>
-                    <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis" id="pwanimate-live-page-badge">p. 1</span>
+                    <span class="badge rounded-pill pwanimate-meta-pill" id="pwanimate-live-page-badge">p. 1</span>
                 </div>
                 <div class="pwanimate-live-page-actions">
                     <button type="button" class="pwanimate-live-page-pill" data-study-action="summarize_book" title="{% trans 'Get an overview summary of the entire document' %}">
@@ -532,6 +752,14 @@
             <form id="pwanimate-composer-form" class="pwanimate-composer-box" onsubmit="return false;">
                 <!-- Staged Attachments Strip -->
                 <div class="pwanimate-composer-attachments d-none" id="pwanimate-composer-attachments"></div>
+
+                <!-- @study Command Autocomplete Hint -->
+                <div class="pwanimate-study-cmd-hint d-none" id="pwanimate-study-cmd-hint" role="listbox" aria-label="{% trans 'Study command suggestion' %}">
+                    <button type="button" class="pwanimate-study-cmd-option" id="pwanimateStudyCmdApplyBtn">
+                        <span class="badge rounded-pill bg-primary me-2"><i class="bi bi-mortarboard-fill me-1"></i>@study</span>
+                        <span class="small">{% trans "Activate persistent Study Mode with learning checkpoints & document tracking" %}</span>
+                    </button>
+                </div>
 
                 <!-- Hidden file inputs for attachment picking -->
                 <input type="file" id="pwanimatePhotoInput" accept="image/jpeg,image/png,image/gif,image/webp" multiple class="d-none" style="display: none;">
@@ -563,7 +791,7 @@
                     <textarea id="pwanimate-input"
                               class="pwanimate-textarea"
                               rows="1"
-                              placeholder="{% trans 'Message Pwanimate...' %}"
+                              placeholder="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}{% trans 'Study Mode: Ask a question or type @study <topic>...' %}{% else %}{% trans 'Ask Pwanimate anything... (Tip: type @study for Study Mode)' %}{% endif %}"
                               aria-label="{% trans 'Message Pwanimate' %}">{{ initial_prompt }}</textarea>
                 </div>
                 <div class="pwanimate-composer-action-row">
@@ -761,6 +989,167 @@
         </div>
     </div>
 
+    <!-- Study Mode Checkpoint, Summary & Save-to-Collection Modal -->
+    <div class="modal fade pwanimate-study-modal" id="pwanimateStudyModal" tabindex="-1" aria-labelledby="pwanimateStudyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-mortarboard-fill text-primary fs-5"></i>
+                        <h5 class="modal-title fw-bold mb-0" id="pwanimateStudyModalLabel">{% trans "Study Mode Progress & Summary" %}</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <ul class="nav nav-pills mb-3 gap-2" id="pwanimateStudyModalTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active d-flex align-items-center gap-1 py-1 px-3"
+                                    id="pwanimateStudyTabCheckpointBtn"
+                                    data-bs-toggle="pill"
+                                    data-bs-target="#pwanimateStudyTabCheckpoint"
+                                    type="button"
+                                    role="tab">
+                                <i class="bi bi-flag-fill"></i>
+                                <span>{% trans "Learning Checkpoint" %}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link d-flex align-items-center gap-1 py-1 px-3"
+                                    id="pwanimateStudyTabSummaryBtn"
+                                    data-bs-toggle="pill"
+                                    data-bs-target="#pwanimateStudyTabSummary"
+                                    type="button"
+                                    role="tab">
+                                <i class="bi bi-journal-text"></i>
+                                <span>{% trans "Session Summary & Save to Collection" %}</span>
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- TAB 1: LEARNING CHECKPOINT -->
+                        <div class="tab-pane fade show active" id="pwanimateStudyTabCheckpoint" role="tabpanel">
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold mb-1" for="pwanimateStudyObjectiveInput">{% trans "Learning Objective" %}</label>
+                                    <input type="text" class="form-control form-control-sm" id="pwanimateStudyObjectiveInput" placeholder="{% trans 'e.g. Understand conditional probability and Bayes theorem' %}" value="{{ active_study_session.learning_objective|default:'' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold mb-1" for="pwanimateStudyTopicInput">{% trans "Current Topic" %}</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" class="form-control" id="pwanimateStudyTopicInput" placeholder="{% trans 'Current topic or chapter' %}" value="{{ active_study_session.current_topic|default:'' }}">
+                                        <button type="button" class="btn btn-outline-primary" id="pwanimateSaveStudyMetaBtn">{% trans "Save" %}</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="small fw-bold text-uppercase text-muted">{% trans "Latest Learning Checkpoint" %}</span>
+                                <button type="button" class="btn btn-sm btn-primary rounded-pill d-inline-flex align-items-center gap-1" id="pwanimateGenerateCheckpointNowBtn">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                    <span>{% trans "Update Checkpoint Now" %}</span>
+                                </button>
+                            </div>
+
+                            <div id="pwanimateStudyCheckpointContent" class="pwanimate-study-checkpoint-box p-3 rounded border">
+                                <div class="text-muted small text-center py-3" id="pwanimateStudyCheckpointEmpty">
+                                    {% trans "No learning checkpoint generated yet. Ask a few study questions or click 'Update Checkpoint Now' to snapshot your progress." %}
+                                </div>
+                                <div class="d-none" id="pwanimateStudyCheckpointDetails">
+                                    <div class="mb-2">
+                                        <div class="small fw-semibold text-success"><i class="bi bi-check-circle-fill me-1"></i>{% trans "Concepts Demonstrated by You (Verified)" %}</div>
+                                        <ul class="small mb-2 ps-3" id="pwanimateCkptDemonstratedList"></ul>
+                                    </div>
+                                    <div class="mb-2">
+                                        <div class="small fw-semibold text-primary"><i class="bi bi-book me-1"></i>{% trans "Concepts Explained by Pwanimate" %}</div>
+                                        <ul class="small mb-2 ps-3" id="pwanimateCkptExplainedList"></ul>
+                                    </div>
+                                    <div class="mb-2">
+                                        <div class="small fw-semibold text-warning-emphasis"><i class="bi bi-question-circle me-1"></i>{% trans "Open Questions & Misconceptions to Revisit" %}</div>
+                                        <ul class="small mb-2 ps-3" id="pwanimateCkptMisconceptionsList"></ul>
+                                    </div>
+                                    <div class="mb-2">
+                                        <div class="small fw-semibold text-secondary"><i class="bi bi-lightbulb me-1"></i>{% trans "Assistant's Inferred Understanding Note" %}</div>
+                                        <p class="small text-muted mb-2" id="pwanimateCkptInferredText"></p>
+                                    </div>
+                                    <div class="p-2 rounded bg-primary-subtle text-primary-emphasis small">
+                                        <strong><i class="bi bi-compass me-1"></i>{% trans "Recommended Next Step:" %}</strong>
+                                        <span id="pwanimateCkptNextStepText"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 2: SUMMARY, EXPORT & SAVE TO COLLECTION -->
+                        <div class="tab-pane fade" id="pwanimateStudyTabSummary" role="tabpanel">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                <p class="small text-muted mb-0">
+                                    {% trans "Review or edit your structured study summary before downloading or saving it to a Collection." %}
+                                </p>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" id="pwanimateGenerateSummaryNowBtn">
+                                        <i class="bi bi-stars me-1"></i>{% trans "Generate Summary" %}
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill pwanimate-export-summary-btn" id="pwanimateExportSummaryPdfBtn" data-format="pdf">
+                                        <i class="bi bi-filetype-pdf me-1"></i>{% trans "PDF" %}
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill pwanimate-export-summary-btn" id="pwanimateExportSummaryDocxBtn" data-format="docx">
+                                        <i class="bi bi-filetype-docx me-1"></i>{% trans "Word" %}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="visually-hidden" for="pwanimateStudySummaryTextarea">{% trans "Study Summary Markdown" %}</label>
+                                <textarea class="form-control font-monospace small"
+                                          id="pwanimateStudySummaryTextarea"
+                                          rows="9"
+                                          placeholder="{% trans 'Click Generate Summary to synthesize your study session into structured notes...' %}"></textarea>
+                            </div>
+
+                            <!-- Save to Collection Section -->
+                            <div class="p-3 rounded border pwanimate-study-collection-box">
+                                <h6 class="fw-bold small mb-2 d-flex align-items-center gap-1">
+                                    <i class="bi bi-collection-fill text-primary"></i>
+                                    <span>{% trans "Save Summary to a Document Collection" %}</span>
+                                </h6>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1" for="pwanimateSummaryCollectionSelect">{% trans "Choose Existing Collection" %}</label>
+                                        <select class="form-select form-select-sm" id="pwanimateSummaryCollectionSelect">
+                                            <option value="">{% trans "-- Or create a new collection below --" %}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1" for="pwanimateNewCollectionNameInput">{% trans "Or New Collection Name" %}</label>
+                                        <input type="text" class="form-control form-control-sm" id="pwanimateNewCollectionNameInput" placeholder="{% trans 'e.g. Exam Revision Notes' %}">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1" for="pwanimateSummaryCollectionFormat">{% trans "Document Format" %}</label>
+                                        <select class="form-select form-select-sm" id="pwanimateSummaryCollectionFormat">
+                                            <option value="pdf">{% trans "PDF Document (.pdf)" %}</option>
+                                            <option value="docx">{% trans "Word Document (.docx)" %}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label small mb-1" for="pwanimateSummaryCollectionNotes">{% trans "Collection Item Note (Optional)" %}</label>
+                                        <input type="text" class="form-control form-control-sm" id="pwanimateSummaryCollectionNotes" placeholder="{% trans 'Optional note for this summary' %}">
+                                    </div>
+                                    <div class="col-md-3 d-grid">
+                                        <button type="button" class="btn btn-sm btn-primary" id="pwanimateSaveToCollectionBtn">
+                                            <i class="bi bi-bookmark-plus me-1"></i>{% trans "Save to Collection" %}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="alert alert-sm mt-2 mb-0 py-2 px-3 small d-none" id="pwanimateCollectionSaveFeedback" role="status"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Pwanimate Dedicated Settings Modal -->
     {% include 'pwanimate/settings/partials/settings_modal.html' %}
 </div>
@@ -783,7 +1172,7 @@
             scriptsToLoad.push("{% static 'documents/js/document-viewer.js' %}");
         }
         if (typeof window.initPwanimate !== 'function') {
-            scriptsToLoad.push("{% static 'js/pwanimate/pwanimate-chat.js' %}?v={{ pwanimate_version|default:'2.0.0' }}-20261001-1");
+            scriptsToLoad.push("{% static 'js/pwanimate/pwanimate-chat.js' %}?v={{ pwanimate_version|default:'2.0.0' }}-20261011-1");
         }
 
         function loadNext() {

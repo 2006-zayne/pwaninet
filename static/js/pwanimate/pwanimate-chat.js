@@ -148,6 +148,15 @@
             this.previewDocViewer = null;
             this.contextDocViewer = null;
 
+            // Persistent Study Mode state
+            this.activeStudySession = null;
+            this.resumableStudySession = null;
+            this.unavailableResourceNotices = [];
+            this.studyModeActive = workspace.dataset.studyMode === 'true' || workspace.dataset.initialStudyMode === 'true';
+            this.studySessionId = workspace.dataset.studySessionId || null;
+            this.historyFilter = 'all';
+            this._studyContextSyncTimer = null;
+
             // Model selection & Quota modal state
             this.selectedProvider = localStorage.getItem('pwanimate_selected_provider') || '';
             this.selectedModel = localStorage.getItem('pwanimate_selected_model') || '';
@@ -167,6 +176,7 @@
         init() {
             this.initWorkspaceGeometry();
             this.initInitialContextResources();
+            this.initStudyMode();
             this.initMarkdown();
             this.renderExistingMarkdown();
             this.initEmptyStateWelcome();
@@ -228,6 +238,900 @@
                     let offcanvas = bootstrap.Offcanvas.getInstance(sheetEl);
                     if (!offcanvas) offcanvas = new bootstrap.Offcanvas(sheetEl);
                     offcanvas.show();
+                }
+            }
+        }
+
+        initStudyMode() {
+            const activeJsonEl = document.getElementById('pwanimate-active-study-session');
+            if (activeJsonEl && activeJsonEl.textContent) {
+                try {
+                    const parsed = JSON.parse(activeJsonEl.textContent);
+                    if (parsed && parsed.id) {
+                        this.activeStudySession = parsed;
+                        this.studySessionId = parsed.id;
+                        this.studyModeActive = parsed.status === 'active';
+                    }
+                } catch (err) {
+                    console.warn('[Pwanimate] Could not parse active study session:', err);
+                }
+            }
+
+            const resumableJsonEl = document.getElementById('pwanimate-resumable-study-session');
+            if (resumableJsonEl && resumableJsonEl.textContent) {
+                try {
+                    const parsed = JSON.parse(resumableJsonEl.textContent);
+                    if (parsed && parsed.id) {
+                        this.resumableStudySession = parsed;
+                    }
+                } catch (err) {
+                    console.warn('[Pwanimate] Could not parse resumable study session:', err);
+                }
+            }
+
+            const noticesJsonEl = document.getElementById('pwanimate-unavailable-resource-notices');
+            if (noticesJsonEl && noticesJsonEl.textContent) {
+                try {
+                    const parsed = JSON.parse(noticesJsonEl.textContent);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        this.unavailableResourceNotices = parsed;
+                        this.showUnavailableSourceWarnings(parsed);
+                    }
+                } catch (err) {
+                    console.warn('[Pwanimate] Could not parse unavailable resource notices:', err);
+                }
+            }
+
+            // Restore active document page if specified in activeStudySession.context_state
+            if (this.activeStudySession && this.activeStudySession.context_state) {
+                const activeDocState = this.activeStudySession.context_state.active_document;
+                if (activeDocState && activeDocState.pageNumber && this.contextResources.length > 0) {
+                    const matchIdx = this.contextResources.findIndex(item =>
+                        (activeDocState.documentId && item.documentId === activeDocState.documentId) ||
+                        (activeDocState.documentShareId && item.documentShareId === activeDocState.documentShareId) ||
+                        (activeDocState.attachmentId && item.attachmentId === activeDocState.attachmentId)
+                    );
+                    if (matchIdx >= 0) {
+                        this.contextResources[matchIdx].pageNumber = activeDocState.pageNumber;
+                        this.activeContextIndex = matchIdx;
+                        this.syncContextView();
+                    }
+                }
+            }
+
+            this.syncStudyModeUI();
+            this.initStudyModal();
+        }
+
+        syncStudyModeUI() {
+            const toggleBtn = document.getElementById('pwanimateStudyModeToggleBtn');
+            if (toggleBtn) {
+                const active = Boolean(this.studyModeActive);
+                toggleBtn.classList.toggle('active', active);
+                toggleBtn.classList.toggle('is-active', active);
+                toggleBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+            }
+            if (this.workspace) {
+                this.workspace.dataset.studyMode = this.studyModeActive ? 'true' : 'false';
+                if (this.studySessionId) {
+                    this.workspace.dataset.studySessionId = this.studySessionId;
+                }
+            }
+            if (this.input) {
+                this.input.placeholder = this.studyModeActive
+                    ? 'Study Mode: Ask a question or type @study <topic>...'
+                    : 'Ask Pwanimate anything... (Tip: type @study for Study Mode)';
+            }
+
+            const banner = document.getElementById('pwanimate-study-session-banner');
+            if (!banner) return;
+
+            const hasSession = Boolean(this.activeStudySession && this.activeStudySession.id);
+            if (!hasSession && !this.studyModeActive) {
+                banner.classList.add('d-none');
+                return;
+            }
+
+            banner.classList.remove('d-none');
+            if (hasSession) {
+                banner.dataset.studySessionId = this.activeStudySession.id;
+                banner.dataset.sessionId = this.activeStudySession.id;
+            }
+
+            const session = this.activeStudySession || {};
+            const status = (session.status || (this.studyModeActive ? 'active' : 'paused')).toLowerCase();
+
+            const statusBadge = document.getElementById('pwanimateStudyBannerStatusBadge') ||
+                document.getElementById('pwanimate-study-status-badge');
+            const statusTextEl = document.getElementById('pwanimateStudyBannerStatusText');
+            if (statusBadge) {
+                statusBadge.classList.remove('status-active', 'status-paused', 'status-completed');
+                statusBadge.classList.add(`status-${status}`);
+                const shortLabel = status === 'paused' ? 'Paused' : (status === 'completed' ? 'Completed' : 'Study');
+                if (statusTextEl) {
+                    statusTextEl.textContent = shortLabel;
+                } else {
+                    statusBadge.innerHTML = `<i class="bi bi-mortarboard-fill"></i><span>${escapeHtml(shortLabel)}</span>`;
+                }
+            }
+
+            const titleEl = document.getElementById('pwanimateStudyBannerTitle') ||
+                document.getElementById('pwanimate-study-topic-label');
+            if (titleEl) {
+                titleEl.textContent = session.learning_objective ||
+                    session.title ||
+                    session.current_topic ||
+                    'Guided Study Session';
+            }
+
+            const topicEl = document.getElementById('pwanimateStudyBannerTopic') ||
+                document.getElementById('pwanimate-study-objective-sub');
+            if (topicEl) {
+                const topText = session.current_topic || '';
+                const objText = session.learning_objective || session.title || '';
+                if (topText && topText !== objText) {
+                    topicEl.textContent = `· ${topText}`;
+                    topicEl.classList.remove('d-none');
+                } else {
+                    topicEl.textContent = '';
+                    topicEl.classList.add('d-none');
+                }
+            }
+
+            const nextStepWrap = document.getElementById('pwanimateStudyBannerNextStep');
+            const nextStepText = document.getElementById('pwanimateStudyBannerNextStepText');
+            const nextStepVal = session.latest_checkpoint && session.latest_checkpoint.next_step
+                ? session.latest_checkpoint.next_step
+                : '';
+            if (nextStepWrap && nextStepText) {
+                if (nextStepVal) {
+                    nextStepText.textContent = nextStepVal;
+                    nextStepWrap.classList.remove('d-none');
+                } else {
+                    nextStepText.textContent = '';
+                    nextStepWrap.classList.add('d-none');
+                }
+            }
+
+            const pauseResumeBtn = document.getElementById('pwanimateStudyPauseResumeBtn') ||
+                document.getElementById('pwanimate-study-PauseResumeBtn');
+            const pauseResumeIcon = document.getElementById('pwanimateStudyPauseResumeIcon');
+            const pauseResumeText = document.getElementById('pwanimateStudyPauseResumeText');
+            if (pauseResumeBtn) {
+                const nextAction = status === 'active' ? 'pause' : 'resume';
+                pauseResumeBtn.dataset.action = nextAction;
+                pauseResumeBtn.dataset.studyStatusAction = nextAction;
+                pauseResumeBtn.title = nextAction === 'pause' ? 'Pause Study Session' : 'Resume Study Session';
+                if (pauseResumeIcon && pauseResumeText) {
+                    pauseResumeIcon.className = `bi ${nextAction === 'pause' ? 'bi-pause-fill' : 'bi-play-fill'}`;
+                    pauseResumeText.textContent = nextAction === 'pause' ? 'Pause' : 'Resume';
+                } else {
+                    pauseResumeBtn.innerHTML = nextAction === 'pause'
+                        ? '<i class="bi bi-pause-fill"></i><span class="pwanimate-study-btn-label">Pause</span>'
+                        : '<i class="bi bi-play-fill"></i><span class="pwanimate-study-btn-label">Resume</span>';
+                }
+                pauseResumeBtn.classList.remove('d-none');
+            }
+
+            const endBtn = document.getElementById('pwanimateStudyEndBtn') ||
+                document.getElementById('pwanimate-study-end-btn');
+            if (endBtn) {
+                endBtn.classList.toggle('d-none', status === 'completed');
+            }
+        }
+
+        showUnavailableSourceWarnings(warnings) {
+            if (!Array.isArray(warnings) || warnings.length === 0) return;
+            const banner = document.getElementById('pwanimate-unavailable-source-banner');
+            const listEl = document.getElementById('pwanimate-unavailable-source-list');
+            const textEl = document.getElementById('pwanimate-unavailable-source-text');
+            if (!banner) return;
+            const formatted = warnings.map(w => {
+                if (typeof w === 'object' && w !== null) {
+                    return String(w.message || w.title || '').trim();
+                }
+                return String(w || '').trim();
+            }).filter(Boolean);
+            const uniqueWarnings = Array.from(new Set(formatted));
+            if (!uniqueWarnings.length) return;
+            if (listEl) {
+                listEl.innerHTML = uniqueWarnings.map(msg => `<li>${escapeHtml(msg)}</li>`).join('');
+            } else if (textEl) {
+                textEl.textContent = uniqueWarnings.join(' · ');
+            }
+            banner.classList.remove('d-none');
+        }
+
+        updateStudyCommandHint() {
+            const hintEl = document.getElementById('pwanimate-study-cmd-hint');
+            if (!hintEl || !this.input) return;
+            const raw = this.input.value || '';
+            const trimmedStart = raw.replace(/^\s+/, '');
+            // Show hint only when user is typing a leading @st / @study token (not @studybuddy or mid-sentence)
+            const isLeadingStudyPrefix = /^@(?:s|st|stu|stud|study)(?:\s|$)/i.test(trimmedStart);
+            hintEl.classList.toggle('d-none', !isLeadingStudyPrefix);
+        }
+
+        applyStudyCommandHint() {
+            if (!this.input) return;
+            const raw = this.input.value || '';
+            const match = raw.match(/^\s*@(?:s|st|stu|stud|study)\b\s*(.*)$/i);
+            this.studyModeActive = true;
+            if (match) {
+                const remainder = (match[1] || '').trim();
+                this.input.value = remainder ? `@study ${remainder}` : '@study ';
+            } else if (!/^\s*@study\b/i.test(raw)) {
+                this.input.value = `@study ${raw.trim()}`.trim() + ' ';
+            }
+            this.syncStudyModeUI();
+            this.updateStudyCommandHint();
+            this.updateSendButtonState();
+            this.input.focus();
+        }
+
+        scheduleStudyContextSync() {
+            if (!this.studySessionId) return;
+            if (this._studyContextSyncTimer) {
+                clearTimeout(this._studyContextSyncTimer);
+            }
+            this._studyContextSyncTimer = setTimeout(() => {
+                this._studyContextSyncTimer = null;
+                this.syncStudyContextToServer();
+            }, 600);
+        }
+
+        async syncStudyContextToServer() {
+            if (!this.studySessionId) return;
+            const activeDoc = this.getActiveStudyDocument();
+            const contextResources = this.getContextResourcesForRequest();
+            try {
+                const response = await fetch(`/api/pwanimate/study-sessions/${encodeURIComponent(this.studySessionId)}/`, {
+                    method: 'PATCH',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        context_resources: contextResources,
+                        active_document: activeDoc || null,
+                    }),
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.study_session) {
+                    this.activeStudySession = data.study_session;
+                }
+                if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+                    this.showUnavailableSourceWarnings(data.warnings);
+                }
+            } catch (err) {
+                console.warn('[Pwanimate] Failed to sync study context state:', err);
+            }
+        }
+
+        async ensureStudySession(extraFields = {}) {
+            if (this.studySessionId && this.activeStudySession) {
+                return this.activeStudySession;
+            }
+            try {
+                const response = await fetch('/api/pwanimate/study-sessions/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        conversation_id: this.conversationId || undefined,
+                        create_conversation: Boolean(this.conversationId),
+                        context_resources: this.getContextResourcesForRequest(),
+                        ...extraFields,
+                    }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.study_session) {
+                    this.activeStudySession = data.study_session;
+                    this.studySessionId = data.study_session.id;
+                    this.studyModeActive = data.study_session.status === 'active';
+                    if (data.conversation_id && !this.conversationId) {
+                        this.conversationId = data.conversation_id;
+                        if (this.workspace) {
+                            this.workspace.dataset.conversationId = data.conversation_id;
+                        }
+                        if (window.history && window.history.replaceState) {
+                            window.history.replaceState({}, '', `/pwanimate/${encodeURIComponent(data.conversation_id)}/`);
+                        }
+                    }
+                    this.syncStudyModeUI();
+                    this.refreshConversationsList();
+                    return data.study_session;
+                }
+            } catch (err) {
+                console.warn('[Pwanimate] Could not initialize study session:', err);
+            }
+            return null;
+        }
+
+        async handleStudySessionStatusAction(action, targetSessionId = null) {
+            if (!action) return null;
+            let sessionId = targetSessionId || this.studySessionId || (this.activeStudySession && this.activeStudySession.id);
+            if (!sessionId && !targetSessionId) {
+                if (action === 'end' || action === 'complete') {
+                    this.studyModeActive = false;
+                    this.syncStudyModeUI();
+                    return null;
+                }
+                const created = await this.ensureStudySession();
+                sessionId = created && created.id;
+            }
+            if (!sessionId) return null;
+            try {
+                const response = await fetch(`/api/pwanimate/study-sessions/${encodeURIComponent(sessionId)}/status/`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ action }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.error || `Could not perform ${action} on study session.`);
+                }
+                if (data.study_session) {
+                    if (!targetSessionId || targetSessionId === this.studySessionId) {
+                        this.activeStudySession = data.study_session;
+                        this.studySessionId = data.study_session.id;
+                        this.studyModeActive = data.study_session.status === 'active';
+                        this.syncStudyModeUI();
+                    }
+                }
+                this.refreshConversationsList();
+                return data.study_session || null;
+            } catch (err) {
+                console.error('[Pwanimate] Study session status update error:', err);
+                return null;
+            }
+        }
+
+        initStudyModal() {
+            const modalEl = document.getElementById('pwanimateStudyModal');
+            if (!modalEl) return;
+
+            modalEl.addEventListener('show.bs.modal', () => {
+                this.populateStudyModal();
+                this.loadUserCollectionsForModal();
+            });
+        }
+
+        openStudyModal(tab = 'checkpoint') {
+            const modalEl = document.getElementById('pwanimateStudyModal');
+            if (!modalEl || !window.bootstrap) return;
+            this.populateStudyModal();
+            this.loadUserCollectionsForModal();
+            const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+
+            const tabBtn = tab === 'summary'
+                ? (document.getElementById('pwanimateStudyTabSummaryBtn') || document.getElementById('pwanimate-study-tab-summary'))
+                : (document.getElementById('pwanimateStudyTabCheckpointBtn') || document.getElementById('pwanimate-study-tab-checkpoint'));
+            if (tabBtn && window.bootstrap.Tab) {
+                const tabInstance = window.bootstrap.Tab.getOrCreateInstance(tabBtn);
+                tabInstance.show();
+            } else if (tabBtn) {
+                tabBtn.click();
+            }
+        }
+
+        populateStudyModal() {
+            const session = this.activeStudySession;
+            const topicInput = document.getElementById('pwanimateStudyTopicInput') ||
+                document.getElementById('pwanimate-study-modal-topic');
+            const objInput = document.getElementById('pwanimateStudyObjectiveInput') ||
+                document.getElementById('pwanimate-study-modal-objective');
+            if (topicInput) topicInput.value = session ? (session.current_topic || '') : '';
+            if (objInput) objInput.value = session ? (session.learning_objective || '') : '';
+
+            this.renderCheckpointInModal(session ? (session.latest_checkpoint || null) : null);
+
+            const lastSummary = session && session.context_state && session.context_state.last_summary
+                ? session.context_state.last_summary
+                : (session && session.latest_summary ? session.latest_summary : null);
+            if (lastSummary) {
+                this.populateSummaryInModal(lastSummary);
+            }
+        }
+
+        renderCheckpointInModal(ckpt) {
+            const emptyEl = document.getElementById('pwanimateStudyCheckpointEmpty');
+            const detailsEl = document.getElementById('pwanimateStudyCheckpointDetails');
+            if (emptyEl && detailsEl) {
+                if (!ckpt) {
+                    emptyEl.classList.remove('d-none');
+                    detailsEl.classList.add('d-none');
+                    return;
+                }
+                emptyEl.classList.add('d-none');
+                detailsEl.classList.remove('d-none');
+
+                const renderItems = (items, emptyText) => {
+                    if (!Array.isArray(items) || items.length === 0) {
+                        return `<li class="text-muted">${escapeHtml(emptyText)}</li>`;
+                    }
+                    return items.map(item => {
+                        if (typeof item === 'object' && item !== null) {
+                            const concept = item.concept || item.title || '';
+                            const evidence = item.evidence_excerpt || item.evidence || '';
+                            return `<li>${escapeHtml(concept)}${evidence ? ` — <em class="text-muted">"${escapeHtml(evidence)}"</em>` : ''}</li>`;
+                        }
+                        return `<li>${escapeHtml(String(item))}</li>`;
+                    }).join('');
+                };
+
+                const demEl = document.getElementById('pwanimateCkptDemonstratedList');
+                const expEl = document.getElementById('pwanimateCkptExplainedList');
+                const misEl = document.getElementById('pwanimateCkptMisconceptionsList');
+                const infEl = document.getElementById('pwanimateCkptInferredText');
+                const nextEl = document.getElementById('pwanimateCkptNextStepText');
+
+                if (demEl) {
+                    demEl.innerHTML = renderItems(
+                        ckpt.concepts_demonstrated,
+                        'None verified yet — explain a concept or solve a practice question in your own words!'
+                    );
+                }
+                if (expEl) {
+                    expEl.innerHTML = renderItems(ckpt.concepts_explained, 'None recorded yet.');
+                }
+                if (misEl) {
+                    misEl.innerHTML = renderItems(ckpt.misconceptions, 'None identified.');
+                }
+                if (infEl) {
+                    const inferred = ckpt.inferred_understanding;
+                    if (Array.isArray(inferred)) {
+                        infEl.textContent = inferred.length ? inferred.join('; ') : 'No unverified inferences.';
+                    } else {
+                        infEl.textContent = inferred || ckpt.summary || 'No unverified inferences.';
+                    }
+                }
+                if (nextEl) {
+                    nextEl.textContent = ckpt.next_step || 'Continue practicing the current topic.';
+                }
+                this.syncStudyModeUI();
+                return;
+            }
+
+            const container = document.getElementById('pwanimate-checkpoint-body');
+            if (!container) return;
+
+            if (!ckpt) {
+                container.innerHTML = '<div class="text-muted small py-2">No checkpoint generated yet. Click <strong>Update Checkpoint</strong> to capture your current progress, demonstrated concepts, and next steps.</div>';
+                return;
+            }
+
+            const renderList = (items, emptyText) => {
+                if (!Array.isArray(items) || items.length === 0) {
+                    return `<li class="text-muted">${escapeHtml(emptyText)}</li>`;
+                }
+                return items.map(i => `<li>${escapeHtml(String(i))}</li>`).join('');
+            };
+
+            const demonstratedItems = Array.isArray(ckpt.concepts_demonstrated) && ckpt.concepts_demonstrated.length > 0
+                ? ckpt.concepts_demonstrated.map(item => {
+                    const concept = typeof item === 'object' ? (item.concept || '') : String(item);
+                    const evidence = typeof item === 'object' && item.evidence_excerpt ? ` — <em class="text-muted">"${escapeHtml(item.evidence_excerpt)}"</em>` : '';
+                    return `<li>${escapeHtml(concept)}${evidence}</li>`;
+                }).join('')
+                : '<li class="text-muted">None verified yet — explain a concept or solve a practice question in your own words!</li>';
+
+            container.innerHTML = `
+                <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                        <div class="p-2 rounded-3 border bg-body-tertiary h-100">
+                            <div class="fw-semibold x-small text-uppercase text-primary mb-1"><i class="bi bi-book me-1"></i>Concepts Explained</div>
+                            <ul class="small mb-0 ps-3">${renderList(ckpt.concepts_explained, 'None recorded yet.')}</ul>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="p-2 rounded-3 border bg-body-tertiary h-100">
+                            <div class="fw-semibold x-small text-uppercase text-success mb-1"><i class="bi bi-patch-check-fill me-1"></i>Verified Demonstrated Mastery</div>
+                            <ul class="small mb-0 ps-3">${demonstratedItems}</ul>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="p-2 rounded-3 border bg-body-tertiary h-100">
+                            <div class="fw-semibold x-small text-uppercase text-warning-emphasis mb-1"><i class="bi bi-lightbulb me-1"></i>Inferred Understanding (Unverified)</div>
+                            <ul class="small mb-0 ps-3">${renderList(ckpt.inferred_understanding, 'No unverified inferences.')}</ul>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="p-2 rounded-3 border bg-body-tertiary h-100">
+                            <div class="fw-semibold x-small text-uppercase text-danger mb-1"><i class="bi bi-question-circle me-1"></i>Open Questions & Misconceptions</div>
+                            <ul class="small mb-0 ps-3">${renderList(ckpt.misconceptions, 'None identified.')}</ul>
+                        </div>
+                    </div>
+                    ${ckpt.next_step ? `
+                    <div class="col-12">
+                        <div class="p-2 rounded-3 border border-primary-subtle bg-primary-subtle text-primary-emphasis small">
+                            <strong><i class="bi bi-signpost-split me-1"></i>Recommended Next Step:</strong> ${escapeHtml(ckpt.next_step)}
+                        </div>
+                    </div>` : ''}
+                </div>
+            `;
+        }
+
+        populateSummaryInModal(summary) {
+            if (!summary) return;
+            const markdown = typeof summary === 'string'
+                ? summary
+                : (summary.content || summary.markdown || summary.summary_markdown || '');
+            const title = typeof summary === 'object' ? (summary.title || '') : '';
+            const titleInput = document.getElementById('pwanimate-summary-title-input');
+            const mdInput = document.getElementById('pwanimateStudySummaryTextarea') ||
+                document.getElementById('pwanimate-summary-markdown-input');
+            const previewEl = document.getElementById('pwanimate-summary-preview');
+            if (titleInput && title) titleInput.value = title;
+            if (mdInput && markdown) mdInput.value = markdown;
+            if (previewEl && markdown) {
+                previewEl.innerHTML = this.renderMarkdownWithMathAndCode(markdown);
+                previewEl.classList.remove('d-none');
+            }
+            document.querySelectorAll('.pwanimate-export-summary-btn, #pwanimateExportSummaryPdfBtn, #pwanimateExportSummaryDocxBtn').forEach(btn => {
+                btn.disabled = false;
+            });
+            const saveColBtn = document.getElementById('pwanimateSaveToCollectionBtn') ||
+                document.getElementById('pwanimate-save-to-collection-btn');
+            if (saveColBtn) saveColBtn.disabled = false;
+        }
+
+        async handleSaveStudyMetadata(button) {
+            const topicInput = document.getElementById('pwanimateStudyTopicInput') ||
+                document.getElementById('pwanimate-study-modal-topic');
+            const objInput = document.getElementById('pwanimateStudyObjectiveInput') ||
+                document.getElementById('pwanimate-study-modal-objective');
+            const currentTopic = topicInput ? topicInput.value.trim() : '';
+            const learningObjective = objInput ? objInput.value.trim() : '';
+
+            const originalHtml = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+            }
+            try {
+                if (!this.studySessionId) {
+                    const created = await this.ensureStudySession({
+                        current_topic: currentTopic,
+                        learning_objective: learningObjective,
+                    });
+                    if (created && button) {
+                        button.innerHTML = '<i class="bi bi-check2 me-1"></i>Saved';
+                    }
+                    return;
+                }
+                const response = await fetch(`/api/pwanimate/study-sessions/${encodeURIComponent(this.studySessionId)}/`, {
+                    method: 'PATCH',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        current_topic: currentTopic,
+                        learning_objective: learningObjective,
+                    }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.study_session) {
+                    this.activeStudySession = data.study_session;
+                    this.syncStudyModeUI();
+                    this.refreshConversationsList();
+                    if (button) button.innerHTML = '<i class="bi bi-check2 me-1"></i>Saved';
+                }
+            } catch (err) {
+                console.error('[Pwanimate] Error saving study metadata:', err);
+            } finally {
+                setTimeout(() => {
+                    if (button) {
+                        button.disabled = false;
+                        button.innerHTML = originalHtml || '<i class="bi bi-check2 me-1"></i>Save Topic & Objective';
+                    }
+                }, 1400);
+            }
+        }
+
+        async handleGenerateCheckpoint(button) {
+            const originalHtml = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating…';
+            }
+            try {
+                if (!this.studySessionId) {
+                    await this.ensureStudySession();
+                }
+                if (!this.studySessionId) return;
+                const response = await fetch(`/api/pwanimate/study-sessions/${encodeURIComponent(this.studySessionId)}/checkpoint/`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (response.ok) {
+                    if (data.study_session) {
+                        this.activeStudySession = data.study_session;
+                    }
+                    if (data.checkpoint) {
+                        if (this.activeStudySession) {
+                            this.activeStudySession.latest_checkpoint = data.checkpoint;
+                        }
+                        this.renderCheckpointInModal(data.checkpoint);
+                    }
+                } else {
+                    const emptyEl = document.getElementById('pwanimateStudyCheckpointEmpty');
+                    if (emptyEl && data.error) {
+                        emptyEl.textContent = data.error;
+                        emptyEl.classList.remove('d-none');
+                    }
+                }
+            } catch (err) {
+                console.error('[Pwanimate] Checkpoint generation failed:', err);
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalHtml || '<i class="bi bi-arrow-repeat me-1"></i>Refresh Checkpoint Now';
+                }
+            }
+        }
+
+        async handleGenerateStudySummary(button) {
+            const originalHtml = button ? button.innerHTML : '';
+            const statusEl = document.getElementById('pwanimateCollectionSaveFeedback') ||
+                document.getElementById('pwanimate-collection-save-status');
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating…';
+            }
+            try {
+                if (!this.studySessionId) {
+                    await this.ensureStudySession();
+                }
+                if (!this.studySessionId) return;
+                const response = await fetch(`/api/pwanimate/study-sessions/${encodeURIComponent(this.studySessionId)}/summary/`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ action: 'generate' }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (response.ok) {
+                    if (data.study_session) {
+                        this.activeStudySession = data.study_session;
+                    }
+                    const summaryPayload = data.summary || (data.summary_markdown ? { markdown: data.summary_markdown } : null);
+                    if (summaryPayload) {
+                        this.populateSummaryInModal(summaryPayload);
+                    }
+                    if (statusEl) {
+                        statusEl.classList.add('d-none');
+                    }
+                } else if (statusEl && data.error) {
+                    statusEl.className = 'small mt-2 text-danger';
+                    statusEl.textContent = data.error;
+                    statusEl.classList.remove('d-none');
+                }
+            } catch (err) {
+                console.error('[Pwanimate] Summary generation failed:', err);
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalHtml || '<i class="bi bi-stars me-1"></i>Generate / Refresh Summary';
+                }
+            }
+        }
+
+        async handleExportStudySummary(button) {
+            if (!button) return;
+            const fmt = button.dataset.format || (button.id === 'pwanimateExportSummaryDocxBtn' ? 'docx' : 'pdf');
+            const titleInput = document.getElementById('pwanimate-summary-title-input');
+            const mdInput = document.getElementById('pwanimateStudySummaryTextarea') ||
+                document.getElementById('pwanimate-summary-markdown-input');
+            const statusEl = document.getElementById('pwanimateCollectionSaveFeedback') ||
+                document.getElementById('pwanimate-collection-save-status');
+            const originalHtml = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Exporting…';
+            try {
+                if (!this.studySessionId) {
+                    await this.ensureStudySession();
+                }
+                if (!this.studySessionId) {
+                    throw new Error('Could not initialize study session for export.');
+                }
+                const markdownText = mdInput ? mdInput.value : '';
+                const response = await fetch(`/api/pwanimate/study-sessions/${encodeURIComponent(this.studySessionId)}/summary/`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'export',
+                        export_format: fmt,
+                        format: fmt,
+                        title: titleInput ? titleInput.value.trim() : '',
+                        summary_markdown: markdownText,
+                        markdown: markdownText,
+                    }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not export study summary.');
+                }
+                if (data.summary_markdown && mdInput && !mdInput.value.trim()) {
+                    mdInput.value = data.summary_markdown;
+                }
+                const downloadUrl = data.download_url || (data.exported_document && data.exported_document.download_url) || '';
+                if (statusEl) {
+                    statusEl.className = 'small mt-2 text-success';
+                    statusEl.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>Exported ${escapeHtml(fmt.toUpperCase())} to My Resources.${downloadUrl ? ` <a href="${escapeHtml(downloadUrl)}" class="fw-semibold" target="_blank" rel="noopener">Download file</a>` : ''}`;
+                    statusEl.classList.remove('d-none');
+                }
+                if (downloadUrl) {
+                    window.location.assign(downloadUrl);
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.className = 'small mt-2 text-danger';
+                    statusEl.textContent = err.message || 'Failed to export summary.';
+                    statusEl.classList.remove('d-none');
+                }
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+            }
+        }
+
+        async loadUserCollectionsForModal() {
+            const selectEl = document.getElementById('pwanimateSummaryCollectionSelect') ||
+                document.getElementById('pwanimate-collection-select');
+            if (!selectEl) return;
+            try {
+                const response = await fetch('/api/pwanimate/collections/', {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                const collections = Array.isArray(data.collections) ? data.collections : [];
+                const currentVal = selectEl.value;
+                selectEl.innerHTML = '<option value="">— Select existing collection —</option>' + collections.map(col => (
+                    `<option value="${escapeHtml(col.id)}">${escapeHtml(col.name)} (${col.item_count || 0} items)</option>`
+                )).join('');
+                if (currentVal && collections.some(c => String(c.id) === String(currentVal))) {
+                    selectEl.value = currentVal;
+                } else if (collections.length > 0) {
+                    selectEl.value = collections[0].id;
+                }
+            } catch (err) {
+                console.warn('[Pwanimate] Could not load user collections:', err);
+            }
+        }
+
+        async handleSaveSummaryToCollection(button) {
+            const selectEl = document.getElementById('pwanimateSummaryCollectionSelect') ||
+                document.getElementById('pwanimate-collection-select');
+            const newFormEl = document.getElementById('pwanimate-new-collection-form');
+            const newNameInput = document.getElementById('pwanimateNewCollectionNameInput') ||
+                document.getElementById('pwanimate-new-collection-name');
+            const newDescInput = document.getElementById('pwanimate-new-collection-desc');
+            const formatSelect = document.getElementById('pwanimateSummaryCollectionFormat') ||
+                document.getElementById('pwanimate-collection-format-select');
+            const notesInput = document.getElementById('pwanimateSummaryCollectionNotes') ||
+                document.getElementById('pwanimate-collection-item-notes');
+            const titleInput = document.getElementById('pwanimate-summary-title-input');
+            const mdInput = document.getElementById('pwanimateStudySummaryTextarea') ||
+                document.getElementById('pwanimate-summary-markdown-input');
+            const statusEl = document.getElementById('pwanimateCollectionSaveFeedback') ||
+                document.getElementById('pwanimate-collection-save-status');
+
+            const typedNewName = newNameInput ? newNameInput.value.trim() : '';
+            const collectionId = (!typedNewName && selectEl) ? selectEl.value : '';
+            const collectionName = typedNewName;
+
+            if (!collectionId && !collectionName) {
+                if (statusEl) {
+                    statusEl.className = 'small mt-2 text-danger';
+                    statusEl.textContent = 'Please select an existing collection or enter a new collection name.';
+                    statusEl.classList.remove('d-none');
+                }
+                return;
+            }
+
+            const originalHtml = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+            }
+
+            try {
+                if (!this.studySessionId) {
+                    await this.ensureStudySession();
+                }
+                if (!this.studySessionId) {
+                    throw new Error('Could not initialize study session.');
+                }
+                const fmt = formatSelect ? formatSelect.value : 'pdf';
+                const markdownText = mdInput ? mdInput.value : '';
+                const payload = {
+                    file_format: fmt,
+                    export_format: fmt,
+                    title: titleInput ? titleInput.value.trim() : '',
+                    summary_markdown: markdownText,
+                    markdown: markdownText,
+                    notes: notesInput ? notesInput.value.trim() : '',
+                };
+                if (collectionId) {
+                    payload.collection_id = collectionId;
+                } else {
+                    payload.new_collection_name = collectionName;
+                    payload.collection_name = collectionName;
+                    payload.collection_description = newDescInput ? newDescInput.value.trim() : '';
+                }
+
+                const response = await fetch(`/api/pwanimate/study-sessions/${encodeURIComponent(this.studySessionId)}/summary/save-to-collection/`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not save summary to collection.');
+                }
+                if (statusEl) {
+                    const colName = data.collection ? data.collection.name : (collectionName || 'collection');
+                    statusEl.className = 'small mt-2 text-success';
+                    statusEl.innerHTML = `<i class="bi bi-bookmark-check-fill me-1"></i>Saved to collection <strong>${escapeHtml(colName)}</strong>!`;
+                    statusEl.classList.remove('d-none');
+                }
+                if (newFormEl) newFormEl.classList.add('d-none');
+                if (newNameInput) newNameInput.value = '';
+                if (newDescInput) newDescInput.value = '';
+                await this.loadUserCollectionsForModal();
+                if (data.collection && selectEl) {
+                    selectEl.value = data.collection.id;
+                }
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.className = 'small mt-2 text-danger';
+                    statusEl.textContent = err.message || 'Failed to save to collection.';
+                    statusEl.classList.remove('d-none');
+                }
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalHtml || '<i class="bi bi-bookmark-plus me-1"></i>Save to Collection';
                 }
             }
         }
@@ -1025,6 +1929,14 @@
                     if (e.isComposing || e.keyCode === 229) {
                         return;
                     }
+                    if (e.key === 'Tab') {
+                        const hintEl = document.getElementById('pwanimate-study-cmd-hint');
+                        if (hintEl && !hintEl.classList.contains('d-none')) {
+                            e.preventDefault();
+                            this.applyStudyCommandHint();
+                            return;
+                        }
+                    }
                     if (e.key === 'Enter' && !e.shiftKey) {
                         if (isFinePointerDevice()) {
                             e.preventDefault();
@@ -1042,6 +1954,7 @@
                 this.input.addEventListener('input', () => {
                     this.scheduleTextareaResize();
                     this.updateSendButtonState();
+                    this.updateStudyCommandHint();
                 });
             }
 
@@ -1239,7 +2152,7 @@
                 });
             }
 
-            // Consolidated delegated click listener on document for delete, preview close, and model dropdowns
+            // Consolidated delegated click listener on document for delete, preview close, Study Mode, and model dropdowns
             this._onDocumentClick = (e) => {
                 // Delete conversation buttons (delegated on document so desktop sidebar buttons work)
                 const deleteBtn = e.target.closest('.pwanimate-conversation-delete');
@@ -1250,6 +2163,184 @@
                     if (convId) {
                         this.handleDeleteConversation(convId);
                     }
+                    return;
+                }
+
+                // History filter tabs (All / Study)
+                const historyFilterBtn = e.target.closest('.pwanimate-history-filter-btn');
+                if (historyFilterBtn) {
+                    this.historyFilter = historyFilterBtn.dataset.historyFilter || 'all';
+                    document.querySelectorAll('.pwanimate-history-filter-btn').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.historyFilter === this.historyFilter);
+                    });
+                    return;
+                }
+
+                // Composer Study Mode toggle button
+                const studyToggleBtn = e.target.closest('#pwanimateStudyModeToggleBtn');
+                if (studyToggleBtn) {
+                    e.preventDefault();
+                    this.studyModeActive = !this.studyModeActive;
+                    this.syncStudyModeUI();
+                    if (this.input) this.input.focus();
+                    return;
+                }
+
+                // Composer @study command autocomplete hint button
+                const studyCmdApplyBtn = e.target.closest('#pwanimateStudyCmdApplyBtn, #pwanimate-study-cmd-apply');
+                if (studyCmdApplyBtn) {
+                    e.preventDefault();
+                    this.applyStudyCommandHint();
+                    return;
+                }
+
+                // Study Session Header Bar: Checkpoint & Goal button
+                const studyCheckpointBtn = e.target.closest('#pwanimateStudyCheckpointBtn, #pwanimate-study-checkpoint-btn');
+                if (studyCheckpointBtn) {
+                    e.preventDefault();
+                    this.openStudyModal('checkpoint');
+                    return;
+                }
+
+                // Study Session Header Bar: Summary & Save button
+                const studySummaryBtn = e.target.closest('#pwanimateStudySummaryBtn, #pwanimate-study-summary-btn');
+                if (studySummaryBtn) {
+                    e.preventDefault();
+                    this.openStudyModal('summary');
+                    return;
+                }
+
+                // Study Session Header Bar: Pause / Resume button
+                const studyPauseResumeBtn = e.target.closest('#pwanimateStudyPauseResumeBtn, #pwanimate-study-PauseResumeBtn');
+                if (studyPauseResumeBtn) {
+                    e.preventDefault();
+                    const action = studyPauseResumeBtn.dataset.action ||
+                        studyPauseResumeBtn.dataset.studyStatusAction ||
+                        'pause';
+                    this.handleStudySessionStatusAction(action);
+                    return;
+                }
+
+                // Study Session Header Bar: End Session button
+                const studyEndBtn = e.target.closest('#pwanimateStudyEndBtn, #pwanimate-study-end-btn');
+                if (studyEndBtn) {
+                    e.preventDefault();
+                    this.handleStudySessionStatusAction('end').then((session) => {
+                        if (session) {
+                            this.openStudyModal('summary');
+                        }
+                    });
+                    return;
+                }
+
+                // Home Resume Study Card: Resume Session button
+                const resumeStudyBtn = e.target.closest('#pwanimateResumeStudySessionBtn, #pwanimate-resume-study-btn');
+                if (resumeStudyBtn) {
+                    e.preventDefault();
+                    const resumeCard = document.getElementById('pwanimate-resume-study-card');
+                    const sessionId = resumeStudyBtn.dataset.sessionId ||
+                        resumeStudyBtn.dataset.studySessionId ||
+                        (resumeCard && (resumeCard.dataset.sessionId || resumeCard.dataset.studySessionId));
+                    const convId = resumeStudyBtn.dataset.conversationId ||
+                        (resumeCard && resumeCard.dataset.conversationId);
+                    this.handleStudySessionStatusAction('resume', sessionId).then(() => {
+                        if (convId) {
+                            const url = `/pwanimate/${encodeURIComponent(convId)}/`;
+                            if (window.htmx) {
+                                window.htmx.ajax('GET', url, {
+                                    target: '#page-content-target',
+                                    pushUrl: true,
+                                    swap: 'innerHTML'
+                                });
+                            } else {
+                                window.location.href = url;
+                            }
+                        }
+                    });
+                    return;
+                }
+
+                // Home Resume Study Card: Start New Study Session button
+                const startNewStudyBtn = e.target.closest('#pwanimateStartNewStudySessionBtn, #pwanimate-start-new-study-btn');
+                if (startNewStudyBtn) {
+                    e.preventDefault();
+                    const resumeCard = document.getElementById('pwanimate-resume-study-card');
+                    const prevSessionId = resumeCard && (resumeCard.dataset.sessionId || resumeCard.dataset.studySessionId);
+                    if (prevSessionId) {
+                        this.handleStudySessionStatusAction('pause', prevSessionId);
+                    }
+                    if (resumeCard) resumeCard.classList.add('d-none');
+                    this.studyModeActive = true;
+                    this.syncStudyModeUI();
+                    if (this.input) {
+                        this.input.focus();
+                    }
+                    return;
+                }
+
+                // Home Resume Study Card: Dismiss Banner button
+                const dismissResumeBtn = e.target.closest('#pwanimateDismissResumeBannerBtn, #pwanimate-dismiss-resume-btn');
+                if (dismissResumeBtn) {
+                    e.preventDefault();
+                    const resumeCard = document.getElementById('pwanimate-resume-study-card');
+                    const sessionId = dismissResumeBtn.dataset.sessionId ||
+                        dismissResumeBtn.dataset.studySessionId ||
+                        (resumeCard && (resumeCard.dataset.sessionId || resumeCard.dataset.studySessionId));
+                    if (resumeCard) resumeCard.classList.add('d-none');
+                    if (sessionId) {
+                        this.handleStudySessionStatusAction('dismiss_banner', sessionId);
+                    }
+                    return;
+                }
+
+                // Study Modal actions: Save Goal, Update Checkpoint, Generate Summary, Export, Save to Collection
+                const saveStudyMetaBtn = e.target.closest('#pwanimateSaveStudyMetaBtn, #pwanimate-save-study-meta-btn');
+                if (saveStudyMetaBtn) {
+                    e.preventDefault();
+                    this.handleSaveStudyMetadata(saveStudyMetaBtn);
+                    return;
+                }
+
+                const genCheckpointBtn = e.target.closest('#pwanimateGenerateCheckpointNowBtn, #pwanimate-generate-checkpoint-btn');
+                if (genCheckpointBtn) {
+                    e.preventDefault();
+                    this.handleGenerateCheckpoint(genCheckpointBtn);
+                    return;
+                }
+
+                const genSummaryBtn = e.target.closest('#pwanimateGenerateSummaryNowBtn, #pwanimate-generate-summary-btn');
+                if (genSummaryBtn) {
+                    e.preventDefault();
+                    this.handleGenerateStudySummary(genSummaryBtn);
+                    return;
+                }
+
+                const exportSummaryBtn = e.target.closest('#pwanimateExportSummaryPdfBtn, #pwanimateExportSummaryDocxBtn, .pwanimate-export-summary-btn');
+                if (exportSummaryBtn) {
+                    e.preventDefault();
+                    this.handleExportStudySummary(exportSummaryBtn);
+                    return;
+                }
+
+                const newCollectionToggleBtn = e.target.closest('#pwanimate-new-collection-toggle-btn');
+                if (newCollectionToggleBtn) {
+                    e.preventDefault();
+                    const formEl = document.getElementById('pwanimate-new-collection-form');
+                    if (formEl) {
+                        formEl.classList.toggle('d-none');
+                        const nameInput = document.getElementById('pwanimateNewCollectionNameInput') ||
+                            document.getElementById('pwanimate-new-collection-name');
+                        if (!formEl.classList.contains('d-none') && nameInput) {
+                            nameInput.focus();
+                        }
+                    }
+                    return;
+                }
+
+                const saveToCollectionBtn = e.target.closest('#pwanimateSaveToCollectionBtn, #pwanimate-save-to-collection-btn');
+                if (saveToCollectionBtn) {
+                    e.preventDefault();
+                    this.handleSaveSummaryToCollection(saveToCollectionBtn);
                     return;
                 }
 
@@ -2272,6 +3363,7 @@
             this.updateAddToContextButtons();
             this.syncContextView();
             this.syncDocumentStudyUI();
+            this.scheduleStudyContextSync();
             this.switchWorkspaceTab('context');
         }
 
@@ -2313,6 +3405,7 @@
             this.updateAddToContextButtons();
             this.syncContextView();
             this.syncDocumentStudyUI();
+            this.scheduleStudyContextSync();
             if (this.contextResources.length === 0 && !this.previewResourceState) {
                 this.closeContextRail();
             }
@@ -2325,6 +3418,7 @@
             this.activeContextIndex = index;
             this.syncContextView();
             this.syncDocumentStudyUI();
+            this.scheduleStudyContextSync();
         }
 
         getActiveStudyDocument() {
@@ -2708,6 +3802,7 @@
                             locText.textContent = totalPages ? `p. ${page} / ${totalPages}` : `p. ${page}`;
                         }
                         this.syncDocumentStudyUI();
+                        this.scheduleStudyContextSync();
                     }
                 };
                 const viewerInstance = new window.DocumentViewer(
@@ -3761,6 +4856,8 @@
                 : (this.stagedAttachments && this.stagedAttachments.length > 0);
             if (!text && !hasStagedAttachments) return;
 
+            const isBareStudyCommand = !isRetry && /^\s*@study\s*$/i.test(text) && !hasStagedAttachments;
+
             // Setup AbortController for modern cancellation support
             this.abortController = new AbortController();
 
@@ -3769,6 +4866,7 @@
                 this.input.value = '';
                 this.resetTextareaHeight();
                 this.updateSendButtonState();
+                this.updateStudyCommandHint();
                 this.setVoiceStatus('');
             }
 
@@ -3778,20 +4876,23 @@
                 : (this.stagedAttachments || []).slice();
             if (!isRetry) this._clearStagedAttachments();
 
-            // Remove empty state if present
-            const emptyState = this.transcript.querySelector('#pwanimate-empty-state');
-            if (emptyState) {
-                emptyState.remove();
-            }
+            let userRow = null;
+            if (!isBareStudyCommand) {
+                // Remove empty state if present
+                const emptyState = this.transcript.querySelector('#pwanimate-empty-state');
+                if (emptyState) {
+                    emptyState.remove();
+                }
 
-            // Render optimistic user message (with attachment chips)
-            const userRow = isRetry
-                ? retryOptions.userRow
-                : this.appendUserMessage(text, null, snapshotAttachments);
-            this.addImageAttachmentsToContext(userRow);
-            this.showTypingIndicator();
+                // Render optimistic user message (with attachment chips)
+                userRow = isRetry
+                    ? retryOptions.userRow
+                    : this.appendUserMessage(text, null, snapshotAttachments);
+                this.addImageAttachmentsToContext(userRow);
+                this.showTypingIndicator();
+                this.scrollToBottom();
+            }
             this.setGenerating(true);
-            this.scrollToBottom();
 
             const csrfToken = getCsrfToken();
             if (!this.conversationId && !this.pendingConversationId) {
@@ -3812,6 +4913,12 @@
                         ? 'Africa/Nairobi'
                         : browserTimezone
                 };
+                if (this.studyModeActive) {
+                    payload.study_mode = true;
+                }
+                if (this.studySessionId) {
+                    payload.study_session_id = this.studySessionId;
+                }
                 if (isRetry) {
                     payload.retry = true;
                     if (retryOptions.userMessageId) {
@@ -3874,6 +4981,13 @@
                     window.history.replaceState({ htmx: true }, '', targetUrl);
                 }
 
+                if (data.study_session) {
+                    this.activeStudySession = data.study_session;
+                    this.studySessionId = data.study_session.id;
+                    this.studyModeActive = data.study_session.status === 'active';
+                    this.syncStudyModeUI();
+                }
+
                 if (!responseOk) {
                     let errMsg = data.error || 'Failed to get answer from Pwanimate.';
                     if (responseStatus === 429) {
@@ -3887,7 +5001,11 @@
                     if (userRow && data.user_message_id) {
                         userRow.dataset.messageId = data.user_message_id;
                     }
-                    this.showErrorBubble(errMsg, text, userRow, snapshotAttachments);
+                    if (userRow) {
+                        this.showErrorBubble(errMsg, text, userRow, snapshotAttachments);
+                    } else {
+                        this.showSystemNotice(errMsg);
+                    }
                     this.refreshConversationsList();
                     if (data.quota_status) {
                         this.updateQuotaStatus(data.quota_status);
@@ -3896,8 +5014,18 @@
                 }
 
                 this.removeTypingIndicator();
+                if (data.study_mode_activated) {
+                    this.showSystemNotice(data.notice || 'Study Mode activated. Enter a learning objective or ask a question to begin.');
+                    this.refreshConversationsList();
+                    return;
+                }
+
                 if (userRow && data.user_message_id) {
                     userRow.dataset.messageId = data.user_message_id;
+                }
+
+                if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+                    this.showUnavailableSourceWarnings(data.warnings);
                 }
 
                 const meta = data.metadata || {};
@@ -4237,6 +5365,10 @@
             if (this._timestampTicker) {
                 clearInterval(this._timestampTicker);
                 this._timestampTicker = null;
+            }
+            if (this._studyContextSyncTimer) {
+                clearTimeout(this._studyContextSyncTimer);
+                this._studyContextSyncTimer = null;
             }
             if (this.resizeFrame) {
                 cancelAnimationFrame(this.resizeFrame);
@@ -4669,7 +5801,10 @@
 
         async refreshConversationsList() {
             try {
-                const res = await fetch('/api/pwanimate/conversations/', {
+                const url = this.historyFilter === 'study'
+                    ? '/api/pwanimate/conversations/?filter=study'
+                    : '/api/pwanimate/conversations/';
+                const res = await fetch(url, {
                     headers: {
                         'Accept': 'application/json'
                     }
@@ -4695,9 +5830,22 @@
                     const ts = c.updated_at || c.created_at || '';
                     const relTime = ts ? formatRelativeTime(ts) : 'just now';
                     const tsAttr = ts ? ` data-ts="${escapeHtml(ts)}"` : '';
+                    const ss = c.study_session || null;
+                    let studyBadgeHtml = '';
+                    let objectiveHtml = '';
+                    if (ss) {
+                        const statusClass = escapeHtml(ss.status || 'active');
+                        const statusTitle = escapeHtml((ss.status || 'active').replace(/^\w/, ch => ch.toUpperCase()));
+                        studyBadgeHtml = `<span class="badge rounded-pill pwanimate-study-conv-badge status-${statusClass}" title="Study Session (${statusTitle})"><i class="bi bi-mortarboard-fill me-1"></i>Study</span>`;
+                        if (ss.learning_objective) {
+                            const objEscaped = escapeHtml(ss.learning_objective);
+                            objectiveHtml = `<div class="text-muted text-truncate x-small mt-1" title="${objEscaped}">${objEscaped}</div>`;
+                        }
+                    }
                     return `
                         <div class="pwanimate-conversation-item ${isActive}"
                              data-id="${c.id}"
+                             data-is-study="${ss ? 'true' : 'false'}"
                              hx-get="/pwanimate/${c.id}/"
                              hx-target="#page-content-target"
                              hx-swap="innerHTML"
@@ -4705,7 +5853,11 @@
                              role="button"
                              tabindex="0">
                             <div class="pwanimate-conversation-info">
-                                <div class="pwanimate-conversation-title" title="${title}">${title}</div>
+                                <div class="pwanimate-conversation-title d-flex align-items-center gap-1" title="${title}">
+                                    ${studyBadgeHtml}
+                                    <span class="text-truncate">${title}</span>
+                                </div>
+                                ${objectiveHtml}
                                 <div class="pwanimate-conversation-time"><time${tsAttr}>${relTime}</time></div>
                             </div>
                             <button type="button"

@@ -565,3 +565,204 @@ class PwanimateAttachmentChunk(models.Model):
         indexes = [
             models.Index(fields=["attachment", "page_number"], name="pwan_attach_page_idx"),
         ]
+
+
+class PwanimateStudySession(models.Model):
+    """
+    Persistent Study Mode session associated one-to-one with a PwanimateConversation.
+
+    Tracks learning lifecycle (active, paused, completed), objective/current topic,
+    persisted Context Rail state (authorized resources and page positions),
+    resume-banner dismissal, and the latest valid learning checkpoint.
+    """
+
+    STATUS_ACTIVE = "active"
+    STATUS_PAUSED = "paused"
+    STATUS_COMPLETED = "completed"
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_PAUSED, "Paused"),
+        (STATUS_COMPLETED, "Completed"),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pwanimate_study_sessions",
+        db_index=True,
+    )
+    conversation = models.OneToOneField(
+        PwanimateConversation,
+        on_delete=models.CASCADE,
+        related_name="study_session",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+        db_index=True,
+    )
+    learning_objective = models.TextField(
+        blank=True,
+        default="",
+        help_text="Primary learning objective for this study session",
+    )
+    current_topic = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Current topic or focus question",
+    )
+    context_state = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Persisted Context Rail state (active/pinned resource descriptors and page positions)",
+    )
+    latest_checkpoint = models.ForeignKey(
+        "PwanimateStudyCheckpoint",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    resume_banner_dismissed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+    started_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+    )
+    last_active_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+    )
+    ended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+
+    class Meta:
+        ordering = ["-last_active_at", "-started_at"]
+        indexes = [
+            models.Index(
+                fields=["user", "status", "-last_active_at"],
+                name="pwan_study_usr_st_act_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(status="active"),
+                name="pwanimate_unique_active_study_session_per_user",
+            ),
+        ]
+
+    def __str__(self):
+        title = getattr(self.conversation, "title", "") or self.current_topic or "Study Session"
+        return f"{title} ({self.status}, {self.id})"
+
+
+class PwanimateStudyCheckpoint(models.Model):
+    """
+    Compact, structured snapshot of learning progress within a PwanimateStudySession.
+
+    Anchored to the conversation message boundary (`up_to_message`) so that
+    resumed sessions can combine the latest valid checkpoint with a bounded
+    recent-message window without re-sending the entire transcript.
+    """
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    session = models.ForeignKey(
+        PwanimateStudySession,
+        on_delete=models.CASCADE,
+        related_name="checkpoints",
+        db_index=True,
+    )
+    up_to_message = models.ForeignKey(
+        PwanimateMessage,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="study_checkpoints",
+    )
+    learning_objective = models.TextField(
+        blank=True,
+        default="",
+    )
+    current_topic = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+    concepts_explained = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Concepts explained by the assistant",
+    )
+    concepts_demonstrated = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Concepts demonstrated by the student, with supporting user-message references",
+    )
+    inferred_understanding = models.TextField(
+        blank=True,
+        default="",
+        help_text="Unverified assistant inference about learner understanding, separated from verified mastery",
+    )
+    misconceptions = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Misconceptions or unresolved questions",
+    )
+    key_discoveries = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Relevant decisions and discoveries",
+    )
+    recommended_next_step = models.TextField(
+        blank=True,
+        default="",
+    )
+    document_state = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Relevant document and page state at the checkpoint boundary",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=["session", "-created_at"],
+                name="pwan_study_ckpt_sess_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "up_to_message"],
+                condition=models.Q(up_to_message__isnull=False),
+                name="pwanimate_unique_study_ckpt_per_msg",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Checkpoint for {self.session_id} (up_to_msg={self.up_to_message_id})"
+

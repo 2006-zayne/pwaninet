@@ -59,16 +59,50 @@
             </div>
         </div>
 
-        <a href="{% url 'pwanimate:index' %}"
-           class="btn btn-primary w-100 btn-sm d-flex align-items-center justify-content-center gap-2 mb-3 flex-shrink-0"
-           hx-get="{% url 'pwanimate:index' %}"
-           hx-target="#page-content-target"
-           hx-swap="innerHTML"
-           hx-push-url="true">
-            <i class="bi bi-plus-lg"></i>
-            <span class="fw-semibold">{% trans "New Chat" %}</span>
-        </a>
-        <h6 class="fw-bold mb-2 text-muted small text-uppercase flex-shrink-0">{% trans "Chat History" %}</h6>
+        <div class="d-flex gap-1 mb-3 flex-shrink-0">
+            <a href="{% url 'pwanimate:index' %}"
+               class="btn btn-primary btn-sm flex-grow-1 d-flex align-items-center justify-content-center gap-1"
+               hx-get="{% url 'pwanimate:index' %}"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-plus-lg"></i>
+                <span class="fw-semibold">{% trans "New Chat" %}</span>
+            </a>
+            <a href="{% url 'pwanimate:index' %}?study=1"
+               class="btn btn-outline-primary btn-sm d-flex align-items-center justify-content-center gap-1 px-2"
+               title="{% trans 'Start a new Study Mode session' %}"
+               hx-get="{% url 'pwanimate:index' %}?study=1"
+               hx-target="#page-content-target"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-mortarboard-fill"></i>
+                <span class="small fw-semibold">{% trans "Study" %}</span>
+            </a>
+        </div>
+        <div class="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
+            <h6 class="fw-bold mb-0 text-muted small text-uppercase">{% trans "History" %}</h6>
+            <div class="btn-group btn-group-sm pwanimate-history-filter-group" role="group" aria-label="{% trans 'Filter conversations' %}">
+                <button type="button"
+                        class="btn btn-xs {% if history_filter != 'study' %}btn-primary active{% else %}btn-outline-secondary{% endif %}"
+                        data-history-filter="all"
+                        hx-get="{% url 'pwanimate:conversation_history' %}?page=1&filter=all{% if active_conversation_id %}&active_id={{ active_conversation_id }}{% endif %}"
+                        hx-target="#pwanimate-sidebar-list"
+                        hx-swap="innerHTML"
+                        onclick="this.parentElement.querySelectorAll('button').forEach(b => { b.classList.remove('btn-primary', 'active'); b.classList.add('btn-outline-secondary'); }); this.classList.remove('btn-outline-secondary'); this.classList.add('btn-primary', 'active');">
+                    {% trans "All" %}
+                </button>
+                <button type="button"
+                        class="btn btn-xs {% if history_filter == 'study' %}btn-primary active{% else %}btn-outline-secondary{% endif %}"
+                        data-history-filter="study"
+                        hx-get="{% url 'pwanimate:conversation_history' %}?page=1&filter=study{% if active_conversation_id %}&active_id={{ active_conversation_id }}{% endif %}"
+                        hx-target="#pwanimate-sidebar-list"
+                        hx-swap="innerHTML"
+                        onclick="this.parentElement.querySelectorAll('button').forEach(b => { b.classList.remove('btn-primary', 'active'); b.classList.add('btn-outline-secondary'); }); this.classList.remove('btn-outline-secondary'); this.classList.add('btn-primary', 'active');">
+                    <i class="bi bi-mortarboard-fill me-1"></i>{% trans "Study" %}
+                </button>
+            </div>
+        </div>
         <div id="pwanimate-sidebar-list" class="flex-grow-1 pwanimate-left-rail-list" style="min-height: 0; overflow-y: auto;">
             {% include 'pwanimate/partials/conversation_list.html' %}
         </div>

@@ -69,7 +69,7 @@
                     </div>
                     <h6 class="fw-semibold mb-1 small text-body">{% trans "Reference Inspection" %}</h6>
                     <p class="small text-muted mb-3" style="max-width: 320px;">{% trans "Click any citation badge in the conversation to inspect documents, posts, or media here without modifying your working context." %}</p>
-                    <div class="p-2 rounded bg-light border text-muted small" style="max-width: 340px;">
+                    <div class="p-2 rounded pwanimate-empty-hint-box text-muted small" style="max-width: 340px;">
                         <i class="bi bi-info-circle me-1"></i>{% trans "The open preview is included with your next question. Add it to Context to keep it attached while you chat." %}
                     </div>
                 </div>
@@ -83,7 +83,7 @@
                                 <i class="bi bi-file-earmark me-1" id="desktopPreviewCategoryIcon"></i>
                                 <span id="desktopPreviewCategoryText">{% trans "Document" %}</span>
                             </span>
-                            <span class="badge rounded-pill bg-light text-dark border d-none" id="desktopPreviewLocationBadge">
+                            <span class="badge rounded-pill pwanimate-meta-pill d-none" id="desktopPreviewLocationBadge">
                                 <i class="bi bi-bookmark me-1"></i><span id="desktopPreviewLocationText">p. 1</span>
                             </span>
                         </div>
@@ -162,7 +162,7 @@
                     </div>
                     <h6 class="fw-semibold mb-1 small text-body">{% trans "Working Context" %}</h6>
                     <p class="small text-muted mb-3" style="max-width: 320px;">{% trans "No working materials attached yet. Inspect citations in the Preview tab and click '+ Add to Context' to keep key references attached while you chat." %}</p>
-                    <div class="p-2 rounded bg-light border text-muted small" style="max-width: 340px;">
+                    <div class="p-2 rounded pwanimate-empty-hint-box text-muted small" style="max-width: 340px;">
                         <i class="bi bi-check2-circle text-success me-1"></i>{% trans "Attached resources remain pinned across tab switches and citations." %}
                     </div>
                     <button type="button" class="btn btn-primary rounded-pill mt-3" data-pwanimate-open-context-picker>
@@ -192,7 +192,7 @@
                                     <i class="bi bi-file-earmark me-1" id="desktopContextCategoryIcon"></i>
                                     <span id="desktopContextCategoryText">{% trans "Document" %}</span>
                                 </span>
-                                <span class="badge rounded-pill bg-light text-dark border" id="desktopContextLocationBadge">
+                                <span class="badge rounded-pill pwanimate-meta-pill" id="desktopContextLocationBadge">
                                     <i class="bi bi-bookmark me-1"></i><span id="desktopContextLocationText">p. 1</span>
                                 </span>
                             </div>
