@@ -347,6 +347,10 @@
             .in-conversation-shell > .desktop-context-rail {
                 display: none !important;
             }
+            .app-shell-layout.in-conversation-shell {
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+            }
             .auth-guest-entry-shell > .desktop-center-panel,
             .in-conversation-shell > .desktop-center-panel {
                 grid-column: 1 / -1 !important;
@@ -1034,9 +1038,9 @@
         }
 
         /* Native App & Standalone PWA Spacing Overrides */
-        body.is-native-app,
-        body.is-standalone-pwa,
-        .is-standalone-pwa body {
+        body.is-native-app:not(.in-conversation-active):not(:has(.whatsapp-layout)),
+        body.is-standalone-pwa:not(.in-conversation-active):not(:has(.whatsapp-layout)),
+        .is-standalone-pwa body:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
             padding-top: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
             padding-bottom: calc(76px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
         }
@@ -1051,7 +1055,7 @@
         }
 
         @media (display-mode: standalone) {
-            body {
+            body:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
                 padding-top: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
                 padding-bottom: calc(76px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
@@ -1930,7 +1934,7 @@
     </div>
 
     <!-- Desktop Three-Surface Shell / Mobile Single-Surface Shell -->
-    <div class="app-shell-layout{% if request.resolver_match.url_name == 'login' or request.resolver_match.url_name == 'login_direct' or request.resolver_match.url_name == 'register' %}{% if not request.user.is_authenticated %} auth-guest-entry-shell{% endif %}{% endif %}{% if request.resolver_match.url_name == 'conversation_detail' %} in-conversation-shell{% endif %}" id="app-shell-layout">
+    <div class="app-shell-layout{% if request.resolver_match.url_name == 'login' or request.resolver_match.url_name == 'login_direct' or request.resolver_match.url_name == 'register' %}{% if not request.user.is_authenticated %} auth-guest-entry-shell{% endif %}{% endif %}{% if request.resolver_match.url_name == 'conversation_detail' or request.resolver_match.url_name == 'conversation_list' or request.resolver_match.app_name == 'messaging' %} in-conversation-shell{% endif %}" id="app-shell-layout">
 
         <!-- 1. LEFT RAIL: Persistent Global Navigation (Desktop only: >= 992px) -->
         <aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Global Navigation' %}">
@@ -4303,6 +4307,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
                             }
                             if (doc.body && doc.body.className) {
                                 document.body.className = doc.body.className;
+                            }
+                            if (doc.querySelector('.whatsapp-layout') || incomingTarget.querySelector('.whatsapp-layout')) {
+                                document.documentElement.classList.add('in-conversation-active');
+                                document.body.classList.add('in-conversation-active');
                             }
 
                             // Sync app-shell-layout class (e.g. in-conversation-shell)

@@ -26,7 +26,7 @@
                     </a>
                     <div class="messaging-card-actions">
                         {% if user.id in following_ids %}
-                            <button class="btn btn-primary btn-sm messaging-btn-primary w-100" data-user-id="{{ user.id }}">
+                            <button class="btn btn-primary btn-sm messaging-btn-primary start-conversation-btn w-100" data-user-id="{{ user.id }}">
                                 <i class="bi bi-chat-dots me-1"></i>Message
                             </button>
                         {% else %}
@@ -485,56 +485,59 @@ function handleFollowAction(button, userId) {
 
 function handleMessagingAction(button, userId) {
     console.log('handleMessagingAction called for user ID:', userId);
-    // Show loading state
     const originalContent = button.innerHTML;
-    button.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading...';
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Loading...';
     button.disabled = true;
-    
-    // Create form data for conversation creation
-    const formData = new FormData();
-    formData.append('user_id', userId);
-    formData.append('type', 'direct');
-    
-    // Get CSRF token
+
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                      getCookie('csrftoken');
-    
-    // Make POST request to create conversation
-    fetch('/messaging/create/', {
+                      getCookie('csrftoken') || '';
+
+    // First call the standard REST endpoint
+    fetch('/messaging/v1/conversations/', {
         method: 'POST',
         headers: {
-            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
             'X-CSRFToken': csrfToken,
         },
-        body: formData,
-        credentials: 'same-origin'
+        body: JSON.stringify({
+            type: 'direct',
+            member_ids: [parseInt(userId, 10)]
+        })
     })
-    .then(response => {
-        if (response.redirected) {
-            // Redirect to conversation
-            window.location.href = response.url;
-            return;
+    .then(async response => {
+        if (!response.ok) {
+            // Fallback to /messaging/create/
+            const formData = new FormData();
+            formData.append('user_id', userId);
+            formData.append('type', 'direct');
+            const fallbackRes = await fetch('/messaging/create/', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: formData
+            });
+            return fallbackRes.json();
         }
         return response.json();
     })
     .then(data => {
-        if (data && data.error) {
-            console.error('Error:', data.error);
-            button.innerHTML = originalContent;
-            button.disabled = false;
+        if (data && (data.id || data.conversation_id)) {
+            const convId = data.id || data.conversation_id;
+            window.location.href = `/messaging/conversation/${convId}/`;
         } else if (data && data.redirect_url) {
             window.location.href = data.redirect_url;
         } else {
-            // Fallback: redirect to messages page
-            window.location.href = '/messaging/';
+            console.error('No conversation ID received:', data);
+            button.innerHTML = originalContent;
+            button.disabled = false;
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('Error in handleMessagingAction:', error);
         button.innerHTML = originalContent;
         button.disabled = false;
-        // Fallback: redirect to messages page
-        window.location.href = '/messaging/';
     });
 }
 

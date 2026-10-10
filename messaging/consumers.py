@@ -677,6 +677,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     id__lte=target_msg.id
                 ).exclude(sender_id=self.user_id).update(status='read')
 
+                try:
+                    from .context_processors import invalidate_unread_message_count_cache
+                    invalidate_unread_message_count_cache(self.user_id)
+                except Exception:
+                    pass
+
                 reader_avatar = None
                 if hasattr(self.user, 'profile_pic') and self.user.profile_pic:
                     try:

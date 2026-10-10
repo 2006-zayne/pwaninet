@@ -687,7 +687,7 @@
 
         slide.innerHTML = `
             ${item.thumbnail ? `<img class="offline-reel-poster-overlay" src="${item.thumbnail}" alt="" />` : ''}
-            <video class="offline-reel-video" src="${src}" poster="${item.thumbnail || ''}" loop playsinline webkit-playsinline disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" preload="auto"></video>
+            <video class="offline-reel-video" src="${src}" poster="${item.thumbnail || ''}" loop playsinline webkit-playsinline disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" preload="auto" ${isReelsMuted ? 'muted' : ''}></video>
             
             <div class="offline-reel-tap-indicator">
                 <i class="bi bi-play-fill"></i>
@@ -821,6 +821,17 @@
         progressContainer.addEventListener('pointercancel', stopScrubbing);
 
         // Right Rail Actions
+        video.muted = isReelsMuted;
+        video.addEventListener('volumechange', () => {
+            isReelsMuted = video.muted;
+            document.querySelectorAll('.reel-sound-btn').forEach(btn => {
+                const icon = btn.querySelector('i');
+                if (icon) icon.className = `bi ${isReelsMuted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}`;
+                const lbl = btn.querySelector('.rail-label');
+                if (lbl) lbl.textContent = isReelsMuted ? 'Muted' : 'Sound';
+            });
+        });
+
         const soundBtn = slide.querySelector('.reel-sound-btn');
         soundBtn.onclick = (e) => {
             e.stopPropagation();

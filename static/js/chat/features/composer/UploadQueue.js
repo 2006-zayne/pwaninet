@@ -374,19 +374,25 @@ export class UploadQueue {
                 metadata: {
                     type: singleItem.type,
                     url: singleItem.previewUrl || (singleItem.file ? URL.createObjectURL(singleItem.file) : ''),
+                    thumbnail: singleItem.thumbnail || singleItem.previewUrl || '',
                     file_name: singleItem.name || singleItem.file?.name || 'Media',
                     size: singleItem.size,
                     duration: singleItem.duration || 0,
+                    width: singleItem.width || 0,
+                    height: singleItem.height || 0,
                     uploadProgress: 0
                 },
                 attachments: [{
                     id: `temp_attach_0`,
                     file_url: singleItem.previewUrl || (singleItem.file ? URL.createObjectURL(singleItem.file) : ''),
+                    thumbnail: singleItem.thumbnail || singleItem.previewUrl || '',
                     file_type: singleItem.type,
                     caption: singleItem.caption || globalCaption || '',
                     order: 0,
                     size: singleItem.size,
-                    duration: singleItem.duration || 0
+                    duration: singleItem.duration || 0,
+                    width: singleItem.width || 0,
+                    height: singleItem.height || 0
                 }],
                 created_at: new Date().toISOString(),
                 status: 'uploading'
@@ -410,11 +416,14 @@ export class UploadQueue {
                 attachments: mediaItems.map((item, index) => ({
                     id: `temp_attach_${index}`,
                     file_url: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : ''),
+                    thumbnail: item.thumbnail || item.previewUrl || '',
                     file_type: item.type,
                     caption: item.caption || '',
                     order: index,
                     size: item.size,
-                    duration: item.duration || 0
+                    duration: item.duration || 0,
+                    width: item.width || 0,
+                    height: item.height || 0
                 })),
                 global_caption: globalCaption || '',
                 uploadProgress: 0
@@ -422,11 +431,14 @@ export class UploadQueue {
             attachments: mediaItems.map((item, index) => ({
                 id: `temp_attach_${index}`,
                 file_url: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : ''),
+                thumbnail: item.thumbnail || item.previewUrl || '',
                 file_type: item.type,
                 caption: item.caption || '',
                 order: index,
                 size: item.size,
-                duration: item.duration || 0
+                duration: item.duration || 0,
+                width: item.width || 0,
+                height: item.height || 0
             })),
             created_at: new Date().toISOString(),
             status: 'uploading'

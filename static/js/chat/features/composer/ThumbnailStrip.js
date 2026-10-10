@@ -85,13 +85,22 @@ export class ThumbnailStrip {
                 const videoThumb = document.createElement('div');
                 videoThumb.className = 'thumbnail-video';
                 
-                if (item.previewUrl) {
+                if (item.thumbnail) {
+                    const img = document.createElement('img');
+                    img.src = item.thumbnail;
+                    img.className = 'thumbnail-image';
+                    img.style.objectFit = 'cover';
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    videoThumb.appendChild(img);
+                } else if (item.previewUrl) {
                     const video = document.createElement('video');
                     video.src = item.previewUrl;
                     video.className = 'thumbnail-video-element';
                     video.muted = true;
+                    video.playsInline = true;
                     video.onloadeddata = () => {
-                        video.currentTime = 1; // Get frame at 1 second
+                        video.currentTime = 0.5;
                     };
                     videoThumb.appendChild(video);
                 }

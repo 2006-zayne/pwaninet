@@ -392,10 +392,11 @@ export class MediaComposer {
             const fileType = this._getFileType(file);
             const previewUrl = this._createPreviewUrl(file);
 
-            items.push({
+            const item = {
                 file: file,
                 type: fileType,
                 previewUrl: previewUrl,
+                thumbnail: '',
                 caption: '',
                 size: file.size,
                 name: file.name,
@@ -405,9 +406,92 @@ export class MediaComposer {
                 trimStart: 0,
                 trimEnd: 0,
                 duration: 0
-            });
+            };
+
+            if (fileType === 'image') {
+                const img = new Image();
+                img.onload = () => {
+                    item.width = img.naturalWidth;
+                    item.height = img.naturalHeight;
+                };
+                img.src = previewUrl;
+            } else if (fileType === 'video') {
+                this._generateVideoThumbnail(file, previewUrl).then(result => {
+                    if (result && result.thumbnail) {
+                        item.thumbnail = result.thumbnail;
+                        if (result.width && result.height) {
+                            item.width = result.width;
+                            item.height = result.height;
+                        }
+                        if (result.duration) {
+                            item.duration = result.duration;
+                        }
+                        if (this.thumbnailStrip) {
+                            this.thumbnailStrip.render(this.mediaItems);
+                        }
+                    }
+                }).catch(() => {});
+            }
+
+            items.push(item);
         }
         return items;
+    }
+
+    _generateVideoThumbnail(file, previewUrl) {
+        return new Promise((resolve) => {
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.muted = true;
+            video.playsInline = true;
+            const src = previewUrl || (file ? URL.createObjectURL(file) : '');
+            if (!src) return resolve({ thumbnail: '', width: 0, height: 0, duration: 0 });
+            video.src = src;
+
+            let finished = false;
+            const done = (dataUrl) => {
+                if (finished) return;
+                finished = true;
+                const width = video.videoWidth || 0;
+                const height = video.videoHeight || 0;
+                const duration = video.duration || 0;
+                video.remove();
+                resolve({
+                    thumbnail: dataUrl || '',
+                    width: width,
+                    height: height,
+                    duration: duration
+                });
+            };
+
+            video.onloadeddata = () => {
+                try {
+                    video.currentTime = Math.min(0.5, (video.duration || 1) / 2);
+                } catch (_) {
+                    done('');
+                }
+            };
+
+            video.onseeked = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const w = Math.min(video.videoWidth || 360, 480);
+                    const aspect = (video.videoHeight && video.videoWidth) ? (video.videoHeight / video.videoWidth) : 0.75;
+                    const h = Math.max(1, Math.round(w * aspect));
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, w, h);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+                    done(dataUrl);
+                } catch (_) {
+                    done('');
+                }
+            };
+
+            video.onerror = () => done('');
+            setTimeout(() => done(''), 3000);
+        });
     }
 
     _getFileType(file) {
@@ -993,7 +1077,10 @@ export class MediaComposer {
         const itemsToUpload = this.mediaItems.map(item => ({
             ...item,
             // Ensure previewUrl is preserved for optimistic bubble
-            previewUrl: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : '')
+            previewUrl: item.previewUrl || (item.file ? URL.createObjectURL(item.file) : ''),
+            thumbnail: item.thumbnail || '',
+            width: item.width || 0,
+            height: item.height || 0
         }));
         const captionToUpload = this.globalCaption || '';
         const conversationId = this.conversationId;

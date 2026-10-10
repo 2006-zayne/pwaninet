@@ -677,7 +677,7 @@ body.is-native-app .navbar-top {
 }
 
 /* Adjust body padding to match navbar height in native app with safe area consideration */
-body.is-native-app {
+body.is-native-app:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
     padding-top: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
     /* Content clearance for the floating pill nav + safe area */
     padding-bottom: calc(76px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
@@ -868,14 +868,14 @@ body.keyboard-open .mobile-bottom-nav {
         box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28) !important;
     }
 
-    [data-mobile-nav-position="top"] body {
+    [data-mobile-nav-position="top"] body:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
         padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
         padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
     }
 
-    [data-mobile-nav-position="top"] body.is-native-app,
-    [data-mobile-nav-position="top"] body.is-standalone-pwa,
-    [data-mobile-nav-position="top"].is-standalone-pwa body {
+    [data-mobile-nav-position="top"] body.is-native-app:not(.in-conversation-active):not(:has(.whatsapp-layout)),
+    [data-mobile-nav-position="top"] body.is-standalone-pwa:not(.in-conversation-active):not(:has(.whatsapp-layout)),
+    [data-mobile-nav-position="top"].is-standalone-pwa body:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
         padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
         padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
     }

@@ -1536,8 +1536,8 @@
         layout.classList.toggle('mobile-chat-active', active);
       }
       document.body.classList.toggle('mobile-chat-active', active);
-      document.documentElement.classList.toggle('in-conversation-active', active);
-      document.body.classList.toggle('in-conversation-active', active);
+      document.documentElement.classList.add('in-conversation-active');
+      document.body.classList.add('in-conversation-active');
     }
 
     // Tap on back button in chat header on mobile: Navigate cleanly to mobile conversation list

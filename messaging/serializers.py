@@ -67,6 +67,9 @@ class MessageAttachmentSerializer(serializers.ModelSerializer):
     def get_file_url(self, obj):
         """Get the URL of the attachment file."""
         if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
             return obj.file.url
         return None
 
@@ -110,6 +113,9 @@ class MessageSerializer(serializers.ModelSerializer):
     def get_attachment_url(self, obj):
         """Get the URL of the attachment (legacy single attachment, stickers, and GIFs)."""
         if obj.attachment:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.attachment.url)
             return obj.attachment.url
         if (getattr(obj, 'attachment_type', None) in ('sticker', 'gif') or
             getattr(obj, 'message_type', None) in ('sticker', 'gif')) and obj.link_image:
@@ -377,11 +383,11 @@ class ConversationSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             member = obj.members.filter(user=request.user).first()
-            if member and member.last_read_message:
+            if member and member.last_read_message_id:
                 return obj.messages.filter(
-                    created_at__gt=member.last_read_message.created_at
-                ).count()
-            return obj.messages.count()
+                    id__gt=member.last_read_message_id
+                ).exclude(sender=request.user).count()
+            return obj.messages.exclude(sender=request.user).count()
         return 0
 
     def get_existing(self, obj):

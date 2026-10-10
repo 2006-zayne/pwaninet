@@ -380,6 +380,10 @@ export class UIController {
                     if (replyId) {
                         const targetEl = document.querySelector(`.message-wrapper[data-message-id="${replyId}"] .message-bubble, .message-bubble[data-message-id="${replyId}"]`);
                         if (targetEl) {
+                            if (this.renderer) {
+                                this.renderer.isGroundedToBottom = false;
+                                this.renderer.isUserScrolledUp = true;
+                            }
                             targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             targetEl.classList.remove('highlight-flash');
                             void targetEl.offsetWidth;
@@ -397,7 +401,8 @@ export class UIController {
                 if (this.renderer && typeof this.renderer.updateScrollToBottomButton === 'function') {
                     this.renderer.updateScrollToBottomButton();
                 }
-                if (messagesContainer.scrollTop <= 80) {
+                // ONLY trigger loading older messages if the user has willingly chosen to scroll up to top!
+                if (this.renderer && this.renderer.isUserScrolledUp && messagesContainer.scrollTop <= 80) {
                     if (scrollDebounceTimer) return;
                     scrollDebounceTimer = setTimeout(async () => {
                         scrollDebounceTimer = null;
@@ -422,9 +427,15 @@ export class UIController {
             if (scrollBtn) {
                 e.preventDefault();
                 e.stopPropagation();
-                const container = document.getElementById('messagesContainer');
-                if (container) {
-                    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                if (this.renderer) {
+                    this.renderer.isGroundedToBottom = true;
+                    this.renderer.isUserScrolledUp = false;
+                    this.renderer._scrollToBottom(true);
+                } else {
+                    const container = document.getElementById('messagesContainer');
+                    if (container) {
+                        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                    }
                 }
                 scrollBtn.classList.add('d-none');
                 const badge = document.getElementById('chatScrollToBottomBadge');

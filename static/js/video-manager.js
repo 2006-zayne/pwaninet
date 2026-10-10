@@ -699,21 +699,43 @@
     // GLOBAL MUTE SYNCHRONIZATION
     // ============================================================================
 
-    function syncMuteButtons() {
-        const muteButtons = document.querySelectorAll('.reel-mute-btn, .video-mute-toggle, [data-action="mute-toggle"]');
+    function getActiveFullscreenVideo() {
+        if (!state.isFullScreenActive) return null;
+        const activeSnap = getActiveSnapItem();
+        return activeSnap ? activeSnap.querySelector('video') : null;
+    }
+
+    function syncMuteButtons(explicitMuted = null) {
+        let isMuted = isGlobalMuted;
+        if (explicitMuted !== null && explicitMuted !== undefined) {
+            isMuted = !!explicitMuted;
+        } else if (state.isFullScreenActive) {
+            const activeFsVid = getActiveFullscreenVideo();
+            if (activeFsVid) {
+                isMuted = Boolean(activeFsVid.muted);
+            }
+        } else if (state.currentPlayingVideo) {
+            isMuted = Boolean(state.currentPlayingVideo.muted);
+        }
+
+        const muteButtons = document.querySelectorAll('.reel-mute-btn, .video-mute-toggle, [data-action="mute-toggle"], #global-mute-button');
         muteButtons.forEach(btn => {
             const icon = btn.querySelector('i');
             if (icon) {
-                if (isGlobalMuted) {
-                    icon.className = 'bi bi-volume-mute-fill';
+                if (isMuted) {
+                    icon.className = icon.className.includes('bi-volume') ? 'bi bi-volume-mute-fill' : icon.className;
+                    if (btn.id === 'global-mute-button') icon.className = 'bi bi-volume-mute';
                 } else {
-                    icon.className = 'bi bi-volume-up-fill';
+                    icon.className = icon.className.includes('bi-volume') ? 'bi bi-volume-up-fill' : icon.className;
+                    if (btn.id === 'global-mute-button') icon.className = 'bi bi-volume-up';
                 }
             }
-            const label = btn.parentElement?.querySelector('.reel-mute-label');
+            const label = btn.parentElement?.querySelector('.reel-mute-label, .reel-desktop-action-label.reel-mute-label');
             if (label) {
-                label.textContent = isGlobalMuted ? 'Mute' : 'Sound';
+                label.textContent = isMuted ? 'Muted' : 'Sound';
             }
+            btn.title = isMuted ? 'Unmute' : 'Mute';
+            btn.setAttribute('aria-label', isMuted ? 'Unmute' : 'Mute');
         });
     }
 
@@ -728,10 +750,13 @@
 
         isProgrammaticAudioSync = true;
         try {
-            // Sync all video elements across feed and overlays (excluding carousel preview videos)
+            // Sync all video elements across feed and overlays (excluding carousel preview videos and messaging videos)
             document.querySelectorAll('video').forEach(vid => {
                 if (vid.classList.contains('reels-carousel-video') || vid.closest('.reels-carousel-shelf')) {
                     vid.muted = true;
+                    return;
+                }
+                if (isMessagingVideo(vid)) {
                     return;
                 }
                 delete vid._isAutoplayMutedFallback;
@@ -741,12 +766,27 @@
             setTimeout(() => { isProgrammaticAudioSync = false; }, 80);
         }
 
-        syncMuteButtons();
+        syncMuteButtons(isGlobalMuted);
+
+        // Keep GlobalAudioManager preference in sync if present
+        try {
+            if (window.PwaniNetGlobalAudio && typeof window.PwaniNetGlobalAudio.getAudioPreference === 'function') {
+                const targetPref = isGlobalMuted ? 'muted' : 'unmuted';
+                if (window.PwaniNetGlobalAudio.getAudioPreference() !== targetPref) {
+                    if (typeof window.PwaniNetGlobalAudio.setAudioPreference === 'function') {
+                        window.PwaniNetGlobalAudio.setAudioPreference(targetPref);
+                    }
+                }
+            }
+        } catch (_) {}
+
         console.log('[VideoManager] Global mute toggled to:', isGlobalMuted);
     }
 
     function toggleGlobalMute() {
-        setGlobalMute(!isGlobalMuted);
+        const activeVid = (state.isFullScreenActive ? getActiveFullscreenVideo() : state.currentPlayingVideo);
+        const currentMuted = activeVid ? activeVid.muted : isGlobalMuted;
+        setGlobalMute(!currentMuted);
     }
 
     // ============================================================================
@@ -1113,6 +1153,7 @@
             if (vinyl) {
                 vinyl.classList.add('is-playing');
             }
+            syncMuteButtons(video.muted);
             // If fullscreen is active, ensure orientation and desktop rail are updated for this playing video!
             if (state.isFullScreenActive) {
                 const snapItem = video.closest('.reels-snap-item');
@@ -1171,6 +1212,7 @@
                     isProgrammaticAudioSync = true;
                     video._isAutoplayMutedFallback = true;
                     video.muted = true;
+                    syncMuteButtons(true);
                     video.play().then(() => {
                         onPlaySuccess();
                     }).catch(silentErr => {
@@ -1526,6 +1568,9 @@
 
             const activeVid = activeItem.querySelector('video');
             if (activeVid) {
+                isProgrammaticAudioSync = true;
+                activeVid.muted = isGlobalMuted;
+                setTimeout(() => { isProgrammaticAudioSync = false; }, 80);
                 if (originCurrentTime > 0) {
                     const applyOriginTime = () => {
                         try { activeVid.currentTime = originCurrentTime; } catch (_) {}
@@ -1537,6 +1582,7 @@
                     }
                 }
                 playVideo(activeVid, true);
+                syncMuteButtons(isGlobalMuted);
                 const vinyl = activeItem.querySelector('.reel-vinyl-disc');
                 if (vinyl) vinyl.classList.add('is-playing');
             }
@@ -2117,6 +2163,7 @@
                 <video class="fullscreen-reel-video w-100 h-100"
                        id="fs-video-${postId}"
                        playsinline loop preload="none"
+                       ${isGlobalMuted ? 'muted' : ''}
                        poster="${poster}"
                        data-post-id="${postId}"
                        ${hlsUrl ? `data-hls-url="${hlsUrl}"` : ''}
@@ -2197,10 +2244,10 @@
                     </div>
 
                     <div class="reel-action-unit text-center">
-                        <button type="button" class="reel-action-btn reel-mute-btn text-white" data-action="mute-toggle" title="Sound" aria-label="Sound">
+                        <button type="button" class="reel-action-btn reel-mute-btn text-white" data-action="mute-toggle" title="${isGlobalMuted ? 'Unmute' : 'Mute'}" aria-label="${isGlobalMuted ? 'Unmute' : 'Mute'}">
                             <i class="bi ${isGlobalMuted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}"></i>
                         </button>
-                        <span class="reel-action-label reel-mute-label">${isGlobalMuted ? 'Mute' : 'Sound'}</span>
+                        <span class="reel-action-label reel-mute-label">${isGlobalMuted ? 'Muted' : 'Sound'}</span>
                     </div>
 
                     <div class="reel-action-unit reel-vinyl-unit text-center mt-1">
@@ -2231,14 +2278,27 @@
 
         const fsVideoEl = snapItem.querySelector('video');
         if (fsVideoEl) {
+            fsVideoEl.muted = isGlobalMuted;
             const fsSpinner = snapItem.querySelector('.reel-buffering-indicator');
             const fsProgress = snapItem.querySelector('.reel-progress-container');
             const fsVinyl = snapItem.querySelector('.reel-vinyl-disc');
             wireVideoBufferingListeners(fsVideoEl, snapItem, fsSpinner, fsProgress, fsVinyl);
 
+            // Wire volumechange to keep fullscreen mute button synchronized
+            fsVideoEl.addEventListener('volumechange', () => {
+                if (isProgrammaticAudioSync) return;
+                if (fsVideoEl._isAutoplayMutedFallback) return;
+                if (fsVideoEl.classList.contains('reels-carousel-video') || fsVideoEl.closest('.reels-carousel-shelf')) return;
+                syncMuteButtons(fsVideoEl.muted);
+                if (fsVideoEl.muted !== isGlobalMuted) {
+                    setGlobalMute(fsVideoEl.muted);
+                }
+            });
+
             fsVideoEl.addEventListener('playing', () => {
                 triggerPlayHud(snapItem, true);
                 if (fsVinyl) fsVinyl.classList.add('is-playing');
+                syncMuteButtons(fsVideoEl.muted);
             });
             fsVideoEl.addEventListener('pause', () => {
                 if (!fsVideoEl.seeking && !fsVideoEl.ended) {

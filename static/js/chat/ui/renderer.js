@@ -20,6 +20,11 @@ export class MessageRenderer {
         this.typingIndicatorElement = null;
         this.downloadedMediaIds = new Set();
         this.preserveScrollOnPrepend = false;
+        this.isGroundedToBottom = true;
+        this.isUserScrolledUp = false;
+        this.unreadScrolledCount = 0;
+        this._scrollGroundingListenersAttached = false;
+        this._containerResizeObserver = null;
         this.debugMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     }
 
@@ -31,6 +36,10 @@ export class MessageRenderer {
 
         this.container = document.getElementById('messagesContainer');
         this.currentUserId = currentUserId;
+        this.isGroundedToBottom = true;
+        this.isUserScrolledUp = false;
+        this.lastRenderedCount = 0;
+        this.unreadScrolledCount = 0;
 
         // Initialize device media store (Capacitor filesystem or IndexedDB)
         deviceMediaStore.init().catch(err => console.warn('[RENDERER] DeviceMediaStore init error:', err));
@@ -44,13 +53,7 @@ export class MessageRenderer {
         this._setupDelegatedEventListeners();
         this._setupEvictionListeners();
         this._setupSingleMediaPlaybackCoordinator();
-
-        // Listen for image/video/media load events inside container to maintain bottom settling
-        this.container.addEventListener('load', (e) => {
-            if (e.target && (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO')) {
-                this._scrollToBottom(false);
-            }
-        }, true);
+        this._setupScrollGroundingListeners();
 
         // Listen for live upload progress updates
         eventBus.on(EVENTS.MESSAGE_UPLOAD_PROGRESS, (data) => {
@@ -60,6 +63,78 @@ export class MessageRenderer {
         });
 
         this._log('RENDERER_INITIALIZED');
+    }
+
+    /**
+     * Setup user scroll intent detection and automatic bottom grounding
+     */
+    _setupScrollGroundingListeners() {
+        if (!this.container) return;
+        if (this._scrollGroundingListenersAttached) return;
+        this._scrollGroundingListenersAttached = true;
+
+        let userInteractionActive = false;
+        let interactionEndTimeout = null;
+
+        const markUserInteracting = () => {
+            userInteractionActive = true;
+            if (interactionEndTimeout) clearTimeout(interactionEndTimeout);
+            interactionEndTimeout = setTimeout(() => {
+                userInteractionActive = false;
+            }, 1200);
+        };
+
+        // Track intentional user scroll gestures
+        this.container.addEventListener('wheel', markUserInteracting, { passive: true });
+        this.container.addEventListener('touchstart', markUserInteracting, { passive: true });
+        this.container.addEventListener('touchmove', markUserInteracting, { passive: true });
+        this.container.addEventListener('pointerdown', markUserInteracting, { passive: true });
+        this.container.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'PageUp', 'Home', 'ArrowDown', 'PageDown', 'End'].includes(e.key)) {
+                markUserInteracting();
+            }
+        }, { passive: true });
+
+        // Scroll event: maintain isGroundedToBottom vs isUserScrolledUp
+        this.container.addEventListener('scroll', () => {
+            const threshold = 180;
+            const distanceFromBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight;
+
+            if (distanceFromBottom <= threshold) {
+                // User reached bottom: ground view to bottom!
+                this.isGroundedToBottom = true;
+                this.isUserScrolledUp = false;
+            } else if (userInteractionActive) {
+                // User willingly scrolled up: un-ground and preserve reading position
+                this.isGroundedToBottom = false;
+                this.isUserScrolledUp = true;
+            }
+            this.updateScrollToBottomButton();
+        }, { passive: true });
+
+        // Maintain bottom grounding as images or videos load
+        this.container.addEventListener('load', (e) => {
+            if (e.target && (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO')) {
+                if (this.isGroundedToBottom && !this.isUserScrolledUp) {
+                    this._scrollToBottom(true);
+                }
+            }
+        }, true);
+
+        // Keep pinned to bottom on container resizing (keyboard opening, viewport changes)
+        if (window.ResizeObserver) {
+            try {
+                if (this._containerResizeObserver) {
+                    this._containerResizeObserver.disconnect();
+                }
+                this._containerResizeObserver = new ResizeObserver(() => {
+                    if (this.isGroundedToBottom && !this.isUserScrolledUp) {
+                        this._scrollToBottom(true);
+                    }
+                });
+                this._containerResizeObserver.observe(this.container);
+            } catch (_) {}
+        }
     }
 
     /**
@@ -806,10 +881,8 @@ export class MessageRenderer {
         // Add to container at the end
         this.container.appendChild(this.typingIndicatorElement);
 
-        // Auto-scroll if already near bottom
-        const threshold = 180;
-        const isNearBottom = (this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight) < threshold;
-        if (isNearBottom) {
+        // Auto-scroll if grounded to bottom and user hasn't scrolled up
+        if (this.isGroundedToBottom && !this.isUserScrolledUp) {
             this.container.scrollTop = this.container.scrollHeight;
         }
     }
@@ -877,10 +950,8 @@ export class MessageRenderer {
         // Add to container at the end
         this.container.appendChild(this.typingIndicatorElement);
 
-        // Auto-scroll if already near bottom
-        const threshold = 180;
-        const isNearBottom = (this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight) < threshold;
-        if (isNearBottom) {
+        // Auto-scroll if grounded to bottom and user hasn't scrolled up
+        if (this.isGroundedToBottom && !this.isUserScrolledUp) {
             this.container.scrollTop = this.container.scrollHeight;
         }
     }
@@ -1042,23 +1113,23 @@ export class MessageRenderer {
                 const heightDiff = this.container.scrollHeight - prevScrollHeight;
                 this.container.scrollTop = prevScrollTop + heightDiff;
                 this.preserveScrollOnPrepend = false;
+            } else if (this.isGroundedToBottom || !this.isUserScrolledUp || this.lastRenderedCount === 0) {
+                // Default grounded state: keep bottom pinned unless user willingly scrolled up
+                this._scrollToBottom(true);
+                this.updateScrollToBottomButton();
             } else {
-                const isInitialRender = (this.lastRenderedCount === 0);
+                // User has deliberately scrolled up reading earlier messages
                 const isNewCount = messages.length > this.lastRenderedCount;
-                if (isInitialRender) {
-                    this._scrollToBottom(true);
-                    this.updateScrollToBottomButton();
-                } else if (isNewCount) {
+                if (isNewCount) {
                     const lastMsg = messages[messages.length - 1];
                     const isFromMe = (lastMsg && (lastMsg.sender_id === this.currentUserId || lastMsg.senderId === this.currentUserId || lastMsg.isOptimistic));
-                    this.handleIncomingMessageScroll(isFromMe);
-                } else {
-                    // Small change (status update, reaction, typing) - anchor to bottom if user was near bottom, else preserve exact scroll offset!
-                    if (wasNearBottom) {
+                    if (isFromMe) {
                         this._scrollToBottom(true);
                     } else {
-                        this.container.scrollTop = prevScrollTop;
+                        this.handleIncomingMessageScroll(false);
                     }
+                } else {
+                    this.container.scrollTop = prevScrollTop;
                     this.updateScrollToBottomButton();
                 }
             }
@@ -1231,6 +1302,7 @@ export class MessageRenderer {
         const elements = this.container.querySelectorAll(selector);
         elements.forEach(el => {
             el.setAttribute('data-message-id', String(actualId));
+            el.setAttribute('data-status', 'sent');
         });
         const uploadOverlays = this.container.querySelectorAll(`[data-upload-id="${tempId}"]`);
         uploadOverlays.forEach(el => {
@@ -2100,41 +2172,40 @@ export class MessageRenderer {
         const mediaFrame = document.createElement('div');
         mediaFrame.className = 'media-card-frame';
 
-        if (attachmentType === 'video') {
-            bubble.classList.add('video-bubble');
-            const isPortrait = metadata.width && metadata.height && metadata.height > metadata.width;
+        const applyMediaDimensions = (w, h) => {
+            if (!w || !h) return;
+            const isPortrait = h > w;
+            bubble.classList.remove('media-portrait', 'media-landscape', 'media-square');
             if (isPortrait) {
                 bubble.classList.add('media-portrait');
+            } else if (w > h * 1.1) {
+                bubble.classList.add('media-landscape');
+            } else {
+                bubble.classList.add('media-square');
+            }
+            mediaFrame.style.aspectRatio = `${w} / ${h}`;
+            const MAX_MEDIA_HEIGHT = 380;
+            const baseWidth = isPortrait ? 260 : 330;
+            const fitWidth = Math.floor(Math.min(baseWidth, MAX_MEDIA_HEIGHT * (w / h)));
+            mediaFrame.style.width = `min(${fitWidth}px, calc(100vw - 72px))`;
+        };
+
+        if (attachmentType === 'video') {
+            bubble.classList.add('video-bubble');
+            const initialW = metadata.width || metadata.file_width || message.width || (metadata.attachments && metadata.attachments[0] && (metadata.attachments[0].width || metadata.attachments[0].file_width));
+            const initialH = metadata.height || metadata.file_height || message.height || (metadata.attachments && metadata.attachments[0] && (metadata.attachments[0].height || metadata.attachments[0].file_height));
+            if (initialW && initialH) {
+                applyMediaDimensions(initialW, initialH);
             } else {
                 bubble.classList.add('media-landscape');
-            }
-            const aspect = (metadata.width && metadata.height)
-                ? `${metadata.width} / ${metadata.height}`
-                : '16 / 9';
-            mediaFrame.style.aspectRatio = aspect;
-            if (isPortrait) {
-                mediaFrame.style.width = 'min(260px, calc(100vw - 72px))';
-            } else {
+                mediaFrame.style.aspectRatio = '16 / 9';
                 mediaFrame.style.width = 'min(330px, calc(100vw - 72px))';
             }
         } else if (attachmentType === 'image') {
-            const w = metadata.width || metadata.file_width;
-            const h = metadata.height || metadata.file_height;
+            const w = metadata.width || metadata.file_width || message.width;
+            const h = metadata.height || metadata.file_height || message.height;
             if (w && h) {
-                const isPortrait = h > w;
-                if (isPortrait) {
-                    bubble.classList.add('media-portrait');
-                } else if (w > h * 1.1) {
-                    bubble.classList.add('media-landscape');
-                } else {
-                    bubble.classList.add('media-square');
-                }
-                const aspect = `${w} / ${h}`;
-                mediaFrame.style.aspectRatio = aspect;
-                const MAX_MEDIA_HEIGHT = 380;
-                const baseWidth = isPortrait ? 260 : 330;
-                const fitWidth = Math.floor(Math.min(baseWidth, MAX_MEDIA_HEIGHT * w / h));
-                mediaFrame.style.width = `min(${fitWidth}px, calc(100vw - 72px))`;
+                applyMediaDimensions(w, h);
             }
         }
 
@@ -2151,9 +2222,11 @@ export class MessageRenderer {
                 mediaContent = `<img src="${escapeHtml(mediaUrl)}" alt="Image" loading="lazy" class="single-media-img" style="border-radius: 12px !important;">`;
             }
         } else if (attachmentType === 'video' && mediaUrl) {
+            const thumbUrl = metadata.thumbnail || metadata.previewUrl || message.thumbnail || (metadata.attachments && metadata.attachments[0] && (metadata.attachments[0].thumbnail || metadata.attachments[0].previewUrl)) || '';
+            const posterAttr = thumbUrl ? `poster="${escapeHtml(thumbUrl)}"` : '';
+
             if (isNotDownloaded) {
                 // When not downloaded: render blurred video thumbnail underneath download overlay
-                const thumbUrl = metadata.thumbnail || metadata.previewUrl || '';
                 const videoSource = `${escapeHtml(mediaUrl)}#t=0.001`;
 
                 mediaContent = `
@@ -2165,7 +2238,7 @@ export class MessageRenderer {
                     ${thumbUrl ? `
                         <img src="${escapeHtml(thumbUrl)}" data-full-src="${escapeHtml(mediaUrl)}" alt="Video preview" loading="lazy" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;">
                     ` : `
-                        <video src="${videoSource}" preload="metadata" poster="${escapeHtml(thumbUrl)}" data-full-src="${escapeHtml(mediaUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;"></video>
+                        <video src="${videoSource}" preload="metadata" ${posterAttr} data-full-src="${escapeHtml(mediaUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;"></video>
                     `}
                 `;
             } else {
@@ -2175,19 +2248,58 @@ export class MessageRenderer {
                             <polygon points="5,3 19,12 5,21"></polygon>
                         </svg>
                     </div>
-                    <video src="${escapeHtml(mediaUrl)}" preload="metadata" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 12px !important;"></video>
+                    ${thumbUrl ? `
+                        <img src="${escapeHtml(thumbUrl)}" alt="Video preview" loading="lazy" class="single-media-video-poster" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 12px !important;">
+                        <video src="${escapeHtml(mediaUrl)}" preload="metadata" ${posterAttr} data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="display: none;"></video>
+                    ` : `
+                        <video src="${escapeHtml(mediaUrl)}" preload="metadata" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 12px !important;"></video>
+                    `}
                 `;
             }
         }
 
         mediaFrame.innerHTML = mediaContent;
 
-        // Strictly prevent inline playback in chat bubbles
+        // Auto-detect and adapt bubble shape to actual video / thumbnail dimensions
+        const posterEl = mediaFrame.querySelector('.single-media-video-poster, .single-media-video-thumb');
+        if (posterEl) {
+            if (posterEl.complete && posterEl.naturalWidth && posterEl.naturalHeight) {
+                applyMediaDimensions(posterEl.naturalWidth, posterEl.naturalHeight);
+            } else {
+                posterEl.addEventListener('load', () => {
+                    if (posterEl.naturalWidth && posterEl.naturalHeight) {
+                        applyMediaDimensions(posterEl.naturalWidth, posterEl.naturalHeight);
+                    }
+                }, { once: true });
+            }
+        }
+
+        // Strictly prevent inline playback in chat bubbles and generate canvas frame fallback on mobile/Capacitor
         mediaFrame.querySelectorAll('video').forEach(vid => {
             vid.addEventListener('play', (e) => {
                 e.preventDefault();
                 try { vid.pause(); } catch (_) {}
             });
+            vid.addEventListener('loadedmetadata', () => {
+                if (vid.videoWidth && vid.videoHeight) {
+                    applyMediaDimensions(vid.videoWidth, vid.videoHeight);
+                }
+            }, { once: true });
+            if (!vid.getAttribute('poster') && vid.src && !vid.src.endsWith('#t=0.001')) {
+                vid.addEventListener('loadeddata', () => {
+                    try {
+                        if (vid.videoWidth && vid.videoHeight) {
+                            applyMediaDimensions(vid.videoWidth, vid.videoHeight);
+                            const c = document.createElement('canvas');
+                            c.width = Math.min(vid.videoWidth, 480);
+                            c.height = Math.max(1, Math.round(c.width * (vid.videoHeight / vid.videoWidth)));
+                            c.getContext('2d').drawImage(vid, 0, 0, c.width, c.height);
+                            const poster = c.toDataURL('image/jpeg', 0.7);
+                            vid.setAttribute('poster', poster);
+                        }
+                    } catch (_) {}
+                }, { once: true });
+            }
         });
 
         // Asynchronously check and use locally stored device media if available
@@ -2279,26 +2391,29 @@ export class MessageRenderer {
 
         // Click handler: if not downloaded, trigger download; if downloaded, open fullscreen viewer
         bubble.addEventListener('click', async (e) => {
+            const currentMsgId = bubble.getAttribute('data-message-id') || message.id;
             if (bubble.classList.contains('not-downloaded')) {
                 e.stopPropagation();
-                this._handleMediaDownload(message.id, bubble);
+                this._handleMediaDownload(currentMsgId, bubble);
                 return;
             }
-            if (isUploading) return;
+            const activeUpload = bubble.querySelector('.media-upload-overlay:not(.upload-complete)');
+            const currentStatus = bubble.getAttribute('data-status');
+            if (activeUpload || currentStatus === 'uploading' || currentStatus === 'sending') return;
             if (e.target.closest('.media-card-footer.has-caption')) {
                 return; // Let user select or click caption text
             }
-            console.log('[MEDIA_VIEWER] Opening attachment:', message.id);
+            console.log('[MEDIA_VIEWER] Opening attachment:', currentMsgId);
             let viewerUrl = mediaUrl;
             try {
-                const localUrl = await deviceMediaStore.getLocalMediaUrl(message.id);
+                const localUrl = await deviceMediaStore.getLocalMediaUrl(currentMsgId);
                 if (localUrl) {
                     viewerUrl = localUrl;
                 }
             } catch (_) {}
 
             this.renderFullscreenMediaViewer([{
-                id: message.id,
+                id: currentMsgId,
                 type: attachmentType,
                 url: viewerUrl,
                 caption: caption
@@ -2451,12 +2566,15 @@ export class MessageRenderer {
 
         // Click handler: if not downloaded, trigger download; if downloaded, open fullscreen viewer
         bubble.addEventListener('click', async (e) => {
+            const currentMsgId = bubble.getAttribute('data-message-id') || message.id;
             if (bubble.classList.contains('not-downloaded')) {
                 e.stopPropagation();
-                this._handleMediaDownload(message.id, bubble);
+                this._handleMediaDownload(currentMsgId, bubble);
                 return;
             }
-            if (isUploading) return;
+            const activeUpload = bubble.querySelector('.media-upload-overlay:not(.upload-complete)');
+            const currentStatus = bubble.getAttribute('data-status');
+            if (activeUpload || currentStatus === 'uploading' || currentStatus === 'sending') return;
             if (e.target.closest('.media-card-footer.has-caption')) {
                 return; // Let user select or click caption text
             }
@@ -2467,7 +2585,7 @@ export class MessageRenderer {
                 const idx = tiles.indexOf(clickedTile);
                 if (idx !== -1) startIndex = idx;
             }
-            console.log('[MEDIA_VIEWER] Opening media group:', message.id, 'startIndex:', startIndex);
+            console.log('[MEDIA_VIEWER] Opening media group:', currentMsgId, 'startIndex:', startIndex);
 
             // Fetch local offline URLs for attachments if available
             const preparedAttachments = await Promise.all(attachments.map(async (att, idx) => {
@@ -2540,8 +2658,9 @@ export class MessageRenderer {
                 }
                 break;
             case 'video':
+                const tileThumb = attachment.thumbnail || attachment.previewUrl || '';
+                const tilePosterAttr = tileThumb ? `poster="${escapeHtml(tileThumb)}"` : '';
                 if (isNotDownloaded) {
-                    const tileThumb = attachment.thumbnail || attachment.previewUrl || '';
                     const videoSrc = `${escapeHtml(fileUrl)}#t=0.001`;
                     tileContent = `
                         <div class="tile-play-icon">
@@ -2552,7 +2671,7 @@ export class MessageRenderer {
                         ${tileThumb ? `
                             <img src="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" alt="Video preview" loading="lazy" class="tile-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;">
                         ` : `
-                            <video src="${videoSrc}" preload="metadata" poster="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;"></video>
+                            <video src="${videoSrc}" preload="metadata" ${tilePosterAttr} data-full-src="${escapeHtml(fileUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;"></video>
                         `}
                     `;
                 } else {
@@ -2562,7 +2681,12 @@ export class MessageRenderer {
                                 <polygon points="5,3 19,12 5,21"></polygon>
                             </svg>
                         </div>
-                        <video src="${escapeHtml(fileUrl)}" preload="metadata" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 8px !important;"></video>
+                        ${tileThumb ? `
+                            <img src="${escapeHtml(tileThumb)}" alt="Video preview" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 8px !important;">
+                            <video src="${escapeHtml(fileUrl)}" preload="metadata" ${tilePosterAttr} data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="display: none;"></video>
+                        ` : `
+                            <video src="${escapeHtml(fileUrl)}" preload="metadata" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 8px !important;"></video>
+                        `}
                     `;
                 }
                 break;
@@ -2572,12 +2696,26 @@ export class MessageRenderer {
 
         tile.innerHTML = tileContent;
 
-        // Strictly prevent inline playback in media tile
+        // Strictly prevent inline playback in media tile and add canvas frame fallback
         tile.querySelectorAll('video').forEach(vid => {
             vid.addEventListener('play', (e) => {
                 e.preventDefault();
                 try { vid.pause(); } catch (_) {}
             });
+            if (!vid.getAttribute('poster') && vid.src && !vid.src.endsWith('#t=0.001')) {
+                vid.addEventListener('loadeddata', () => {
+                    try {
+                        if (vid.videoWidth && vid.videoHeight) {
+                            const c = document.createElement('canvas');
+                            c.width = Math.min(vid.videoWidth, 480);
+                            c.height = Math.max(1, Math.round(c.width * (vid.videoHeight / vid.videoWidth)));
+                            c.getContext('2d').drawImage(vid, 0, 0, c.width, c.height);
+                            const poster = c.toDataURL('image/jpeg', 0.7);
+                            vid.setAttribute('poster', poster);
+                        }
+                    } catch (_) {}
+                }, { once: true });
+            }
         });
 
         // Add overlay count for last visible tile if there are hidden items
@@ -2792,15 +2930,28 @@ export class MessageRenderer {
                     video.muted = false;
                     video.volume = 1.0;
 
+                    const updateMuteUi = () => {
+                        if (!muteBtn || !video) return;
+                        const isMuted = Boolean(video.muted || video.volume === 0);
+                        muteBtn.innerHTML = isMuted
+                            ? '<i class="bi bi-volume-mute-fill"></i>'
+                            : '<i class="bi bi-volume-up-fill"></i>';
+                        muteBtn.title = isMuted ? 'Unmute' : 'Mute';
+                        muteBtn.setAttribute('aria-label', isMuted ? 'Unmute video' : 'Mute video');
+                    };
+
+                    video.addEventListener('volumechange', updateMuteUi);
+                    updateMuteUi();
+
                     // Play attempt
                     const playPromise = video.play();
                     if (playPromise !== undefined) {
-                        playPromise.catch(() => {
+                        playPromise.then(() => {
+                            updateMuteUi();
+                        }).catch(() => {
                             // If browser autoplay policy with audio fails, fallback to muted then user can tap unmute
                             video.muted = true;
-                            if (muteBtn) {
-                                muteBtn.innerHTML = '<i class="bi bi-volume-mute-fill"></i>';
-                            }
+                            updateMuteUi();
                             video.play().catch(() => {});
                         });
                     }
@@ -2821,7 +2972,10 @@ export class MessageRenderer {
                         tapHitbox.addEventListener('click', (e) => {
                             e.stopPropagation();
                             if (video.paused) {
-                                video.play().then(() => showHud(true)).catch(() => {});
+                                video.play().then(() => {
+                                    showHud(true);
+                                    updateMuteUi();
+                                }).catch(() => {});
                             } else {
                                 video.pause();
                                 showHud(false);
@@ -2834,9 +2988,10 @@ export class MessageRenderer {
                         muteBtn.addEventListener('click', (e) => {
                             e.stopPropagation();
                             video.muted = !video.muted;
-                            muteBtn.innerHTML = video.muted
-                                ? '<i class="bi bi-volume-mute-fill"></i>'
-                                : '<i class="bi bi-volume-up-fill"></i>';
+                            if (!video.muted && video.volume === 0) {
+                                video.volume = 1.0;
+                            }
+                            updateMuteUi();
                         });
                     }
 
@@ -3834,10 +3989,14 @@ export class MessageRenderer {
         }
         if (!this.container) return;
         const threshold = 180;
-        const isNearBottom = (this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight) < threshold;
-        if (force || isNearBottom) {
+        const distanceFromBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight;
+        const isNearBottom = distanceFromBottom < threshold;
+
+        if (force || isNearBottom || (this.isGroundedToBottom && !this.isUserScrolledUp)) {
+            this.isGroundedToBottom = true;
+            this.isUserScrolledUp = false;
             const applyScroll = () => {
-                if (this.container) {
+                if (this.container && (this.isGroundedToBottom || force)) {
                     this.container.scrollTop = this.container.scrollHeight;
                 }
                 this.updateScrollToBottomButton();
@@ -3848,6 +4007,7 @@ export class MessageRenderer {
                 setTimeout(applyScroll, 25);
                 setTimeout(applyScroll, 80);
                 setTimeout(applyScroll, 200);
+                setTimeout(applyScroll, 500);
             });
         } else {
             this.updateScrollToBottomButton();
@@ -3871,7 +4031,7 @@ export class MessageRenderer {
         const distanceFromBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight;
         const isNearBottom = distanceFromBottom < threshold;
 
-        if (isNearBottom) {
+        if (isNearBottom || (this.isGroundedToBottom && !this.isUserScrolledUp)) {
             btn.classList.add('d-none', 'is-hidden');
             btn.style.setProperty('display', 'none', 'important');
             this.unreadScrolledCount = 0;
@@ -3894,19 +4054,18 @@ export class MessageRenderer {
         }
         if (!this.container) return;
 
-        const threshold = 180;
-        const distanceFromBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight;
-        const isNearBottom = distanceFromBottom < threshold;
-
-        if (isFromMe || isNearBottom) {
+        if (isFromMe || this.isGroundedToBottom || !this.isUserScrolledUp) {
             this._scrollToBottom(true);
             this.updateScrollToBottomButton();
         } else {
-            // User is scrolled up reading earlier messages!
+            // User is willingly scrolled up reading earlier messages!
             this.unreadScrolledCount = (this.unreadScrolledCount || 0) + 1;
             const btn = document.getElementById('chatScrollToBottomBtn');
             const badge = document.getElementById('chatScrollToBottomBadge');
-            if (btn) btn.classList.remove('d-none');
+            if (btn) {
+                btn.classList.remove('d-none', 'is-hidden');
+                btn.style.removeProperty('display');
+            }
             if (badge) {
                 badge.textContent = String(this.unreadScrolledCount);
                 badge.classList.remove('d-none');

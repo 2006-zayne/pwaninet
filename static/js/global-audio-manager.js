@@ -122,6 +122,15 @@
         
         // Apply to all videos
         applyAudioPreference();
+
+        // Also sync with VideoManager if active
+        try {
+            if (window.videoManager && typeof window.videoManager.setGlobalMute === 'function') {
+                window.videoManager.setGlobalMute(state.audioPreference === 'muted');
+            } else if (window.PwaniNetVideoManager && typeof window.PwaniNetVideoManager.setGlobalMute === 'function') {
+                window.PwaniNetVideoManager.setGlobalMute(state.audioPreference === 'muted');
+            }
+        } catch (_) {}
         
         console.log('[GlobalAudioManager] Audio preference toggled:', state.audioPreference);
     }
@@ -329,9 +338,25 @@
     // VIDEO AUDIO MANAGEMENT
     // ============================================================================
 
+    function isExcludedVideo(video) {
+        if (!video) return true;
+        if (video.dataset && (
+            video.dataset.chatMedia === 'true' ||
+            video.dataset.noInline === 'true' ||
+            video.dataset.messaging === 'true'
+        )) {
+            return true;
+        }
+        if (video.closest('.media-viewer-overlay, #messagesContainer, .messages-area, .media-bubble, .media-tile, .message-bubble, .message-wrapper, .conversation-container, #chatMessages, #chatAppContainer, .messaging-view, #mediaPreviewModal, .media-preview-modal, .media-composer-modal, .reels-carousel-shelf')) {
+            return true;
+        }
+        return false;
+    }
+
     function applyAudioPreference() {
         const videos = document.querySelectorAll('video');
         videos.forEach(video => {
+            if (isExcludedVideo(video)) return;
             if (state.audioPreference === 'unmuted') {
                 video.muted = false;
             } else {
@@ -409,9 +434,21 @@
         getAudioPreference: () => state.audioPreference,
         setAudioPreference: (preference) => {
             state.audioPreference = preference;
+            localStorage.setItem(getUserStorageKey(STORAGE_KEYS.AUDIO_PREFERENCE), preference);
             localStorage.setItem(STORAGE_KEYS.AUDIO_PREFERENCE, preference);
             updateMuteButtonIcon();
             applyAudioPreference();
+            try {
+                if (window.videoManager && typeof window.videoManager.setGlobalMute === 'function') {
+                    if (window.videoManager.isGlobalMuted !== (preference === 'muted')) {
+                        window.videoManager.setGlobalMute(preference === 'muted');
+                    }
+                } else if (window.PwaniNetVideoManager && typeof window.PwaniNetVideoManager.setGlobalMute === 'function') {
+                    if (window.PwaniNetVideoManager.isGlobalMuted !== (preference === 'muted')) {
+                        window.PwaniNetVideoManager.setGlobalMute(preference === 'muted');
+                    }
+                }
+            } catch (_) {}
         }
     };
 

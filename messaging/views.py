@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
@@ -61,10 +62,12 @@ class ConversationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create a new conversation and add the current user as member."""
         conversation = serializer.save()
+        if getattr(conversation, '_existing', False):
+            return conversation
         # Only add current user if not already in member_ids
         member_ids = self.request.data.get('member_ids', [])
         if self.request.user.id not in member_ids:
-            ConversationMember.objects.create(
+            ConversationMember.objects.get_or_create(
                 conversation=conversation,
                 user=self.request.user
             )
@@ -488,12 +491,12 @@ def conversation_list(request):
         
         # Calculate unread count and pin status for this user
         member = user_memberships.get(conversation.id)
-        if member and member.last_read_message:
+        if member and member.last_read_message_id:
             unread_count = conversation.messages.filter(
-                created_at__gt=member.last_read_message.created_at
-            ).count()
+                id__gt=member.last_read_message_id
+            ).exclude(sender=request.user).count()
         else:
-            unread_count = conversation.messages.count()
+            unread_count = conversation.messages.exclude(sender=request.user).count()
         
         is_pinned = bool(member and member.is_pinned)
         pinned_at = member.pinned_at if member else None
@@ -639,7 +642,13 @@ def conversation_detail(request, conversation_id):
         last_message = messages.last()
         if last_message:
             member.last_read_message = last_message
-            member.save()
+            member.save(update_fields=['last_read_message'])
+            Message.objects.filter(
+                conversation_id=conversation.id,
+                id__lte=last_message.id
+            ).exclude(sender=request.user).update(status='read')
+        from .context_processors import invalidate_unread_message_count_cache
+        invalidate_unread_message_count_cache(request.user.id)
     
     # Active conversation list for desktop WhatsApp left rail
     conversations = Conversation.objects.filter(
@@ -666,12 +675,14 @@ def conversation_detail(request, conversation_id):
             read_status = conv.get_last_message_read_status(request.user) or 'sent'
         
         mem = user_memberships.get(conv.id)
-        if mem and mem.last_read_message:
+        if conv.id == conversation.id:
+            unread_count = 0
+        elif mem and mem.last_read_message_id:
             unread_count = conv.messages.filter(
-                created_at__gt=mem.last_read_message.created_at
-            ).count()
+                id__gt=mem.last_read_message_id
+            ).exclude(sender=request.user).count()
         else:
-            unread_count = conv.messages.count()
+            unread_count = conv.messages.exclude(sender=request.user).count()
         
         is_pinned = bool(mem and mem.is_pinned)
         pinned_at = mem.pinned_at if mem else None
@@ -965,11 +976,25 @@ def conversation_media(request, conversation_id):
 @login_required
 def create_conversation(request):
     """Create a new conversation or redirect to existing one."""
+    is_ajax = (
+        request.headers.get('x-requested-with') == 'XMLHttpRequest' or
+        'application/json' in request.headers.get('accept', '') or
+        request.content_type == 'application/json'
+    )
     if request.method == 'POST':
         user_id = request.POST.get('user_id')
+        if not user_id and request.content_type == 'application/json':
+            import json
+            try:
+                data = json.loads(request.body)
+                user_id = data.get('user_id')
+            except Exception:
+                pass
         conversation_type = request.POST.get('type', 'direct')
         
         if not user_id:
+            if is_ajax:
+                return JsonResponse({'error': 'User ID is required.'}, status=400)
             messages.error(request, 'User ID is required.')
             return redirect('messaging:conversation_list')
         
@@ -983,24 +1008,46 @@ def create_conversation(request):
             )
             
             if existing:
+                if is_ajax:
+                    return JsonResponse({
+                        'success': True,
+                        'id': existing.id,
+                        'conversation_id': existing.id,
+                        'existing': True,
+                        'redirect_url': reverse('messaging:conversation_detail', kwargs={'conversation_id': existing.id})
+                    })
                 messages.info(request, 'Existing conversation found.')
                 return redirect('messaging:conversation_detail', conversation_id=existing.id)
             
             # Create new conversation
             conversation = Conversation.objects.create(type=conversation_type)
             
-            # Add members
-            ConversationMember.objects.create(conversation=conversation, user=request.user)
-            ConversationMember.objects.create(conversation=conversation, user=other_user)
+            # Add members safely
+            ConversationMember.objects.get_or_create(conversation=conversation, user=request.user)
+            ConversationMember.objects.get_or_create(conversation=conversation, user=other_user)
             
+            if is_ajax:
+                return JsonResponse({
+                    'success': True,
+                    'id': conversation.id,
+                    'conversation_id': conversation.id,
+                    'existing': False,
+                    'redirect_url': reverse('messaging:conversation_detail', kwargs={'conversation_id': conversation.id})
+                })
             messages.success(request, 'Conversation created successfully.')
             return redirect('messaging:conversation_detail', conversation_id=conversation.id)
             
         except User.DoesNotExist:
+            if is_ajax:
+                return JsonResponse({'error': 'User not found.'}, status=404)
             messages.error(request, 'User not found.')
         except Exception as e:
+            if is_ajax:
+                return JsonResponse({'error': f'Failed to create conversation: {str(e)}'}, status=500)
             messages.error(request, f'Failed to create conversation: {str(e)}')
     
+    if is_ajax:
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
     return redirect('messaging:conversation_list')
 
 
@@ -1695,13 +1742,12 @@ def unread_message_count(request):
     
     for conversation in conversations:
         member = conversation.members.filter(user=request.user).first()
-        if member and member.last_read_message:
+        if member and member.last_read_message_id:
             unread = conversation.messages.filter(
-                created_at__gt=member.last_read_message.created_at
-            ).count()
+                id__gt=member.last_read_message_id
+            ).exclude(sender=request.user).count()
         else:
-            # If no last_read_message, count all messages as unread
-            unread = conversation.messages.count()
+            unread = conversation.messages.exclude(sender=request.user).count()
         total_unread += unread
     
     # Build HTML similar to notification badge
