@@ -2,9 +2,9 @@
 {% load static %}
 {% load messaging_extras %}
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=8">
-<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=25">
-<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=44">
+<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=9">
+<link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=26">
+<link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=46">
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 <script>
 // Helper function to get CSRF token
@@ -1484,7 +1484,7 @@ function showNotification(message, type = 'info') {
 </div>
 </div>
 <!-- Offline Messaging Cache -->
-<script src="{% static 'js/messaging/offline-cache.js' %}?v=47"></script>
+<script src="{% static 'js/messaging/offline-cache.js' %}?v=48"></script>
 
 <script>
 // Conversation list specific functions for real-time updates
@@ -1559,8 +1559,8 @@ function handleUserStatusUpdate(userData) {
 }
 window.handleUserStatusUpdate = handleUserStatusUpdate;
 </script>
-<script src="{% static 'js/messaging/conversation-realtime-manager.js' %}?v=5"></script>
-<script src="{% static 'js/chat-theme-handler.js' %}?v=28"></script>
-<script src="{% static 'js/messaging/start-conversation.js' %}?v=1"></script>
+<script src="{% static 'js/messaging/conversation-realtime-manager.js' %}?v=6"></script>
+<script src="{% static 'js/chat-theme-handler.js' %}?v=29"></script>
+<script src="{% static 'js/messaging/start-conversation.js' %}?v=2"></script>
 
 {% endblock %}

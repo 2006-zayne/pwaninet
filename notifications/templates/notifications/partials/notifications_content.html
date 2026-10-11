@@ -1,6 +1,6 @@
 {% load static %}
 
-<link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}?v=4">
 
 <div class="page-wrap">
   <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
@@ -152,7 +152,7 @@
 </div>
 
 <script type="module">
-  import { initNotificationCenter } from "{% static 'notifications/js/notifications.js' %}?v=3";
+  import { initNotificationCenter } from "{% static 'notifications/js/notifications.js' %}?v=4";
   initNotificationCenter();
 </script>
 <script>

@@ -6,7 +6,7 @@
 
 import { store } from '../core/store.js';
 import { messageService } from '../core/message-service.js';
-import { MessageRenderer } from './renderer.js?v=43';
+import { MessageRenderer } from './renderer.js?v=44';
 import { contextMenuService } from '../features/context-menu/context-menu.service.js';
 import { messageSoundManager } from '../shared/message-sound.js';
 import { eventBus } from '../core/event-bus.js';
