@@ -5,9 +5,9 @@
  * organic rolling wave animation, and VN preview playback before sending.
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-7';
-import { eventBus } from '../../core/event-bus.js?v=20261011-7';
-import { voiceService } from './voice.service.js?v=20261011-7';
+import { EVENTS } from '../../shared/constants.js?v=20261011-12';
+import { eventBus } from '../../core/event-bus.js?v=20261011-12';
+import { voiceService } from './voice.service.js?v=20261011-12';
 
 export class VoiceModalController {
   constructor() {
@@ -146,12 +146,16 @@ export class VoiceModalController {
         if (icon) icon.classList.add('d-none');
         if (spinner) spinner.classList.remove('d-none');
 
+        // Reset the composer to its normal state immediately: the optimistic
+        // bubble already carries upload progress, so the preview must not
+        // linger (and spin) for the whole upload. Failures surface on the
+        // bubble with retry; they must not trap the composer.
+        const sendPromise = voiceService.sendRecording();
+        this.resetToIdle();
         try {
-          await voiceService.sendRecording();
+          await sendPromise;
         } catch (err) {
           console.error('[VOICE_CONTROLLER] Send error:', err);
-        } finally {
-          this.resetToIdle();
         }
         return;
       }

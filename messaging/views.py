@@ -659,8 +659,9 @@ def conversation_list(request):
     except Exception:
         is_mobile = any(k in ua_string.lower() for k in ['mobile', 'android', 'iphone', 'ipod'])
 
-    # Desktop: hop directly into three-panel layout with empty state unless view=list requested
-    if not is_mobile and request.GET.get('view') != 'list':
+    # Desktop: always the three-panel layout. The conversation list
+    # template is mobile-only (?view=list is ignored on desktop clients).
+    if not is_mobile:
         from django.utils import timezone
         from datetime import timedelta
         today = timezone.now().date()

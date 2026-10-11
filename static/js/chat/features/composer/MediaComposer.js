@@ -12,13 +12,13 @@
  * - Semi-transparent floating caption input & send button
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-7';
-import { eventBus } from '../../core/event-bus.js?v=20261011-7';
-import { PreviewCanvas } from './PreviewCanvas.js?v=20261011-7';
-import { ThumbnailStrip } from './ThumbnailStrip.js?v=20261011-7';
-import { CaptionInput } from './CaptionInput.js?v=20261011-7';
-import { UploadQueue } from './UploadQueue.js?v=20261011-7';
-import { CroppingEngine } from './CroppingEngine.js?v=20261011-7';
+import { EVENTS } from '../../shared/constants.js?v=20261011-12';
+import { eventBus } from '../../core/event-bus.js?v=20261011-12';
+import { PreviewCanvas } from './PreviewCanvas.js?v=20261011-12';
+import { ThumbnailStrip } from './ThumbnailStrip.js?v=20261011-12';
+import { CaptionInput } from './CaptionInput.js?v=20261011-12';
+import { UploadQueue } from './UploadQueue.js?v=20261011-12';
+import { CroppingEngine } from './CroppingEngine.js?v=20261011-12';
 
 export class MediaComposer {
     constructor() {
@@ -441,20 +441,27 @@ export class MediaComposer {
     _generateVideoThumbnail(file, previewUrl) {
         return new Promise((resolve) => {
             const video = document.createElement('video');
-            video.preload = 'metadata';
+            // 'auto' + a real (muted) play is required: WebView decoders
+            // often never produce a seekable frame from metadata alone,
+            // which is what left Capacitor uploads with a grey/dark box.
+            video.preload = 'auto';
             video.muted = true;
+            video.setAttribute('muted', '');
             video.playsInline = true;
+            video.setAttribute('playsinline', '');
             const src = previewUrl || (file ? URL.createObjectURL(file) : '');
             if (!src) return resolve({ thumbnail: '', width: 0, height: 0, duration: 0 });
-            video.src = src;
 
             let finished = false;
             const done = (dataUrl) => {
                 if (finished) return;
                 finished = true;
+                try { video.pause(); } catch (_) {}
                 const width = video.videoWidth || 0;
                 const height = video.videoHeight || 0;
                 const duration = video.duration || 0;
+                video.removeAttribute('src');
+                try { video.load(); } catch (_) {}
                 video.remove();
                 resolve({
                     thumbnail: dataUrl || '',
@@ -464,33 +471,65 @@ export class MediaComposer {
                 });
             };
 
-            video.onloadeddata = () => {
+            const capture = () => {
                 try {
-                    video.currentTime = Math.min(0.5, (video.duration || 1) / 2);
+                    const w = Math.min(video.videoWidth || 360, 480);
+                    if (!w || !video.videoHeight) return false;
+                    const aspect = video.videoHeight / video.videoWidth;
+                    const h = Math.max(1, Math.round(w * aspect));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+                    // Reject blank captures (all-black first frames).
+                    if (dataUrl && dataUrl.length > 2000) {
+                        done(dataUrl);
+                        return true;
+                    }
+                } catch (_) {}
+                return false;
+            };
+
+            const seekTo = (t) => {
+                try {
+                    video.currentTime = Math.min(Math.max(0.1, t), Math.max(0.1, (video.duration || 1) - 0.1));
                 } catch (_) {
                     done('');
                 }
             };
 
-            video.onseeked = () => {
+            video.onloadeddata = () => {
+                // Nudge a real play so the decoder produces frames, then
+                // capture from a seeked position. Falls back to plain seek
+                // when autoplay is denied.
+                let played = false;
                 try {
-                    const canvas = document.createElement('canvas');
-                    const w = Math.min(video.videoWidth || 360, 480);
-                    const aspect = (video.videoHeight && video.videoWidth) ? (video.videoHeight / video.videoWidth) : 0.75;
-                    const h = Math.max(1, Math.round(w * aspect));
-                    canvas.width = w;
-                    canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, w, h);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-                    done(dataUrl);
+                    const p = video.play();
+                    if (p && typeof p.then === 'function') {
+                        p.then(() => { played = true; seekTo(0.5); }).catch(() => seekTo(0.5));
+                    } else {
+                        seekTo(0.5);
+                    }
                 } catch (_) {
-                    done('');
+                    seekTo(0.5);
+                }
+                // If play stalls without seek events, capture the playing frame.
+                setTimeout(() => { if (!finished && played) capture(); }, 1200);
+            };
+
+            video.onseeked = () => {
+                if (!capture()) {
+                    // Blank frame: try the other end of the clip once.
+                    seekTo(Math.max(0.1, (video.duration || 1) - 0.2));
+                    setTimeout(() => { if (!finished && !capture()) done(''); }, 1500);
                 }
             };
 
             video.onerror = () => done('');
-            setTimeout(() => done(''), 3000);
+            video.src = src;
+            // Large phone clips need more than the old 3s window.
+            setTimeout(() => done(''), 8000);
         });
     }
 

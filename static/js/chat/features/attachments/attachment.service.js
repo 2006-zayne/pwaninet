@@ -3,10 +3,10 @@
  * Pure service layer, no DOM manipulation
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-7';
-import { eventBus } from '../../core/event-bus.js?v=20261011-7';
-import { isImageFile, isVideoFile, isAudioFile } from '../../shared/utils.js?v=20261011-7';
-import { messageService } from '../../core/message-service.js?v=20261011-7';
+import { EVENTS } from '../../shared/constants.js?v=20261011-12';
+import { eventBus } from '../../core/event-bus.js?v=20261011-12';
+import { isImageFile, isVideoFile, isAudioFile } from '../../shared/utils.js?v=20261011-12';
+import { messageService } from '../../core/message-service.js?v=20261011-12';
 
 export class AttachmentService {
   constructor() {
@@ -103,7 +103,7 @@ export class AttachmentService {
       // Save sender file locally to IndexedDB/Filesystem
       if (file && options.tempId) {
         try {
-          const { deviceMediaStore } = await import('../../core/device-media-store.js?v=20261011-7');
+          const { deviceMediaStore } = await import('../../core/device-media-store.js?v=20261011-12');
           await deviceMediaStore.saveSenderMedia(options.tempId, file, file.name || 'attachment');
         } catch (_) {}
       }
@@ -118,6 +118,9 @@ export class AttachmentService {
         if (csrfToken) {
           xhr.setRequestHeader('X-CSRFToken', csrfToken);
         }
+        // Without this, ontimeout is unreachable and a hung request leaves
+        // the voice composer spinning forever (await never settles).
+        try { xhr.timeout = 300000; } catch (_) {}
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
@@ -172,7 +175,7 @@ export class AttachmentService {
         // Rekey local media store from tempId to permanent message id
         if (options.tempId && data?.id) {
           try {
-            const { deviceMediaStore } = await import('../../core/device-media-store.js?v=20261011-7');
+            const { deviceMediaStore } = await import('../../core/device-media-store.js?v=20261011-12');
             await deviceMediaStore.rekeyMedia(options.tempId, data.id);
           } catch (_) {}
         }

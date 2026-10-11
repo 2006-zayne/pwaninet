@@ -4,12 +4,12 @@
  * Pure DOM manipulation based on provided data
  */
 
-import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js?v=20261011-7';
-import { renderMessageStatus } from '../shared/message-status-renderer.js?v=20261011-7';
-import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js?v=20261011-7';
-import { EVENTS } from '../shared/constants.js?v=20261011-7';
-import { eventBus } from '../core/event-bus.js?v=20261011-7';
-import { deviceMediaStore } from '../core/device-media-store.js?v=20261011-7';
+import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js?v=20261011-12';
+import { renderMessageStatus } from '../shared/message-status-renderer.js?v=20261011-12';
+import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js?v=20261011-12';
+import { EVENTS } from '../shared/constants.js?v=20261011-12';
+import { eventBus } from '../core/event-bus.js?v=20261011-12';
+import { deviceMediaStore } from '../core/device-media-store.js?v=20261011-12';
 
 export class MessageRenderer {
     constructor() {
@@ -709,7 +709,11 @@ export class MessageRenderer {
                 throw new Error('No media elements found in bubble');
             }
 
-            // Save all media elements permanently to IndexedDB / Capacitor storage
+            // Save all media elements permanently to IndexedDB / Capacitor storage.
+            // Each tile is independent: already-local tiles are skipped, a
+            // single tile failure no longer aborts the rest, and tapping
+            // again resumes only what is still missing.
+            let failedCount = 0;
             for (let i = 0; i < mediaEls.length; i++) {
                 const el = mediaEls[i];
                 const src = el.getAttribute('data-full-src') || el.getAttribute('data-src') || el.getAttribute('src');
@@ -720,14 +724,33 @@ export class MessageRenderer {
                     const filename = cleanSrc.split('/').pop()?.split('?')[0] || `media_${messageId}`;
                     const mediaKey = mediaEls.length > 1 ? `${messageId}_${i}` : messageId;
 
-                    const localUrl = await deviceMediaStore.downloadMedia(mediaKey, cleanSrc, filename, onProgress);
-                    if (!localUrl) {
-                        throw new Error('Failed to obtain local media URL from IndexedDB');
-                    }
+                    // Resume: skip tiles already stored locally.
+                    try {
+                        if (deviceMediaStore.hasMedia(mediaKey)) {
+                            const existing = await deviceMediaStore.getLocalMediaUrl(mediaKey);
+                            if (existing) {
+                                el.src = existing;
+                                el.removeAttribute('data-full-src');
+                                el.removeAttribute('data-src');
+                                continue;
+                            }
+                        }
+                    } catch (_) {}
 
-                    el.src = localUrl;
-                    el.removeAttribute('data-full-src');
-                    el.removeAttribute('data-src');
+                    try {
+                        const localUrl = await deviceMediaStore.downloadMedia(mediaKey, cleanSrc, filename, onProgress);
+                        if (!localUrl) {
+                            throw new Error('Failed to obtain local media URL from IndexedDB');
+                        }
+
+                        el.src = localUrl;
+                        el.removeAttribute('data-full-src');
+                        el.removeAttribute('data-src');
+                    } catch (tileErr) {
+                        console.error('[MEDIA_DOWNLOAD] Tile failed, continuing with rest:', tileErr);
+                        failedCount++;
+                        continue;
+                    }
 
                     if (el.tagName === 'IMG') {
                         el.style.filter = 'none';
@@ -747,6 +770,21 @@ export class MessageRenderer {
                         el.load();
                     }
                 }
+            }
+
+            // Partial failure: keep the bundle overlay as the retry affordance
+            // for the remaining tiles instead of leaving a dead spinner.
+            // Tapping again resumes only what is still missing (see skip above).
+            if (failedCount > 0) {
+                delete bubble.dataset.isDownloading;
+                try {
+                    if (dlIcon) dlIcon.classList.remove('d-none');
+                    if (spinner) spinner.classList.add('d-none');
+                    if (sizeText) sizeText.textContent = `Tap to retry (${failedCount} left)`;
+                    const groupLabel = bubble.querySelector('.group-dl-label');
+                    if (groupLabel) groupLabel.textContent = `Download remaining (${failedCount})`;
+                } catch (_) {}
+                return;
             }
 
             // Clean up any remaining blurred thumbnail classes without duplicating elements
@@ -2330,6 +2368,22 @@ export class MessageRenderer {
     }
 
     /**
+     * Preload mode for attachment videos. Local sources (blob:, Capacitor
+     * file, data:) cost nothing to fetch, so load full frames — WebView
+     * decoders often never paint from metadata-only preload, leaving the
+     * grey/dark box where the thumbnail should be. Remote URLs stay on
+     * metadata to save bandwidth.
+     */
+    _videoPreload(url) {
+        const u = String(url || '');
+        if (u.startsWith('blob:') || u.startsWith('capacitor:') ||
+            u.startsWith('data:') || u.indexOf('/_capacitor_file_') !== -1) {
+            return 'auto';
+        }
+        return 'metadata';
+    }
+
+    /**
      * Render single media bubble (Telegram-style)
      * Media itself becomes the bubble - NOT reusing text bubbles
      * @param {Object} message - Media message object
@@ -2424,7 +2478,7 @@ export class MessageRenderer {
                     ${thumbUrl ? `
                         <img src="${escapeHtml(thumbUrl)}" data-full-src="${escapeHtml(mediaUrl)}" alt="Video preview" loading="lazy" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;">
                     ` : `
-                        <video src="${videoSource}" preload="metadata" ${posterAttr} data-full-src="${escapeHtml(mediaUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;"></video>
+                        <video src="${videoSource}" preload="${this._videoPreload(videoSource)}" ${posterAttr} data-full-src="${escapeHtml(mediaUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="single-media-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 12px !important;"></video>
                     `}
                 `;
             } else {
@@ -2436,9 +2490,9 @@ export class MessageRenderer {
                     </div>
                     ${thumbUrl ? `
                         <img src="${escapeHtml(thumbUrl)}" alt="Video preview" loading="lazy" class="single-media-video-poster" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 12px !important;">
-                        <video src="${escapeHtml(mediaUrl)}" preload="metadata" ${posterAttr} data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="display: none;"></video>
+                        <video src="${escapeHtml(mediaUrl)}" preload="${this._videoPreload(mediaUrl)}" ${posterAttr} data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="display: none;"></video>
                     ` : `
-                        <video src="${escapeHtml(mediaUrl)}" preload="metadata" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 12px !important;"></video>
+                        <video src="${escapeHtml(mediaUrl)}" preload="${this._videoPreload(mediaUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 12px !important;"></video>
                     `}
                 `;
             }
@@ -2786,23 +2840,41 @@ export class MessageRenderer {
             }
             console.log('[MEDIA_VIEWER] Opening media group:', currentMsgId, 'startIndex:', startIndex);
 
-            // Fetch local offline URLs for attachments if available
-            const preparedAttachments = await Promise.all(attachments.map(async (att, idx) => {
-                const attKey = att.id || `${message.id}_${idx}`;
-                let url = att.file_url || att.file || att.url || '';
-                try {
-                    const localUrl = await deviceMediaStore.getLocalMediaUrl(attKey) || await deviceMediaStore.getLocalMediaUrl(message.id);
-                    if (localUrl) url = localUrl;
-                } catch (_) {}
-                return {
-                    ...att,
-                    url: url,
-                    file_url: url
-                };
-            }));
+            // Fetch local offline URLs for attachments if available.
+            // Same key order as render rehydration: per-tile, bundle, then
+            // server id — never probe a never-stored id first (evict spam).
+            const preparedAttachments = await this._prepareGroupViewerUrls(message, attachments);
 
             this.renderFullscreenMediaViewer(preparedAttachments, startIndex);
         });
+
+        console.log('[MEDIA_GROUP] Media group bubble created');
+        return bubble;
+    }
+
+    /**
+     * Resolve viewer URLs for group attachments, preferring local downloads.
+     */
+    async _prepareGroupViewerUrls(message, attachments) {
+        return Promise.all(attachments.map(async (att, idx) => {
+            const keysToTry = [`${message.id}_${idx}`, String(message.id)];
+            if (att.id) keysToTry.push(String(att.id));
+            let url = att.file_url || att.file || att.url || '';
+            try {
+                for (const k of keysToTry) {
+                    if (deviceMediaStore.hasMedia(k)) {
+                        const localUrl = await deviceMediaStore.getLocalMediaUrl(k);
+                        if (localUrl) { url = localUrl; break; }
+                    }
+                }
+            } catch (_) {}
+            return {
+                ...att,
+                url: url,
+                file_url: url
+            };
+        }));
+    }
 
         console.log('[MEDIA_GROUP] Media group bubble created');
         return bubble;
@@ -2870,7 +2942,7 @@ export class MessageRenderer {
                         ${tileThumb ? `
                             <img src="${escapeHtml(tileThumb)}" data-full-src="${escapeHtml(fileUrl)}" alt="Video preview" loading="lazy" class="tile-video-thumb not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;">
                         ` : `
-                            <video src="${videoSrc}" preload="metadata" ${tilePosterAttr} data-full-src="${escapeHtml(fileUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;"></video>
+                            <video src="${videoSrc}" preload="${this._videoPreload(videoSrc)}" ${tilePosterAttr} data-full-src="${escapeHtml(fileUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" muted playsinline tabindex="-1" class="not-downloaded-thumb" style="width: 100%; height: 100%; object-fit: cover; filter: blur(14px) brightness(0.72); transform: scale(1.08); pointer-events: none; display: block; border-radius: 8px !important;"></video>
                         `}
                     `;
                 } else {
@@ -2882,9 +2954,9 @@ export class MessageRenderer {
                         </div>
                         ${tileThumb ? `
                             <img src="${escapeHtml(tileThumb)}" alt="Video preview" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 8px !important;">
-                            <video src="${escapeHtml(fileUrl)}" preload="metadata" ${tilePosterAttr} data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="display: none;"></video>
+                            <video src="${escapeHtml(fileUrl)}" preload="${this._videoPreload(fileUrl)}" ${tilePosterAttr} data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="display: none;"></video>
                         ` : `
-                            <video src="${escapeHtml(fileUrl)}" preload="metadata" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 8px !important;"></video>
+                            <video src="${escapeHtml(fileUrl)}" preload="${this._videoPreload(fileUrl)}" data-no-inline="true" data-autoplay="false" data-chat-media="true" playsinline tabindex="-1" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; border-radius: 8px !important;"></video>
                         `}
                     `;
                 }

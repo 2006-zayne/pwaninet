@@ -5,13 +5,13 @@
  * MUST NOT bypass message-service or store
  */
 
-import { store } from './store.js?v=20261011-7';
-import { messageService } from './message-service.js?v=20261011-7';
-import { webSocketManager } from './websocket.js?v=20261011-7';
-import { uiController } from '../ui/ui-controller.js?v=20261011-7';
-import { networkHealthTracker } from '../shared/network-health-tracker.js?v=20261011-7';
-import { eventBus } from './event-bus.js?v=20261011-7';
-import { messageSoundManager } from '../shared/message-sound.js?v=20261011-7';
+import { store } from './store.js?v=20261011-12';
+import { messageService } from './message-service.js?v=20261011-12';
+import { webSocketManager } from './websocket.js?v=20261011-12';
+import { uiController } from '../ui/ui-controller.js?v=20261011-12';
+import { networkHealthTracker } from '../shared/network-health-tracker.js?v=20261011-12';
+import { eventBus } from './event-bus.js?v=20261011-12';
+import { messageSoundManager } from '../shared/message-sound.js?v=20261011-12';
 
 export class AppController {
     constructor() {

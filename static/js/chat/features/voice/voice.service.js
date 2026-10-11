@@ -5,8 +5,8 @@
  * and clean fallback to prevent browser origin errors.
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-7';
-import { eventBus } from '../../core/event-bus.js?v=20261011-7';
+import { EVENTS } from '../../shared/constants.js?v=20261011-12';
+import { eventBus } from '../../core/event-bus.js?v=20261011-12';
 
 export class VoiceService {
   constructor() {
@@ -303,6 +303,10 @@ export class VoiceService {
         let finalBlob = null;
         if (totalBytes > 0) {
           const rawBlob = new Blob(this.audioChunks, { type: this.mimeType });
+          // Upload the raw (opus/webm) recording as-is: it is 10-20x smaller
+          // than a decoded WAV and uploads in seconds. Decode is only used
+          // to read an accurate duration, never to re-encode the upload.
+          finalBlob = rawBlob;
           try {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (AudioCtx) {
@@ -314,13 +318,11 @@ export class VoiceService {
                   res.then(resolve).catch(reject);
                 }
               });
-              finalBlob = this._audioBufferToWavBlob(audioBuffer);
               this.duration = Math.max(1, Math.round(audioBuffer.duration));
               tempCtx.close().catch(() => {});
             }
           } catch (decodeErr) {
-            console.warn('[VOICE_SERVICE] decodeAudioData failed, using raw blob:', decodeErr);
-            finalBlob = rawBlob;
+            console.warn('[VOICE_SERVICE] duration decode failed, keeping timer duration:', decodeErr);
           }
         }
 
@@ -330,7 +332,7 @@ export class VoiceService {
         }
 
         this.audioBlob = finalBlob;
-        this.mimeType = finalBlob.type || 'audio/wav';
+        this.mimeType = finalBlob.type || this.mimeType || 'audio/webm';
 
         if (this.audioUrl) {
           URL.revokeObjectURL(this.audioUrl);
@@ -573,7 +575,7 @@ export class VoiceService {
     const recordingDuration = this.duration || 0;
     let localUrl = '';
     try {
-      const { deviceMediaStore } = await import('../../core/device-media-store.js?v=20261011-7');
+      const { deviceMediaStore } = await import('../../core/device-media-store.js?v=20261011-12');
       localUrl = await deviceMediaStore.saveSenderMedia(tempId, recordingBlob, filename);
     } catch (saveErr) {
       console.warn('[VOICE_SERVICE] Failed to save sender voice note locally:', saveErr);
@@ -617,7 +619,7 @@ export class VoiceService {
     eventBus.emit(EVENTS.MESSAGE_OPTIMISTIC_ADD, optMsg);
 
     try {
-      const { attachmentService } = await import('../attachments/attachment.service.js?v=20261011-7');
+      const { attachmentService } = await import('../attachments/attachment.service.js?v=20261011-12');
       const uploadedMsg = await attachmentService.handleFileUpload(file, conversationId, {
         isVoiceNote: true,
         tempId,
@@ -625,7 +627,7 @@ export class VoiceService {
       });
       if (uploadedMsg?.id && recordingBlob) {
         try {
-          const { deviceMediaStore } = await import('../../core/device-media-store.js?v=20261011-7');
+          const { deviceMediaStore } = await import('../../core/device-media-store.js?v=20261011-12');
           await deviceMediaStore.saveSenderMedia(uploadedMsg.id, recordingBlob, filename);
         } catch (_) {}
       }

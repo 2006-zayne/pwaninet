@@ -4,7 +4,7 @@
  * All mutations MUST go through explicit store methods
  */
 
-import { CONNECTION_STATE, UI_STATE, MESSAGE_STATE } from '../shared/constants.js?v=20261011-7';
+import { CONNECTION_STATE, UI_STATE, MESSAGE_STATE } from '../shared/constants.js?v=20261011-12';
 
 // CANONICAL MESSAGE SCHEMA - All modules MUST conform to this
 export const MESSAGE_SCHEMA = {

@@ -6,9 +6,9 @@
  * Displays browser storage used, downloads, cache, temporary data, and offline content.
  */
 
-import { cacheManager } from './cache_manager.js?v=20261011-7';
-import { downloadsMetadataManager } from './indexeddb_manager.js?v=20261011-7';
-import { tempDataManager } from './indexeddb_manager.js?v=20261011-7';
+import { cacheManager } from './cache_manager.js?v=20261011-12';
+import { downloadsMetadataManager } from './indexeddb_manager.js?v=20261011-12';
+import { tempDataManager } from './indexeddb_manager.js?v=20261011-12';
 
 class StorageManager {
     constructor() {

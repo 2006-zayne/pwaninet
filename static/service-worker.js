@@ -6,8 +6,8 @@
 
 'use strict';
 let CACHE_VERSION = '1.6.3';
-let CACHE_BUILD = '104';
-const SW_CACHE_REVISION = '5';
+let CACHE_BUILD = '109';
+const SW_CACHE_REVISION = '10';
 let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 

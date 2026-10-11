@@ -2,6 +2,21 @@
 {% load static %}
 {% load messaging_extras %}
 {% block content %}
+<script>
+  // The conversation list is mobile-only. A desktop-class browser on a wide
+  // viewport never belongs here (e.g. stale ?view=list history entry):
+  // bounce to the three-panel layout. Loop-safe: that page has no guard,
+  // and mobile UAs never redirect.
+  (function() {
+    try {
+      var ua = navigator.userAgent || '';
+      var isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+      if (!isMobileUA && window.innerWidth >= 992) {
+        window.location.replace('/messaging/');
+      }
+    } catch (_) {}
+  })();
+</script>
 <link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=9">
 <link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=26">
 <link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=46">

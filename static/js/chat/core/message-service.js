@@ -4,12 +4,12 @@
  * NO direct state mutations, NO UI updates, NO business logic
  */
 
-import { store } from './store.js?v=20261011-7';
-import { webSocketManager } from './websocket.js?v=20261011-7';
-import { eventBus } from './event-bus.js?v=20261011-7';
-import { getCSRFToken } from '../shared/utils.js?v=20261011-7';
-import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js?v=20261011-7';
-import { messageSoundManager } from '../shared/message-sound.js?v=20261011-7';
+import { store } from './store.js?v=20261011-12';
+import { webSocketManager } from './websocket.js?v=20261011-12';
+import { eventBus } from './event-bus.js?v=20261011-12';
+import { getCSRFToken } from '../shared/utils.js?v=20261011-12';
+import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js?v=20261011-12';
+import { messageSoundManager } from '../shared/message-sound.js?v=20261011-12';
 
 export class MessageService {
     constructor() {
@@ -1653,7 +1653,7 @@ export class MessageService {
             const data = await res.json();
             const msgs = data.results || data.messages || data;
             if (!Array.isArray(msgs)) return;
-            const { normalizeServerMessage } = await import('./message-normalizer.js?v=20261011-7').catch(() => ({}));
+            const { normalizeServerMessage } = await import('./message-normalizer.js?v=20261011-12').catch(() => ({}));
             for (const m of msgs) {
                 const canonical = normalizeServerMessage ? normalizeServerMessage(m) : m;
                 if (!store.getMessageById(String(canonical.id))) {
