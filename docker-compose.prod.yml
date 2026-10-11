@@ -37,6 +37,10 @@ services:
     container_name: pwaninet_web
     restart: unless-stopped
     env_file: .env
+    environment:
+      DJANGO_ENV: ${DJANGO_ENV:-production}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-pwaninet.settings.production}
+      REDIS_HOST: ${REDIS_HOST:-redis}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -47,7 +51,7 @@ services:
       sh -c "mkdir -p /app/media/temp &&
              python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             daphne -b 0.0.0.0 -p 8000 pwaninet.asgi:application"
+             daphne -b 0.0.0.0 -p 8000 --ping-interval 20 --ping-timeout 60 pwaninet.asgi:application"
     depends_on:
       db:
         condition: service_healthy
@@ -62,11 +66,15 @@ services:
     container_name: pwaninet_celery
     restart: unless-stopped
     env_file: .env
+    environment:
+      DJANGO_ENV: ${DJANGO_ENV:-production}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-pwaninet.settings.production}
+      REDIS_HOST: ${REDIS_HOST:-redis}
     volumes:
       - /srv/prod-app/src:/app
       - /srv/prod-app/data/media:/app/media
       - /srv/prod-app/src/firebase-adminsdk.json:/app/firebase-adminsdk.json:ro
-    command: celery -A pwaninet worker -l info --concurrency=2
+    command: celery -A pwaninet worker -l info --concurrency=2 -Q default,media_queue,docs_queue,search_queue
     depends_on:
       db:
         condition: service_healthy

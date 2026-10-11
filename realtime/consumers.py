@@ -83,11 +83,14 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""
         # Leave user's notification group
-        if hasattr(self, 'user_group_name'):
-            await self.channel_layer.group_discard(
-                self.user_group_name,
-                self.channel_name
-            )
+        try:
+            if getattr(self, 'channel_layer', None) is not None and hasattr(self, 'user_group_name'):
+                await self.channel_layer.group_discard(
+                    self.user_group_name,
+                    self.channel_name
+                )
+        except Exception:
+            pass
 
         # Remove connection from presence tracking - FROZEN FOR MVP
         # PresenceService.remove_connection(self.user.id, self.channel_name)
@@ -114,6 +117,10 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         """Handle incoming WebSocket messages."""
         try:
             data = json.loads(text_data)
+            # Heartbeat: keep Cloudflare/proxy idle timeouts from killing idle sockets
+            if data.get('type') in ('heartbeat', 'ping'):
+                await self.send(text_data=json.dumps({'type': 'pong'}))
+                return
             # Echo back for now - can be extended for specific commands
             await self.send(text_data=json.dumps({
                 'type': 'echo',
@@ -260,6 +267,10 @@ class FeedConsumer(AsyncWebsocketConsumer):
         """Handle incoming WebSocket messages."""
         try:
             data = json.loads(text_data)
+            # Heartbeat: keep Cloudflare/proxy idle timeouts from killing idle sockets
+            if data.get('type') in ('heartbeat', 'ping'):
+                await self.send(text_data=json.dumps({'type': 'pong'}))
+                return
             # Echo back for now - can be extended for specific commands
             await self.send(text_data=json.dumps({
                 'type': 'echo',
@@ -401,6 +412,10 @@ class CommentConsumer(AsyncWebsocketConsumer):
         """Handle incoming WebSocket messages."""
         try:
             data = json.loads(text_data)
+            # Heartbeat: keep Cloudflare/proxy idle timeouts from killing idle sockets
+            if data.get('type') in ('heartbeat', 'ping'):
+                await self.send(text_data=json.dumps({'type': 'pong'}))
+                return
             # Echo back for now - can be extended for specific commands
             await self.send(text_data=json.dumps({
                 'type': 'echo',
@@ -487,6 +502,10 @@ class OnlineStatusConsumer(AsyncWebsocketConsumer):
         """Handle incoming WebSocket messages."""
         try:
             data = json.loads(text_data)
+            # Heartbeat: keep Cloudflare/proxy idle timeouts from killing idle sockets
+            if data.get('type') in ('heartbeat', 'ping'):
+                await self.send(text_data=json.dumps({'type': 'pong'}))
+                return
             # Echo back for now - can be extended for specific commands
             await self.send(text_data=json.dumps({
                 'type': 'echo',

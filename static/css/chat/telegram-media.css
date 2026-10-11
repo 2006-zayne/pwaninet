@@ -215,6 +215,7 @@
     gap: 4px;
     overflow: hidden;
     border-radius: 12px !important;
+    width: 100%;
 }
 
 /* 1 MEDIA - Single large preview */
@@ -267,6 +268,10 @@
     background: rgba(0, 0, 0, 0.05);
     aspect-ratio: 4 / 3;
     cursor: pointer;
+    min-height: 0;
+    min-width: 0;
+    height: 100%;
+    width: 100%;
 }
 
 .media-tile img {

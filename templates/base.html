@@ -1900,11 +1900,14 @@
             position: fixed;
             inset: 0;
             z-index: 2147483000;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             background: #FFFFFF;
             transition: opacity 0.35s ease;
+        }
+        #pwani-boot-splash.pwani-boot-show {
+            display: flex;
         }
         #pwani-boot-splash img {
             width: 128px;
@@ -1942,23 +1945,52 @@
         <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="" onerror="this.style.display='none'">
     </div>
     <script>
-        // Dismiss boot splash only when the app is visually ready; notify
-        // native so the system splash stays until the same moment.
+        // Boot splash ONLY on native cold launch. Every in-app / web
+        // navigation skips it entirely (overlay stays display:none).
         (function() {
-            var done = false;
-            function hide() {
-                if (done) return;
-                done = true;
-                var el = document.getElementById('pwani-boot-splash');
+            var el = document.getElementById('pwani-boot-splash');
+            function isNative() {
+                try {
+                    if (typeof window.Capacitor !== 'undefined') return true;
+                    if (window.AndroidBridge || window.PwaninetBridge) return true;
+                    if (/PwaniNetApp\/Android/i.test(navigator.userAgent || '')) return true;
+                } catch (_) {}
+                return false;
+            }
+            function notifyReady() {
                 try {
                     var bridge = window.AndroidBridge || window.PwaninetBridge;
                     if (bridge && typeof bridge.notifyPageReady === 'function') {
                         bridge.notifyPageReady();
                     }
                 } catch (_) {}
+            }
+            function removeEl() {
+                if (el && el.parentNode) el.parentNode.removeChild(el);
+                el = null;
+            }
+            var cold = false;
+            try {
+                cold = isNative() && !sessionStorage.getItem('pwani_boot_done');
+            } catch (_) {
+                cold = isNative();
+            }
+            if (!cold) {
+                // Not a cold native launch: never show the logo.
+                notifyReady();
+                removeEl();
+                return;
+            }
+            try { sessionStorage.setItem('pwani_boot_done', '1'); } catch (_) {}
+            el.classList.add('pwani-boot-show');
+            var done = false;
+            function hide() {
+                if (done) return;
+                done = true;
+                notifyReady();
                 if (el) {
                     el.classList.add('pwani-boot-hide');
-                    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 450);
+                    setTimeout(removeEl, 450);
                 }
             }
             function ready() {
@@ -3520,8 +3552,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
     // Global notification WebSocket connection
     let globalNotificationsSocket = null;
     let globalReconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
+    const maxReconnectAttempts = 20;
     let notificationCountPollInterval = null;
+    let globalNotificationsHeartbeat = null;
 
     // Global feed WebSocket connection for real-time comments
     let globalFeedSocket = null;
@@ -3552,6 +3585,17 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 if (errorIndicator) {
                     errorIndicator.style.display = 'none';
                 }
+
+                // Client heartbeat keeps Cloudflare/proxy idle timeouts (~100s)
+                // from killing the socket; server answers pong.
+                try {
+                    if (globalNotificationsHeartbeat) clearInterval(globalNotificationsHeartbeat);
+                    globalNotificationsHeartbeat = setInterval(function() {
+                        if (globalNotificationsSocket && globalNotificationsSocket.readyState === WebSocket.OPEN) {
+                            globalNotificationsSocket.send(JSON.stringify({type: 'heartbeat'}));
+                        }
+                    }, 25000);
+                } catch (_) {}
             };
 
             globalNotificationsSocket.onmessage = function(e) {
@@ -3645,13 +3689,14 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
             globalNotificationsSocket.onclose = function(e) {
                 console.log('[GLOBAL] Notifications WebSocket disconnected:', e.code, e.reason);
+                try { if (globalNotificationsHeartbeat) clearInterval(globalNotificationsHeartbeat); } catch (_) {}
 
                 // Start polling as fallback when WebSocket disconnects
                 startNotificationCountPolling();
 
-                // Attempt to reconnect with exponential backoff
+                // Attempt to reconnect with exponential backoff + jitter
                 if (globalReconnectAttempts < maxReconnectAttempts) {
-                    const delay = Math.min(1000 * Math.pow(2, globalReconnectAttempts), 30000);
+                    const delay = Math.min(1000 * Math.pow(2, globalReconnectAttempts), 30000) + Math.random() * 500;
                     console.log('[GLOBAL] Reconnecting notifications in ' + delay + 'ms...');
 
                     setTimeout(() => {

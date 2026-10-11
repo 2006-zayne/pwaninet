@@ -35,4 +35,4 @@ RUN mkdir -p /app/logs
 EXPOSE 8000
 
 # Run the application with Daphne for WebSocket support
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "pwaninet.asgi:application"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "--ping-interval", "20", "--ping-timeout", "60", "pwaninet.asgi:application"]

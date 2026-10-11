@@ -1279,12 +1279,15 @@
   position: relative;
   overflow: hidden;
   border-radius: 12px !important; /* All 4 corners rounded */
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  /* Flex column drops whitespace text nodes between overlay/img/video
+     (renderer template literals) so portrait video can't be pushed down. */
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
 }
 
 .media-card-frame img.single-media-img {

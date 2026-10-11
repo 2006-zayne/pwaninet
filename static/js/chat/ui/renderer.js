@@ -44,6 +44,17 @@ export class MessageRenderer {
         // Initialize device media store (Capacitor filesystem or IndexedDB)
         deviceMediaStore.init().catch(err => console.warn('[RENDERER] DeviceMediaStore init error:', err));
 
+        // Hydrate in-memory download flags from persisted localStorage so
+        // downloaded groups don't revert to the overlay after reload.
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.indexOf('media_dl_') === 0) {
+                    this.downloadedMediaIds.add(k.slice('media_dl_'.length));
+                }
+            }
+        } catch (_) {}
+
         if (!this.container) {
             console.error('MessageRenderer: Messages container not found');
             return;
@@ -386,6 +397,12 @@ export class MessageRenderer {
     _isMediaDownloaded(messageId) {
         if (!messageId) return false;
         if (this.downloadedMediaIds.has(String(messageId))) return true;
+        try {
+            if (localStorage.getItem(`media_dl_${messageId}`) === 'true') {
+                this.downloadedMediaIds.add(String(messageId));
+                return true;
+            }
+        } catch (_) {}
         return deviceMediaStore.hasMedia(messageId);
     }
 

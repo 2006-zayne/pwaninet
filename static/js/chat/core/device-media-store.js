@@ -142,14 +142,17 @@ class DeviceMediaStore {
             return true;
         }
 
-        // Fallback for before init completes
-        if (!this.isInitialized) {
-            try {
-                return localStorage.getItem(`media_dl_${strId}`) === 'true';
-            } catch (_) {
-                return false;
-            }
+        // Group bundles are stored per-tile (chat_<id>_0, ...); bundle counts
+        // as downloaded when the first tile key exists.
+        if (this.downloadedKeys.has(`${safeKey}_0`) || this.downloadedKeys.has(`${strId}_0`)) {
+            return true;
         }
+
+        // localStorage persists across reloads; always consult it, not just pre-init.
+        try {
+            if (localStorage.getItem(`media_dl_${strId}`) === 'true') return true;
+            if (localStorage.getItem(`media_dl_${safeKey}`) === 'true') return true;
+        } catch (_) {}
 
         return false;
     }
