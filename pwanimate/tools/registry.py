@@ -98,6 +98,7 @@ def get_default_tool_registry() -> ToolRegistry:
             PeopleDiscoveryTool,
             LocalTimeTool, ContentSearchTool, SendNotificationTool,
             WebSearchTool,
+            SiteInfoTool,
         )
         registry.register(AcademicLookupTool())
         registry.register(DocumentDetailTool())
@@ -109,5 +110,6 @@ def get_default_tool_registry() -> ToolRegistry:
         registry.register(ContentSearchTool())
         registry.register(SendNotificationTool())
         registry.register(WebSearchTool())
+        registry.register(SiteInfoTool())
         _default_registry = registry
     return _default_registry

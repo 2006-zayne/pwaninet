@@ -285,6 +285,7 @@ urlpatterns = [
     path('about/', TemplateView.as_view(template_name='legal/about.html'), name='public_about'),
     path('privacy/', TemplateView.as_view(template_name='legal/privacy.html'), name='public_privacy'),
     path('licenses/', TemplateView.as_view(template_name='legal/licenses.html'), name='public_licenses'),
+    path('pwanimate-about/', TemplateView.as_view(template_name='legal/pwanimate.html'), name='public_pwanimate_about'),
     # Phase 3: 2FA challenge (shown after valid password, before full login)
     path('login/2fa/', login_2fa_challenge_view, name='login_2fa_challenge'),
     # This maps 'accounts/logout/' and remaining auth views automatically

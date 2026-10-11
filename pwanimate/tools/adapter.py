@@ -369,6 +369,46 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
             )
         return items
 
+    # 7. Site Info Tool
+    elif tool_name == "site_info":
+        if not data or not isinstance(data, dict):
+            return [
+                ContextItem(
+                    source="site_content",
+                    object_id="site_info_none",
+                    title="Site Information",
+                    content="Site information could not be retrieved.",
+                    citation=None,
+                    url="/about/",
+                )
+            ]
+        content = data.get("content")
+        topic = data.get("topic", "site")
+        if not content:
+            available = data.get("available_topics", [])
+            return [
+                ContextItem(
+                    source="site_content",
+                    object_id=f"site_{topic}",
+                    title=f"Site Information: {topic}",
+                    content=f"No specific information found for '{topic}'. Available topics: {', '.join(available)}",
+                    citation="[PwaniNet Site Info]",
+                    url="/about/",
+                    metadata=data,
+                )
+            ]
+        return [
+            ContextItem(
+                source="site_content",
+                object_id=f"site_{topic}",
+                title=f"PwaniNet: {topic.replace('_', ' ').title()}",
+                content=content[:5000],
+                citation="[PwaniNet Site Documentation]",
+                url="/about/",
+                metadata=data,
+            )
+        ]
+
     # Fallback for unknown tool
     return [
         ContextItem(

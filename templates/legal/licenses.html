@@ -5,8 +5,68 @@
 <article class="container py-4" style="max-width: 860px;">
   <h1>{% trans "Licences and attributions" %}</h1>
   <p>PwaniNet's own code is not currently offered under an open-source licence. This notice does not grant permission to copy or reuse PwaniNet code.</p>
-  <p>Software and assets made by other authors remain under their respective licence terms. Required third-party notices and attributions are being assembled and will be published here as that review is completed.</p>
+  <p>Software and assets made by other authors remain under their respective licence terms. Below is a list of key third-party components used in PwaniNet:</p>
+
+  <h2 class="h4 mt-4">Python and backend</h2>
+  <ul>
+    <li><strong>Django</strong> — <a href="https://www.djangoproject.com/" target="_blank" rel="noopener">djangoproject.com</a> — BSD-3-Clause licence</li>
+    <li><strong>Django REST Framework</strong> — <a href="https://www.django-rest-framework.org/" target="_blank" rel="noopener">django-rest-framework.org</a> — BSD-3-Clause licence</li>
+    <li><strong>drf-spectacular</strong> — OpenAPI schema generation — BSD-3-Clause licence</li>
+    <li><strong>django-axes</strong> — Brute-force login protection — MIT licence</li>
+    <li><strong>django-storages</strong> — Cloud storage backends (R2/S3/B2/Azure) — BSD-3-Clause licence</li>
+    <li><strong>psycopg / psycopg2</strong> — PostgreSQL adapter — LGPL-3.0 licence</li>
+    <li><strong>pgvector</strong> — Vector similarity search for PostgreSQL — PostgreSQL licence</li>
+    <li><strong>Celery</strong> — Distributed task queue — BSD-3-Clause licence</li>
+    <li><strong>channels-redis</strong> — Redis channel layer for Django Channels — MIT licence</li>
+    <li><strong>Daphne</strong> — ASGI/WebSocket server — BSD-3-Clause licence</li>
+    <li><strong>PyMuPDF (fitz)</strong> — PDF text and image extraction — AGPL-3.0 licence (commercial licence available)</li>
+    <li><strong>python-docx</strong> — DOCX file reading — MIT licence</li>
+    <li><strong>python-pptx</strong> — PPTX file reading — MIT licence</li>
+    <li><strong>boto3</strong> — AWS SDK for S3-compatible storage (R2) — Apache-2.0 licence</li>
+    <li><strong>pyotp</strong> — TOTP two-factor authentication — BSD licence</li>
+    <li><strong>qrcode</strong> — QR code generation — BSD licence</li>
+  </ul>
+
+  <h2 class="h4 mt-4">JavaScript and frontend</h2>
+  <ul>
+    <li><strong>Bootstrap</strong> — CSS framework — MIT licence</li>
+    <li><strong>HTMX</strong> — HTML-over-the-wire interactivity — BSD-2-Clause licence</li>
+    <li><strong>Marked</strong> — Markdown parser — MIT licence</li>
+    <li><strong>DOMPurify</strong> — HTML sanitisation — MPL-2.0 licence (dual-licensed under Apache-2.0)</li>
+    <li><strong>KaTeX</strong> — Mathematical typesetting — MIT licence</li>
+    <li><strong>Prism</strong> — Syntax highlighting — MIT licence</li>
+    <li><strong>Emoji Picker Element</strong> — Emoji picker web component — Apache-2.0 licence</li>
+  </ul>
+
+  <h2 class="h4 mt-4">Fonts</h2>
+  <ul>
+    <li><strong>Manrope</strong> — Primary UI font — SIL Open Font License 1.1</li>
+    <li><strong>Merriweather</strong> — Serif accent font — SIL Open Font License 1.1</li>
+    <li><strong>Playfair Display</strong> — Display serif font — SIL Open Font License 1.1</li>
+  </ul>
+
+  <h2 class="h4 mt-4">Mobile and PWA</h2>
+  <ul>
+    <li><strong>Capacitor</strong> — Native web runtime for Android — MIT licence</li>
+    <li><strong>Android Gradle Plugin</strong> — Build system — Apache-2.0 licence</li>
+    <li><strong>AndroidX libraries</strong> — Android support libraries — Apache-2.0 licence</li>
+  </ul>
+
+  <h2 class="h4 mt-4">AI and embedding providers</h2>
+  <ul>
+    <li><strong>Google Gemini</strong> — LLM and embedding API — Subject to Google Terms of Service</li>
+    <li><strong>Groq</strong> — LLM inference API — Subject to Groq Terms of Service</li>
+    <li><strong>OpenRouter</strong> — LLM routing API — Subject to OpenRouter Terms of Service</li>
+    <li><strong>Jina AI</strong> — Embedding API — Subject to Jina AI Terms of Service</li>
+    <li><strong>Voyage AI</strong> — Embedding API — Subject to Voyage AI Terms of Service</li>
+    <li><strong>Cloudflare</strong> — AI Gateway and embedding API — Subject to Cloudflare Terms of Service</li>
+  </ul>
+
+  <h2 class="h4 mt-4">Vendored reference material</h2>
+  <p>The Pwanimate app includes vendored reference copies of the LangChain framework and an OpenAI quickstart under <code>pwanimate/repos/frameworks/langchain/</code> and <code>pwanimate/repos/openai-quickstart-python/</code>. These are study and reference material only and are not installed dependencies of the live assistant. They retain their original licence terms.</p>
+
+  <h2 class="h4 mt-4">Questions</h2>
   <p>For questions about this notice or a rights concern, email <a href="mailto:Engineerzayne005@gmail.com">Engineerzayne005@gmail.com</a>.</p>
-  <p><a href="{% url 'public_about' %}">About PwaniNet</a> · <a href="{% url 'public_privacy' %}">Privacy Policy</a></p>
+  <p><a href="{% url 'public_about' %}">About PwaniNet</a> · <a href="{% url 'public_privacy' %}">Privacy Policy</a> · <a href="{% url 'public_pwanimate_about' %}">About Pwanimate</a></p>
 </article>
 {% endblock %}

@@ -43,7 +43,7 @@ Only select send_notification when the student directly asks Pwanimate to send a
         r"web|internet|online|browse|research|latest|new|updated|up[- ]to[- ]date|breaking|"
         r"current(?:ly)?|recent|today|yesterday|as\s+of\s+now|this\s+(?:week|month|year)|news|"
         r"prices?|pricing|forecast|weather|version|release|law|regulation|schedule|election|"
-        r"score|stock|exchange\s+rate)\b",
+        r"score|stock|exchange\s+rate|pwaninet|pwanimate|site|platform|app|about|help)\b",
         re.IGNORECASE,
     )
 

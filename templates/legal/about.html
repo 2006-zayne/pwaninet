@@ -4,17 +4,32 @@
 {% block content %}
 <article class="container py-4" style="max-width: 860px;">
   <h1>{% trans "About PwaniNet" %}</h1>
-  <p>PwaniNet is a student community and learning-resource platform for students at Pwani University. It brings student discussions, campus updates, groups, and study resources together in one place.</p>
+  <p>PwaniNet is a student community and learning-resource platform for students at Pwani University. It brings student discussions, campus updates, groups, academic resources, and an AI assistant together in one place, making it easier to discover useful information and connect with other students.</p>
   <p>PwaniNet is an independent project created by Zayne Earthman, a student at Pwani University. The project is seeking University guidance and permission regarding its name and relationship to the University; that process is ongoing. PwaniNet is not currently an official Pwani University service or a University assignment.</p>
+
+  <h2 class="h4 mt-4">What you can do on PwaniNet</h2>
+  <p>PwaniNet includes several core features designed to help students connect, share, and learn:</p>
+  <ul>
+    <li><strong>Posts and discussions</strong> — Share text, images, videos, and links with your followers, everyone on PwaniNet, or specific groups. Comment, react, and repost to keep conversations going.</li>
+    <li><strong>Groups</strong> — Join course groups, departmental communities, or interest-based groups. Group admins can pin announcements, share resources, and manage membership.</li>
+    <li><strong>Academic documents</strong> — Upload and browse past papers, lecture notes, slides, and other study materials. Documents are organised by programme, academic unit, and semester so you can find what you need.</li>
+    <li><strong>Search</strong> — Search across people, posts, documents, and groups in one place. Results are tailored to your enrolled units and academic level.</li>
+    <li><strong>Pwanimate</strong> — An AI academic assistant built into PwaniNet. Pwanimate can search your campus documents, answer questions about your academic structure, help you discover peers with shared interests, and provide web search when you need current information. See <a href="{% url 'public_pwanimate_about' %}">About Pwanimate</a> for details.</li>
+    <li><strong>Notifications</strong> — Stay updated with in-app and push notifications for likes, comments, group activity, document requests, and security events.</li>
+    <li><strong>Recommendations</strong> — PwaniNet suggests classmates, groups, and documents based on your programme, academic level, and interests.</li>
+  </ul>
+
+  <h2 class="h4 mt-4">Who can use PwaniNet?</h2>
+  <p>PwaniNet is intended for students enrolled at Pwani University. There is no age cutoff. You register with your programme, academic level, and semester so that content and recommendations are relevant to your studies.</p>
 
   <h2 class="h4 mt-4">Share thoughtfully</h2>
   <p>Posts and uploads are associated with your account and may be seen according to the audience and privacy settings for that feature. Avoid sharing private or confidential information. Upload photos, past papers, lecture notes, and other material only when you created it or have permission to share it. Other people may copy or save content they can access, so removing it from PwaniNet may not remove every copy.</p>
 
-  <h2 class="h4 mt-4">Who can use PwaniNet?</h2>
-  <p>PwaniNet is intended for students enrolled at Pwani University.</p>
+  <h2 class="h4 mt-4">Mobile and offline</h2>
+  <p>PwaniNet works as a Progressive Web App (PWA) in your browser and has an Android app built with Capacitor. The PWA supports offline access to core pages and previously viewed content, and can send push notifications when enabled.</p>
 
   <h2 class="h4 mt-4">Contact</h2>
   <p>For questions, privacy requests, or content concerns, email <a href="mailto:Engineerzayne005@gmail.com">Engineerzayne005@gmail.com</a>.</p>
-  <p><a href="{% url 'public_privacy' %}">Privacy Policy</a> · <a href="{% url 'public_licenses' %}">Licences and attributions</a></p>
+  <p><a href="{% url 'public_privacy' %}">Privacy Policy</a> · <a href="{% url 'public_licenses' %}">Licences and attributions</a> · <a href="{% url 'public_pwanimate_about' %}">About Pwanimate</a></p>
 </article>
 {% endblock %}
