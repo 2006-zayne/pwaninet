@@ -1,3 +1,4 @@
+from .tasks import process_video_attachment_task
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action, api_view, permission_classes, parser_classes
 from rest_framework.response import Response
@@ -1345,7 +1346,7 @@ def process_video_attachment(uploaded_file, trim_start=0.0, trim_end=None, is_mu
         with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as out_temp:
             out_temp_path = out_temp.name
 
-        cmd = ['/usr/bin/ffmpeg', '-y', '-i', in_temp_path]
+        cmd = ['/usr/bin/ffmpeg', '-y', '-i', in_temp_path, '-map', '0:v', '-map', '0:a?']
 
         start_val = max(0.0, float(trim_start)) if trim_start else 0.0
         if start_val > 0.05:
@@ -1492,14 +1493,10 @@ def batch_attachment_upload(request):
                 is_muted = attachment_metadata.get('is_muted', False)
                 rotation = attachment_metadata.get('rotation', 0)
 
-                final_file, final_size, final_duration = process_video_attachment(
-                    file,
-                    trim_start=trim_start,
-                    trim_end=trim_end,
-                    is_muted=is_muted,
-                    rotation=rotation,
-                    is_trimmed=is_trimmed
-                )
+                # Keep original file temporarily for immediate response, process in background via Celery
+                final_file = file
+                final_size = file.size
+                final_duration = None
             
             validated_attachments.append({
                 'file': final_file,
@@ -1507,7 +1504,14 @@ def batch_attachment_upload(request):
                 'caption': attachment_metadata.get('caption', ''),
                 'order': attachment_metadata.get('order', idx),
                 'size': final_size,
-                'duration': final_duration
+                'duration': final_duration,
+                'meta': {
+                    'trim_start': attachment_metadata.get('trim_start', 0),
+                    'trim_end': attachment_metadata.get('trim_end', 0),
+                    'is_trimmed': attachment_metadata.get('is_trimmed', False),
+                    'is_muted': attachment_metadata.get('is_muted', False),
+                    'rotation': attachment_metadata.get('rotation', 0)
+                } if attachment_type == 'video' else {}
             })
         
         # Partition validated attachments into:
@@ -1535,7 +1539,7 @@ def batch_attachment_upload(request):
                     global_caption=caption_text
                 )
                 try:
-                    MessageAttachment.objects.create(
+                    single_rec = MessageAttachment.objects.create(
                         message=media_msg,
                         file=media_msg.attachment,
                         file_type=single_att['file_type'],
@@ -1544,6 +1548,17 @@ def batch_attachment_upload(request):
                         size=single_att['size'],
                         duration=single_att.get('duration')
                     )
+                    if single_att['file_type'] == 'video':
+                        from .tasks import process_video_attachment_task
+                        m = single_att.get('meta', {})
+                        process_video_attachment_task.delay(
+                            attachment_id=single_rec.id,
+                            trim_start=m.get('trim_start', 0),
+                            trim_end=m.get('trim_end', 0),
+                            is_muted=m.get('is_muted', False),
+                            rotation=m.get('rotation', 0),
+                            is_trimmed=m.get('is_trimmed', False)
+                        )
                 except Exception as ma_err:
                     logger.warning(f"Secondary MessageAttachment failed: {ma_err}")
                 created_messages.append(media_msg)
@@ -1565,6 +1580,17 @@ def batch_attachment_upload(request):
                         size=att['size'],
                         duration=att.get('duration')
                     )
+                    if att['file_type'] == 'video':
+                        from .tasks import process_video_attachment_task
+                        m = att.get('meta', {})
+                        process_video_attachment_task.delay(
+                            attachment_id=created_att.id,
+                            trim_start=m.get('trim_start', 0),
+                            trim_end=m.get('trim_end', 0),
+                            is_muted=m.get('is_muted', False),
+                            rotation=m.get('rotation', 0),
+                            is_trimmed=m.get('is_trimmed', False)
+                        )
                     if order_idx == 0:
                         group_msg.attachment = created_att.file
                         group_msg.attachment_type = created_att.file_type
