@@ -12,13 +12,13 @@
  * - Semi-transparent floating caption input & send button
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-6';
-import { eventBus } from '../../core/event-bus.js?v=20261011-6';
-import { PreviewCanvas } from './PreviewCanvas.js?v=20261011-6';
-import { ThumbnailStrip } from './ThumbnailStrip.js?v=20261011-6';
-import { CaptionInput } from './CaptionInput.js?v=20261011-6';
-import { UploadQueue } from './UploadQueue.js?v=20261011-6';
-import { CroppingEngine } from './CroppingEngine.js?v=20261011-6';
+import { EVENTS } from '../../shared/constants.js?v=20261011-7';
+import { eventBus } from '../../core/event-bus.js?v=20261011-7';
+import { PreviewCanvas } from './PreviewCanvas.js?v=20261011-7';
+import { ThumbnailStrip } from './ThumbnailStrip.js?v=20261011-7';
+import { CaptionInput } from './CaptionInput.js?v=20261011-7';
+import { UploadQueue } from './UploadQueue.js?v=20261011-7';
+import { CroppingEngine } from './CroppingEngine.js?v=20261011-7';
 
 export class MediaComposer {
     constructor() {

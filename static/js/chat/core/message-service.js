@@ -4,12 +4,12 @@
  * NO direct state mutations, NO UI updates, NO business logic
  */
 
-import { store } from './store.js?v=20261011-6';
-import { webSocketManager } from './websocket.js?v=20261011-6';
-import { eventBus } from './event-bus.js?v=20261011-6';
-import { getCSRFToken } from '../shared/utils.js?v=20261011-6';
-import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js?v=20261011-6';
-import { messageSoundManager } from '../shared/message-sound.js?v=20261011-6';
+import { store } from './store.js?v=20261011-7';
+import { webSocketManager } from './websocket.js?v=20261011-7';
+import { eventBus } from './event-bus.js?v=20261011-7';
+import { getCSRFToken } from '../shared/utils.js?v=20261011-7';
+import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js?v=20261011-7';
+import { messageSoundManager } from '../shared/message-sound.js?v=20261011-7';
 
 export class MessageService {
     constructor() {
@@ -263,6 +263,7 @@ export class MessageService {
     mapType(type) {
         const media = ['image', 'video', 'audio', 'voice', 'file', 'sticker', 'gif'];
         if (media.includes(type)) return 'media';
+        if (type === 'media_group') return 'media_group';
         if (type === 'emoji') return 'emoji';
         if (type === 'system') return 'system';
         if (type === 'link') return 'link';
@@ -1514,37 +1515,60 @@ export class MessageService {
     }
 
     /**
-     * Queue a read receipt to send later when WebSocket reconnects
+     * Queue a read receipt to send later when WebSocket reconnects.
+     * Persisted to localStorage so a reload/swap can't lose it.
      * @param {string} messageId - Message ID to queue
      */
     queueReadReceipt(messageId) {
         // Add to read receipt queue (avoid duplicates)
         if (!this.readReceiptQueue) {
             this.readReceiptQueue = new Set();
+            try {
+                const saved = JSON.parse(localStorage.getItem('pwani_read_receipt_queue') || '[]');
+                saved.forEach(id => this.readReceiptQueue.add(String(id)));
+            } catch (_) {}
         }
-        this.readReceiptQueue.add(messageId);
+        this.readReceiptQueue.add(String(messageId));
+        try {
+            localStorage.setItem('pwani_read_receipt_queue', JSON.stringify(Array.from(this.readReceiptQueue)));
+        } catch (_) {}
         console.log('[MESSAGE_SERVICE] Queued read receipt for:', messageId, 'Queue size:', this.readReceiptQueue.size);
     }
 
     /**
-     * Send all queued read receipts when WebSocket reconnects
+     * Send all queued read receipts when WebSocket reconnects.
+     * Sends one batch; anything unsent stays queued instead of being lost.
      */
     sendQueuedReadReceipts() {
+        if (!this.readReceiptQueue) {
+            try {
+                const saved = JSON.parse(localStorage.getItem('pwani_read_receipt_queue') || '[]');
+                if (saved.length) this.readReceiptQueue = new Set(saved.map(String));
+            } catch (_) {}
+        }
         if (!this.readReceiptQueue || this.readReceiptQueue.size === 0) {
             return;
         }
+        if (!webSocketManager.isConnected()) return;
 
         console.log('[MESSAGE_SERVICE] Sending', this.readReceiptQueue.size, 'queued read receipts');
         const messageIds = Array.from(this.readReceiptQueue);
-        this.readReceiptQueue.clear();
-        
-        // Send all queued read receipts
-        messageIds.forEach(messageId => {
-            webSocketManager.send({
-                type: 'read_receipt',
-                message_id: messageId
-            });
+        const numeric = messageIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+        if (!numeric.length) {
+            this.readReceiptQueue.clear();
+            try { localStorage.removeItem('pwani_read_receipt_queue'); } catch (_) {}
+            return;
+        }
+        const sent = webSocketManager.send({
+            type: 'read_receipt',
+            message_id: Math.max(...numeric),
+            message_ids: numeric
         });
+        if (sent) {
+            this.readReceiptQueue.clear();
+            try { localStorage.removeItem('pwani_read_receipt_queue'); } catch (_) {}
+        }
+        // On failure the set is left intact for the next reconnect.
     }
 
     /**
@@ -1566,13 +1590,15 @@ export class MessageService {
         this._log('MARK_MESSAGES_AS_READ', { count: validNumericIds.length, maxId });
 
         if (webSocketManager.isConnected()) {
-            webSocketManager.send({
+            const sent = webSocketManager.send({
                 type: 'read_receipt',
                 message_id: maxId,
                 message_ids: validNumericIds
             });
+            if (!sent) validNumericIds.forEach(id => this.queueReadReceipt(id));
         } else {
-            this.sendReadReceipt(maxId);
+            // Queue the FULL batch, not just maxId, so no receipt is lost.
+            validNumericIds.forEach(id => this.queueReadReceipt(id));
         }
     }
 
@@ -1627,7 +1653,7 @@ export class MessageService {
             const data = await res.json();
             const msgs = data.results || data.messages || data;
             if (!Array.isArray(msgs)) return;
-            const { normalizeServerMessage } = await import('./message-normalizer.js?v=20261011-6').catch(() => ({}));
+            const { normalizeServerMessage } = await import('./message-normalizer.js?v=20261011-7').catch(() => ({}));
             for (const m of msgs) {
                 const canonical = normalizeServerMessage ? normalizeServerMessage(m) : m;
                 if (!store.getMessageById(String(canonical.id))) {

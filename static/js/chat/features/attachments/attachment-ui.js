@@ -3,13 +3,13 @@
  * Connects UI elements to attachment service
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-6';
-import { eventBus } from '../../core/event-bus.js?v=20261011-6';
-import { attachmentService } from './attachment.service.js?v=20261011-6';
-import { cameraService } from '../camera/camera.service.js?v=20261011-6';
-import { voiceService } from '../voice/voice.service.js?v=20261011-6';
-import { voiceModalController } from '../voice/voice-modal-controller.js?v=20261011-6';
-import { mediaComposer } from '../composer/MediaComposer.js?v=20261011-6';
+import { EVENTS } from '../../shared/constants.js?v=20261011-7';
+import { eventBus } from '../../core/event-bus.js?v=20261011-7';
+import { attachmentService } from './attachment.service.js?v=20261011-7';
+import { cameraService } from '../camera/camera.service.js?v=20261011-7';
+import { voiceService } from '../voice/voice.service.js?v=20261011-7';
+import { voiceModalController } from '../voice/voice-modal-controller.js?v=20261011-7';
+import { mediaComposer } from '../composer/MediaComposer.js?v=20261011-7';
 
 export class AttachmentUI {
     constructor() {

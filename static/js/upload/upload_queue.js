@@ -6,8 +6,8 @@
  * Current upload behavior remains sequential (no parallel uploads yet).
  */
 
-import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-6';
-import { UploadState } from './upload_state_machine.js?v=20261011-6';
+import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-7';
+import { UploadState } from './upload_state_machine.js?v=20261011-7';
 
 class UploadItem {
     constructor(id, data) {

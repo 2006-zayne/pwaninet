@@ -1570,6 +1570,37 @@ body.keyboard-open.pwanimate-active .pwanimate-composer-wrapper {
     padding-bottom: 0.35rem !important;
 }
 
+/* Capacitor native: pin the composer to the viewport bottom. The offset
+   height chain (fixed navbar + body padding-top + nested 100% heights)
+   resolves shorter than the viewport under real system insets, which is
+   why the in-flow island floats mid-screen while chat's full-bleed chain
+   sits correctly. Fixed positioning is viewport-relative and follows the
+   keyboard via adjustResize, so it docks exactly like the chat composer. */
+.is-native-app body.pwanimate-active .pwanimate-composer-wrapper,
+.is-capacitor body.pwanimate-active .pwanimate-composer-wrapper,
+body.pwanimate-active.is-native-app .pwanimate-composer-wrapper,
+body.pwanimate-active.is-capacitor .pwanimate-composer-wrapper {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: min(860px, 100%) !important;
+    max-width: 860px !important;
+    margin-top: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-bottom: calc(0.35rem + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+    z-index: 60 !important;
+}
+
+/* Clearance so the last transcript messages scroll above the fixed composer. */
+.is-native-app body.pwanimate-active .pwanimate-transcript,
+.is-capacitor body.pwanimate-active .pwanimate-transcript,
+body.pwanimate-active.is-native-app .pwanimate-transcript,
+body.pwanimate-active.is-capacitor .pwanimate-transcript {
+    padding-bottom: 120px !important;
+}
+
 .pwanimate-composer-box,
 .pwanimate-live-page-bar,
 .pwanimate-composer-attachments,
@@ -2013,6 +2044,20 @@ body.keyboard-open.pwanimate-active .pwanimate-composer-wrapper {
 .pwanimate-offcanvas .offcanvas-header {
     border-bottom: 1px solid var(--pwanimate-border);
     flex-shrink: 0;
+}
+
+/* Side drawer: respect mobile safe areas so the title/close button clears
+   the status bar/notch and logout clears the system nav bar. */
+.pwanimate-offcanvas.offcanvas-end {
+    padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) !important;
+    padding-right: var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)) !important;
+    box-sizing: border-box !important;
+}
+
+.pwanimate-offcanvas.offcanvas-end .offcanvas-body {
+    padding-bottom: calc(1rem + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+    padding-left: calc(1rem + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px))) !important;
+    box-sizing: border-box !important;
 }
 
 .pwanimate-offcanvas .offcanvas-body {

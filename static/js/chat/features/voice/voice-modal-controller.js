@@ -5,9 +5,9 @@
  * organic rolling wave animation, and VN preview playback before sending.
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-6';
-import { eventBus } from '../../core/event-bus.js?v=20261011-6';
-import { voiceService } from './voice.service.js?v=20261011-6';
+import { EVENTS } from '../../shared/constants.js?v=20261011-7';
+import { eventBus } from '../../core/event-bus.js?v=20261011-7';
+import { voiceService } from './voice.service.js?v=20261011-7';
 
 export class VoiceModalController {
   constructor() {

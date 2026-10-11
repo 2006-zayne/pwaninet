@@ -3,15 +3,16 @@
  * Manages background upload progress, retry logic, and optimistic messaging
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-6';
-import { eventBus } from '../../core/event-bus.js?v=20261011-6';
-import { ImageCompressor } from './ImageCompressor.js?v=20261011-6';
-import { deviceMediaStore } from '../../core/device-media-store.js?v=20261011-6';
+import { EVENTS } from '../../shared/constants.js?v=20261011-7';
+import { eventBus } from '../../core/event-bus.js?v=20261011-7';
+import { ImageCompressor } from './ImageCompressor.js?v=20261011-7';
+import { deviceMediaStore } from '../../core/device-media-store.js?v=20261011-7';
 
 export class UploadQueue {
     constructor(composer) {
         this.composer = composer;
         this.activeUploads = new Map();
+        this.pendingPayloads = new Map();
         this.initialized = false;
     }
     
@@ -20,6 +21,11 @@ export class UploadQueue {
      */
     init() {
         this.initialized = true;
+        // Media retry requests (emitted when a failed_upload bubble's retry
+        // button is tapped and the text-message retry path has nothing).
+        eventBus.on(EVENTS.MESSAGE_UPLOAD_RETRY, (data) => {
+            if (data && data.tempId) this.retry(data.tempId);
+        });
         console.log('[UPLOAD_QUEUE] Upload queue initialized');
     }
     
@@ -114,17 +120,54 @@ export class UploadQueue {
                 formData.append('csrfmiddlewaretoken', csrfToken);
             }
 
+            // Retain payload so failed uploads can be retried from the
+            // bubble's retry button even after error/cancel/reload-less nav.
+            this.pendingPayloads.set(tempId, {
+                formData,
+                csrfToken,
+                conversationId,
+                siblingIds: this._collectEmittedTempIds(tempId, mediaItems)
+            });
+
             // 4. Execute upload via XMLHttpRequest for real-time progress events
             await this._performXHRUpload(tempId, formData, csrfToken);
 
         } catch (error) {
             console.error('[UPLOAD_QUEUE] Upload error:', error);
             this.activeUploads.delete(tempId);
-            eventBus.emit(EVENTS.MESSAGE_UPLOAD_FAILED, {
-                tempId,
-                error: error.message || 'Upload failed'
+            this._emitUploadFailed(tempId, error.message || 'Upload failed');
+        }
+    }
+
+    /**
+     * All optimistic bubble IDs produced for one upload() call: the base
+     * tempId plus per-file siblings for docs/audio batches.
+     */
+    _collectEmittedTempIds(tempId, mediaItems) {
+        const ids = [tempId];
+        if (!mediaItems || mediaItems.length <= 1) return ids;
+        const areAllDocs = mediaItems.every(item => item.type === 'document');
+        const areAllAudios = mediaItems.every(item => item.type === 'audio');
+        if (areAllDocs || areAllAudios) {
+            mediaItems.forEach((_, index) => {
+                if (index !== 0) ids.push(`${tempId}_${index}`);
             });
         }
+        return ids;
+    }
+
+    /**
+     * Fail every bubble from one upload so none hangs on a spinner forever.
+     */
+    _emitUploadFailed(tempId, errorMessage) {
+        const payload = this.pendingPayloads.get(tempId);
+        const ids = (payload && payload.siblingIds) || [tempId];
+        ids.forEach(id => {
+            eventBus.emit(EVENTS.MESSAGE_UPLOAD_FAILED, {
+                tempId: id,
+                error: errorMessage
+            });
+        });
     }
 
     /**
@@ -139,6 +182,9 @@ export class UploadQueue {
             if (csrfToken) {
                 xhr.setRequestHeader('X-CSRFToken', csrfToken);
             }
+            // Generous timeout for large videos on slow mobile links; without
+            // this ontimeout is unreachable and hangs look like silence.
+            try { xhr.timeout = 600000; } catch (_) {}
 
             // Live progress tracking
             xhr.upload.onprogress = (e) => {
@@ -160,6 +206,8 @@ export class UploadQueue {
             xhr.onload = () => {
                 this.activeUploads.delete(tempId);
                 if (xhr.status >= 200 && xhr.status < 300) {
+                    // Payload no longer needed; free the retained FormData.
+                    this.pendingPayloads.delete(tempId);
                     try {
                         const data = JSON.parse(xhr.responseText);
                         console.log('[UPLOAD_QUEUE] Server response parsed successfully:', data);
@@ -218,6 +266,11 @@ export class UploadQueue {
             xhr.onerror = () => {
                 this.activeUploads.delete(tempId);
                 reject(new Error('Network connection error during upload'));
+            };
+
+            xhr.onabort = () => {
+                this.activeUploads.delete(tempId);
+                reject(new Error('Upload cancelled'));
             };
 
             xhr.ontimeout = () => {
@@ -469,22 +522,60 @@ export class UploadQueue {
     }
     
     /**
-     * Retry failed upload
-     * @param {string} tempId - Temporary ID of failed message
+     * Retry failed upload: replays the retained FormData so the user gets
+     * another chance instead of watching the bubble disappear.
+     * @param {string} tempId - Temporary ID of failed message (base or sibling)
      */
     async retry(tempId) {
         console.log('[UPLOAD_QUEUE] Retry upload for:', tempId);
+        const payload = this.pendingPayloads.get(tempId) || this._findPayload(tempId);
+        if (!payload) {
+            console.warn('[UPLOAD_QUEUE] No retained payload for retry:', tempId);
+            eventBus.emit(EVENTS.MESSAGE_UPLOAD_FAILED, {
+                tempId,
+                error: 'Original file is no longer available. Please reselect it.'
+            });
+            return false;
+        }
+        const baseTempId = payload.baseTempId;
+        try {
+            await this._performXHRUpload(baseTempId, payload.formData, payload.csrfToken);
+            return true;
+        } catch (error) {
+            console.error('[UPLOAD_QUEUE] Retry error:', error);
+            this.activeUploads.delete(baseTempId);
+            this._emitUploadFailed(baseTempId, error.message || 'Upload failed');
+            return false;
+        }
+    }
+
+    /**
+     * Find retained payload by base or sibling tempId.
+     */
+    _findPayload(tempId) {
+        if (this.pendingPayloads.has(tempId)) {
+            const p = this.pendingPayloads.get(tempId);
+            return { ...p, baseTempId: tempId };
+        }
+        for (const [baseTempId, p] of this.pendingPayloads.entries()) {
+            if ((p.siblingIds || []).includes(tempId)) {
+                return { ...p, baseTempId };
+            }
+        }
+        return null;
     }
     
     /**
-     * Cancel upload
+     * Cancel upload: abort XHR and fail the bubbles so they show retry
+     * instead of hanging on a spinner forever.
      */
     cancel(tempId) {
         if (tempId && this.activeUploads.has(tempId)) {
             const xhr = this.activeUploads.get(tempId);
-            xhr.abort();
+            try { xhr.abort(); } catch (_) {}
             this.activeUploads.delete(tempId);
             console.log('[UPLOAD_QUEUE] Cancelled upload for:', tempId);
+            this._emitUploadFailed(tempId, 'Upload cancelled');
         }
     }
     

@@ -4,12 +4,12 @@
  * Pure DOM manipulation based on provided data
  */
 
-import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js?v=20261011-6';
-import { renderMessageStatus } from '../shared/message-status-renderer.js?v=20261011-6';
-import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js?v=20261011-6';
-import { EVENTS } from '../shared/constants.js?v=20261011-6';
-import { eventBus } from '../core/event-bus.js?v=20261011-6';
-import { deviceMediaStore } from '../core/device-media-store.js?v=20261011-6';
+import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js?v=20261011-7';
+import { renderMessageStatus } from '../shared/message-status-renderer.js?v=20261011-7';
+import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js?v=20261011-7';
+import { EVENTS } from '../shared/constants.js?v=20261011-7';
+import { eventBus } from '../core/event-bus.js?v=20261011-7';
+import { deviceMediaStore } from '../core/device-media-store.js?v=20261011-7';
 
 export class MessageRenderer {
     constructor() {
@@ -227,6 +227,21 @@ export class MessageRenderer {
         this._delegatedListenersAttached = true;
 
         this.container.addEventListener('click', (e) => {
+            // Retry button delegation: works for buttons rendered by full
+            // render() AND by in-place updateMessageStatuses(), which never
+            // re-attaches per-button listeners.
+            const retryBtn = e.target.closest('.retry-button');
+            if (retryBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const messageId = retryBtn.getAttribute('data-message-id');
+                this._log('RETRY_BUTTON_CLICKED', { messageId });
+                window.dispatchEvent(new CustomEvent('messageRetry', {
+                    detail: { messageId }
+                }));
+                return;
+            }
+
             // Speed button handler delegation
             const speedBtn = e.target.closest('.vn-speed-btn');
             if (speedBtn) {
@@ -1177,8 +1192,10 @@ export class MessageRenderer {
             }
             this.lastRenderedCount = messages.length;
 
-            // Add event listeners for retry buttons
-            this._attachRetryButtonListeners();
+            // NOTE: retry buttons are handled by the container-level delegated
+            // listener in _setupDelegatedEventListeners (single attach in
+            // init). Do NOT per-button attach here: it double-fires retries
+            // and misses buttons added by in-place updateMessageStatuses.
 
         } finally {
             this.isRendering = false;
@@ -2638,11 +2655,24 @@ export class MessageRenderer {
 
         mediaFrame.appendChild(contentDiv);
 
-        // Check and use local media URLs for tiles if already downloaded
+        // Check and use local media URLs for tiles if already downloaded.
+        // Key order matters: per-tile keys first (that's how downloads are
+        // stored), then the bundle key. hasMedia() never evicts, so probing
+        // a never-stored server attachment id can't fire a spurious
+        // media-evicted event that would flash the overlay back.
         if (!isNotDownloaded && !isUploading) {
             Promise.all(attachments.map(async (att, idx) => {
-                const attKey = att?.id || `${message.id}_${idx}`;
-                const localUrl = await deviceMediaStore.getLocalMediaUrl(attKey) || await deviceMediaStore.getLocalMediaUrl(message.id);
+                const keysToTry = [`${message.id}_${idx}`, String(message.id)];
+                if (att?.id) keysToTry.push(String(att.id));
+                let localUrl = null;
+                for (const k of keysToTry) {
+                    try {
+                        if (deviceMediaStore.hasMedia(k)) {
+                            localUrl = await deviceMediaStore.getLocalMediaUrl(k);
+                            if (localUrl) break;
+                        }
+                    } catch (_) {}
+                }
                 if (localUrl) {
                     const tiles = mediaFrame.querySelectorAll('.media-tile');
                     const tile = tiles[idx];

@@ -4,7 +4,7 @@
  * All mutations MUST go through explicit store methods
  */
 
-import { CONNECTION_STATE, UI_STATE, MESSAGE_STATE } from '../shared/constants.js?v=20261011-6';
+import { CONNECTION_STATE, UI_STATE, MESSAGE_STATE } from '../shared/constants.js?v=20261011-7';
 
 // CANONICAL MESSAGE SCHEMA - All modules MUST conform to this
 export const MESSAGE_SCHEMA = {
@@ -75,6 +75,9 @@ export class Store {
             this._state.isInitialHistoryLoaded = false;
             this._state.hasMoreOlderMessages = true;
             this._state.typingUsers.clear();
+            // Drop previous conversation's presence so the header can't show
+            // the old peer's avatar/online state after a swap.
+            this._state.peerOnlineStatus.clear();
         }
 
         this._state.conversationId = targetConvId;
@@ -270,6 +273,8 @@ export class Store {
 
             if (this._state.processedMessageIds.has(idStr)) {
                 const existing = this._state.messages.get(idStr) || this._state.messages.get(Number(idStr));
+                const existingAtt = existing?.attachments || existing?.metadata?.attachments || [];
+                const validatedAtt = validated.attachments || validated.metadata?.attachments || [];
                 if (existing && (
                     existing.content !== validated.content ||
                     existing.editedAt !== validated.editedAt ||
@@ -277,7 +282,8 @@ export class Store {
                     existing.status !== validated.status ||
                     existing.isOptimistic !== validated.isOptimistic ||
                     existing.type !== validated.type ||
-                    existing.metadata?.url !== validated.metadata?.url
+                    existing.metadata?.url !== validated.metadata?.url ||
+                    existingAtt.length !== validatedAtt.length
                 )) {
                     this._state.messages.set(idStr, {
                         ...existing,
@@ -796,6 +802,7 @@ export class Store {
         }
 
         // Return validated message with defaults
+        const myId = Number(this._state.currentUserId) || null;
         const validated = {
             id: message.id,
             conversationId: message.conversationId,
@@ -804,6 +811,9 @@ export class Store {
             status: message.status,
             content: message.content,
             type: message.type,
+            isOwn: message.isOwn !== undefined
+                ? Boolean(message.isOwn)
+                : (myId !== null && Number(message.senderId) === myId),
             metadata: message.metadata || {},
             attachments: message.attachments || message.metadata?.attachments || [],
             global_caption: message.global_caption || message.metadata?.global_caption || '',

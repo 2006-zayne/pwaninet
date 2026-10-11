@@ -79,6 +79,7 @@ export const EVENTS = {
   MESSAGE_UPLOAD_PROGRESS: 'message:upload_progress',
   MESSAGE_UPLOAD_SUCCESS: 'message:upload_success',
   MESSAGE_UPLOAD_FAILED: 'message:upload_failed',
+  MESSAGE_UPLOAD_RETRY: 'message:upload_retry',
 
   // Theme events
   THEME_TOGGLE: 'theme:toggle',

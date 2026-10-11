@@ -314,6 +314,17 @@
         const isCurrentActive = Boolean((activeConvId && String(activeConvId) === convId) || onThisChatUrl);
         const isReadReceiptOnly = data.event_kind === 'read_receipt' || (!data.message_preview && !data.clean_preview);
 
+        // Read receipts also arrive here (sender's notifications_* channel) when
+        // the chat-room socket is down or paused. Mirror them into the chat
+        // store so ticks update without waiting for a history refetch.
+        if (data.event_kind === 'read_receipt' && data.last_read_message_id) {
+            try {
+                if (window.store && typeof window.store.markMessagesAsReadUpTo === 'function') {
+                    window.store.markMessagesAsReadUpTo(data.last_read_message_id, data.read_avatar || null);
+                }
+            } catch (_) {}
+        }
+
         // Query conversation items in sidebar, mobile list, or cards
         let items = document.querySelectorAll(`[data-conversation-id="${convId}"]`);
         if ((!items || items.length === 0) && !isReadReceiptOnly) {

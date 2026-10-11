@@ -181,9 +181,10 @@ class MessageSerializer(serializers.ModelSerializer):
 
     def _get_prefetched_attachments(self, obj):
         """Return attachments from prefetch cache if available, avoiding extra DB queries."""
-        if 'attachments' in getattr(obj, '_prefetched_objects_cache', {}):
-            return list(obj.attachments.all())
-        return list(obj.attachments.all()[:1])
+        # Never truncate: group bubbles need the full attachment list to
+        # choose the group layout. A [:1] fallback made groups render as
+        # singles depending on which endpoint serialized them.
+        return list(obj.attachments.all())
 
     def get_file_size(self, obj):
         """Get byte size of attachment without extra DB queries or unnecessary disk stat calls."""

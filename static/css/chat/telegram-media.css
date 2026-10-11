@@ -272,6 +272,12 @@
     min-width: 0;
     height: 100%;
     width: 100%;
+    /* Flex drops whitespace text nodes from renderer template literals,
+       which otherwise strut the tile image down (~35px top gap). */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
 }
 
 .media-tile img {

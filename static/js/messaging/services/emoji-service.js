@@ -3,8 +3,8 @@
  * Manages emoji picker functionality
  */
 
-import { eventBus } from '../../chat/core/event-bus.js?v=20261011-6';
-import { EVENTS } from '../../chat/shared/constants.js?v=20261011-6';
+import { eventBus } from '../../chat/core/event-bus.js?v=20261011-7';
+import { EVENTS } from '../../chat/shared/constants.js?v=20261011-7';
 
 export class EmojiService {
   constructor() {
