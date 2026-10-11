@@ -1546,19 +1546,31 @@ def batch_attachment_upload(request):
                         caption=caption_text,
                         order=0,
                         size=single_att['size'],
-                        duration=single_att.get('duration')
+                        duration=single_att.get('duration'),
+                        processing_status='pending' if single_att['file_type'] == 'video' else 'ready',
                     )
                     if single_att['file_type'] == 'video':
                         from .tasks import process_video_attachment_task
                         m = single_att.get('meta', {})
-                        process_video_attachment_task.delay(
-                            attachment_id=single_rec.id,
-                            trim_start=m.get('trim_start', 0),
-                            trim_end=m.get('trim_end', 0),
-                            is_muted=m.get('is_muted', False),
-                            rotation=m.get('rotation', 0),
-                            is_trimmed=m.get('is_trimmed', False)
-                        )
+                        try:
+                            res = process_video_attachment_task.apply_async(
+                                kwargs=dict(
+                                    attachment_id=single_rec.id,
+                                    trim_start=m.get('trim_start', 0),
+                                    trim_end=m.get('trim_end', 0),
+                                    is_muted=m.get('is_muted', False),
+                                    rotation=m.get('rotation', 0),
+                                    is_trimmed=m.get('is_trimmed', False),
+                                ),
+                                queue='media_queue',
+                            )
+                            single_rec.celery_task_id = getattr(res, 'id', None)
+                            single_rec.save(update_fields=['celery_task_id'])
+                        except Exception as e:
+                            logger.error(f"Video task enqueue failed, marking failed: {e}")
+                            single_rec.processing_status = 'failed'
+                            single_rec.processing_error = 'ENQUEUE_FAILED'
+                            single_rec.save(update_fields=['processing_status', 'processing_error'])
                 except Exception as ma_err:
                     logger.warning(f"Secondary MessageAttachment failed: {ma_err}")
                 created_messages.append(media_msg)
@@ -1578,19 +1590,31 @@ def batch_attachment_upload(request):
                         caption=att['caption'],
                         order=order_idx,
                         size=att['size'],
-                        duration=att.get('duration')
+                        duration=att.get('duration'),
+                        processing_status='pending' if att['file_type'] == 'video' else 'ready',
                     )
                     if att['file_type'] == 'video':
                         from .tasks import process_video_attachment_task
                         m = att.get('meta', {})
-                        process_video_attachment_task.delay(
-                            attachment_id=created_att.id,
-                            trim_start=m.get('trim_start', 0),
-                            trim_end=m.get('trim_end', 0),
-                            is_muted=m.get('is_muted', False),
-                            rotation=m.get('rotation', 0),
-                            is_trimmed=m.get('is_trimmed', False)
-                        )
+                        try:
+                            res = process_video_attachment_task.apply_async(
+                                kwargs=dict(
+                                    attachment_id=created_att.id,
+                                    trim_start=m.get('trim_start', 0),
+                                    trim_end=m.get('trim_end', 0),
+                                    is_muted=m.get('is_muted', False),
+                                    rotation=m.get('rotation', 0),
+                                    is_trimmed=m.get('is_trimmed', False),
+                                ),
+                                queue='media_queue',
+                            )
+                            created_att.celery_task_id = getattr(res, 'id', None)
+                            created_att.save(update_fields=['celery_task_id'])
+                        except Exception as e:
+                            logger.error(f"Video task enqueue failed, marking failed: {e}")
+                            created_att.processing_status = 'failed'
+                            created_att.processing_error = 'ENQUEUE_FAILED'
+                            created_att.save(update_fields=['processing_status', 'processing_error'])
                     if order_idx == 0:
                         group_msg.attachment = created_att.file
                         group_msg.attachment_type = created_att.file_type

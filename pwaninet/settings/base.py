@@ -291,11 +291,30 @@ AXES_RESET_ON_SUCCESS = True
 # AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True  # Deprecated in django-axes 6.0
 
 # Channels configuration
+def _redis_host_port():
+    url = os.environ.get('REDIS_URL', '')
+    if url:
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(url)
+            return p.hostname or '127.0.0.1', p.port or 6379
+        except Exception:
+            pass
+    return os.environ.get('REDIS_HOST', '127.0.0.1'), int(os.environ.get('REDIS_PORT', 6379))
+
+_REDIS_HOST, _REDIS_PORT = _redis_host_port()
+_REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD') or None
+_CHANNEL_HOSTS: list = [{'address': (_REDIS_HOST, _REDIS_PORT)}]
+if _REDIS_PASSWORD:
+    _CHANNEL_HOSTS[0]['password'] = _REDIS_PASSWORD
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            'hosts': [(os.environ.get('REDIS_HOST', '127.0.0.1'), int(os.environ.get('REDIS_PORT', 6379)))],
+            'hosts': _CHANNEL_HOSTS,
+            'capacity': 300,
+            'expiry': 15,
         },
     },
 }
@@ -316,6 +335,7 @@ CELERY_IMPORTS = (
     # Keep Pwanimate's task package explicit so workers register attachment
     # processing as well as the existing ingestion and reconciliation tasks.
     'pwanimate.tasks',
+    'messaging.tasks',
 )
 
 CELERY_TASK_DEFAULT_QUEUE = 'default'
@@ -330,6 +350,9 @@ CELERY_TASK_QUEUES = {
 CELERY_TASK_ROUTES = {
     # Heavy video processing
     'posts.tasks.process_large_video': {'queue': 'media_queue'},
+    # Chat video attachments share the media queue so default stays responsive
+    'messaging.tasks.process_video_attachment_task': {'queue': 'media_queue'},
+    'messaging.tasks.*': {'queue': 'media_queue'},
     
     # Background speech/transcription tasks (routed to search_queue so media_queue stays fast & responsive)
     'posts.tasks.extract_video_transcript': {'queue': 'search_queue'},

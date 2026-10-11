@@ -21,7 +21,32 @@ django_asgi_app = get_asgi_application()
 
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
+from channels.middleware import BaseMiddleware
+from channels.db import database_sync_to_async
+from urllib.parse import parse_qs
+from django.contrib.auth.models import AnonymousUser
 from pwaninet.routing import websocket_urlpatterns
+
+
+@database_sync_to_async
+def _get_user_from_token(token_key):
+    try:
+        from rest_framework.authtoken.models import Token
+        return Token.objects.select_related('user').get(key=token_key).user
+    except Exception:
+        return AnonymousUser()
+
+
+class TokenAuthMiddleware(BaseMiddleware):
+    """Accept ?token=<DRF token> for mobile/Capacitor clients without session cookies."""
+
+    async def __call__(self, scope, receive, send):
+        if scope.get('type') == 'websocket' and not scope.get('user'):
+            qs = parse_qs(scope.get('query_string', b'').decode())
+            token = (qs.get('token') or [None])[0]
+            if token:
+                scope['user'] = await _get_user_from_token(token)
+        return await super().__call__(scope, receive, send)
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -73,8 +98,10 @@ class ASGIResponseDiagnostics:
 
 application = ASGIResponseDiagnostics(ProtocolTypeRouter({
     "http": django_asgi_app,
-    "websocket": AuthMiddlewareStack(
-        URLRouter(websocket_urlpatterns)
+    "websocket": TokenAuthMiddleware(
+        AuthMiddlewareStack(
+            URLRouter(websocket_urlpatterns)
+        )
     ),
 }))
 

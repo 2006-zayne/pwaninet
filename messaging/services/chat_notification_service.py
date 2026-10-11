@@ -903,6 +903,8 @@ class ChatNotificationService:
         """
         Broadcast updated unread count (0 for this conversation + fresh total_unread_count)
         to the reader's personal `notifications_{user_id}` channel so all tabs clear `.messages-badge`.
+        Also push read_receipt to every OTHER member's notification channel so
+        offline senders update ticks without re-entering the chat room.
         """
         if not reader_user or not getattr(reader_user, 'is_authenticated', False):
             return
@@ -910,19 +912,49 @@ class ChatNotificationService:
             invalidate_unread_message_count_cache(reader_user.id)
             total_unread = get_cached_unread_message_count(reader_user)
             channel_layer = get_channel_layer()
-            if channel_layer:
-                async_to_sync(channel_layer.group_send)(
-                    f"notifications_{reader_user.id}",
-                    {
-                        'type': 'conversation_update',
-                        'event_kind': 'read_receipt',
-                        'conversation_id': int(conversation_id),
-                        'unread_count': 0,
-                        'total_unread_count': total_unread,
-                        'should_alert': False,
-                        'retract_tag': f"pwaninet-chat-{conversation_id}",
-                    },
-                )
+            if not channel_layer:
+                return
+            async_to_sync(channel_layer.group_send)(
+                f"notifications_{reader_user.id}",
+                {
+                    'type': 'conversation_update',
+                    'event_kind': 'read_receipt',
+                    'conversation_id': int(conversation_id),
+                    'unread_count': 0,
+                    'total_unread_count': total_unread,
+                    'should_alert': False,
+                    'retract_tag': f"pwaninet-chat-{conversation_id}",
+                },
+            )
+            try:
+                from messaging.models import ConversationMember
+                other_ids = list(ConversationMember.objects.filter(
+                    conversation_id=conversation_id).exclude(user_id=reader_user.id
+                    ).values_list('user_id', flat=True))
+                member = ConversationMember.objects.filter(
+                    conversation_id=conversation_id, user_id=reader_user.id).first()
+                last_read_id = getattr(member, 'last_read_message_id', None)
+                avatar = None
+                try:
+                    if getattr(reader_user, 'profile_pic', None):
+                        avatar = reader_user.profile_pic.url
+                except Exception:
+                    avatar = None
+                for oid in other_ids:
+                    async_to_sync(channel_layer.group_send)(
+                        f"notifications_{oid}",
+                        {
+                            'type': 'conversation_update',
+                            'event_kind': 'read_receipt',
+                            'conversation_id': int(conversation_id),
+                            'user_id': reader_user.id,
+                            'last_read_message_id': last_read_id,
+                            'read_avatar': avatar,
+                            'should_alert': False,
+                        },
+                    )
+            except Exception as inner:
+                logger.warning(f"[ChatNotificationService] sender read fan-out failed: {inner}")
         except Exception as e:
             logger.error(f"[ChatNotificationService] Error in notify_read_receipt: {e}", exc_info=True)
 

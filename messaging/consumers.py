@@ -1,6 +1,7 @@
 import json
 import asyncio
 import logging
+from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils import timezone
@@ -20,6 +21,8 @@ User = get_user_model()
 
 HEARTBEAT_INTERVAL = 25
 WS_MESSAGE_RATE = 120  # messages per minute
+SERVER_PING_INTERVAL = 20
+HEARTBEAT_TYPES = {'heartbeat', 'ping'}
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -48,7 +51,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         # Register connection tracking & presence
-        WebSocketConnectionTracker.register_connection(
+        await sync_to_async(WebSocketConnectionTracker.register_connection)(
             self.user_id,
             self.connection_id,
             metadata={
@@ -57,18 +60,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
 
-        PresenceService.record_heartbeat(
+        await sync_to_async(PresenceService.record_heartbeat)(
             self.user_id,
             self.connection_id,
             metadata={'conversation_id': self.conversation_id}
         )
 
-        # Join conversation room group
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        # Join conversation room group (guard: channel_layer may be None in tests)
+        if self.channel_layer is not None:
+            await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         try:
             await self.accept()
         except RuntimeError:
             return
+        # Server-side ping keeps NAT/proxies alive even when client tab is throttled
+        self._ping_task = asyncio.create_task(self._server_ping_loop())
 
         # Mark all pending messages sent to this user as 'delivered'
         delivered_ids = await self._mark_received_messages_delivered()
@@ -110,42 +116,70 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 **peer_last_read
             }))
 
+    async def _server_ping_loop(self):
+        try:
+            while True:
+                await asyncio.sleep(SERVER_PING_INTERVAL)
+                try:
+                    await self.send(text_data=json.dumps({'type': 'ping'}))
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
+
     async def disconnect(self, close_code):
-        if not self.user_id:
+        if getattr(self, '_ping_task', None):
+            try:
+                self._ping_task.cancel()
+            except Exception:
+                pass
+        if not getattr(self, 'user_id', None):
             return
 
-        # Discard from room group
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        # Discard from room group — never let cleanup errors mask the disconnect
+        try:
+            if self.channel_layer is not None and getattr(self, 'room_group_name', None):
+                await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        except Exception:
+            logger.exception("group_discard failed")
+        finally:
+            try:
+                await sync_to_async(PresenceService.remove_connection)(self.user_id, self.channel_name)
+            except Exception:
+                pass
+            try:
+                await sync_to_async(WebSocketConnectionTracker.unregister_connection)(self.user_id, self.channel_name)
+            except Exception:
+                pass
 
-        # Unregister presence & connection
-        PresenceService.remove_connection(self.user_id, self.channel_name)
-        WebSocketConnectionTracker.unregister_connection(self.user_id, self.channel_name)
-
-        is_still_online = PresenceService.is_user_online(self.user_id)
-        last_seen = PresenceService.get_last_seen(self.user_id) or timezone.now()
+        try:
+            is_still_online = await sync_to_async(PresenceService.is_user_online)(self.user_id)
+            last_seen = await PresenceService.aget_last_seen(self.user_id) or timezone.now()
+        except Exception:
+            is_still_online, last_seen = True, timezone.now()
 
         if not is_still_online:
-            await PresenceService.persist_last_seen_to_db(self.user_id)
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'user_status_event',
-                    'user_id': self.user_id,
-                    'username': self.user.username,
-                    'is_online': False,
-                    'last_seen': last_seen.isoformat() if hasattr(last_seen, 'isoformat') else str(last_seen)
-                }
-            )
+            try:
+                await PresenceService.persist_last_seen_to_db(self.user_id)
+            except Exception:
+                pass
+            try:
+                username = getattr(getattr(self, 'user', None), 'username', '') or ''
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'user_status_event',
+                        'user_id': self.user_id,
+                        'username': username,
+                        'is_online': False,
+                        'last_seen': last_seen.isoformat() if hasattr(last_seen, 'isoformat') else str(last_seen)
+                    }
+                )
+            except Exception:
+                logger.exception("offline broadcast failed")
 
     async def receive(self, text_data):
         """Receive message from WebSocket and dispatch action."""
-        if WebSocketRateLimiter.is_rate_limited(self.user_id, self.connection_id, WS_MESSAGE_RATE):
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': 'Rate limit exceeded. Please wait a moment.'
-            }))
-            return
-
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
@@ -153,11 +187,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         msg_type = data.get('type')
 
-        if msg_type == 'heartbeat':
-            PresenceService.record_heartbeat(self.user_id, self.connection_id)
+        if msg_type in HEARTBEAT_TYPES:
+            await sync_to_async(PresenceService.record_heartbeat)(self.user_id, self.connection_id)
             await self.send(text_data=json.dumps({'type': 'pong'}))
+            return
 
-        elif msg_type == 'get_peer_presence':
+        if WebSocketRateLimiter.is_rate_limited(self.user_id, self.connection_id, WS_MESSAGE_RATE):
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Rate limit exceeded. Please wait a moment.'
+            }))
+            return
+
+        if msg_type == 'get_peer_presence':
             peer_status = await self._get_peer_presence()
             if peer_status:
                 await self.send(text_data=json.dumps({
@@ -234,7 +276,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # 3. Check if recipient is active to mark delivered automatically
         other_members = await self._get_other_members()
-        any_peer_online = any(PresenceService.is_user_online(uid) for uid in other_members)
+        any_peer_online = False
+        for uid in other_members:
+            try:
+                if await sync_to_async(PresenceService.is_user_online)(uid):
+                    any_peer_online = True
+                    break
+            except Exception:
+                continue
         if any_peer_online:
             await self._set_message_status(saved_msg.id, 'delivered')
             await self.channel_layer.group_send(
@@ -423,6 +472,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'read_avatar': event.get('read_avatar')
         }))
 
+    async def video_ready_event(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'video_ready',
+            'message_id': event.get('message_id'),
+            'attachment_id': event.get('attachment_id'),
+            'file_url': event.get('file_url'),
+            'duration': event.get('duration'),
+        }))
+
     async def typing_event(self, event):
         if event['user_id'] != self.user_id:
             await self.send(text_data=json.dumps({
@@ -504,7 +562,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         peer_user = other_member.user
         is_online = PresenceService.is_user_online(peer_user.id)
-        last_seen = PresenceService.get_last_seen(peer_user.id)
+        last_seen = PresenceService.get_last_seen(peer_user.id) or getattr(peer_user, 'last_seen', None)
 
         return {
             'user_id': peer_user.id,

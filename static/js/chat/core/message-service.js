@@ -931,6 +931,21 @@ export class MessageService {
                     }
                     break;
 
+                case 'video_ready':
+                    // Swap stale pre-transcode URL for processed file
+                    store.updateMessage(String(data.message_id), {
+                        attachment_url: data.file_url,
+                        duration: data.duration,
+                    });
+                    try {
+                        if (window.offlineCache && typeof window.offlineCache.saveMessages === 'function') {
+                            const existing = store.getMessageById(String(data.message_id));
+                            window.offlineCache.saveMessages([{...(existing || {}),
+                                id: data.message_id, attachment_url: data.file_url}]).catch(() => {});
+                        }
+                    } catch (e) {}
+                    break;
+
                 case 'typing':
                 case 'typing_indicator':
                     const activeUserId = store.getState().currentUserId;
@@ -1590,13 +1605,38 @@ export class MessageService {
         try {
             const state = store.getState();
             // Only send ACK for incoming messages (not from current user)
-            if (message.senderId !== state.currentUserId) {
-                // TODO: Implement actual delivery acknowledgement via WebSocket
-                console.log('[MESSAGE_SERVICE] Would send delivery acknowledgement for message:', message.id);
+            if (Number(message.senderId) !== Number(state.currentUserId)) {
+                webSocketManager.send({ type: 'message_delivered', message_id: message.id });
             }
         } catch (error) {
             console.error('[MESSAGE_SERVICE] Delivery ACK failed:', error);
             // Fail silently - never break primary flow
+        }
+    }
+
+    /**
+     * Refetch history after reconnect to cover messages missed while socket was CLOSED.
+     */
+    async syncMissedMessages() {
+        try {
+            const state = store.getState();
+            const convId = state.activeConversationId || webSocketManager.conversationId;
+            if (!convId) return;
+            const res = await fetch(`/messaging/api/conversations/${convId}/messages/?limit=20`);
+            if (!res.ok) return;
+            const data = await res.json();
+            const msgs = data.results || data.messages || data;
+            if (!Array.isArray(msgs)) return;
+            const { normalizeServerMessage } = await import('./message-normalizer.js').catch(() => ({}));
+            for (const m of msgs) {
+                const canonical = normalizeServerMessage ? normalizeServerMessage(m) : m;
+                if (!store.getMessageById(String(canonical.id))) {
+                    store.addMessage(canonical);
+                    this._safeSendDeliveryAck(canonical);
+                }
+            }
+        } catch (e) {
+            console.warn('[MESSAGE_SERVICE] syncMissedMessages failed', e);
         }
     }
 

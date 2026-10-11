@@ -54,8 +54,10 @@ class Conversation(models.Model):
             if member.last_read_message_id and member.last_read_message_id >= last_msg.id:
                 return 'read'
 
+        # Preserve DB delivered state so refresh doesn't downgrade ✓✓ -> ✓
+        if last_msg.status == 'delivered':
+            return 'delivered'
         # If message exists but hasn't been read yet, it's just 'sent'
-        # 'delivered' status should only be set when receiver confirms receipt via WebSocket
         return 'sent' if last_msg else None
 
     @classmethod
@@ -252,6 +254,14 @@ class MessageAttachment(models.Model):
     width = models.IntegerField(null=True, blank=True)
     height = models.IntegerField(null=True, blank=True)
     duration = models.FloatField(null=True, blank=True)
+    # Background video processing state (prevents silent failures)
+    processing_status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('processing', 'Processing'), ('ready', 'Ready'), ('failed', 'Failed')],
+        default='ready',
+    )
+    processing_error = models.TextField(blank=True, null=True)
+    celery_task_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

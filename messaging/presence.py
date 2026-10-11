@@ -248,27 +248,34 @@ class PresenceService:
     def get_last_seen(user_id: int) -> Optional[datetime]:
         """
         Get the last seen timestamp for a user.
-        
+
         Args:
             user_id: User ID
-        
+
         Returns:
             Last seen datetime or None
         """
         try:
             redis_client = get_redis_client()
             last_seen_key = PresenceService._get_last_seen_key(user_id)
-            
+
             last_seen_str = redis_client.get(last_seen_key)
             if not last_seen_str:
-                # Fallback to database if not in Redis
-                return PresenceService._get_last_seen_from_db(user_id)
-            
+                return None
+
             last_seen_timestamp = float(last_seen_str)
             return datetime.fromtimestamp(last_seen_timestamp, tz=timezone.utc)
         except Exception as e:
             print(f'[PRESENCE] Error getting last seen for user {user_id}: {e}')
             return None
+
+    @staticmethod
+    async def aget_last_seen(user_id: int) -> Optional[datetime]:
+        """Async variant with DB fallback for use inside consumers."""
+        last_seen = await database_sync_to_async(PresenceService.get_last_seen)(user_id)
+        if last_seen:
+            return last_seen
+        return await PresenceService._get_last_seen_from_db(user_id)
     
     @staticmethod
     @database_sync_to_async

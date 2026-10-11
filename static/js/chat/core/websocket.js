@@ -10,6 +10,8 @@ export class WebSocketManager {
         this.conversationId = null;
         this.customWsUrl = null;
         this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 10;
+        this.lastCloseCode = null;
         this.reconnectTimer = null;
         this.messageCallback = null;
         this.connectionCallback = null;
@@ -215,11 +217,19 @@ export class WebSocketManager {
             this._notifyConnectionChange(true);
         };
 
-        socket.onclose = () => {
+        socket.onclose = (event) => {
             if (socketId !== this.currentSocketId) return;
 
+            this.lastCloseCode = event ? event.code : null;
             this.stopHeartbeat();
             this._notifyConnectionChange(false);
+
+            // Auth / membership errors must not loop forever
+            if (this.lastCloseCode === 4001 || this.lastCloseCode === 4003) {
+                console.warn('[WS] Closed with code', this.lastCloseCode, '— not reconnecting');
+                this.shouldReconnect = false;
+                return;
+            }
 
             if (this.shouldReconnect && !this.paused) {
                 this.handleReconnect();
@@ -240,16 +250,18 @@ export class WebSocketManager {
                 console.log('[WEBSOCKET] Parsed data:', JSON.stringify(data, null, 2));
 
                 this.lastMessageTime = Date.now();
-                this.lastHeartbeatTime = Date.now();
 
+                // Only pong/ping refreshes heartbeat liveness; other traffic must not mask death
                 // Handle ping/pong heartbeat
                 if (data.type === 'ping') {
                     this.send({ type: 'pong' });
+                    this.lastHeartbeatTime = Date.now();
                     this._log('HEARTBEAT_RECEIVED');
                     console.groupEnd();
                     return;
                 }
                 if (data.type === 'pong' || data.type === 'heartbeat_ack') {
+                    this.lastHeartbeatTime = Date.now();
                     this._log('HEARTBEAT_ACK_RECEIVED');
                     console.groupEnd();
                     return;
@@ -343,9 +355,15 @@ export class WebSocketManager {
 
     handleReconnect() {
         if (this.reconnectInProgress || this.paused || !this.shouldReconnect) return;
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.warn('[WS] Max reconnect attempts reached');
+            return;
+        }
 
         this.reconnectInProgress = true;
-        const delay = Math.min(1000 * 2 ** Math.min(this.reconnectAttempts, 4), 15000);
+        const base = Math.min(1000 * 2 ** Math.min(this.reconnectAttempts, 4), 15000);
+        const jitter = Math.random() * 500;
+        const delay = base + jitter;
         this.reconnectAttempts++;
 
         this.reconnectTimer = setTimeout(() => {
@@ -385,9 +403,9 @@ export class WebSocketManager {
         }
     }
 
-    _forceClose() {
+    _forceClose(code = 1000) {
         if (this.socket) {
-            this.socket.close();
+            try { this.socket.close(code); } catch (e) { /* noop */ }
             this.socket = null;
         }
     }

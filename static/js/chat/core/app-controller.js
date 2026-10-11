@@ -68,6 +68,14 @@ export class AppController {
             messageService.processMessageQueue();
             // Send any queued read receipts
             messageService.sendQueuedReadReceipts();
+            // Refetch missed history after reconnect (covers messages sent while CLOSED)
+            try {
+                if (typeof messageService.syncMissedMessages === 'function') {
+                    messageService.syncMissedMessages();
+                } else if (typeof messageService.loadMoreMessages === 'function') {
+                    messageService.refreshConversation?.();
+                }
+            } catch (e) { console.warn('[APP] missed-sync failed', e); }
         } else {
             store.setConnectionState('disconnected');
         }

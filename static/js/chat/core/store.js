@@ -688,11 +688,12 @@ export class Store {
         for (const [id, msg] of this._state.messages.entries()) {
             const numericId = parseInt(id, 10);
             if (!isNaN(numericId) && numericId <= targetId) {
-                if (msg.status !== 'read') {
+                // Only own messages carry read ticks; never flip received bubbles to read
+                if (msg.isOwn && msg.status !== 'read') {
                     msg.status = 'read';
                     changed = true;
                 }
-                if (numericId === targetId && readAvatar) {
+                if (numericId === targetId && readAvatar && msg.isOwn) {
                     msg.read_avatar = readAvatar;
                 }
             }

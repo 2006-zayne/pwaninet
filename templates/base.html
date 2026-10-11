@@ -4828,6 +4828,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 
     <!-- Version Footer -->
+    {% block footer %}
     <footer style="text-align: center; padding: 1rem; background: transparent; border-top: none; margin-top: auto; font-size: 0.8rem; color: #64748b;">
         <style>
           [data-theme="dark"] footer {
@@ -4848,6 +4849,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             <span>{{ app_environment|title }}</span>
         </div>
     </footer>
+    {% endblock footer %}
 
 
     <script>

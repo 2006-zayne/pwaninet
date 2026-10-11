@@ -41,17 +41,17 @@ const VALIDATION_CONFIG = {
         minDimensions: { width: 1, height: 1 },
     },
     video: {
-        maxSize: 150 * 1024 * 1024, // 150MB
-        allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/3gpp'],
+        maxSize: 100 * 1024 * 1024, // 100MB — must match server FileUploadValidator
+        allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/3gpp', 'video/x-matroska', 'video/x-m4v', 'video/3gpp2'],
         maxDuration: 3600, // 1 hour in seconds
     },
     document: {
         maxSize: 50 * 1024 * 1024, // 50MB
-        allowedTypes: ['application/pdf'],
+        allowedTypes: ['application/pdf', 'text/plain', 'text/csv', 'text/markdown', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip', 'application/json'],
     },
     audio: {
-        maxSize: 20 * 1024 * 1024, // 20MB
-        allowedTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4'],
+        maxSize: 25 * 1024 * 1024, // 25MB — must match server
+        allowedTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/3gpp', 'audio/flac', 'application/ogg'],
     },
     caption: {
         maxLength: 2500,
@@ -151,8 +151,11 @@ class VideoValidator {
     static async validate(file) {
         const result = new ValidationResult();
 
-        // Check file type
-        if (!VALIDATION_CONFIG.video.allowedTypes.includes(file.type)) {
+        // Check file type (with extension fallback for mobile pickers sending octet-stream)
+        const isAllowedMime = file.type && VALIDATION_CONFIG.video.allowedTypes.includes(file.type);
+        const hasVideoExt = /\.(mp4|m4v|webm|mov|mkv|ogv|ogg|3gp|3g2)$/i.test(file.name || '');
+        const isGeneric = !file.type || file.type === 'application/octet-stream';
+        if (!isAllowedMime && !(isGeneric && hasVideoExt)) {
             result.addError('type', `Invalid video type. Allowed: ${VALIDATION_CONFIG.video.allowedTypes.join(', ')}`);
         }
 

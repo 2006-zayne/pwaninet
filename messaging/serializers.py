@@ -230,6 +230,9 @@ class MessageSerializer(serializers.ModelSerializer):
             for member in members:
                 if member.user_id != request.user.id and member.last_read_message_id and member.last_read_message_id >= obj.id:
                     return 'read'
+            # Preserve delivered so history reload doesn't downgrade ticks
+            if getattr(obj, 'status', None) == 'delivered':
+                return 'delivered'
             return 'sent'
 
         # If the current user received this message, check if they've read it
@@ -252,7 +255,8 @@ class FileUploadValidator:
     
     ALLOWED_TYPES = {
         'image': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
-        'video': ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'],
+        'video': ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska',
+                  'video/ogg', 'video/3gpp', 'video/3gpp2', 'video/x-m4v'],
         'audio': [
             'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/vnd.wave',
             'audio/webm', 'audio/ogg', 'application/ogg', 'audio/aac',
@@ -279,10 +283,14 @@ class FileUploadValidator:
         'image/gif': ['.gif'],
         'image/webp': ['.webp'],
         'image/svg+xml': ['.svg'],
-        'video/mp4': ['.mp4'],
+        'video/mp4': ['.mp4', '.m4v'],
         'video/webm': ['.webm'],
         'video/quicktime': ['.mov'],
         'video/x-matroska': ['.mkv'],
+        'video/ogg': ['.ogv', '.ogg'],
+        'video/3gpp': ['.3gp'],
+        'video/3gpp2': ['.3g2'],
+        'video/x-m4v': ['.m4v'],
         'audio/mpeg': ['.mp3'],
         'audio/mp3': ['.mp3'],
         'audio/wav': ['.wav'],

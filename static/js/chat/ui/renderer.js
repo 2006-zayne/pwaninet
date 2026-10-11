@@ -417,7 +417,9 @@ export class MessageRenderer {
      * Restore download overlay and not-downloaded state if media was deleted from IndexedDB/Filesystem
      */
     _restoreDownloadOverlay(message, bubble) {
-        if (!bubble || message?.isOwn || bubble.classList.contains('sent')) return;
+        if (!bubble) return;
+        // Allow sender bubbles too so evicted media restores consistently; sender just skips blur via CSS.
+        const isOwn = message?.isOwn || bubble.classList.contains('sent');
         const messageId = message?.id || bubble.getAttribute('data-message-id');
         if (messageId) {
             this.downloadedMediaIds.delete(String(messageId));
