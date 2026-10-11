@@ -44,6 +44,12 @@ class ChatThemeHandler {
         const observer = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
                 if (mutation.type === 'attributes' && (mutation.attributeName === 'data-theme' || mutation.attributeName === 'data-bs-theme')) {
+                    // If user never picked an explicit preset, follow mode defaults
+                    // (ocean-wave on light, midnight-coast on dark) to avoid visibility issues.
+                    if (!this.hasExplicitThemeChoice()) {
+                        this.activeConfig.preset = this.resolveModeDefault();
+                        this.activeConfig.type = 'preset';
+                    }
                     // Re-apply current configuration to refresh contrast calculations for the new mode
                     this.applyThemeConfig(this.activeConfig, false);
                     // Guarantee any backdrop/overlay is completely eliminated
@@ -73,10 +79,41 @@ class ChatThemeHandler {
         return document.body.dataset.conversationId || null;
     }
 
+    resolveModeDefault() {
+        const mode = document.documentElement.getAttribute('data-theme')
+            || document.documentElement.getAttribute('data-bs-theme') || 'light';
+        return mode === 'dark' ? 'midnight-coast' : 'ocean-wave';
+    }
+
+    hasExplicitThemeChoice() {
+        const chatContainer = document.getElementById('chatMainArea');
+        const defaultFromDataset = chatContainer?.dataset?.defaultChatTheme;
+        if (defaultFromDataset && defaultFromDataset !== 'default') return true;
+        const stored = localStorage.getItem('default_chat_theme') || localStorage.getItem('chat_theme');
+        if (stored && stored !== 'default') return true;
+        const convId = this.getConversationId();
+        if (convId) {
+            const saved = localStorage.getItem(`chat_theme_${convId}`);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && parsed.preset && parsed.preset !== 'default') return true;
+                } catch (_) {
+                    if (typeof saved === 'string' && saved.length < 50 && saved !== 'default') return true;
+                }
+            }
+        }
+        return false;
+    }
+
     getDefaultTheme() {
         const chatContainer = document.getElementById('chatMainArea');
         const defaultFromDataset = chatContainer?.dataset?.defaultChatTheme;
-        return localStorage.getItem('default_chat_theme') || defaultFromDataset || 'ocean-wave';
+        const stored = localStorage.getItem('default_chat_theme');
+        const candidate = (stored && stored !== 'default') ? stored : null;
+        if (candidate) return candidate;
+        if (defaultFromDataset && defaultFromDataset !== 'default') return defaultFromDataset;
+        return this.resolveModeDefault();
     }
 
     setupEventListeners() {
@@ -890,6 +927,12 @@ class ChatThemeHandler {
                     console.error('Failed to parse saved chat theme:', e);
                 }
             }
+        }
+
+        // Normalize 'default' sentinel to the mode-aware default
+        if (!targetConfig.preset || targetConfig.preset === 'default') {
+            targetConfig.preset = this.resolveModeDefault();
+            targetConfig.type = 'preset';
         }
 
         this.applyThemeConfig(targetConfig, false);

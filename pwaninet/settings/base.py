@@ -291,28 +291,23 @@ AXES_RESET_ON_SUCCESS = True
 # AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True  # Deprecated in django-axes 6.0
 
 # Channels configuration
-def _redis_host_port():
+def _channel_hosts():
     url = os.environ.get('REDIS_URL', '')
     if url:
-        try:
-            from urllib.parse import urlparse
-            p = urlparse(url)
-            return p.hostname or '127.0.0.1', p.port or 6379
-        except Exception:
-            pass
-    return os.environ.get('REDIS_HOST', '127.0.0.1'), int(os.environ.get('REDIS_PORT', 6379))
-
-_REDIS_HOST, _REDIS_PORT = _redis_host_port()
-_REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD') or None
-_CHANNEL_HOSTS: list = [{'address': (_REDIS_HOST, _REDIS_PORT)}]
-if _REDIS_PASSWORD:
-    _CHANNEL_HOSTS[0]['password'] = _REDIS_PASSWORD
+        # channels_redis accepts redis:// URL strings directly
+        return [url]
+    host = os.environ.get('REDIS_HOST', '127.0.0.1')
+    port = int(os.environ.get('REDIS_PORT', 6379))
+    password = os.environ.get('REDIS_PASSWORD') or None
+    if password:
+        return [{'host': host, 'port': port, 'password': password}]
+    return [(host, port)]
 
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            'hosts': _CHANNEL_HOSTS,
+            'hosts': _channel_hosts(),
             'capacity': 300,
             'expiry': 15,
         },

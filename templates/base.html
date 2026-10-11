@@ -123,14 +123,20 @@
                     }
                 }
 
-                // 4. Default fallback
+                // 4. Mode-aware default fallback: ocean blue for light, midnight for dark
                 if (!resolvedChatTheme || resolvedChatTheme === 'default') {
-                    resolvedChatTheme = 'ocean-wave';
+                    const mode = document.documentElement.getAttribute('data-theme')
+                        || document.documentElement.getAttribute('data-bs-theme')
+                        || 'light';
+                    resolvedChatTheme = mode === 'dark' ? 'midnight-coast' : 'ocean-wave';
                 }
 
                 document.documentElement.setAttribute('data-chat-theme', resolvedChatTheme);
             } catch (e) {
-                document.documentElement.setAttribute('data-chat-theme', 'ocean-wave');
+                const mode = document.documentElement.getAttribute('data-theme')
+                    || document.documentElement.getAttribute('data-bs-theme')
+                    || 'light';
+                document.documentElement.setAttribute('data-chat-theme', mode === 'dark' ? 'midnight-coast' : 'ocean-wave');
             }
         })();
 
@@ -1885,6 +1891,41 @@
         .heart-pop {
             animation: heartPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+
+        /* Native boot splash bridge: covers the empty gap between native
+           splash dismissal and first meaningful web paint. Adaptive to
+           device theme (white in light, navy in dark) like the native
+           launch screen. Logo persists until app-ready, then fades. */
+        #pwani-boot-splash {
+            position: fixed;
+            inset: 0;
+            z-index: 2147483000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #FFFFFF;
+            transition: opacity 0.35s ease;
+        }
+        #pwani-boot-splash img {
+            width: 128px;
+            height: 128px;
+            object-fit: contain;
+        }
+        @media (prefers-color-scheme: dark) {
+            #pwani-boot-splash { background: #0f172a; }
+        }
+        [data-theme="dark"] #pwani-boot-splash,
+        [data-bs-theme="dark"] #pwani-boot-splash {
+            background: #0f172a;
+        }
+        [data-theme="light"] #pwani-boot-splash,
+        [data-bs-theme="light"] #pwani-boot-splash {
+            background: #FFFFFF;
+        }
+        #pwani-boot-splash.pwani-boot-hide {
+            opacity: 0;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="{% block body_class %}{% endblock %}{% if request.resolver_match.url_name == 'login' or request.resolver_match.url_name == 'login_direct' or request.resolver_match.url_name == 'register' %} auth-entry-page{% endif %}"
@@ -1896,6 +1937,48 @@
       data-app-version="{{ app_version }}"
       data-app-build="{{ app_build }}"
       data-app-environment="{{ app_environment }}">
+
+    <div id="pwani-boot-splash" aria-hidden="true">
+        <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="" onerror="this.style.display='none'">
+    </div>
+    <script>
+        // Dismiss boot splash only when the app is visually ready; notify
+        // native so the system splash stays until the same moment.
+        (function() {
+            var done = false;
+            function hide() {
+                if (done) return;
+                done = true;
+                var el = document.getElementById('pwani-boot-splash');
+                try {
+                    var bridge = window.AndroidBridge || window.PwaninetBridge;
+                    if (bridge && typeof bridge.notifyPageReady === 'function') {
+                        bridge.notifyPageReady();
+                    }
+                } catch (_) {}
+                if (el) {
+                    el.classList.add('pwani-boot-hide');
+                    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 450);
+                }
+            }
+            function ready() {
+                try {
+                    if (document.fonts && document.fonts.ready) {
+                        document.fonts.ready.then(function() { requestAnimationFrame(function() { setTimeout(hide, 50); }); });
+                    } else {
+                        requestAnimationFrame(function() { setTimeout(hide, 50); });
+                    }
+                } catch (_) { setTimeout(hide, 100); }
+            }
+            if (document.readyState === 'complete') {
+                ready();
+            } else {
+                window.addEventListener('load', ready);
+            }
+            // Fallback: never trap the app behind the splash.
+            setTimeout(hide, 5000);
+        })();
+    </script>
 
     <script>
         // Add .is-native-app class to body when running in Capacitor native environment

@@ -26,6 +26,18 @@ from notifications.services.notification_service import invalidate_unread_count_
 from users.services.device_service import get_or_create_device_id, hash_device_id
 from users.services.email_verification_service import send_verification_email, verify_email_token
 from pwaninet.utils.htmx import htmx_location_response
+
+
+def _existing_direct_conversation_id(viewer, other_user):
+    """Return existing 1-1 conversation id or None. Never creates."""
+    if not viewer or not other_user or viewer.pk == other_user.pk:
+        return None
+    try:
+        from messaging.models import Conversation
+        conv = Conversation.get_direct_conversation_between(viewer, other_user)
+        return conv.id if conv else None
+    except Exception:
+        return None
 from .serializers import (
     UserSerializer, UserPublicSerializer, FollowSerializer, PinchSerializer,
     DeviceAccountSerializer, UserUpdateSerializer, NotificationPreferencesSerializer
@@ -783,6 +795,7 @@ def profile_view(request, username):
             'profile_user': profile_user,
             'posts': posts_page,
             'is_following': is_following,
+            'existing_conversation_id': _existing_direct_conversation_id(request.user, profile_user),
             'followers_count': followers_count,
             'following_count': following_count,
             'total_likes': total_likes,
@@ -814,6 +827,7 @@ def profile_view(request, username):
         'profile_user': profile_user,
         'posts': posts_page,
         'is_following': is_following,
+        'existing_conversation_id': _existing_direct_conversation_id(request.user, profile_user),
         'followers_count': followers_count,
         'following_count': following_count,
         'total_likes': total_likes,
@@ -1059,6 +1073,7 @@ def toggle_follow(request, username):
             'profile_user': target,
             'recruit': target,
             'is_following': is_following,
+            'existing_conversation_id': _existing_direct_conversation_id(request.user, target),
             'follower_count': follower_count,
         })
 

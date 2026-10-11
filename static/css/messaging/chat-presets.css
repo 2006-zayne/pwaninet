@@ -413,3 +413,87 @@
 [data-bs-theme="dark"] .preset-option[data-preset="forest-glow"] .theme-preview { background-color: #0d281a !important; }
 [data-theme="dark"] .preset-option[data-preset="pwani-neon"] .theme-preview,
 [data-bs-theme="dark"] .preset-option[data-preset="pwani-neon"] .theme-preview { background-color: #1d1130 !important; }
+
+/* ==========================================================================
+   EMPTY STATE + INITIAL CONVERSATION TEXT — THEME ADAPTIVE
+   Maps empty-state copy onto per-preset chat tokens so it stays readable
+   on ocean-wave (light) and midnight-coast (dark) wallpapers/gradients.
+   ========================================================================== */
+#chatMainArea .pwanimate-empty-state,
+#chatMainArea .messaging-empty-state,
+.messages-area .pwanimate-empty-state,
+.messages-area .messaging-empty-state {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+#chatMainArea .pwanimate-empty-title,
+.messages-area .pwanimate-empty-title {
+  color: var(--chat-text-received) !important;
+  text-shadow: 0 1px 12px color-mix(in srgb, var(--chat-bg) 55%, transparent) !important;
+}
+
+#chatMainArea .pwanimate-empty-greeting,
+.messages-area .pwanimate-empty-greeting {
+  color: var(--chat-text-received) !important;
+  opacity: 0.92 !important;
+}
+
+#chatMainArea .pwanimate-empty-question,
+.messages-area .pwanimate-empty-question,
+#chatMainArea .messaging-empty-state .text-muted,
+.messages-area .messaging-empty-state .text-muted,
+#chatMainArea .pwanimate-empty-state .text-muted,
+.messages-area .pwanimate-empty-state .text-muted {
+  color: var(--chat-meta-received) !important;
+  opacity: 1 !important;
+}
+
+#chatMainArea .messaging-empty-state .bg-body-tertiary,
+.messages-area .messaging-empty-state .bg-body-tertiary,
+#chatMainArea .pwanimate-empty-state .bg-body-tertiary,
+.messages-area .pwanimate-empty-state .bg-body-tertiary {
+  background: var(--chat-bg-received) !important;
+  background: color-mix(in srgb, var(--chat-bg-received) 60%, transparent) !important;
+  border-color: var(--chat-border-received) !important;
+  color: var(--chat-meta-received) !important;
+}
+
+#chatMainArea .pwanimate-suggestion-chip,
+#chatMainArea .empty-greeting-chip,
+.messages-area .pwanimate-suggestion-chip,
+.messages-area .empty-greeting-chip {
+  background: var(--chat-composer-bg) !important;
+  border-color: var(--chat-composer-border) !important;
+  color: var(--chat-composer-text) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+#chatMainArea .pwanimate-suggestion-chip:hover,
+#chatMainArea .empty-greeting-chip:hover,
+.messages-area .pwanimate-suggestion-chip:hover,
+.messages-area .empty-greeting-chip:hover {
+  border-color: var(--chat-accent) !important;
+  color: var(--chat-accent) !important;
+  background: var(--chat-composer-bg) !important;
+}
+
+/* Date dividers + system notices inside the message stream */
+#chatMainArea .chat-date-divider span,
+.messages-area .chat-date-divider span,
+#chatMainArea .system-message,
+.messages-area .system-message {
+  background: var(--chat-bg-received) !important;
+  background: color-mix(in srgb, var(--chat-bg-received) 88%, transparent) !important;
+  border: 1px solid var(--chat-border-received) !important;
+  color: var(--chat-meta-received) !important;
+}
+
+/* Online-dot ring uses chat surface instead of hardcoded white */
+#chatMainArea .pwanimate-empty-state .border-white,
+.messages-area .pwanimate-empty-state .border-white {
+  border-color: var(--chat-bg-received) !important;
+}

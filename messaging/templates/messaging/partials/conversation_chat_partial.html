@@ -88,7 +88,9 @@
           if (userPref && userPref !== 'default') themeToApply = userPref;
         }
         if (!themeToApply || themeToApply === 'default') {
-          themeToApply = 'ocean-wave';
+          const mode = document.documentElement.getAttribute('data-theme')
+            || document.documentElement.getAttribute('data-bs-theme') || 'light';
+          themeToApply = mode === 'dark' ? 'midnight-coast' : 'ocean-wave';
         }
         document.documentElement.setAttribute('data-chat-theme', themeToApply);
         if (layout) layout.setAttribute('data-chat-theme', themeToApply);

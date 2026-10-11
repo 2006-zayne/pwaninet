@@ -9,8 +9,58 @@
     </button>
 </form>
 
-{% if is_following %}
-{# Messaging button - FROZEN FOR MVP #}
+{% if request.user != profile_user %}
+<button type="button"
+        class="btn btn-outline-primary w-100 rounded-pill fw-bold mb-2 start-conversation start-conversation-btn profile-message-btn"
+        data-user-id="{{ profile_user.id }}"
+        {% if existing_conversation_id %}data-conversation-id="{{ existing_conversation_id }}"{% endif %}>
+    <i class="bi bi-chat-dots me-1"></i> Message
+</button>
+<script>
+(function() {
+  if (window.__pwaniProfileMsgBound) return;
+  window.__pwaniProfileMsgBound = true;
+  function getCSRF() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value
+      || document.querySelector('meta[name="csrf-token"]')?.content
+      || (document.cookie.split('; ').find(function(r){return r.indexOf('csrftoken=')===0;})||'').split('=')[1]
+      || '';
+  }
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest && e.target.closest('.profile-message-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (btn.dataset.conversationId) {
+      window.location.href = '/messaging/conversation/' + btn.dataset.conversationId + '/';
+      return;
+    }
+    var userId = btn.dataset.userId;
+    if (!userId) return;
+    btn.disabled = true;
+    var orig = btn.innerHTML;
+    btn.innerHTML = 'Opening...';
+    fetch('/messaging/v1/conversations/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRF()},
+      body: JSON.stringify({type: 'direct', member_ids: [parseInt(userId, 10)]})
+    })
+    .then(function(r) { if (!r.ok) return r.text().then(function(t){ throw new Error('HTTP '+r.status+': '+t); }); return r.json(); })
+    .then(function(data) {
+      var convId = data && (data.id || data.conversation_id);
+      if (convId) { window.location.href = '/messaging/conversation/' + convId + '/'; return; }
+      if (data && data.redirect_url) { window.location.href = data.redirect_url; return; }
+      throw new Error('No conversation ID in response');
+    })
+    .catch(function(err) {
+      console.error(err);
+      btn.disabled = false;
+      btn.innerHTML = orig;
+      alert('Could not open conversation: ' + err.message);
+    });
+  });
+})();
+</script>
 {% endif %}
 
 <h6 id="follower-count" class="fw-bold mb-0 count-number" hx-swap-oob="true">{{ follower_count }}</h6>

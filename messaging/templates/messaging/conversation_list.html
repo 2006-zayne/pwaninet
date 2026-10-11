@@ -2,7 +2,7 @@
 {% load static %}
 {% load messaging_extras %}
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=7">
+<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=8">
 <link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=25">
 <link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=44">
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
@@ -27,14 +27,21 @@ function getCSRFToken() {
 if (!window.__pwaniConvListDelegationBound) {
   window.__pwaniConvListDelegationBound = true;
 
-  // Start conversation functionality - use event delegation
+  // Start conversation functionality - use event delegation (legacy fallback; global handler preferred)
   document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.start-conversation');
+    if (window.__pwaniStartConvGlobalBound) return;
+    const btn = e.target.closest('.start-conversation, .start-conversation-btn');
     if (btn) {
       e.preventDefault();
       e.stopPropagation();
       const userId = btn.dataset.userId;
       if (!userId) return;
+
+      // If we already know the conversation, go straight there
+      if (btn.dataset.conversationId) {
+        window.location.href = `/messaging/conversation/${btn.dataset.conversationId}/`;
+        return;
+      }
 
       const csrfToken = getCSRFToken();
 
@@ -46,7 +53,7 @@ if (!window.__pwaniConvListDelegationBound) {
         },
         body: JSON.stringify({
           type: 'direct',
-          member_ids: [userId]
+          member_ids: [parseInt(userId, 10)]
         })
       })
       .then(response => {
@@ -58,11 +65,14 @@ if (!window.__pwaniConvListDelegationBound) {
         return response.json();
       })
       .then(data => {
-        if (data.id) {
+        const convId = data.id || data.conversation_id;
+        if (convId) {
           if (data.existing) {
             showNotification('Existing conversation found. Redirecting...', 'info');
           }
-          window.location.href = `/messaging/conversation/${data.id}/`;
+          window.location.href = `/messaging/conversation/${convId}/`;
+        } else if (data.redirect_url) {
+          window.location.href = data.redirect_url;
         } else {
           alert('Failed to create conversation. No ID in response.');
         }
@@ -1551,5 +1561,6 @@ window.handleUserStatusUpdate = handleUserStatusUpdate;
 </script>
 <script src="{% static 'js/messaging/conversation-realtime-manager.js' %}?v=5"></script>
 <script src="{% static 'js/chat-theme-handler.js' %}?v=28"></script>
+<script src="{% static 'js/messaging/start-conversation.js' %}?v=1"></script>
 
 {% endblock %}

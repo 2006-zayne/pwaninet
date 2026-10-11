@@ -12,7 +12,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/messaging/conversation-detail.css' %}?v=44">
-<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=7">
+<link rel="stylesheet" href="{% static 'css/messaging/chat-presets.css' %}?v=8">
 <link rel="stylesheet" href="{% static 'css/chat_theme.css' %}?v=25">
 <link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}?v=27">
 <link rel="stylesheet" href="{% static 'css/chat/telegram-media.css' %}?v=28">
@@ -49,7 +49,9 @@
       if (userPref && userPref !== 'default') themeToApply = userPref;
     }
     if (!themeToApply || themeToApply === 'default') {
-      themeToApply = 'ocean-wave';
+      const mode = document.documentElement.getAttribute('data-theme')
+        || document.documentElement.getAttribute('data-bs-theme') || 'light';
+      themeToApply = mode === 'dark' ? 'midnight-coast' : 'ocean-wave';
     }
     document.documentElement.setAttribute('data-chat-theme', themeToApply);
   } catch (e) {}
@@ -1175,8 +1177,9 @@
     return cookie ? cookie.split('=')[1] : '';
   }
 
-  // Start new conversation handler
+  // Start new conversation handler (legacy: global start-conversation.js handles this; kept as fallback)
   document.addEventListener('click', function(e) {
+    if (window.__pwaniStartConvGlobalBound) return;
     const btn = e.target.closest('.start-conversation');
     if (btn) {
       e.preventDefault();
@@ -1437,6 +1440,7 @@
 <script src="{% static 'js/messaging/offline-cache.js' %}?v=47"></script>
 <script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=52"></script>
 <script src="{% static 'js/chat-theme-handler.js' %}?v=28"></script>
+<script src="{% static 'js/messaging/start-conversation.js' %}?v=1"></script>
 
 <script>
   // Handle quick action and empty state greeting chip clicks
@@ -1491,14 +1495,19 @@
       });
     }
 
-    // Start conversation click handler for suggested friends in left rail
+    // Start conversation click handler for suggested friends in left rail (legacy fallback)
     document.addEventListener('click', function(e) {
+      if (window.__pwaniStartConvGlobalBound) return;
       const btn = e.target.closest('.start-conversation-btn');
       if (btn) {
         e.preventDefault();
         e.stopPropagation();
         const userId = btn.dataset.userId;
         if (!userId) return;
+        if (btn.dataset.conversationId) {
+          window.location.href = `/messaging/conversation/${btn.dataset.conversationId}/`;
+          return;
+        }
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width: 0.8rem; height: 0.8rem;"></span>...';
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || (document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1]) || '';
@@ -1513,13 +1522,28 @@
             member_ids: [parseInt(userId, 10)]
           })
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+          if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t); });
+          return r.json();
+        })
         .then(function(data) {
-          if (data.id) {
-            window.location.href = `/messaging/conversation/${data.id}/`;
+          const convId = data && (data.id || data.conversation_id);
+          if (convId) {
+            window.location.href = `/messaging/conversation/${convId}/`;
+          } else if (data && data.redirect_url) {
+            window.location.href = data.redirect_url;
           } else {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-chat-dots me-1"></i> Message';
+            // Fallback to legacy create endpoint which handles more response shapes
+            const fd = new FormData();
+            fd.append('user_id', userId);
+            return fetch('/messaging/create/', {method: 'POST', headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}, body: fd})
+              .then(function(r2) { return r2.json(); })
+              .then(function(d2) {
+                const c2 = d2 && (d2.id || d2.conversation_id);
+                if (c2) { window.location.href = `/messaging/conversation/${c2}/`; return; }
+                if (d2 && d2.redirect_url) { window.location.href = d2.redirect_url; return; }
+                throw new Error('No conversation ID in response');
+              });
           }
         })
         .catch(function(err) {

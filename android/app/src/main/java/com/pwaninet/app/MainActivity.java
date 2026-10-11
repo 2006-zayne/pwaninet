@@ -73,7 +73,7 @@ public class MainActivity extends BridgeActivity {
     private boolean isOfflinePageShowing = false;
     private static final String WEBVIEW_STATE_KEY = "WEBVIEW_STATE";
     private volatile boolean isPageReady = false;
-    private static final long SPLASH_WATCHDOG_TIMEOUT_MS = 6000L;
+    private static final long SPLASH_WATCHDOG_TIMEOUT_MS = 8000L;
 
     private int lastSafeTop = 0;
     private int lastSafeBottom = 0;
@@ -112,6 +112,14 @@ public class MainActivity extends BridgeActivity {
             if (activity != null) {
                 boolean isLight = !"dark".equalsIgnoreCase(theme);
                 activity.applySystemBarTheme(isLight);
+            }
+        }
+
+        @JavascriptInterface
+        public void notifyPageReady() {
+            MainActivity activity = activityRef.get();
+            if (activity != null) {
+                activity.runOnUiThread(() -> activity.isPageReady = true);
             }
         }
 
@@ -1030,7 +1038,9 @@ public class MainActivity extends BridgeActivity {
             getBridge().addWebViewListener(new WebViewListener() {
                 @Override
                 public void onPageLoaded(WebView webView) {
-                    isPageReady = true;
+                    // Do NOT dismiss splash here: committed DOM is often still blank
+                    // (remote CSS/fonts pending). Web signals readiness via
+                    // AndroidBridge.notifyPageReady(); watchdog covers failure.
                     isOfflinePageShowing = false;
                     setupAndroidBridge();
                     injectSafeAreaInsets();
@@ -1048,7 +1058,8 @@ public class MainActivity extends BridgeActivity {
 
                 @Override
                 public void onPageCommitVisible(WebView view, String url) {
-                    isPageReady = true;
+                    // First pixels committed are usually the blank body background.
+                    // Keep native splash up so logo persists until web-ready.
                     isOfflinePageShowing = false;
                     setupAndroidBridge();
                     injectSafeAreaInsets();

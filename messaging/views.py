@@ -640,6 +640,14 @@ def conversation_list(request):
                     existing_direct_user_ids.add(m.user_id)
 
     unmessaged_friends = users.exclude(id__in=existing_direct_user_ids)
+    if existing_direct_user_ids:
+        try:
+            suggested_users = suggested_users.exclude(id__in=existing_direct_user_ids)
+        except Exception:
+            try:
+                suggested_users = [u for u in suggested_users if getattr(u, 'id', None) not in existing_direct_user_ids]
+            except Exception:
+                pass
 
     # Detect desktop vs mobile client
     ua_string = request.META.get('HTTP_USER_AGENT', '')
@@ -840,6 +848,14 @@ def conversation_detail(request, conversation_id):
 
     from users.services.friend_suggestion_service import get_friend_suggestions_for_user
     suggested_users = get_friend_suggestions_for_user(request.user, limit=10)
+    if existing_direct_user_ids:
+        try:
+            suggested_users = suggested_users.exclude(id__in=existing_direct_user_ids)
+        except Exception:
+            try:
+                suggested_users = [u for u in suggested_users if getattr(u, 'id', None) not in existing_direct_user_ids]
+            except Exception:
+                pass
 
     context = {
         'conversation': conversation,
