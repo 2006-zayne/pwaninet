@@ -4,12 +4,12 @@
  * Pure DOM manipulation based on provided data
  */
 
-import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js?v=20261011-12';
-import { renderMessageStatus } from '../shared/message-status-renderer.js?v=20261011-12';
-import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js?v=20261011-12';
-import { EVENTS } from '../shared/constants.js?v=20261011-12';
-import { eventBus } from '../core/event-bus.js?v=20261011-12';
-import { deviceMediaStore } from '../core/device-media-store.js?v=20261011-12';
+import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js?v=20261011-16';
+import { renderMessageStatus } from '../shared/message-status-renderer.js?v=20261011-16';
+import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js?v=20261011-16';
+import { EVENTS } from '../shared/constants.js?v=20261011-16';
+import { eventBus } from '../core/event-bus.js?v=20261011-16';
+import { deviceMediaStore } from '../core/device-media-store.js?v=20261011-16';
 
 export class MessageRenderer {
     constructor() {
@@ -2397,10 +2397,11 @@ export class MessageRenderer {
         const attachmentType = metadata.type || message.attachment_type || (metadata.attachments && metadata.attachments[0] ? metadata.attachments[0].file_type : '') || (mediaUrl.match(/\.(mp4|webm|mov|ogg)$/i) ? 'video' : 'image');
         const caption = message.content || '';
         const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
-        const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
+        const isOwnMsg = this._isOwnMessage(message);
+        const isNotDownloaded = !isOwnMsg && !isUploading && !this._isMediaDownloaded(message.id);
 
         const bubble = document.createElement('div');
-        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-bubble single-media media-card-bubble group-${message.groupPosition}`;
+        bubble.className = `message-bubble ${isOwnMsg ? 'sent' : 'received'} media-bubble single-media media-card-bubble group-${message.groupPosition}`;
         if (isNotDownloaded) {
             bubble.classList.add('not-downloaded');
         }
@@ -2677,10 +2678,11 @@ export class MessageRenderer {
         const globalCaption = message.global_caption || message.metadata?.global_caption || '';
         const attachmentCount = attachments.length;
         const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
-        const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
+        const isOwnMsg = this._isOwnMessage(message);
+        const isNotDownloaded = !isOwnMsg && !isUploading && !this._isMediaDownloaded(message.id);
 
         const bubble = document.createElement('div');
-        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} media-bubble media-group media-card-bubble group-${message.groupPosition}`;
+        bubble.className = `message-bubble ${isOwnMsg ? 'sent' : 'received'} media-bubble media-group media-card-bubble group-${message.groupPosition}`;
         if (isNotDownloaded) {
             bubble.classList.add('not-downloaded');
         }
@@ -2874,10 +2876,6 @@ export class MessageRenderer {
                 file_url: url
             };
         }));
-    }
-
-        console.log('[MEDIA_GROUP] Media group bubble created');
-        return bubble;
     }
 
     /**
@@ -3653,14 +3651,28 @@ export class MessageRenderer {
     }
 
     /**
+     * Ownership with sender fallback. Store validation normally stamps
+     * isOwn, but any message arriving without it (history edge cases,
+     * direct WS payloads) must still classify the sender correctly —
+     * otherwise your own bubbles render as downloadable/received.
+     */
+    _isOwnMessage(message) {
+        if (!message) return false;
+        if (message.isOwn !== undefined) return Boolean(message.isOwn);
+        if (this.currentUserId === null || this.currentUserId === undefined) return false;
+        return Number(message.senderId) === Number(this.currentUserId);
+    }
+
+    /**
      * Render distinct voice note bubble with interactive waveform and speed toggle
      */
     renderVoiceNoteBubble(message, metadata = {}) {
         const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
-        const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
+        const isOwnMsg = this._isOwnMessage(message);
+        const isNotDownloaded = !isOwnMsg && !isUploading && !this._isMediaDownloaded(message.id);
 
         const bubble = document.createElement('div');
-        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} voice-note-bubble group-${message.groupPosition}`;
+        bubble.className = `message-bubble ${isOwnMsg ? 'sent' : 'received'} voice-note-bubble group-${message.groupPosition}`;
         if (isNotDownloaded) {
             bubble.classList.add('not-downloaded');
         }
@@ -3898,10 +3910,11 @@ export class MessageRenderer {
      */
     renderAudioTrackBubble(message, metadata = {}) {
         const isUploading = message.status === 'uploading' || message.status === 'sending' || message.isOptimistic;
-        const isNotDownloaded = !message.isOwn && !isUploading && !this._isMediaDownloaded(message.id);
+        const isOwnMsg = this._isOwnMessage(message);
+        const isNotDownloaded = !isOwnMsg && !isUploading && !this._isMediaDownloaded(message.id);
 
         const bubble = document.createElement('div');
-        bubble.className = `message-bubble ${message.isOwn ? 'sent' : 'received'} audio-track-bubble group-${message.groupPosition}`;
+        bubble.className = `message-bubble ${isOwnMsg ? 'sent' : 'received'} audio-track-bubble group-${message.groupPosition}`;
         if (isNotDownloaded) {
             bubble.classList.add('not-downloaded');
         }

@@ -4,10 +4,10 @@
  * Replaces inline JavaScript in templates
  */
 
-import { themeService } from './services/theme-service.js?v=20261011-12';
-import { emojiService } from './services/emoji-service.js?v=20261011-12';
-import { wallpaperService } from './services/wallpaper-service.js?v=20261011-12';
-import { showNotification } from '../../shared/utils/notification.js?v=20261011-12';
+import { themeService } from './services/theme-service.js?v=20261011-16';
+import { emojiService } from './services/emoji-service.js?v=20261011-16';
+import { wallpaperService } from './services/wallpaper-service.js?v=20261011-16';
+import { showNotification } from '../../shared/utils/notification.js?v=20261011-16';
 
 /**
  * Initialize messaging services

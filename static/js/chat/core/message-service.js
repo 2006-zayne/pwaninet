@@ -4,12 +4,12 @@
  * NO direct state mutations, NO UI updates, NO business logic
  */
 
-import { store } from './store.js?v=20261011-12';
-import { webSocketManager } from './websocket.js?v=20261011-12';
-import { eventBus } from './event-bus.js?v=20261011-12';
-import { getCSRFToken } from '../shared/utils.js?v=20261011-12';
-import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js?v=20261011-12';
-import { messageSoundManager } from '../shared/message-sound.js?v=20261011-12';
+import { store } from './store.js?v=20261011-16';
+import { webSocketManager } from './websocket.js?v=20261011-16';
+import { eventBus } from './event-bus.js?v=20261011-16';
+import { getCSRFToken } from '../shared/utils.js?v=20261011-16';
+import { EVENTS, MESSAGE_STATE, CONNECTION_STATE, isValidStateTransition } from '../shared/constants.js?v=20261011-16';
+import { messageSoundManager } from '../shared/message-sound.js?v=20261011-16';
 
 export class MessageService {
     constructor() {
@@ -1270,7 +1270,18 @@ export class MessageService {
         }
         
         const oldState = currentState.status;
-        
+
+        // Retry is user-initiated: always allow entering RETRYING from any
+        // non-terminal state (strict map lookups here blocked legitimate
+        // user taps, e.g. retry-while-stalled-upload).
+        if (newState === MESSAGE_STATE.RETRYING &&
+            ![MESSAGE_STATE.SENT, MESSAGE_STATE.DELIVERED, MESSAGE_STATE.READ].includes(oldState)) {
+            currentState.status = newState;
+            this.messageStates.set(tempId, currentState);
+            this._log('STATE_TRANSITION', { tempId, from: oldState, to: newState, error });
+            return;
+        }
+
         // Validate transition
         if (!isValidStateTransition(oldState, newState)) {
             console.error('[MESSAGE_SERVICE] Invalid state transition:', {
@@ -1646,16 +1657,15 @@ export class MessageService {
     async syncMissedMessages() {
         try {
             const state = store.getState();
-            const convId = state.activeConversationId || webSocketManager.conversationId;
+            const convId = state.conversationId || state.activeConversationId || webSocketManager.conversationId;
             if (!convId) return;
-            const res = await fetch(`/messaging/api/conversations/${convId}/messages/?limit=20`);
+            const res = await fetch(`/messaging/v1/messages/?conversation=${convId}&limit=20`);
             if (!res.ok) return;
             const data = await res.json();
             const msgs = data.results || data.messages || data;
             if (!Array.isArray(msgs)) return;
-            const { normalizeServerMessage } = await import('./message-normalizer.js?v=20261011-12').catch(() => ({}));
             for (const m of msgs) {
-                const canonical = normalizeServerMessage ? normalizeServerMessage(m) : m;
+                const canonical = this.normalizeServerMessage(m);
                 if (!store.getMessageById(String(canonical.id))) {
                     store.addMessage(canonical);
                     this._safeSendDeliveryAck(canonical);

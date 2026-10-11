@@ -2866,7 +2866,7 @@
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <div class="d-flex align-items-center gap-2 min-w-0">
                                 <a href="#" id="fsRailAuthorProfileLink" class="text-decoration-none flex-shrink-0">
-                                    <img src="/static/images/default_avatar.png" id="fsRailAuthorAvatar" class="rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="">
+                                    <img src="/static/images/default-avatar.png" id="fsRailAuthorAvatar" class="rounded-circle border" style="width: 44px; height: 44px; object-fit: cover;" alt="">
                                 </a>
                                 <div class="min-w-0">
                                     <div class="d-flex align-items-center gap-1">
@@ -5249,7 +5249,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
                 return '<div class="share-target-item" data-key="' + key + '" data-type="' + target.type + '" data-id="' + (target.id || '') + '" data-username="' + (target.username || '') + '">' +
                     '<div class="share-target-avatar-wrap">' +
-                        '<img src="' + escapeHtml(target.avatar || '/static/images/default_avatar.png') + '" alt="' + escapeHtml(target.name) + '" class="share-target-avatar" onerror="this.src=\'/static/images/default_avatar.png\'">' +
+                        '<img src="' + escapeHtml(target.avatar || '/static/images/default-avatar.png') + '" alt="' + escapeHtml(target.name) + '" class="share-target-avatar" onerror="this.src=\'/static/images/default-avatar.png\'">' +
                         badgeHtml +
                     '</div>' +
                     '<div class="share-target-name" title="' + escapeHtml(target.name) + '">' + escapeHtml(target.name) + '</div>' +

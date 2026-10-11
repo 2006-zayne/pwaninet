@@ -3,10 +3,10 @@
  * Manages background upload progress, retry logic, and optimistic messaging
  */
 
-import { EVENTS } from '../../shared/constants.js?v=20261011-12';
-import { eventBus } from '../../core/event-bus.js?v=20261011-12';
-import { ImageCompressor } from './ImageCompressor.js?v=20261011-12';
-import { deviceMediaStore } from '../../core/device-media-store.js?v=20261011-12';
+import { EVENTS } from '../../shared/constants.js?v=20261011-16';
+import { eventBus } from '../../core/event-bus.js?v=20261011-16';
+import { ImageCompressor } from './ImageCompressor.js?v=20261011-16';
+import { deviceMediaStore } from '../../core/device-media-store.js?v=20261011-16';
 
 export class UploadQueue {
     constructor(composer) {

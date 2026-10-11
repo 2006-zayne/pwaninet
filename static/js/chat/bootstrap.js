@@ -4,18 +4,18 @@
  * Supports HTMX partial swaps and continuous conversation switching without full-page reload
  */
 
-import { appController } from './core/app-controller.js?v=20261011-12';
-import { messageService } from './core/message-service.js?v=20261011-12';
-import { webSocketManager } from './core/websocket.js?v=20261011-12';
-import { store } from './core/store.js?v=20261011-12';
-import { uiController } from './ui/ui-controller.js?v=20261011-12';
-import { attachmentService } from './features/attachments/attachment.service.js?v=20261011-12';
-import { attachmentUI } from './features/attachments/attachment-ui.js?v=20261011-12';
-import { cameraService } from './features/camera/camera.service.js?v=20261011-12';
-import { voiceService } from './features/voice/voice.service.js?v=20261011-12';
-import { voiceModalController } from './features/voice/voice-modal-controller.js?v=20261011-12';
-import { emojiService } from './features/emoji/emoji.service.js?v=20261011-12';
-import { contextMenuService } from './features/context-menu/context-menu.service.js?v=20261011-12';
+import { appController } from './core/app-controller.js?v=20261011-16';
+import { messageService } from './core/message-service.js?v=20261011-16';
+import { webSocketManager } from './core/websocket.js?v=20261011-16';
+import { store } from './core/store.js?v=20261011-16';
+import { uiController } from './ui/ui-controller.js?v=20261011-16';
+import { attachmentService } from './features/attachments/attachment.service.js?v=20261011-16';
+import { attachmentUI } from './features/attachments/attachment-ui.js?v=20261011-16';
+import { cameraService } from './features/camera/camera.service.js?v=20261011-16';
+import { voiceService } from './features/voice/voice.service.js?v=20261011-16';
+import { voiceModalController } from './features/voice/voice-modal-controller.js?v=20261011-16';
+import { emojiService } from './features/emoji/emoji.service.js?v=20261011-16';
+import { contextMenuService } from './features/context-menu/context-menu.service.js?v=20261011-16';
 
 // Load encryption module if available
 if (typeof E2EEncryption === 'undefined') {

@@ -6,7 +6,7 @@
  * Supports multiple images, videos, mixed media, and documents.
  */
 
-import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-12';
+import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-16';
 
 class PreviewResult {
     constructor(file, url, type, metadata = {}) {

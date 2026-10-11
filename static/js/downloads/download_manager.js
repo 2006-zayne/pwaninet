@@ -7,8 +7,8 @@
  *   - Offline media streaming source resolver (Capacitor.convertFileSrc vs Blob URL)
  */
 
-import { downloadStorage } from './download_storage.js?v=20261011-12';
-import { downloadQueue, DownloadStatus } from './download_queue.js?v=20261011-12';
+import { downloadStorage } from './download_storage.js?v=20261011-16';
+import { downloadQueue, DownloadStatus } from './download_queue.js?v=20261011-16';
 
 class DownloadManager {
     constructor() {

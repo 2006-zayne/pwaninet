@@ -25,7 +25,12 @@
       document.body.classList.add('messaging-left-collapsed');
     }
     const convId = '{{ conversation.id|default:"" }}';
-    if (!convId && (window.innerWidth < 992 || window.matchMedia('(max-width: 991.98px)').matches)) {
+    // Small screens go to the mobile list — but ONLY on mobile UAs. A
+    // desktop UA always gets the three-panel template back (the server
+    // ignores ?view=list on desktop), so redirecting unconditionally would
+    // ping-pong detail -> list -> detail forever on narrow desktop windows.
+    if (!convId && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '') &&
+        (window.innerWidth < 992 || window.matchMedia('(max-width: 991.98px)').matches)) {
       window.location.replace('/messaging/?view=list');
     }
     let themeToApply = null;
@@ -1438,7 +1443,7 @@
 
 <script src="{% static 'js/encryption.js' %}"></script>
 <script src="{% static 'js/messaging/offline-cache.js' %}?v=48"></script>
-<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=20261011-12"></script>
+<script type="module" src="{% static 'js/chat/bootstrap.js' %}?v=20261011-16"></script>
 <script src="{% static 'js/chat-theme-handler.js' %}?v=29"></script>
 <script src="{% static 'js/messaging/start-conversation.js' %}?v=2"></script>
 
@@ -1553,6 +1558,7 @@
         });
       }
     });
+  })();
   // Mobile Navigation: Seamless Instant Switch between List & Chat with ZERO Full Page Reload
   (function() {
     function setMobileChatActive(active) {

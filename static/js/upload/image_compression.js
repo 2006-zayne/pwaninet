@@ -6,8 +6,8 @@
  * Videos, documents, and PDFs are NOT compressed.
  */
 
-import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-12';
-import { previewManager } from './preview_manager.js?v=20261011-12';
+import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-16';
+import { previewManager } from './preview_manager.js?v=20261011-16';
 
 // Compression configuration
 const COMPRESSION_CONFIG = {
