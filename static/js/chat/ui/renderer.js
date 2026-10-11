@@ -4,12 +4,12 @@
  * Pure DOM manipulation based on provided data
  */
 
-import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js';
-import { renderMessageStatus } from '../shared/message-status-renderer.js';
-import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js';
-import { EVENTS } from '../shared/constants.js';
-import { eventBus } from '../core/event-bus.js';
-import { deviceMediaStore } from '../core/device-media-store.js';
+import { formatDateLabel, formatTime, formatPreciseTime, escapeHtml } from '../shared/utils.js?v=20261011-6';
+import { renderMessageStatus } from '../shared/message-status-renderer.js?v=20261011-6';
+import { linkPreviewRenderer } from '../features/link-preview/link-preview-renderer.js?v=20261011-6';
+import { EVENTS } from '../shared/constants.js?v=20261011-6';
+import { eventBus } from '../core/event-bus.js?v=20261011-6';
+import { deviceMediaStore } from '../core/device-media-store.js?v=20261011-6';
 
 export class MessageRenderer {
     constructor() {

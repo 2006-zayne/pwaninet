@@ -12,7 +12,7 @@
  * Exposes progress events for UI to consume.
  */
 
-import { uploadEvents, UploadEventNames } from './upload_events.js';
+import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-6';
 
 class ProgressTracker {
     constructor(uploadId) {

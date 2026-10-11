@@ -6,15 +6,15 @@
  * preview cleanup, and UploadAPI communication.
  */
 
-import { uploadEvents, UploadEventNames } from './upload_events.js';
-import { UploadState, stateMachineFactory } from './upload_state_machine.js';
-import { UploadValidator } from './upload_validator.js';
-import { ImageCompressor } from './image_compression.js';
-import { previewManager } from './preview_manager.js';
-import { uploadAPI } from './upload_api.js';
-import { uploadQueue } from './upload_queue.js';
-import { progressManager } from './upload_progress.js';
-import { UploadSession } from './upload_session.js';
+import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-6';
+import { UploadState, stateMachineFactory } from './upload_state_machine.js?v=20261011-6';
+import { UploadValidator } from './upload_validator.js?v=20261011-6';
+import { ImageCompressor } from './image_compression.js?v=20261011-6';
+import { previewManager } from './preview_manager.js?v=20261011-6';
+import { uploadAPI } from './upload_api.js?v=20261011-6';
+import { uploadQueue } from './upload_queue.js?v=20261011-6';
+import { progressManager } from './upload_progress.js?v=20261011-6';
+import { UploadSession } from './upload_session.js?v=20261011-6';
 
 class UploadManager {
     constructor() {

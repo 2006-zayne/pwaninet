@@ -4,18 +4,18 @@
  * Supports HTMX partial swaps and continuous conversation switching without full-page reload
  */
 
-import { appController } from './core/app-controller.js';
-import { messageService } from './core/message-service.js';
-import { webSocketManager } from './core/websocket.js';
-import { store } from './core/store.js';
-import { uiController } from './ui/ui-controller.js';
-import { attachmentService } from './features/attachments/attachment.service.js';
-import { attachmentUI } from './features/attachments/attachment-ui.js';
-import { cameraService } from './features/camera/camera.service.js';
-import { voiceService } from './features/voice/voice.service.js';
-import { voiceModalController } from './features/voice/voice-modal-controller.js';
-import { emojiService } from './features/emoji/emoji.service.js';
-import { contextMenuService } from './features/context-menu/context-menu.service.js';
+import { appController } from './core/app-controller.js?v=20261011-6';
+import { messageService } from './core/message-service.js?v=20261011-6';
+import { webSocketManager } from './core/websocket.js?v=20261011-6';
+import { store } from './core/store.js?v=20261011-6';
+import { uiController } from './ui/ui-controller.js?v=20261011-6';
+import { attachmentService } from './features/attachments/attachment.service.js?v=20261011-6';
+import { attachmentUI } from './features/attachments/attachment-ui.js?v=20261011-6';
+import { cameraService } from './features/camera/camera.service.js?v=20261011-6';
+import { voiceService } from './features/voice/voice.service.js?v=20261011-6';
+import { voiceModalController } from './features/voice/voice-modal-controller.js?v=20261011-6';
+import { emojiService } from './features/emoji/emoji.service.js?v=20261011-6';
+import { contextMenuService } from './features/context-menu/context-menu.service.js?v=20261011-6';
 
 // Load encryption module if available
 if (typeof E2EEncryption === 'undefined') {

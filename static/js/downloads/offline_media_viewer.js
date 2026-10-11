@@ -23,14 +23,14 @@
 
         if (!dm || !ds) {
             try {
-                const modManager = await import('/static/js/downloads/download_manager.js');
+                const modManager = await import('/static/js/downloads/download_manager.js?v=20261011-6');
                 dm = modManager.downloadManager;
                 window.downloadManager = dm;
             } catch (e) {
                 console.warn('[OfflineMedia] Dynamic import of download_manager failed:', e);
             }
             try {
-                const modStorage = await import('/static/js/downloads/download_storage.js');
+                const modStorage = await import('/static/js/downloads/download_storage.js?v=20261011-6');
                 ds = modStorage.downloadStorage;
                 window.downloadStorage = ds;
             } catch (e) {

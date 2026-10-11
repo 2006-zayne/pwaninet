@@ -3,9 +3,9 @@
  * Pure service layer for context menu logic
  */
 
-import { EVENTS } from '../../shared/constants.js';
-import { eventBus } from '../../core/event-bus.js';
-import { store } from '../../core/store.js';
+import { EVENTS } from '../../shared/constants.js?v=20261011-6';
+import { eventBus } from '../../core/event-bus.js?v=20261011-6';
+import { store } from '../../core/store.js?v=20261011-6';
 
 export class ContextMenuService {
   constructor() {

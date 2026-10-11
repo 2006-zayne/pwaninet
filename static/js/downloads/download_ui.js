@@ -4,8 +4,8 @@
  * Stacks intelligently above the upload banner if both are active.
  */
 
-import { downloadQueue, DownloadStatus } from './download_queue.js';
-import { downloadStorage } from './download_storage.js';
+import { downloadQueue, DownloadStatus } from './download_queue.js?v=20261011-6';
+import { downloadStorage } from './download_storage.js?v=20261011-6';
 
 class DownloadUI {
     constructor() {

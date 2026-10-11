@@ -3,14 +3,14 @@
  * Enforces: websocket → message-service → store → ui-controller → renderer
  */
 
-import { appController } from './app-controller.js';
-import { messageService } from './message-service.js';
-import { webSocketManager } from './websocket.js';
-import { store } from './store.js';
-import { uiController } from '../ui/ui-controller.js';
-import { voiceService } from '../features/voice/voice.service.js';
-import { attachmentUI } from '../features/attachments/attachment-ui.js';
-import { contextMenuService } from '../features/context-menu/context-menu.service.js';
+import { appController } from './app-controller.js?v=20261011-6';
+import { messageService } from './message-service.js?v=20261011-6';
+import { webSocketManager } from './websocket.js?v=20261011-6';
+import { store } from './store.js?v=20261011-6';
+import { uiController } from '../ui/ui-controller.js?v=20261011-6';
+import { voiceService } from '../features/voice/voice.service.js?v=20261011-6';
+import { attachmentUI } from '../features/attachments/attachment-ui.js?v=20261011-6';
+import { contextMenuService } from '../features/context-menu/context-menu.service.js?v=20261011-6';
 
 // Load encryption module if available
 if (typeof E2EEncryption === 'undefined') {

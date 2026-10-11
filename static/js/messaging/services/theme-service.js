@@ -3,7 +3,7 @@
  * Manages chat theme functionality including loading, saving, and applying themes
  */
 
-import { messagingAPI } from '../../shared/api/messaging-api.js';
+import { messagingAPI } from '../../shared/api/messaging-api.js?v=20261011-6';
 
 export class ThemeService {
   constructor() {

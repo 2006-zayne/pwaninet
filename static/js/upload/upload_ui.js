@@ -7,9 +7,9 @@
  * No alert dialogs or blocking modals.
  */
 
-import { uploadEvents, UploadEventNames } from './upload_events.js';
-import { UploadState } from './upload_state_machine.js';
-import { uploadManager } from './upload_manager.js';
+import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-6';
+import { UploadState } from './upload_state_machine.js?v=20261011-6';
+import { uploadManager } from './upload_manager.js?v=20261011-6';
 
 class UploadBanner {
     constructor() {

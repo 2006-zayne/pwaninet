@@ -3,11 +3,11 @@
  * Verifies strict Single Source of Truth with canonical schema
  */
 
-import { store, MESSAGE_SCHEMA } from './store.js';
-import { messageService } from './message-service.js';
-import { webSocketManager } from './websocket.js';
-import { uiController } from '../ui/ui-controller.js';
-import { appController } from './app-controller.js';
+import { store, MESSAGE_SCHEMA } from './store.js?v=20261011-6';
+import { messageService } from './message-service.js?v=20261011-6';
+import { webSocketManager } from './websocket.js?v=20261011-6';
+import { uiController } from '../ui/ui-controller.js?v=20261011-6';
+import { appController } from './app-controller.js?v=20261011-6';
 
 export class SOTTest {
     constructor() {
@@ -319,7 +319,7 @@ export class SOTTest {
             let passed = true;
 
             // Test event bus validation
-            const { eventBus } = await import('./event-bus.js');
+            const { eventBus } = await import('./event-bus.js?v=20261011-6');
             
             // Try forbidden event patterns (should throw error)
             const forbiddenEvents = ['message', 'state', 'store', 'websocket', 'connection'];

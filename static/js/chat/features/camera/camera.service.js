@@ -3,8 +3,8 @@
  * Pure service layer, no DOM manipulation
  */
 
-import { EVENTS } from '../../shared/constants.js';
-import { eventBus } from '../../core/event-bus.js';
+import { EVENTS } from '../../shared/constants.js?v=20261011-6';
+import { eventBus } from '../../core/event-bus.js?v=20261011-6';
 
 export class CameraService {
   constructor() {

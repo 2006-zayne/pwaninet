@@ -1330,22 +1330,32 @@ class ChatNotificationService:
     # ------------------------------------------------------------------
     # 6. Async Wrappers for WebSocket Consumers (`ChatConsumer`)
     # ------------------------------------------------------------------
+    # NOTE: plain @staticmethods, NOT `database_sync_to_async(lambda...)`
+    # class attributes. SyncToAsync implements __get__, so class-level
+    # wrappers silently inject an extra first arg (None) and every call
+    # dies with "takes N positional arguments but N+1 were given",
+    # killing the consumer handler mid-receive.
 
-    notify_new_message_async = database_sync_to_async(
-        lambda message: ChatNotificationService.notify_new_message(message)
-    )
-    notify_reaction_async = database_sync_to_async(
-        lambda message, reactor, emoji: ChatNotificationService.notify_reaction(message, reactor, emoji)
-    )
-    notify_message_deleted_async = database_sync_to_async(
-        lambda message, actor: ChatNotificationService.notify_message_deleted(message, actor)
-    )
-    notify_message_edited_async = database_sync_to_async(
-        lambda message, actor: ChatNotificationService.notify_message_edited(message, actor)
-    )
-    notify_read_receipt_async = database_sync_to_async(
-        lambda conversation_id, reader_user: ChatNotificationService.notify_read_receipt(conversation_id, reader_user)
-    )
-    notify_member_added_async = database_sync_to_async(
-        lambda conversation, added_user, actor=None: ChatNotificationService.notify_member_added(conversation, added_user, actor)
-    )
+    @staticmethod
+    async def notify_new_message_async(message):
+        await database_sync_to_async(ChatNotificationService.notify_new_message)(message)
+
+    @staticmethod
+    async def notify_reaction_async(message, reactor, emoji):
+        await database_sync_to_async(ChatNotificationService.notify_reaction)(message, reactor, emoji)
+
+    @staticmethod
+    async def notify_message_deleted_async(message, actor):
+        await database_sync_to_async(ChatNotificationService.notify_message_deleted)(message, actor)
+
+    @staticmethod
+    async def notify_message_edited_async(message, actor):
+        await database_sync_to_async(ChatNotificationService.notify_message_edited)(message, actor)
+
+    @staticmethod
+    async def notify_read_receipt_async(conversation_id, reader_user):
+        await database_sync_to_async(ChatNotificationService.notify_read_receipt)(conversation_id, reader_user)
+
+    @staticmethod
+    async def notify_member_added_async(conversation, added_user, actor=None):
+        await database_sync_to_async(ChatNotificationService.notify_member_added)(conversation, added_user, actor)
