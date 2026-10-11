@@ -12,6 +12,7 @@ from pwanimate.tools.domain.notifications import NotificationSummaryTool
 from pwanimate.tools.domain.people import PeopleDiscoveryTool
 from pwanimate.tools.domain.extra import LocalTimeTool, ContentSearchTool, SendNotificationTool
 from pwanimate.tools.domain.web_search import WebSearchTool
+from pwanimate.tools.domain.site_info import SiteInfoTool
 
 __all__ = [
     "AcademicLookupTool",
@@ -21,4 +22,5 @@ __all__ = [
     "NotificationSummaryTool",
     "PeopleDiscoveryTool",
     "LocalTimeTool", "ContentSearchTool", "SendNotificationTool", "WebSearchTool",
+    "SiteInfoTool",
 ]

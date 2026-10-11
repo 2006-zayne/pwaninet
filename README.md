@@ -1,8 +1,6 @@
 # PwaniNet
 
-PwaniNet is a Django-based student community and learning-resource platform for students at Pwani University. It brings together student profiles and connections, a social feed, groups, an academic document repository, an AI assistant (Pwanimate), notifications, unified search, recommendations, and a Progressive Web App (PWA) experience. An Android wrapper built with Capacitor is also included.
-
-Direct messaging is currently frozen behind application gates.
+PwaniNet is a Django-based student community and learning-resource platform for students at Pwani University. It brings together student profiles and connections, a social feed, groups, direct messaging, an academic document repository, an AI assistant (Pwanimate), notifications, unified search, recommendations, and a Progressive Web App (PWA) experience. An Android wrapper built with Capacitor is also included.
 
 ## Table of contents
 
@@ -28,6 +26,12 @@ Direct messaging is currently frozen behind application gates.
 - Group admins can pin announcements (normal, important, or urgent), share resources, and manage membership roles (admin, moderator, delegate, member)
 - Each group has its own messaging with text, media, and system messages, plus photo likes
 - Automatic group creation for courses, programmes, and academic levels
+
+### Messaging
+
+- Direct 1:1 and group conversations with real-time delivery over WebSockets
+- Message attachments (images, files), reactions, link previews, and conversation themes
+- Unread counts, media gallery per conversation, and user search for starting chats
 
 ### Academic documents
 
@@ -246,7 +250,7 @@ pwaninet/
 ├── recommendations/           # Recommendation engine
 ├── realtime/                  # WebSocket consumers
 ├── admin_dashboard/           # Admin panel and feedback
-├── messaging/                 # Group messaging (direct messaging frozen)
+├── messaging/                 # Direct and group messaging (conversations, attachments, reactions, themes)
 ├── templates/                 # Global Django templates
 │   └── legal/                 # About, Privacy, Licenses, Pwanimate pages
 ├── static/                    # Source frontend assets
@@ -273,7 +277,6 @@ pwaninet/
 - The production Dockerfile starts Daphne (ASGI). Gunicorn is available as a WSGI option but not currently used in the Dockerfile.
 - Pwanimate uses pgvector for semantic search. The PostgreSQL Docker image includes the pgvector extension.
 - AI features require provider API keys. Without keys, Pwanimate falls back to a mock provider for development and testing.
-- Direct messaging is frozen. URL gates return disabled behaviour. Do not describe it as a launch feature.
 - PwaniNet is an independent project. It is not an official Pwani University service or assignment unless confirmed in writing.
 
 For detailed setup instructions, see the [developer guide](docs/developer-guide.md).
