@@ -1622,6 +1622,9 @@ body.keyboard-open .pwanimate-composer-wrapper {
 .pwanimate-textarea::placeholder {
     color: var(--pwanimate-muted);
     opacity: 0.85;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 .pwanimate-composer-action-row {

@@ -1,20 +1,12 @@
 {% load static %}
 {% load i18n %}
 <div class="container d-flex justify-content-between align-items-center">
-    <div class="d-flex align-items-center gap-2 min-w-0">
+    <div class="d-flex align-items-center">
         <!-- Pwanimate Brand -->
-        <a class="nav-brand-tactical d-flex align-items-center text-decoration-none flex-shrink-0" href="{% url 'pwanimate:index' %}" data-bypass-htmx="true" hx-boost="false">
+        <a class="nav-brand-tactical d-flex align-items-center text-decoration-none" href="{% url 'pwanimate:index' %}" data-bypass-htmx="true" hx-boost="false">
             <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" alt="Pwanimate" style="width: 32px; height: 32px; object-fit: contain; margin-right: 8px;">
             <span>PWANI<span class="brand-net">MATE</span></span>
         </a>
-        <span class="pwanimate-header-study-sep" aria-hidden="true">·</span>
-        <button type="button"
-                class="pwanimate-header-study-text {% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}active is-active{% endif %}"
-                id="pwanimateStudyModeToggleBtn"
-                aria-pressed="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}true{% else %}false{% endif %}"
-                title="{% trans 'Toggle Study Mode (@study)' %}">
-            <span id="pwanimateHeaderStudyModeLabel">{% trans "Study Mode" %}</span>
-        </button>
     </div>
     
     <!-- Mobile Header Content (Aligned to d-xl-none to match left rail d-none d-xl-block) -->

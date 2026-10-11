@@ -319,8 +319,8 @@
             }
             if (this.input) {
                 this.input.placeholder = this.studyModeActive
-                    ? 'Study Mode: Ask a question or type @study <topic>...'
-                    : 'Ask Pwanimate anything... (Tip: type @study for Study Mode)';
+                    ? 'Ask a study question...'
+                    : 'Ask Pwanimate anything...';
             }
 
             const banner = document.getElementById('pwanimate-study-session-banner');

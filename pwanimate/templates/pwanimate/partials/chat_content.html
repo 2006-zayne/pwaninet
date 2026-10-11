@@ -791,7 +791,7 @@
                     <textarea id="pwanimate-input"
                               class="pwanimate-textarea"
                               rows="1"
-                              placeholder="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}{% trans 'Study Mode: Ask a question or type @study <topic>...' %}{% else %}{% trans 'Ask Pwanimate anything... (Tip: type @study for Study Mode)' %}{% endif %}"
+                              placeholder="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}{% trans 'Ask a study question...' %}{% else %}{% trans 'Ask Pwanimate anything...' %}{% endif %}"
                               aria-label="{% trans 'Message Pwanimate' %}">{{ initial_prompt }}</textarea>
                 </div>
                 <div class="pwanimate-composer-action-row">
@@ -1172,7 +1172,7 @@
             scriptsToLoad.push("{% static 'documents/js/document-viewer.js' %}");
         }
         if (typeof window.initPwanimate !== 'function') {
-            scriptsToLoad.push("{% static 'js/pwanimate/pwanimate-chat.js' %}?v={{ pwanimate_version|default:'2.0.0' }}-20261011-1");
+            scriptsToLoad.push("{% static 'js/pwanimate/pwanimate-chat.js' %}?v={{ pwanimate_version|default:'2.0.0' }}-20261011-2");
         }
 
         function loadNext() {
