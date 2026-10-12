@@ -151,11 +151,11 @@ class DocumentChunk(models.Model):
                 name='pwanimate_chunk_version_index_uniq'
             ),
             models.CheckConstraint(
-                check=models.Q(chunk_index__gte=0),
+                condition=models.Q(chunk_index__gte=0),
                 name='pwanimate_chunk_index_non_negative'
             ),
             models.CheckConstraint(
-                check=~models.Q(content=''),
+                condition=~models.Q(content=''),
                 name='pwanimate_chunk_content_not_empty'
             ),
         ]
@@ -765,4 +765,3 @@ class PwanimateStudyCheckpoint(models.Model):
 
     def __str__(self):
         return f"Checkpoint for {self.session_id} (up_to_msg={self.up_to_message_id})"
-
