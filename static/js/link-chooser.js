@@ -2,7 +2,7 @@
  * vasto Smart Outside-Link Chooser
  * Activates when an external link (e.g. from WhatsApp) is opened in an Android mobile browser.
  * Presents options:
- *   1. Native App (com.pwaninet.app)
+ *   1. Native App (com.vasto.app)
  *   2. PWA (Progressive Web App)
  *   3. Chrome (Browser - continue reading)
  */
@@ -42,7 +42,7 @@
         if (document.getElementById('vasto-link-chooser-sheet')) return;
 
         const currentPath = window.location.pathname + window.location.search;
-        const nativeIntentUrl = `intent://pwaninet.app${currentPath}#Intent;scheme=https;package=com.pwaninet.app;end`;
+        const nativeIntentUrl = `intent://pwaninet.app${currentPath}#Intent;scheme=https;package=com.vasto.app;end`;
 
         const sheet = document.createElement('div');
         sheet.id = 'vasto-link-chooser-sheet';

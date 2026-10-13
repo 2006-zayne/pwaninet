@@ -9,7 +9,7 @@
     tools:context="com.getcapacitor.BridgeActivity"
     >
 
-    <com.pwaninet.app.PwaninetWebView
+    <com.vasto.app.PwaninetWebView
         android:id="@+id/webview"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent" />

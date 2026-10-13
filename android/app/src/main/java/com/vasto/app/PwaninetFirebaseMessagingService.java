@@ -1,4 +1,4 @@
-package com.pwaninet.app;
+package com.vasto.app;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;

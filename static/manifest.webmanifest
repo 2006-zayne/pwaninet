@@ -127,7 +127,7 @@
   "related_applications": [
     {
       "platform": "play",
-      "id": "com.pwaninet.app",
+      "id": "com.vasto.app",
       "url": "https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk"
     }
   ],
