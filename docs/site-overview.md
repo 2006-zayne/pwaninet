@@ -1,8 +1,10 @@
-# PwaniNet Site Overview
+# vasto Site Overview
 
-## What PwaniNet is
+## What vasto is
 
-PwaniNet is a student-focused web application built with Django. It brings together student profiles and connections, posts and groups, academic programme data, a document repository, notifications, and the Pwanimate assistant. The site also has a Progressive Web App experience and an Android wrapper built with Capacitor.
+vasto is a student-focused web application built with Django. It brings together student profiles and connections, posts and groups, academic programme data, a document repository, notifications, and the Spark assistant (formerly Pwanimate). The site also has a Progressive Web App experience and an Android wrapper built with Capacitor.
+
+Vasto was formerly known as Pwaninet. The service domain (pwaninet.app), app identifiers, and technical references may still use the previous name; they refer to the same service.
 
 The project aims to address student updates and discussions being spread across separate channels, difficulty discovering relevant study resources, and difficulty connecting with peers around shared academic interests. These are the product's intended pain points and should be validated with student feedback before being presented as research findings.
 
@@ -15,7 +17,7 @@ The project is an independent personal project. It is not an official Pwani Univ
 3. Users can publish posts, images, comments, reactions, and reposts, with visibility and group-related features governed by the app.
 4. Users can find or share academic documents, browse academic classifications, request resources, bookmark and download available items, and report content.
 5. Notifications surface social, group, document, and service events. Browser or native push is available when configured and enabled by the user.
-6. Search and recommendation components help users find people and content. Pwanimate provides an assistant experience inside the same Django site. Its custom orchestration layer assembles student context, searches the document knowledge base, and can call site tools before requesting a response from a configured AI provider. Provider availability and data routing depend on environment settings.
+6. Search and recommendation components help users find people and content. Spark (formerly Pwanimate) provides an assistant experience inside the same Django site. Its custom orchestration layer assembles student context, searches the document knowledge base, and can call site tools before requesting a response from a configured AI provider. Provider availability and data routing depend on environment settings.
 
 Direct messaging code and data models remain in the repository, but direct messaging is frozen for now. URL gates return frozen/disabled behavior in current flows. Do not describe it as a launch feature unless that gate has been deliberately changed and reviewed.
 
@@ -33,7 +35,7 @@ Direct messaging code and data models remain in the repository, but direct messa
 | Mobile wrapper | Capacitor Android project in `android/` |
 | WSGI option | Gunicorn is in Python dependencies; confirm deployment command before treating it as the production server |
 
-The project settings live in `pwaninet/settings/`. `pwaninet/asgi.py` routes HTTP requests to Django and WebSocket requests through Channels; the shared WebSocket consumers are in `realtime/`. `pwaninet/celery.py` configures task discovery. The root URL configuration mounts the installed apps and project-level endpoints. Much of the site navigation uses HTMX to fetch and swap page sections while Django templates remain the server-rendered source of content. Pwanimate uses a custom browser rendering layer for assistant responses.
+The project settings live in `vasto/settings/`. `vasto/asgi.py` routes HTTP requests to Django and WebSocket requests through Channels; the shared WebSocket consumers are in `realtime/`. `vasto/celery.py` configures task discovery. The root URL configuration mounts the installed apps and project-level endpoints. Much of the site navigation uses HTMX to fetch and swap page sections while Django templates remain the server-rendered source of content. Spark uses a custom browser rendering layer for assistant responses.
 
 ## App map
 
@@ -45,7 +47,7 @@ The project settings live in `pwaninet/settings/`. `pwaninet/asgi.py` routes HTT
 - `notifications`: notification events, preferences, delivery, and push subscriptions.
 - `search`: cross-site search views and suggestions.
 - `recommendations`: recommendation and ranking services consumed by other experiences.
-- `pwanimate`: assistant conversations, retrieval/chunks, attachments, and provider integrations.
+- `pwanimate`: Spark assistant conversations, retrieval/chunks, attachments, and provider integrations (module name retained for compatibility).
 - `releases`: release notes and version information.
 - `admin_dashboard`: internal dashboard and feedback handling.
 - `messaging`: frozen direct-messaging feature code; preserve it while the feature is disabled.
@@ -53,7 +55,7 @@ The project settings live in `pwaninet/settings/`. `pwaninet/asgi.py` routes HTT
 
 See [the app guides](apps/README.md) for code locations and more detail.
 
-For a learner-friendly walkthrough of the site boundaries, important dependencies, and the Pwanimate request lifecycle, start with the [site owner guide](site-owner-guide.md).
+For a learner-friendly walkthrough of the site boundaries, important dependencies, and the Spark request lifecycle, start with the [site owner guide](site-owner-guide.md).
 
 ## Data and files
 

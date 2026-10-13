@@ -1,5 +1,5 @@
 """
-Delivery Adapters for PwaniNet Notification Engine v2
+Delivery Adapters for vasto Notification Engine v2
 
 This module provides delivery adapters for different communication channels.
 Following Chapter 9 of the specification.
@@ -316,7 +316,7 @@ class PushAdapter(DeliveryAdapter):
         if not rich_body:
             rich_body = notification.summary or notification.title or "You have a new notification"
 
-        title = "PwaniNet"
+        title = "vasto"
 
         # 2. Resolve Actor Avatar / Icon
         actor_avatar = None
@@ -442,16 +442,16 @@ class PushAdapter(DeliveryAdapter):
         # 5. Smart Tagging & Grouping
         # Collapse related notifications together to avoid notification flooding
         if notification.aggregation_key:
-            tag = f"pwaninet-{notification.aggregation_key}"
+            tag = f"vasto-{notification.aggregation_key}"
         elif notification.context_type and notification.context_id:
-            tag = f"pwaninet-{str(notification.context_type).lower()}-{notification.context_id}"
+            tag = f"vasto-{str(notification.context_type).lower()}-{notification.context_id}"
         else:
             cat_str = str(notification.category).lower() if notification.category else "general"
             type_str = str(notification.notification_type).lower() if notification.notification_type else "alert"
-            tag = f"pwaninet-{cat_str}-{type_str}"
+            tag = f"vasto-{cat_str}-{type_str}"
 
         # 6. Android Notification Channel (unified channel matching native-app.js)
-        channel_id = 'pwaninet_notifications'
+        channel_id = 'vasto_notifications'
 
         return {
             'title': title,
@@ -490,7 +490,7 @@ class PushAdapter(DeliveryAdapter):
             'body': content['body'],
             'icon': content['icon'],
             'image': content.get('image'),
-            'badge': self._make_absolute_url('/static/images/pwaninetmonochrome.png'),
+            'badge': self._make_absolute_url('/static/images/vastomonochrome.png'),
             'vibrate': [200, 100, 200],
             'requireInteraction': False,
             'tag': content['tag'],
@@ -563,20 +563,20 @@ class PushAdapter(DeliveryAdapter):
             from firebase_admin import messaging
 
             fcm_data = {
-                "title": str(content.get('title') or 'PwaniNet'),
+                "title": str(content.get('title') or 'vasto'),
                 "body": str(content.get('body') or ''),
                 "url": str(content.get('target_url') or '/'),
                 "destination_url": str(content.get('destination_url') or content.get('target_url') or '/'),
                 "notification_id": str(notification.notification_id),
                 "notification_type": str(notification.notification_type),
                 "category": str(notification.category or ''),
-                "icon": "ic_stat_pwaninet",
+                "icon": "ic_stat_vasto",
                 "avatar_url": str(content.get('icon') or ''),
                 "image": str(content.get('image') or ''),
                 "resource_type": str(content.get('resource_type') or ''),
                 "resource_title": str(content.get('resource_title') or ''),
-                "channel_id": str(content.get('channel_id') or 'pwaninet_notifications'),
-                "tag": str(content.get('tag') or f"pwaninet-{notification.notification_id}"),
+                "channel_id": str(content.get('channel_id') or 'vasto_notifications'),
+                "tag": str(content.get('tag') or f"vasto-{notification.notification_id}"),
                 "color": "#2563eb",
             }
 
@@ -584,7 +584,7 @@ class PushAdapter(DeliveryAdapter):
 
             if is_android:
                 # For Android Native, dispatch high-priority data message.
-                # This guarantees PwaninetFirebaseMessagingService runs across all lifecycle states
+                # This guarantees vastoFirebaseMessagingService runs across all lifecycle states
                 # (Foreground, Background, and Terminated), downloading the actor avatar as largeIcon (circular)
                 # and media thumbnail as BigPictureStyle, while preventing Google Play Services from double-posting.
                 message = messaging.Message(
@@ -602,9 +602,9 @@ class PushAdapter(DeliveryAdapter):
                 }
 
                 android_notif_kwargs = {
-                    'icon': 'ic_stat_pwaninet',
-                    'channel_id': content.get('channel_id') or 'pwaninet_notifications',
-                    'tag': content.get('tag') or f"pwaninet-{notification.notification_id}",
+                    'icon': 'ic_stat_vasto',
+                    'channel_id': content.get('channel_id') or 'vasto_notifications',
+                    'tag': content.get('tag') or f"vasto-{notification.notification_id}",
                     'color': '#2563eb',
                     'default_sound': True,
                     'default_vibrate_timings': True,

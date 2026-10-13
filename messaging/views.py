@@ -785,7 +785,7 @@ def conversation_detail(request, conversation_id):
 
     # Determine partner user for direct conversations using already-prefetched members
     partner_user = None
-    partner_relationship = 'Connected on PwaniNet'
+    partner_relationship = 'Connected on vasto'
     if conversation.type == 'direct':
         partner_member = next((m for m in conversation.members.all() if m.user_id != request.user.id), None)
         if partner_member:

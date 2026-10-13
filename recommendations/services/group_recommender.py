@@ -1,6 +1,6 @@
 """
 Group Recommendation Service.
-Multi-tier ranking engine for discovering groups on PwaniNet (Feed, Dashboard, Onboarding).
+Multi-tier ranking engine for discovering groups on vasto (Feed, Dashboard, Onboarding).
 """
 
 import logging

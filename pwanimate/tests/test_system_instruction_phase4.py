@@ -25,7 +25,7 @@ class SystemInstructionBaseTestCase(SimpleTestCase):
         """Base system instruction should exist and be non-empty."""
         self.assertTrue(len(SYSTEM_INSTRUCTION_BASE) > 0)
         self.assertIn("Pwanimate", SYSTEM_INSTRUCTION_BASE)
-        self.assertIn("PwaniNet", SYSTEM_INSTRUCTION_BASE)
+        self.assertIn("vasto", SYSTEM_INSTRUCTION_BASE)
 
     def test_base_instruction_has_identity(self):
         """Base instruction should define core identity."""
@@ -41,7 +41,7 @@ class SystemInstructionBaseTestCase(SimpleTestCase):
         """Base instruction should describe knowledge sources."""
         self.assertIn("KNOWLEDGE SOURCES", SYSTEM_INSTRUCTION_BASE)
         self.assertIn("general knowledge", SYSTEM_INSTRUCTION_BASE.lower())
-        self.assertIn("PwaniNet campus data", SYSTEM_INSTRUCTION_BASE)
+        self.assertIn("vasto campus data", SYSTEM_INSTRUCTION_BASE)
 
     def test_base_instruction_has_grounding_mode_awareness(self):
         """Base instruction should describe grounding modes."""
@@ -187,9 +187,9 @@ class SystemInstructionContentTestCase(SimpleTestCase):
         self.assertIn("general knowledge", SYSTEM_INSTRUCTION_BASE.lower())
         self.assertIn("academic concepts", SYSTEM_INSTRUCTION_BASE.lower())
 
-    def test_base_instruction_mentions_pwaninet_data(self):
-        """Base instruction should mention PwaniNet data usage."""
-        self.assertIn("PwaniNet campus data", SYSTEM_INSTRUCTION_BASE)
+    def test_base_instruction_mentions_vasto_data(self):
+        """Base instruction should mention vasto data usage."""
+        self.assertIn("vasto campus data", SYSTEM_INSTRUCTION_BASE)
         self.assertIn("campus-specific information", SYSTEM_INSTRUCTION_BASE)
 
     def test_base_instruction_mentions_explicit_resources(self):

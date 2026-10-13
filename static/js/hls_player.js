@@ -1,5 +1,5 @@
 /**
- * PwaniNet Industry-Standard Adaptive Bitrate Streaming (ABTS) Engine
+ * vasto Industry-Standard Adaptive Bitrate Streaming (ABTS) Engine
  *
  * Implements Instagram/TikTok-grade video playback:
  *   1. Cross-video Bandwidth Memory (PwaniBandwidthEstimator) across reels and page sessions.
@@ -15,8 +15,8 @@
     // ========================================================================
     // 1. SHARED BANDWIDTH MEMORY (PERSISTENT EWMA ACROSS REELS & FEED CARDS)
     // ========================================================================
-    const BW_STORAGE_KEY = 'pwaninet_bw_estimate';
-    const QUALITY_STORAGE_KEY = 'pwaninet_video_quality';
+    const BW_STORAGE_KEY = 'vasto_bw_estimate';
+    const QUALITY_STORAGE_KEY = 'vasto_video_quality';
 
     const PwaniBandwidthEstimator = {
         _currentBps: null,
@@ -196,7 +196,7 @@
 
             // ONLY resume autoplay if explicitly requested by playback controller
             if (videoEl.dataset.wantsAutoplay === 'true') {
-                const vm = window.videoManager || window.PwaniNetVideoManager;
+                const vm = window.videoManager || window.vastoVideoManager;
                 if (vm && typeof vm.playVideo === 'function') {
                     vm.playVideo(videoEl, true);
                 } else {

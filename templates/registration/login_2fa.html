@@ -192,7 +192,7 @@
             </div>
 
             <div class="text-center mt-3">
-              <a href="{% url 'login' %}?fresh=1" class="text-secondary small text-decoration-none" onclick="sessionStorage.removeItem('pwaninet_pending_2fa');">
+              <a href="{% url 'login' %}?fresh=1" class="text-secondary small text-decoration-none" onclick="sessionStorage.removeItem('vasto_pending_2fa');">
                 &larr; {% trans "Log in as different user" %}
               </a>
             </div>
@@ -212,9 +212,9 @@
 
 <script>
 (function () {
-  sessionStorage.setItem('pwaninet_pending_2fa', '1');
+  sessionStorage.setItem('vasto_pending_2fa', '1');
 
-  const DEVICE_ID_KEY = 'pwaninet_device_id';
+  const DEVICE_ID_KEY = 'vasto_device_id';
   let deviceId = localStorage.getItem(DEVICE_ID_KEY);
   if (!deviceId) {
     const array = new Uint8Array(32);

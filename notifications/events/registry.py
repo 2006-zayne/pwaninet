@@ -1,5 +1,5 @@
 """
-Event Registry for PwaniNet Notification Engine v2
+Event Registry for vasto Notification Engine v2
 
 This module provides a centralized registry for all platform event types.
 Following the specification's recommendation to avoid string literals throughout the codebase.
@@ -17,7 +17,7 @@ class EventTypes(Enum):
     
     Naming Convention: <domain>.<resource>.<action>
     
-    PwaniNet Domains:
+    vasto Domains:
     - posts: Posts, likes, comments
     - groups: Groups, memberships
     - users: Users, follows, pinches
@@ -132,7 +132,7 @@ class EventSources(Enum):
     Canonical event source registry.
     
     These are the approved subsystem names that can publish events.
-    Based on actual PwaniNet Django apps.
+    Based on actual vasto Django apps.
     """
     
     POSTS = "POSTS"

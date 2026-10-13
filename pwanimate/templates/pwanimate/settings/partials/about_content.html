@@ -3,21 +3,21 @@
 <div class="pwanimate-settings-about-container">
     <div class="text-center py-4 border-bottom mb-4 pwanimate-about-header">
         <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}"
-             alt="Pwanimate Logo"
+             alt="Spark Logo"
              style="width: 72px; height: 72px; object-fit: contain;"
              class="mb-3">
         <h3 class="fw-bold mb-1">
-            <span>PWANI<span class="brand-net text-primary">MATE</span></span>
+            <span>SPARK</span>
         </h3>
-        <p class="text-muted small mb-2">{% trans "The Official Intelligent Assistant for Pwani University Students" %}</p>
+        <p class="text-muted small mb-2">{% trans "Your AI Academic Companion" %}</p>
         <span class="badge bg-primary-subtle text-primary px-3 py-1 rounded-pill small" id="pwanimate-about-version-badge">{% blocktrans with ver=pwanimate_version|default:"2.0.0" %}Version {{ ver }}{% endblocktrans %}</span>
     </div>
 
     <!-- Mission & Overview -->
     <div class="mb-4">
-        <h5 class="fw-bold mb-2">{% trans "What is Pwanimate?" %}</h5>
+        <h5 class="fw-bold mb-2">{% trans "What is Spark?" %}</h5>
         <p class="text-muted small">
-            {% trans "Pwanimate is an AI academic companion natively integrated into PwaniNet. Built specifically for Pwani University, Pwanimate bridges campus academic records, lecture materials, student collaboration, and course information to help you navigate your academic journey." %}
+            {% trans "Spark is an AI academic companion natively integrated into Vasto. Spark bridges campus academic records, lecture materials, student collaboration, and course information to help you navigate your academic journey." %}
         </p>
     </div>
 
@@ -76,7 +76,7 @@
     <div class="card border rounded-3 p-3 shadow-sm" style="background-color: var(--pwanimate-card-bg);">
         <h6 class="fw-bold mb-1 small text-uppercase text-muted">{% trans "Academic Boundaries & Privacy" %}</h6>
         <p class="text-muted small mb-0">
-            {% trans "Pwanimate only accesses campus documents and platform records you are authorized to view. Your personal instructions and preference settings are private to your account and never shared with peers or external services. Pwanimate is an advisory assistant and study tool designed to augment your learning, not replace faculty instruction or university grading systems." %}
+            {% trans "Spark only accesses campus documents and platform records you are authorized to view. Your personal instructions and preference settings are private to your account and never shared with peers or external services. Spark is an advisory assistant and study tool designed to augment your learning, not replace faculty instruction or university grading systems." %}
         </p>
     </div>
 </div>

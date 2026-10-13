@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 
 class SourceType(str, Enum):
-    """Supported knowledge source types in PwaniNet/Pwanimate."""
+    """Supported knowledge source types in vasto/Pwanimate."""
     DOCUMENT = "document"
     POST = "post"
     USER = "user"

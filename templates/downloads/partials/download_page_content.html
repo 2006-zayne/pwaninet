@@ -2,14 +2,14 @@
 {% load static %}
 
 <!-- Page Title for HTMX navigation history updates -->
-<title>{% trans "Download PwaniNet — Web App (PWA) & Mobile APK" %}</title>
+<title>{% trans "Download vasto — Web App (PWA) & Mobile APK" %}</title>
 
 <div class="downloads-continuous-wrapper">
     <!-- 1. HERO HEADER (Seamlessly sits directly on background) -->
     <header class="downloads-hero-header text-center py-4 mb-4">
         <div class="d-inline-flex position-relative mb-3">
-            <img src="{% static 'images/pwaninet-app-icon.png' %}" 
-                 alt="PwaniNet" 
+            <img src="{% static 'images/vasto-app-icon.png' %}" 
+                 alt="vasto" 
                  width="88" 
                  height="88" 
                  class="rounded-4 shadow-sm downloads-brand-logo" />
@@ -17,7 +17,7 @@
                 Official
             </span>
         </div>
-        <h1 class="h2 fw-bold text-dark-emphasis mb-2">{% trans "Download PwaniNet" %}</h1>
+        <h1 class="h2 fw-bold text-dark-emphasis mb-2">{% trans "Download vasto" %}</h1>
         <p class="text-secondary mx-auto mb-3" style="max-width: 600px; font-size: 0.95rem; line-height: 1.5;">
             {% trans "Please read the short installation guide below first to avoid browser security blocks, then select your download option at the bottom." %}
         </p>
@@ -67,12 +67,12 @@
                             {% trans "When downloading, Chrome will pop up:" %}
                         </p>
                         <div class="instruction-quote p-2 rounded-2 small mb-2 fst-italic">
-                            "{% trans "File might be harmful. Do you want to download pwaninet.apk anyway?" %}"
+                            "{% trans "File might be harmful. Do you want to download vasto.apk anyway?" %}"
                         </div>
                         <div class="instruction-action alert alert-light border small py-2 px-3 mb-0">
                             <strong>{% trans "Action:" %}</strong> {% trans "Tap " %}<span class="badge bg-primary text-white">{% trans "Download anyway" %}</span>.
                             <div class="text-muted mt-1" style="font-size: 0.78rem;">
-                                {% trans "Chrome shows this standard warning for all APKs outside Google Play. PwaniNet is 100% verified & safe." %}
+                                {% trans "Chrome shows this standard warning for all APKs outside Google Play. vasto is 100% verified & safe." %}
                             </div>
                         </div>
                     </div>
@@ -118,7 +118,7 @@
                             </h3>
                         </div>
                         <p class="small text-secondary mb-2">
-                            {% trans "Open " %}<code>pwaninet.apk</code>{% trans " from your notifications or phone Downloads folder. If your device says:" %}
+                            {% trans "Open " %}<code>vasto.apk</code>{% trans " from your notifications or phone Downloads folder. If your device says:" %}
                         </p>
                         <div class="instruction-quote p-2 rounded-2 small mb-2 fst-italic">
                             "{% trans "For your security, your phone is not allowed to install unknown apps from this source" %}"
@@ -185,7 +185,7 @@
                         <ol class="small text-secondary ps-3 mb-0" style="line-height: 1.5;">
                             <li>{% trans "Click the Install icon (⬇) in the browser URL bar." %}</li>
                             <li>{% trans "Or click " %}<strong>"{% trans "Install Web App" %}"</strong> {% trans "below." %}</li>
-                            <li>{% trans "PwaniNet launches in its own clean window." %}</li>
+                            <li>{% trans "vasto launches in its own clean window." %}</li>
                         </ol>
                     </div>
                 </div>
@@ -229,7 +229,7 @@
                         <button type="button" 
                                 id="apk-download-trigger-btn" 
                                 class="btn btn-success btn-lg w-100 fw-bold py-3 shadow-sm d-flex align-items-center justify-content-center gap-2"
-                                data-download-url="{{ github_apk_url|default:'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk' }}"
+                                data-download-url="{{ github_apk_url|default:'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk' }}"
                                 data-default-label="{% trans 'Download Mobile APK' %}"
                                 data-update-label="{% trans 'Update App' %}"
                                 data-running-label="{% trans 'Native APK Running' %}"
@@ -301,7 +301,7 @@
             <div class="col-12 col-md-4 text-center">
                 <div class="d-inline-flex p-2 rounded-3 shadow-sm" style="background: #ffffff !important; border: 1px solid #e2e8f0;">
                     <img src="{% url 'qr_code_svg' %}?token={{ app_invite_token|default:global_app_invite_token }}"
-                         alt="{% trans 'PwaniNet QR Code' %}"
+                         alt="{% trans 'vasto QR Code' %}"
                          width="110"
                          height="110"
                          style="display: block; image-rendering: pixelated; background: #ffffff;"
@@ -373,7 +373,7 @@
     border-color: var(--border, #e2e8f0) !important;
 }
 
-.pwaninet-pulse {
+.vasto-pulse {
     animation: downloadPulse 1.8s ease-in-out;
 }
 
@@ -511,7 +511,7 @@
                 pwaBtn.classList.remove('btn-primary');
                 pwaBtn.classList.add('btn-success');
             }
-            if (pwaFeedback) pwaFeedback.textContent = 'PwaniNet PWA is running on this device.';
+            if (pwaFeedback) pwaFeedback.textContent = 'vasto PWA is running on this device.';
         }
 
         if (typeof window.isNativeAppContainer === 'function' && window.isNativeAppContainer()) {
@@ -530,7 +530,7 @@
                 }
 
                 if (typeof window.isStandalonePWA === 'function' && window.isStandalonePWA()) {
-                    showAlert('PwaniNet PWA is already installed on your device ✓', 'success', 'bi-check2-circle');
+                    showAlert('vasto PWA is already installed on your device ✓', 'success', 'bi-check2-circle');
                     return;
                 }
 
@@ -541,7 +541,7 @@
                                 if (pwaBtnText) pwaBtnText.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Installed ✓';
                                 pwaBtn.classList.remove('btn-primary');
                                 pwaBtn.classList.add('btn-success');
-                                showAlert('PwaniNet has been installed successfully to your device!', 'success', 'bi-check2-circle');
+                                showAlert('vasto has been installed successfully to your device!', 'success', 'bi-check2-circle');
                             }
                         });
                     return;
@@ -563,7 +563,7 @@
         if (apkBtn) {
             apkBtn.onclick = function(e) {
                 e.preventDefault();
-                const downloadUrl = apkBtn.getAttribute('data-download-url') || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk';
+                const downloadUrl = apkBtn.getAttribute('data-download-url') || 'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk';
 
                 if (apkBtn.disabled) return;
                 const originalHtml = apkBtnText ? apkBtnText.innerHTML : getNativeAppLabel('data-default-label', 'Download Mobile APK');
@@ -573,14 +573,14 @@
                 apkBtn.disabled = true;
 
                 // Trigger file download silently via hidden iframe without page navigation
-                if (typeof window.triggerPwaninetDownload === 'function') {
-                    window.triggerPwaninetDownload(downloadUrl);
+                if (typeof window.triggervastoDownload === 'function') {
+                    window.triggervastoDownload(downloadUrl);
                 } else {
-                    let iframe = document.getElementById('pwaninet-download-target');
+                    let iframe = document.getElementById('vasto-download-target');
                     if (!iframe) {
                         iframe = document.createElement('iframe');
-                        iframe.id = 'pwaninet-download-target';
-                        iframe.name = 'pwaninet-download-target';
+                        iframe.id = 'vasto-download-target';
+                        iframe.name = 'vasto-download-target';
                         iframe.style.display = 'none';
                         iframe.style.width = '0';
                         iframe.style.height = '0';
@@ -615,7 +615,7 @@
                 pwaBtn.classList.remove('btn-primary');
                 pwaBtn.classList.add('btn-success');
             }
-            showAlert('PwaniNet PWA successfully installed to your device!', 'success', 'bi-check2-circle');
+            showAlert('vasto PWA successfully installed to your device!', 'success', 'bi-check2-circle');
         });
 
         // Copy Share Link handler

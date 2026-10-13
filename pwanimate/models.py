@@ -335,7 +335,7 @@ class PwanimatePreferences(models.Model):
     """
     Dedicated AI assistant personalization preferences for an authenticated student.
 
-    Strictly decoupled from PwaniNet platform account settings.
+    Strictly decoupled from Vasto platform account settings.
     Enforces a strict 1-to-1 relationship with the Django User model.
     """
     user = models.OneToOneField(

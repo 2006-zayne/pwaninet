@@ -114,7 +114,7 @@ def register_view(request):
                         logger.warning(f"Error processing invite conversion: {e}")
 
                 request.session['registered_username'] = user.email or user.username
-                messages.success(request, f"Welcome to PwaniNet, @{user.username}! Your account has been created successfully. Sign in using your username or email.")
+                messages.success(request, f"Welcome to vasto, @{user.username}! Your account has been created successfully. Sign in using your username or email.")
                 return redirect('login')
             else:
                 msg_warn = f"[AUTH-REGISTER] Validation failed for username='{submitted_username}', IP={ip}. Errors: {form.errors.as_json()}"
@@ -398,7 +398,7 @@ def password_recovery_identify_view(request):
         return render(request, 'registration/password_recovery_identify.html')
 
     ip = get_client_ip(request)
-    cache_key = f"pwaninet:ratelimit:pwidentify:{ip}"
+    cache_key = f"vasto:ratelimit:pwidentify:{ip}"
     attempts = cache.get(cache_key, 0)
     if attempts >= 10:
         logger.warning(f"[SECURITY-RATELIMIT] BLOCKED: Password recovery lookup rate limit exceeded for IP={ip}")
@@ -1211,7 +1211,7 @@ def encrypted_invite_landing(request, token):
 
     # Default to platform invite
     if request.user.is_authenticated:
-        messages.info(request, "You are already a member of PwaniNet!")
+        messages.info(request, "You are already a member of vasto!")
         return redirect('posts:home')
 
     register_url = reverse('users:register')
@@ -1255,7 +1255,7 @@ def platform_invite_landing(request, token):
             request.session['inviter_username'] = inviter.username
 
     if request.user.is_authenticated:
-        messages.info(request, "You are already a member of PwaniNet!")
+        messages.info(request, "You are already a member of vasto!")
         return redirect('posts:home')
 
     register_url = reverse('users:register')
@@ -1388,7 +1388,7 @@ def settings_downloads_view(request):
 
 @login_required
 def settings_about_view(request):
-    """About PwaniNet page with version information"""
+    """About vasto page with version information"""
     if request.headers.get('HX-Request'):
         return render(request, 'users/settings/partials/settings_navigation_partial.html', {
             'settings_content_partial': 'users/settings/partials/about_content.html'
@@ -1663,7 +1663,7 @@ def settings_two_factor_download_codes_view(request):
 
     lines = [
         "==================================================",
-        "  PwaniNet Two-Factor Authentication Recovery Codes",
+        "  vasto Two-Factor Authentication Recovery Codes",
         f"  Account: {request.user.username}",
         f"  Generated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
         "==================================================",
@@ -1683,7 +1683,7 @@ def settings_two_factor_download_codes_view(request):
         "==================================================",
     ])
     content = "\r\n".join(lines)
-    filename = f"pwaninet-recovery-codes-{request.user.username}.txt"
+    filename = f"vasto-recovery-codes-{request.user.username}.txt"
     response = HttpResponse(content, content_type='text/plain; charset=utf-8')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
@@ -2233,7 +2233,7 @@ def complete_onboarding_view(request):
     cache.delete(f'feed:suggested_groups:{request.user.id}')
 
     request.session['just_onboarded'] = True
-    messages.success(request, "Welcome to PwaniNet! You're connected with your campus network.")
+    messages.success(request, "Welcome to vasto! You're connected with your campus network.")
     return redirect('posts:home')
 
 

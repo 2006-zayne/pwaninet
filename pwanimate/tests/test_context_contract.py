@@ -54,9 +54,9 @@ class IntentCategoryTestCase(SimpleTestCase):
         intent = IntentCategory.DOCUMENT_ANALYSIS
         self.assertEqual(intent.value, "document_analysis")
 
-    def test_intent_pwaninet_knowledge(self):
-        intent = IntentCategory.PWANINET_KNOWLEDGE
-        self.assertEqual(intent.value, "pwaninet_knowledge")
+    def test_intent_vasto_knowledge(self):
+        intent = IntentCategory.vasto_KNOWLEDGE
+        self.assertEqual(intent.value, "vasto_knowledge")
 
     def test_intent_personalized_discovery(self):
         intent = IntentCategory.PERSONALIZED_DISCOVERY

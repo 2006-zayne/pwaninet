@@ -1,7 +1,7 @@
 """
 People Discovery Service for Pwanimate.
 
-Discovers and ranks real PwaniNet users based on skills, interests,
+Discovers and ranks real vasto users based on skills, interests,
 collaboration availability, and academic alignment. Strictly enforces
 domain privacy boundaries (exclusions, blocks, hidden authors, profile
 privacy levels) and reuses proven recommendation signals without N+1 queries.
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class PeopleDiscoveryService:
     """
-    Service responsible for querying, filtering, and scoring real PwaniNet
+    Service responsible for querying, filtering, and scoring real vasto
     users for peer discovery and collaboration requests.
     """
 
@@ -45,7 +45,7 @@ class PeopleDiscoveryService:
             viewer_context: Optional structured UserContext of the viewer.
 
         Returns:
-            List of PersonResult objects representing real PwaniNet users.
+            List of PersonResult objects representing real vasto users.
         """
         # Resolve following IDs and group IDs (from viewer_context if available)
         following_ids = None

@@ -1,6 +1,6 @@
 /**
  * Push Notification Subscription Manager
- * Handles Web Push API subscription for PwaniNet
+ * Handles Web Push API subscription for vasto
  */
 
 class PushSubscriptionManager {
@@ -21,7 +21,7 @@ class PushSubscriptionManager {
             document.documentElement.classList.contains('is-capacitor') ||
             document.documentElement.classList.contains('is-native-app') ||
             typeof window.AndroidBridge !== 'undefined' ||
-            typeof window.PwaninetBridge !== 'undefined' ||
+            typeof window.vastoBridge !== 'undefined' ||
             (typeof window.isNativeAppContainer === 'function' && window.isNativeAppContainer())
         );
     }
@@ -50,7 +50,7 @@ class PushSubscriptionManager {
             const hasCapacitorPush = typeof window.Capacitor !== 'undefined' &&
                 window.Capacitor.Plugins &&
                 !!window.Capacitor.Plugins.PushNotifications;
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             const isPushReady = bridge && typeof bridge.isPushNotificationsAvailable === 'function'
                 ? bridge.isPushNotificationsAvailable()
                 : true;
@@ -206,7 +206,7 @@ class PushSubscriptionManager {
                 await window.initNativePush(true);
             }
 
-            localStorage.setItem('pwaninet_push_subscribed', 'true');
+            localStorage.setItem('vasto_push_subscribed', 'true');
             this.isSubscribed = true;
             return true;
         }
@@ -252,7 +252,7 @@ class PushSubscriptionManager {
             console.log('Sending subscription to server...');
             await this.sendSubscriptionToServer(subscription);
 
-            localStorage.setItem('pwaninet_push_subscribed', 'true');
+            localStorage.setItem('vasto_push_subscribed', 'true');
             console.log('Push subscription successful');
             return subscription;
         } catch (error) {
@@ -318,7 +318,7 @@ class PushSubscriptionManager {
      */
     async unsubscribe() {
         if (this.isNative()) {
-            const fcmToken = localStorage.getItem('pwaninet_fcm_token') || localStorage.getItem('pwaninet_pending_fcm_token');
+            const fcmToken = localStorage.getItem('vasto_fcm_token') || localStorage.getItem('vasto_pending_fcm_token');
             const csrfToken = this.getCsrfToken();
             try {
                 if (fcmToken) {
@@ -334,7 +334,7 @@ class PushSubscriptionManager {
             } catch (err) {
                 console.warn('Failed to unsubscribe FCM token on server:', err);
             }
-            localStorage.removeItem('pwaninet_push_subscribed');
+            localStorage.removeItem('vasto_push_subscribed');
             this.isSubscribed = false;
             console.log('Native push unsubscription successful');
             return true;
@@ -353,7 +353,7 @@ class PushSubscriptionManager {
 
         if (!this.subscription) {
             console.log('No active subscription to unsubscribe');
-            localStorage.removeItem('pwaninet_push_subscribed');
+            localStorage.removeItem('vasto_push_subscribed');
             this.isSubscribed = false;
             return true;
         }
@@ -367,7 +367,7 @@ class PushSubscriptionManager {
 
             this.subscription = null;
             this.isSubscribed = false;
-            localStorage.removeItem('pwaninet_push_subscribed');
+            localStorage.removeItem('vasto_push_subscribed');
 
             console.log('Push unsubscription successful');
             return true;
@@ -417,7 +417,7 @@ class PushSubscriptionManager {
 
             const PushNotifications = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
             if (!PushNotifications) {
-                const isSubscribed = localStorage.getItem('pwaninet_push_subscribed') === 'true';
+                const isSubscribed = localStorage.getItem('vasto_push_subscribed') === 'true';
                 return {
                     supported: true,
                     subscribed: isSubscribed,
@@ -430,7 +430,7 @@ class PushSubscriptionManager {
                 const permStatus = await PushNotifications.checkPermissions();
                 const isGranted = permStatus.receive === 'granted';
                 const isDenied = permStatus.receive === 'denied';
-                const isSubscribed = isGranted && localStorage.getItem('pwaninet_push_subscribed') === 'true';
+                const isSubscribed = isGranted && localStorage.getItem('vasto_push_subscribed') === 'true';
 
                 return {
                     supported: true,
@@ -440,7 +440,7 @@ class PushSubscriptionManager {
                 };
             } catch (err) {
                 console.warn('[PUSH-SUBSCRIPTION] Error checking native permissions:', err);
-                const isSubscribed = localStorage.getItem('pwaninet_push_subscribed') === 'true';
+                const isSubscribed = localStorage.getItem('vasto_push_subscribed') === 'true';
                 return {
                     supported: true,
                     subscribed: isSubscribed,

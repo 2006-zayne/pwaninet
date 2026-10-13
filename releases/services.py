@@ -1,5 +1,5 @@
 """
-Release service for PwaniNet Release Center.
+Release service for vasto Release Center.
 
 Contains all business logic for release management.
 Views should remain thin and delegate to this service.
@@ -214,7 +214,7 @@ class ReleaseService:
                         version=git_ver,
                         build_number=git_build,
                         release_title=title or f"Release {git_ver}",
-                        release_summary=summary or f"PwaniNet Release {git_ver}",
+                        release_summary=summary or f"vasto Release {git_ver}",
                         release_type='PATCH' if git_ver.count('.') == 2 and git_ver.split('.')[-1] != '0' else 'MINOR',
                         status='PUBLISHED',
                         published=True,

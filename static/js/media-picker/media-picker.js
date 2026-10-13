@@ -571,7 +571,7 @@
       });
 
       // 16. Images committed by the Android keyboard (Gboard screenshot chip / clipboard)
-      //     are delivered by the native PwaninetWebView as a window event.
+      //     are delivered by the native vastoWebView as a window event.
       document.addEventListener('focusin', (e) => {
         const t = e.target;
         if (t && t.closest && t.closest('.composer-input-editable, textarea, input[type="text"]')) {
@@ -579,7 +579,7 @@
           if (f) this._lastFocusedComposerForm = f;
         }
       });
-      window.addEventListener('pwaninet:native-image-paste', (e) => {
+      window.addEventListener('vasto:native-image-paste', (e) => {
         const detail = e.detail || {};
         if (!detail.data) return;
         try {
@@ -1547,7 +1547,7 @@
           let defaultToken = '';
           for (const cookie of cookies) {
             const [name, value] = cookie.trim().split('=');
-            if (name === 'pwaninet_local_csrftoken') {
+            if (name === 'vasto_local_csrftoken') {
               localToken = decodeURIComponent(value || '');
             } else if (name === 'csrftoken') {
               defaultToken = decodeURIComponent(value || '');

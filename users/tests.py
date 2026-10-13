@@ -1294,7 +1294,7 @@ class Phase2SecurityTest(TestCase):
         resp = self.client.post(reverse('users:settings_two_factor_download_codes'), {'codes': codes})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp['Content-Type'], 'text/plain; charset=utf-8')
-        self.assertIn('attachment; filename="pwaninet-recovery-codes-phase2_user_a.txt"', resp['Content-Disposition'])
+        self.assertIn('attachment; filename="vasto-recovery-codes-phase2_user_a.txt"', resp['Content-Disposition'])
         self.assertIn(b'ABCD-1234-EFGH', resp.content)
         self.assertIn(b'IJKL-5678-MNOP', resp.content)
 

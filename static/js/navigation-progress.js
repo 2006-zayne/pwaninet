@@ -1,5 +1,5 @@
 /**
- * PwaniNet Navigation Progress Bar
+ * vasto Navigation Progress Bar
  * Shows a subtle progress indicator during page navigation
  */
 
@@ -168,7 +168,7 @@
                 href.startsWith('#') ||
                 href.startsWith('javascript:') ||
                 link.getAttribute('target') === '_blank' ||
-                link.getAttribute('target') === 'pwaninet-download-target' ||
+                link.getAttribute('target') === 'vasto-download-target' ||
                 link.hasAttribute('download') ||
                 link.dataset.apkDownload) {
                 return;
@@ -291,7 +291,7 @@
     }
 
     // Public API
-    window.PwaniNetNavigationProgress = {
+    window.vastoNavigationProgress = {
         start: startNavigationProgress,
         complete: completeNavigationProgress,
         cancel: cancelNavigationProgress

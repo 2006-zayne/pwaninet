@@ -1,5 +1,5 @@
 """
-Release selectors for PwaniNet Release Center.
+Release selectors for vasto Release Center.
 
 Provides reusable query methods for retrieving releases.
 Separates query logic from services and views.

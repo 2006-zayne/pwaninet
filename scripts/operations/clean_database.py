@@ -1,5 +1,5 @@
 """
-Database Cleanup Script for Pwaninet
+Database Cleanup Script for pwaninet
 
 This script clears all existing data from the database.
 Run this with: python manage.py shell < clean_database.py

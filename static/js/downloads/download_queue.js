@@ -1,5 +1,5 @@
 /**
- * PwaniNet Unified Download Queue
+ * vasto Unified Download Queue
  * Manages FIFO download queue with concurrency limit (default: 2),
  * automated trigger of next item upon completion/failure,
  * progress tracking, cancellation, and event broadcasting.
@@ -87,7 +87,7 @@ class DownloadQueue {
         for (const existing of this.items.values()) {
             if (existing.url === options.url && 
                (existing.status === DownloadStatus.QUEUED || existing.status === DownloadStatus.DOWNLOADING)) {
-                this.emitEvent('pwaninet:download-already-active', existing);
+                this.emitEvent('vasto:download-already-active', existing);
                 return existing;
             }
         }
@@ -95,7 +95,7 @@ class DownloadQueue {
         const item = new DownloadQueueItem(options);
         this.items.set(item.id, item);
 
-        this.emitEvent('pwaninet:download-queued', item);
+        this.emitEvent('vasto:download-queued', item);
         this.processQueue();
         return item;
     }
@@ -115,7 +115,7 @@ class DownloadQueue {
         for (const item of toStart) {
             item.status = DownloadStatus.DOWNLOADING;
             item.startedAt = Date.now();
-            this.emitEvent('pwaninet:download-started', item);
+            this.emitEvent('vasto:download-started', item);
 
             // Run asynchronously without awaiting to let concurrent tasks execute
             (async () => {
@@ -142,7 +142,7 @@ class DownloadQueue {
         if (bytesDownloaded !== undefined) item.bytesDownloaded = bytesDownloaded;
         if (totalBytes !== undefined && totalBytes > 0) item.totalBytes = totalBytes;
 
-        this.emitEvent('pwaninet:download-progress', item);
+        this.emitEvent('vasto:download-progress', item);
     }
 
     /**
@@ -157,7 +157,7 @@ class DownloadQueue {
         item.completedAt = Date.now();
         Object.assign(item, resultMetadata);
 
-        this.emitEvent('pwaninet:download-completed', item);
+        this.emitEvent('vasto:download-completed', item);
 
         // Auto-trigger next item in queue
         setTimeout(() => this.processQueue(), 50);
@@ -172,7 +172,7 @@ class DownloadQueue {
 
         item.status = DownloadStatus.FAILED;
         item.error = errorMessage;
-        this.emitEvent('pwaninet:download-failed', item);
+        this.emitEvent('vasto:download-failed', item);
 
         // Auto-trigger next item in queue
         setTimeout(() => this.processQueue(), 50);
@@ -190,7 +190,7 @@ class DownloadQueue {
             item.cancelController.abort();
         }
 
-        this.emitEvent('pwaninet:download-cancelled', item);
+        this.emitEvent('vasto:download-cancelled', item);
 
         // Auto-trigger next item in queue
         setTimeout(() => this.processQueue(), 50);

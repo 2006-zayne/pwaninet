@@ -86,7 +86,7 @@
 
   <div class="form-check">
     <div>
-      <input type="checkbox" class="form-check-input" id="in_app_toast_enabled" name="in_app_toast_enabled" value="on" {% if preferences.in_app_toast_enabled %}checked{% endif %} onchange="localStorage.setItem('pwaninet_in_app_toasts', this.checked ? 'true' : 'false')">
+      <input type="checkbox" class="form-check-input" id="in_app_toast_enabled" name="in_app_toast_enabled" value="on" {% if preferences.in_app_toast_enabled %}checked{% endif %} onchange="localStorage.setItem('vasto_in_app_toasts', this.checked ? 'true' : 'false')">
       <label class="form-check-label" for="in_app_toast_enabled">
         In-app notification popups (toasts)
         <span class="form-check-description">Display floating banner alerts on screen when new notifications arrive</span>
@@ -844,7 +844,7 @@ function getCsrfToken() {
   function syncToastPref() {
     const toastCheck = document.getElementById('in_app_toast_enabled');
     if (toastCheck) {
-      localStorage.setItem('pwaninet_in_app_toasts', toastCheck.checked ? 'true' : 'false');
+      localStorage.setItem('vasto_in_app_toasts', toastCheck.checked ? 'true' : 'false');
     }
   }
 

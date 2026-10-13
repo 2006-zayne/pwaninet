@@ -17,8 +17,8 @@ def _get_cipher_key():
     """
     Derive a 256-bit AES encryption key deterministically from settings.SECRET_KEY.
     """
-    secret = getattr(settings, 'SECRET_KEY', 'pwaninet_default_secure_secret_key_fallback')
-    return hashlib.sha256(b"pwaninet:invite:aes256:v1:" + secret.encode('utf-8')).digest()
+    secret = getattr(settings, 'SECRET_KEY', 'vasto_default_secure_secret_key_fallback')
+    return hashlib.sha256(b"vasto:invite:aes256:v1:" + secret.encode('utf-8')).digest()
 
 
 def encrypt_invite_token(user_id, invite_type):
@@ -121,8 +121,8 @@ def get_invite_data(user, request=None):
         app_url = f"/i/{app_invite.token}/"
         platform_url = f"/i/{platform_invite.token}/"
 
-    app_copy = str(_("📱 Download the official PwaniNet Android app for campus updates, course groups, and offline access:"))
-    platform_copy = str(_("🎓 Join me on PwaniNet! Connect with classmates, access course groups, and collaborate:"))
+    app_copy = str(_("📱 Download the official vasto Android app for campus updates, course groups, and offline access:"))
+    platform_copy = str(_("🎓 Join me on vasto! Connect with classmates, access course groups, and collaborate:"))
 
     return {
         'app_download': {
@@ -237,7 +237,7 @@ def process_invite_conversion(token, new_user):
                     metadata={
                         'actor_username': new_user.username,
                         'recipient_username': inviter.username,
-                        'message': f"@{new_user.username} joined PwaniNet using your invite link!",
+                        'message': f"@{new_user.username} joined vasto using your invite link!",
                     }
                 )
             except Exception as e:

@@ -1,4 +1,4 @@
-# PwaniNet App Guides
+# vasto App Guides
 
 Each guide describes a first-party Django app registered by the project. The code is the source of truth; routes and feature availability can change as the service evolves.
 

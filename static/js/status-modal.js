@@ -4,7 +4,7 @@
 (function (global) {
     'use strict';
 
-    const MODAL_ID = 'pwaninetStatusModal';
+    const MODAL_ID = 'vastoStatusModal';
 
     function delay(ms) {
         return new Promise(function (resolve) {
@@ -15,9 +15,9 @@
     function getElements() {
         return {
             modalEl: document.getElementById(MODAL_ID),
-            iconEl: document.getElementById('pwaninetStatusModalIcon'),
-            titleEl: document.getElementById('pwaninetStatusModalTitle'),
-            subtitleEl: document.getElementById('pwaninetStatusModalSubtitle'),
+            iconEl: document.getElementById('vastoStatusModalIcon'),
+            titleEl: document.getElementById('vastoStatusModalTitle'),
+            subtitleEl: document.getElementById('vastoStatusModalSubtitle'),
         };
     }
 
@@ -102,7 +102,7 @@
         hideModalAndThen(options.onComplete);
     }
 
-    global.PwaniNetStatusModal = {
+    global.vastoStatusModal = {
         runSteps: runSteps,
         hide: function () {
             hideModalAndThen(null);

@@ -1,5 +1,5 @@
 """
-Aggregation Engine for PwaniNet Notification Engine v2
+Aggregation Engine for vasto Notification Engine v2
 
 This module implements the Aggregation Engine that reduces notification fatigue
 by combining related Notification Objects into a single notification.

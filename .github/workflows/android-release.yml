@@ -186,9 +186,9 @@ jobs:
         run: |
           mkdir -p output
           if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk output/pwaninet.apk
+            cp android/app/build/outputs/apk/release/app-release.apk output/vasto.apk
           elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release-unsigned.apk output/pwaninet.apk
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk output/vasto.apk
           else
             echo "Error: No release APK found in build outputs!"
             find android/app/build/outputs/ -name "*.apk"
@@ -203,7 +203,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
-          files: output/pwaninet.apk
+          files: output/vasto.apk
 
       - name: Notify Web / PWA Server of New Release
         run: |

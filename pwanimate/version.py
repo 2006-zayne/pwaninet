@@ -72,7 +72,7 @@ def get_version_info():
         "version": resolve_version(),
         "subsystem": "pwanimate",
         "default_version": DEFAULT_VERSION,
-        "environment": os.environ.get("PWANINET_ENV", "development"),
+        "environment": os.environ.get("vasto_ENV", "development"),
         "release_date": datetime.utcnow().isoformat() + "Z",
     }
 

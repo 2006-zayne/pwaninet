@@ -23,12 +23,12 @@ class ConversationDeletionTestCase(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             username="delete_test_user",
-            email="delete_user@pwaninet.local",
+            email="delete_user@vasto.local",
             password="testpassword123",
         )
         self.other_user = User.objects.create_user(
             username="other_delete_user",
-            email="other_delete@pwaninet.local",
+            email="other_delete@vasto.local",
             password="testpassword123",
         )
         self.conversation = ConversationService.create_conversation(
@@ -85,7 +85,7 @@ class ConversationAutoNamingTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="naming_test_user",
-            email="naming_user@pwaninet.local",
+            email="naming_user@vasto.local",
             password="testpassword123",
         )
 
@@ -163,12 +163,12 @@ class ConversationHistoryPaginationTestCase(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             username="history_page_user",
-            email="history_page@pwaninet.local",
+            email="history_page@vasto.local",
             password="testpassword123",
         )
         self.other_user = User.objects.create_user(
             username="other_history_user",
-            email="other_hist@pwaninet.local",
+            email="other_hist@vasto.local",
             password="testpassword123",
         )
 

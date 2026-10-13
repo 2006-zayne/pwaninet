@@ -692,7 +692,7 @@
       border-left: none !important;
       border-right: none !important;
       border-bottom: none !important;
-      padding: 0.85rem 1rem calc(1.5rem + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) 1rem !important;
+      padding: 0.85rem 1rem calc(1.5rem + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) 1rem !important;
       box-shadow: 0 -8px 36px rgba(0, 0, 0, 0.25) !important;
       animation: sheetSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
       box-sizing: border-box !important;
@@ -1287,8 +1287,8 @@ function initCreatePostComposer() {
         attachCameraBtn.addEventListener('click', async () => {
             if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera) {
                 try {
-                    if (window.PwaninetPermissions && typeof window.PwaninetPermissions.requestCamera === 'function') {
-                        const status = await window.PwaninetPermissions.requestCamera();
+                    if (window.vastoPermissions && typeof window.vastoPermissions.requestCamera === 'function') {
+                        const status = await window.vastoPermissions.requestCamera();
                         if (status && status.camera === 'denied') {
                             console.warn('[CreatePost] Camera permission was denied');
                             return;

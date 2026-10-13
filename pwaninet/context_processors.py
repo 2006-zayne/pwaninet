@@ -1,5 +1,5 @@
 """
-Context processors for PwaniNet.
+Context processors for vasto.
 Provides global template variables.
 """
 from pwaninet import version
@@ -47,16 +47,16 @@ def release_metadata(request):
     # Strict separation: ONLY true Android native app traffic is marked as native.
     # Web and PWA traffic is NEVER treated as a native app and proceeds independently.
     user_agent = request.META.get('HTTP_USER_AGENT', '') if request else ''
-    is_native_app = bool('PwaniNetApp/Android' in user_agent or (request and request.headers.get('X-Capacitor-Platform') == 'android'))
+    is_native_app = bool('vastoApp/Android' in user_agent or (request and request.headers.get('X-Capacitor-Platform') == 'android'))
 
     client_installed_version = None
     if is_native_app:
         import re
-        ua_match = re.search(r'PwaniNetApp/Android/([0-9\.]+)', user_agent)
+        ua_match = re.search(r'vastoApp/Android/([0-9\.]+)', user_agent)
         if ua_match:
             client_installed_version = ua_match.group(1)
-        elif request and request.COOKIES.get('pwaninet_native_version'):
-            client_installed_version = request.COOKIES.get('pwaninet_native_version')
+        elif request and request.COOKIES.get('vasto_native_version'):
+            client_installed_version = request.COOKIES.get('vasto_native_version')
 
     # Effective version determination:
     # 1. Web and PWA (not native): ALWAYS runs the latest web release independently!

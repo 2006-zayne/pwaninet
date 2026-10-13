@@ -1,5 +1,5 @@
 /**
- * PwaniNet Share Manager
+ * vasto Share Manager
  * Unified sharing layer that works across:
  *  1. Capacitor native app  → @capacitor/share plugin  → OS share sheet
  *  2. Mobile browser / PWA  → navigator.share()        → OS share sheet
@@ -35,7 +35,7 @@
 
     function buildPlatformLinks(url, text) {
         var encodedUrl  = encodeURIComponent(url);
-        var encodedText = encodeURIComponent(text || 'Check this out on PwaniNet!');
+        var encodedText = encodeURIComponent(text || 'Check this out on vasto!');
         return {
             whatsapp: 'https://wa.me/?text=' + encodedText + '%20' + encodedUrl,
             telegram: 'https://t.me/share/url?url=' + encodedUrl + '&text=' + encodedText,
@@ -52,8 +52,8 @@
      */
     async function pwaniShare(path, text) {
         var url   = buildAbsoluteUrl(path);
-        var title = 'PwaniNet';
-        var body  = text || 'Check this out on PwaniNet!';
+        var title = 'vasto';
+        var body  = text || 'Check this out on vasto!';
 
         // 1. Capacitor native share sheet (highest fidelity on Android/iOS)
         if (hasCapacitorShare()) {
@@ -84,7 +84,7 @@
         // 3. Fallback: open WhatsApp web (works everywhere, especially desktop)
         var links = buildPlatformLinks(url, body);
         // Try AndroidBridge for Capacitor without Share plugin (opens external browser)
-        var bridge = window.AndroidBridge || window.PwaninetBridge;
+        var bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.openExternalUrl === 'function') {
             bridge.openExternalUrl(links.whatsapp);
         } else {
@@ -120,14 +120,14 @@
             var shareUrl = btn.dataset.shareUrl;
             if (!shareUrl) return;
             var platform = btn.dataset.platform;
-            var links = buildPlatformLinks(shareUrl, 'Check this out on PwaniNet!');
+            var links = buildPlatformLinks(shareUrl, 'Check this out on vasto!');
             if (links[platform]) {
                 btn.href = links[platform];
                 // In Capacitor: intercept click and use openExternalUrl bridge
                 if (isCapacitor()) {
                     btn.addEventListener('click', function (e) {
                         e.preventDefault();
-                        var bridge = window.AndroidBridge || window.PwaninetBridge;
+                        var bridge = window.AndroidBridge || window.vastoBridge;
                         if (bridge && typeof bridge.openExternalUrl === 'function') {
                             bridge.openExternalUrl(links[platform]);
                         } else {

@@ -1,5 +1,5 @@
 /**
- * PwaniNet Conversation Realtime & Pinning Manager
+ * vasto Conversation Realtime & Pinning Manager
  * Provides:
  * 1. Bi-directional real-time conversation list updates (sidebar rail & mobile list)
  * 2. Telegram/WhatsApp-style instant re-ordering with pinning (max 3 pinned chats)
@@ -610,7 +610,7 @@
                     reg.active.postMessage({
                         type: 'CLOSE_CHAT_NOTIFICATIONS',
                         payload: {
-                            tag: `pwaninet-chat-${convStr}`,
+                            tag: `vasto-chat-${convStr}`,
                             conversation_id: convStr
                         }
                     });

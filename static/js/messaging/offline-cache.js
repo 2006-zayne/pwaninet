@@ -1,11 +1,11 @@
 /**
- * Offline Cache Management for PwaniNet Messaging
+ * Offline Cache Management for vasto Messaging
  * Handles IndexedDB storage for conversations, messages, and outbox
  */
 
 class OfflineCache {
     constructor() {
-        this.dbName = 'pwaninet_chat';
+        this.dbName = 'vasto_chat';
         this.dbVersion = 1;
         this.db = null;
     }

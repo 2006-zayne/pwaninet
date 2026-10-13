@@ -16,7 +16,7 @@
         if (offcanvas) return { root: offcanvas, panel: offcanvas, kind: 'offcanvas' };
         const push = handle.closest('#push-sheet-container');
         if (push) return { root: push, panel: push, kind: 'push' };
-        const chooser = handle.closest('#pwaninet-link-chooser-card');
+        const chooser = handle.closest('#vasto-link-chooser-card');
         if (chooser) return { root: chooser, panel: chooser, kind: 'chooser' };
         const custom = handle.closest('.attachment-modal, .pwanimate-attachment-modal');
         if (custom) return { root: custom, panel: custom.querySelector('.attachment-modal-content, .pwanimate-attachment-modal-content'), kind: 'custom' };
@@ -27,7 +27,7 @@
         if (sheet.kind === 'modal' && window.bootstrap?.Modal) window.bootstrap.Modal.getOrCreateInstance(sheet.root).hide();
         else if (sheet.kind === 'offcanvas' && window.bootstrap?.Offcanvas) window.bootstrap.Offcanvas.getOrCreateInstance(sheet.root).hide();
         else if (sheet.kind === 'push') window.dismissPushPromptSheet?.();
-        else if (sheet.kind === 'chooser') window.dismissPwaninetLinkChooser?.();
+        else if (sheet.kind === 'chooser') window.dismissvastoLinkChooser?.();
         else if (sheet.kind === 'custom') sheet.root.classList.remove('show');
         window.setTimeout(() => reset(sheet.panel), 450);
     }
@@ -93,7 +93,7 @@
         if (!sheet?.panel) return;
         const rect = sheet.panel.getBoundingClientRect();
         const viewportHeight = window.visualViewport?.height || window.innerHeight;
-        const safeTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pwaninet-safe-area-top')) || 0;
+        const safeTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--vasto-safe-area-top')) || 0;
         drag = {
             pointerId: event.pointerId,
             startY: event.clientY,

@@ -62,7 +62,7 @@ GRADIENT_CHOICES = [
 class Post(models.Model):
     VISIBILITY_CHOICES = [
         ('PUBLIC', 'Legacy public post'),
-        ('AUTHENTICATED', 'PwaniNet Users'),
+        ('AUTHENTICATED', 'vasto Users'),
         ('FOLLOWERS', 'Followers Only'),
         ('PRIVATE', 'Only Me'),
     ]

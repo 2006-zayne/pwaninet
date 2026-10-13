@@ -15,7 +15,7 @@ import argparse
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, PROJECT_ROOT)
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pwaninet.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "vasto.settings")
 
 # Try to find and use virtualenv if django not in current python
 try:

@@ -1,7 +1,7 @@
 /* Paste into DevTools Console on a logged-in staging page before navigating. */
 (() => {
-  if (window.PwaniNetPerfProbe) {
-    console.info('PwaniNet performance probe is already running.');
+  if (window.VastoPerfProbe) {
+    console.info('Vasto performance probe is already running.');
     return;
   }
 
@@ -54,7 +54,7 @@
       item.responseBytes = event.detail.xhr.responseText?.length || 0;
       records.push(item);
       active.delete(event.detail.xhr);
-      console.info('[PwaniNet perf]', item);
+      console.info('[Vasto perf]', item);
     }));
   });
 
@@ -67,7 +67,7 @@
         item.finishedAt = now();
         records.push(item);
         active.delete(event.detail.xhr);
-        console.warn('[PwaniNet perf]', item);
+        console.warn('[Vasto perf]', item);
       }
     });
   }
@@ -82,7 +82,7 @@
     } catch (_) {}
   }
 
-  window.PwaniNetPerfProbe = {
+  window.VastoPerfProbe = {
     getReport() {
       return {
         capturedAt: new Date().toISOString(),
@@ -117,11 +117,11 @@
       const blob = new Blob([JSON.stringify(this.getReport(), null, 2)], { type: 'application/json' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = 'pwaninet-browser-performance.json';
+      link.download = 'vasto-browser-performance.json';
       link.click();
       URL.revokeObjectURL(link.href);
     },
   };
 
-  console.info('PwaniNet perf probe ready. Navigate through Home, Profile, and Groups, then run PwaniNetPerfProbe.download().');
+  console.info('Vasto perf probe ready. Navigate through Home, Profile, and Groups, then run VastoPerfProbe.download().');
 })();

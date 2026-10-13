@@ -10,13 +10,13 @@
                    class="btn btn-outline-secondary btn-sm rounded-pill d-flex align-items-center px-3"
                    data-bypass-htmx="true"
                    hx-boost="false"
-                   title="{% trans 'Back to PwaniNet' %}">
-                    <i class="bi bi-box-arrow-left me-1"></i> <span class="small">{% trans "PwaniNet" %}</span>
+                   title="{% trans 'Back to vasto' %}">
+                    <i class="bi bi-box-arrow-left me-1"></i> <span class="small">{% trans "vasto" %}</span>
                 </a>
                 <button type="button"
                         class="pwanimate-collapse-toggle-btn"
                         id="pwanimateLeftRailCollapseBtn"
-                        onclick="if (window.pwanimateWorkspace) window.pwanimateWorkspace.toggleLeftRail(true);"
+                        onclick="if (window.sparkWorkspace) window.sparkWorkspace.toggleLeftRail(true);"
                         title="{% trans 'Collapse sidebar' %}"
                         aria-label="{% trans 'Collapse sidebar' %}">
                     <i class="bi bi-layout-sidebar-inset"></i>
@@ -42,7 +42,7 @@
                                     class="dropdown-item d-flex align-items-center"
                                     data-bs-toggle="modal"
                                     data-bs-target="#pwanimateSettingsModal"
-                                    onclick="if (document.getElementById('pwanimateSettingsModal')) { if (typeof window.switchPwanimateSettingsTab === 'function') window.switchPwanimateSettingsTab('modal', 'personalization'); } else if (typeof window.switchPwanimateSettingsTab === 'function') { window.switchPwanimateSettingsTab('mobile', 'personalization'); }">
+                                    onclick="if (document.getElementById('pwanimateSettingsModal')) { if (typeof window.switchSparkSettingsTab === 'function') window.switchSparkSettingsTab('modal', 'personalization'); } else if (typeof window.switchSparkSettingsTab === 'function') { window.switchSparkSettingsTab('mobile', 'personalization'); }">
                                 <i class="bi bi-gear me-2"></i>{% trans "Settings" %}
                             </button>
                         </li>
@@ -113,7 +113,7 @@
         <button type="button"
                 class="pwanimate-rail-icon-btn"
                 id="pwanimateLeftRailExpandBtn"
-                onclick="if (window.pwanimateWorkspace) window.pwanimateWorkspace.toggleLeftRail(false);"
+                onclick="if (window.sparkWorkspace) window.sparkWorkspace.toggleLeftRail(false);"
                 title="{% trans 'Expand sidebar' %}"
                 aria-label="{% trans 'Expand sidebar' %}">
             <i class="bi bi-layout-sidebar"></i>
@@ -132,8 +132,8 @@
 
         <a href="{% url 'posts:home' %}"
            class="pwanimate-rail-icon-btn"
-           title="{% trans 'Back to PwaniNet' %}"
-           aria-label="{% trans 'Back to PwaniNet' %}"
+           title="{% trans 'Back to vasto' %}"
+           aria-label="{% trans 'Back to vasto' %}"
            data-bypass-htmx="true"
            hx-boost="false">
             <i class="bi bi-box-arrow-left"></i>
@@ -146,7 +146,7 @@
                 aria-label="{% trans 'Settings' %}"
                 data-bs-toggle="modal"
                 data-bs-target="#pwanimateSettingsModal"
-                onclick="if (document.getElementById('pwanimateSettingsModal')) { if (typeof window.switchPwanimateSettingsTab === 'function') window.switchPwanimateSettingsTab('modal', 'personalization'); }">
+                onclick="if (document.getElementById('pwanimateSettingsModal')) { if (typeof window.switchSparkSettingsTab === 'function') window.switchSparkSettingsTab('modal', 'personalization'); }">
             <i class="bi bi-gear"></i>
         </button>
         {% endif %}

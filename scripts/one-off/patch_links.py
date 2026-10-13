@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <div class="modal-body text-center py-4">
                         <i class="bi bi-box-arrow-up-right text-primary mb-3" style="font-size: 2.5rem;"></i>
-                        <p class="mb-2">You are about to leave PwaniNet and visit an external website:</p>
+                        <p class="mb-2">You are about to leave pwaninet and visit an external website:</p>
                         <p class="mb-4"><strong id="externalLinkUrl" style="word-break: break-all; color: var(--bs-primary);"></strong></p>
                         <p class="text-muted small mb-0">Are you sure you want to proceed?</p>
                     </div>

@@ -115,9 +115,9 @@ class ReleaseAdmin(admin.ModelAdmin):
             )
     
     def update_version_file(self, release):
-        """Update pwaninet/version.py with the new version"""
+        """Update vasto/version.py with the new version"""
         from django.conf import settings
-        version_file_path = os.path.join(settings.BASE_DIR, 'pwaninet', 'version.py')
+        version_file_path = os.path.join(settings.BASE_DIR, 'vasto', 'version.py')
         
         # Update version.py
         with open(version_file_path, 'w') as f:

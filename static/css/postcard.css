@@ -1,5 +1,5 @@
 /**
- * PwaniNet Postcard Design System - Core Stylesheet
+ * vasto Postcard Design System - Core Stylesheet
  * Phase 1: Foundation, CSS Decoupling & Global Shell Contract
  */
 
@@ -2997,7 +2997,7 @@ body.reels-active .modal-backdrop {
 
   /* Comment input footer safe-area padding */
   .comments-bottom-sheet .modal-footer {
-    padding-bottom: max(10px, var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 10px))) !important;
+    padding-bottom: max(10px, var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 10px))) !important;
     transition: padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1);
   }
 

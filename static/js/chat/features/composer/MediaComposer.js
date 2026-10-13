@@ -709,12 +709,12 @@ export class MediaComposer {
         if (window.videoManager && typeof window.videoManager.isGlobalMuted === 'boolean') {
             return window.videoManager.isGlobalMuted;
         }
-        if (window.PwaniNetGlobalAudio && typeof window.PwaniNetGlobalAudio.getAudioPreference === 'function') {
-            return window.PwaniNetGlobalAudio.getAudioPreference() === 'muted';
+        if (window.vastoGlobalAudio && typeof window.vastoGlobalAudio.getAudioPreference === 'function') {
+            return window.vastoGlobalAudio.getAudioPreference() === 'muted';
         }
-        const username = window.PwaniNetUsername || '';
-        const userKey = username ? `pwaninet_audio_preference_${username}` : 'pwaninet_audio_preference';
-        const pref = localStorage.getItem(userKey) || localStorage.getItem('pwaninet_audio_preference');
+        const username = window.vastoUsername || '';
+        const userKey = username ? `vasto_audio_preference_${username}` : 'vasto_audio_preference';
+        const pref = localStorage.getItem(userKey) || localStorage.getItem('vasto_audio_preference');
         if (pref) return pref === 'muted';
         return false;
     }
@@ -723,13 +723,13 @@ export class MediaComposer {
         if (window.videoManager && typeof window.videoManager.setGlobalMute === 'function') {
             window.videoManager.setGlobalMute(muted);
         }
-        if (window.PwaniNetGlobalAudio && typeof window.PwaniNetGlobalAudio.setAudioPreference === 'function') {
-            window.PwaniNetGlobalAudio.setAudioPreference(muted ? 'muted' : 'unmuted');
+        if (window.vastoGlobalAudio && typeof window.vastoGlobalAudio.setAudioPreference === 'function') {
+            window.vastoGlobalAudio.setAudioPreference(muted ? 'muted' : 'unmuted');
         }
-        const username = window.PwaniNetUsername || '';
-        const userKey = username ? `pwaninet_audio_preference_${username}` : 'pwaninet_audio_preference';
+        const username = window.vastoUsername || '';
+        const userKey = username ? `vasto_audio_preference_${username}` : 'vasto_audio_preference';
         localStorage.setItem(userKey, muted ? 'muted' : 'unmuted');
-        localStorage.setItem('pwaninet_audio_preference', muted ? 'muted' : 'unmuted');
+        localStorage.setItem('vasto_audio_preference', muted ? 'muted' : 'unmuted');
 
         // Also update navbar mute button icon if present
         const muteButton = document.getElementById('global-mute-button');

@@ -39,7 +39,7 @@ class OpenRouterLLMProvider(BaseLLMProvider):
         model_name: Optional[str] = None,
         timeout: Optional[float] = None,
         connect_timeout: Optional[float] = None,
-        site_url: str = "https://pwaninet.local",
+        site_url: str = "https://vasto.local",
         site_name: str = "Pwanimate",
         session: Optional[requests.Session] = None,
     ):

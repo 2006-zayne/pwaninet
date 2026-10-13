@@ -33,14 +33,14 @@ class LocalTimeTool(BaseDomainTool):
 
 class ContentSearchTool(BaseDomainTool):
     name = "content_search"
-    description = "Search accessible PwaniNet posts or documents by text."
+    description = "Search accessible vasto posts or documents by text."
     parameters_schema = {"type": "object", "properties": {
         "query": {"type": "string"}, "content_type": {"type": "string"},
         "limit": {"type": "integer"},
     }, "required": ["query", "content_type"]}
 
     def execute(self, user, query, content_type, limit=5, **kwargs):
-        from pwanimate.retrieval.adapters.pwaninet_search import PwaniNetSearchAdapter
+        from pwanimate.retrieval.adapters.pwaninet_search import pwaninetSearchAdapter
         from pwanimate.retrieval.types import RetrievalRequest
         query = str(query).strip()[:300]
         if content_type not in {"post", "document"}:
@@ -48,7 +48,7 @@ class ContentSearchTool(BaseDomainTool):
         if not query:
             raise ToolValidationError("Please provide search terms.", tool_name=self.name)
         request = RetrievalRequest(query=query, user=user, limit=min(max(int(limit), 1), 10))
-        adapter = PwaniNetSearchAdapter()
+        adapter = pwaninetSearchAdapter()
         results = adapter.search_posts(request) if content_type == "post" else adapter.search_documents_lexical(request)
         return ToolResult.ok([{
             "title": r.title, "snippet": (r.snippet or "")[:1200], "url": r.url,

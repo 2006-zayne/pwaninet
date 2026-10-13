@@ -1,6 +1,6 @@
 /**
- * PwaniNet Unified Download UI (Floating Banner)
- * Matches the design pattern, animations, themes, and responsiveness of PwaniNet's Upload Banner.
+ * vasto Unified Download UI (Floating Banner)
+ * Matches the design pattern, animations, themes, and responsiveness of vasto's Upload Banner.
  * Stacks intelligently above the upload banner if both are active.
  */
 
@@ -135,31 +135,31 @@ class DownloadUI {
      * Listen to download events
      */
     setupEventListeners() {
-        window.addEventListener('pwaninet:download-queued', (e) => {
+        window.addEventListener('vasto:download-queued', (e) => {
             this.handleItemQueued(e.detail);
         });
 
-        window.addEventListener('pwaninet:download-started', (e) => {
+        window.addEventListener('vasto:download-started', (e) => {
             this.handleItemStarted(e.detail);
         });
 
-        window.addEventListener('pwaninet:download-progress', (e) => {
+        window.addEventListener('vasto:download-progress', (e) => {
             this.handleItemProgress(e.detail);
         });
 
-        window.addEventListener('pwaninet:download-completed', (e) => {
+        window.addEventListener('vasto:download-completed', (e) => {
             this.handleItemCompleted(e.detail);
         });
 
-        window.addEventListener('pwaninet:download-failed', (e) => {
+        window.addEventListener('vasto:download-failed', (e) => {
             this.handleItemFailed(e.detail);
         });
 
-        window.addEventListener('pwaninet:download-cancelled', (e) => {
+        window.addEventListener('vasto:download-cancelled', (e) => {
             this.handleItemCancelled(e.detail);
         });
 
-        window.addEventListener('pwaninet:download-already-downloaded', (e) => {
+        window.addEventListener('vasto:download-already-downloaded', (e) => {
             const item = e.detail || {};
             this.showToast(item.gallerySaved === false
                 ? (item.galleryError?.includes('bridge is unavailable')
@@ -403,10 +403,10 @@ class DownloadUI {
     }
 
     showToast(message, type = 'info') {
-        let toast = document.getElementById('pwaninet-download-status-toast');
+        let toast = document.getElementById('vasto-download-status-toast');
         if (!toast) {
             toast = document.createElement('div');
-            toast.id = 'pwaninet-download-status-toast';
+            toast.id = 'vasto-download-status-toast';
             toast.setAttribute('role', 'status');
             document.body.appendChild(toast);
         }
@@ -464,11 +464,11 @@ class DownloadUI {
             /* Mobile positioning */
             @media (max-width: 767.98px) {
                 .download-banner {
-                    bottom: calc(80px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                    bottom: calc(80px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
                     left: 50%;
                     transform: translateX(-50%) translateY(24px) scale(0.96);
                     width: 95%;
-                    max-width: calc(100vw - 24px - var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)) - var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+                    max-width: calc(100vw - 24px - var(--vasto-safe-area-left, env(safe-area-inset-left, 0px)) - var(--vasto-safe-area-right, env(safe-area-inset-right, 0px)));
                     border-radius: 20px;
                 }
                 .download-banner.visible {
@@ -477,15 +477,15 @@ class DownloadUI {
                     transform: translateX(-50%) translateY(0) scale(1);
                 }
                 .download-banner.stacked-above-upload {
-                    bottom: calc(180px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                    bottom: calc(180px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
                 }
             }
 
             /* Desktop positioning */
             @media (min-width: 768px) {
                 .download-banner {
-                    bottom: calc(24px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-                    right: calc(28px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+                    bottom: calc(24px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                    right: calc(28px + var(--vasto-safe-area-right, env(safe-area-inset-right, 0px)));
                     left: auto;
                     transform: translateY(24px) scale(0.96);
                     width: 380px;
@@ -498,7 +498,7 @@ class DownloadUI {
                     transform: translateY(0) scale(1);
                 }
                 .download-banner.stacked-above-upload {
-                    bottom: calc(140px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                    bottom: calc(140px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
                 }
                 .download-banner.visible.is-minimized {
                     width: 290px;

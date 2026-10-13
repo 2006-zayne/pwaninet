@@ -1,6 +1,6 @@
 """
 User / Friend Recommendation Service.
-Multi-tier ranking engine for recommending classmates and peers on PwaniNet.
+Multi-tier ranking engine for recommending classmates and peers on vasto.
 """
 
 import logging

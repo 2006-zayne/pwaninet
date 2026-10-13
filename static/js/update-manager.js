@@ -1,5 +1,5 @@
 /**
- * PwaniNet Update Manager
+ * vasto Update Manager
  * Update detection and notification system
  * Release Center is the single source of truth for version information.
  */
@@ -88,7 +88,7 @@
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">PwaniNet Update Available</h5>
+                        <h5 class="modal-title">vasto Update Available</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
@@ -174,7 +174,7 @@
                         
                         <div class="alert alert-warning">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            This is a mandatory update. You must update to continue using PwaniNet.
+                            This is a mandatory update. You must update to continue using vasto.
                         </div>
                         
                         <h6 class="fw-bold mb-2">${releaseData.release_title || 'Mandatory Update'}</h6>
@@ -298,7 +298,7 @@
                         <div class="spinner-border text-primary mb-3" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
-                        <h5 class="fw-bold mb-2">Updating PwaniNet</h5>
+                        <h5 class="fw-bold mb-2">Updating vasto</h5>
                         <p class="text-muted mb-3" id="progress-text">Preparing update...</p>
                         <div class="progress" style="height: 6px;">
                             <div class="progress-bar progress-bar-striped progress-bar-animated" 
@@ -477,7 +477,7 @@
     setInterval(checkForUpdates, 300000);
 
     // Expose API for manual checks
-    window.PwaniNetUpdateManager = {
+    window.vastoUpdateManager = {
         checkForUpdates,
         initiateUpdate,
         isUpdateAvailable: () => updateAvailable

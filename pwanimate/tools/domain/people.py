@@ -2,7 +2,7 @@
 People Discovery Tool for Pwanimate.
 
 Allows deterministic, read-only retrieval and recommendation of real
-PwaniNet users based on skills, interests, collaboration readiness,
+vasto users based on skills, interests, collaboration readiness,
 and academic alignment.
 """
 
@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 class PeopleDiscoveryTool(BaseDomainTool):
     """
-    Search and discover real PwaniNet students and peers based on skills,
+    Search and discover real vasto students and peers based on skills,
     interests, academic scope, and collaboration readiness.
     """
     name = "people_discovery"
     description = (
-        "Discover real PwaniNet students and peers based on technical/creative skills, "
+        "Discover real vasto students and peers based on technical/creative skills, "
         "interests, collaboration status (open to projects/study groups), and academic programme."
     )
     parameters_schema = {

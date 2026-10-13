@@ -47,7 +47,7 @@ def github_release_webhook(request):
 
     event = request.headers.get('X-GitHub-Event', '')
     if event == 'ping':
-        return JsonResponse({"status": "pong", "message": "PwaniNet GitHub webhook active"})
+        return JsonResponse({"status": "pong", "message": "vasto GitHub webhook active"})
 
     if event != 'release':
         return JsonResponse({"status": "ignored", "message": f"Event '{event}' ignored"})
@@ -83,7 +83,7 @@ def github_release_webhook(request):
             version=tag_name,
             build_number=next_build,
             release_title=title,
-            release_summary=body[:500] if body else f"PwaniNet Release {tag_name}",
+            release_summary=body[:500] if body else f"vasto Release {tag_name}",
             release_type='PATCH' if tag_name.count('.') == 2 and tag_name.split('.')[-1] != '0' else 'MINOR',
             status='PUBLISHED',
             published=True,

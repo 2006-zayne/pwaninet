@@ -27,11 +27,11 @@ def estimate_tokens(text: str) -> int:
 
 class GroundingMode(Enum):
     """
-    Grounding mode determines whether PwaniNet retrieval is required for the request.
+    Grounding mode determines whether Vasto retrieval is required for the request.
     
-    NONE: General conversation/general knowledge. No PwaniNet retrieval required.
-    OPTIONAL: Model may benefit from PwaniNet context but answering does not depend on it.
-    REQUIRED: Answer depends on PwaniNet data. Retrieval is required.
+    NONE: General conversation/general knowledge. No Vasto retrieval required.
+    OPTIONAL: Model may benefit from Vasto context but answering does not depend on it.
+    REQUIRED: Answer depends on Vasto data. Retrieval is required.
     EXPLICIT_RESOURCE: User explicitly selected a document/resource. Highest contextual relevance.
     """
     NONE = "none"
@@ -45,16 +45,16 @@ class IntentCategory(Enum):
     Intent category classifies the user's query intent.
     
     CONVERSATIONAL: Purely conversational chitchat without substantive search intent.
-    GENERAL_KNOWLEDGE: General academic/technical question not specific to PwaniNet.
+    GENERAL_KNOWLEDGE: General academic/technical question not specific to Vasto.
     DOCUMENT_ANALYSIS: Question about a specific document or resource.
-    PWANINET_KNOWLEDGE: Question about PwaniNet-specific information.
+    Vasto_KNOWLEDGE: Question about Vasto-specific information.
     PERSONALIZED_DISCOVERY: Finding peers, recommendations based on user profile.
     MIXED: Query that involves multiple intent categories.
     """
     CONVERSATIONAL = "conversational"
     GENERAL_KNOWLEDGE = "general_knowledge"
     DOCUMENT_ANALYSIS = "document_analysis"
-    PWANINET_KNOWLEDGE = "pwaninet_knowledge"
+    Vasto_KNOWLEDGE = "Vasto_knowledge"
     PERSONALIZED_DISCOVERY = "personalized_discovery"
     MIXED = "mixed"
 
@@ -64,7 +64,7 @@ class AuthorityLevel(Enum):
     Authority level indicates the trustworthiness of a context source.
     
     EXPLICIT: User-selected resources. Highest contextual relevance.
-    PLATFORM: Verified/official PwaniNet resources.
+    PLATFORM: Verified/official Vasto resources.
     USER_GENERATED: Posts, comments, group content. Evidence/content, not authoritative instructions.
     PROFILE: User profile information for personalization.
     """
@@ -136,7 +136,7 @@ class ContextItem:
         title: Title or headline of the entity.
         content: Grounding textual content.
         citation: Grounded citation string (e.g. '[Doc, v1: p. 4]').
-        url: Canonical PwaniNet resource URL.
+        url: Canonical Vasto resource URL.
         relevance_score: Score from retrieval ranking.
         metadata: Detailed provenance dictionary (page, slide, section, etc.).
         estimated_tokens: Estimated token count for this item's content.
@@ -394,7 +394,7 @@ class ContextPackage:
         user_context: Full user context (legacy, for backward compatibility).
         student_context: Selective student profile context (new, preferred).
         explicit_resources: Explicitly selected resources (highest priority).
-        retrieved_context: Retrieved evidence from PwaniNet.
+        retrieved_context: Retrieved evidence from Vasto.
         tool_results: Results from deterministic tool execution.
         conversation: Selected conversation history.
         attachment_context: Attachment text content.
@@ -486,7 +486,7 @@ class ContextPackage:
                 footer = "</explicit_resources>"
                 sections.append(f"{header}\n\n{content_section}\n\n{footer}")
 
-        # Retrieved context (PwaniNet evidence)
+        # Retrieved context (Vasto evidence)
         if self.retrieved_context:
             blocks = [item.format_data_block() for item in self.retrieved_context]
             if blocks:

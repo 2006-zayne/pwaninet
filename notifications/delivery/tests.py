@@ -616,11 +616,11 @@ class PushContentCustomizationTests(TestCase):
         )
 
         content = self.adapter._resolve_push_content(notification)
-        self.assertEqual(content['title'], 'PwaniNet')
+        self.assertEqual(content['title'], 'vasto')
         self.assertIn('Grace Student pinched you', content['body'])
         self.assertEqual(content['icon'], 'https://example.com/avatar.jpg')
-        self.assertEqual(content['channel_id'], 'pwaninet_social')
-        self.assertEqual(content['tag'], 'pwaninet-social-pinch')
+        self.assertEqual(content['channel_id'], 'vasto_social')
+        self.assertEqual(content['tag'], 'vasto-social-pinch')
         self.assertEqual(content['target_url'], '/users/profile/grace')
 
     def test_resolve_push_content_smart_tagging_aggregation(self):
@@ -634,7 +634,7 @@ class PushContentCustomizationTests(TestCase):
         )
 
         content = self.adapter._resolve_push_content(notification)
-        self.assertEqual(content['tag'], 'pwaninet-post_likes_88')
+        self.assertEqual(content['tag'], 'vasto-post_likes_88')
 
     def test_resolve_push_content_smart_tagging_context(self):
         """Test that context type and ID are used when aggregation key is absent."""
@@ -648,10 +648,10 @@ class PushContentCustomizationTests(TestCase):
         )
 
         content = self.adapter._resolve_push_content(notification)
-        self.assertEqual(content['tag'], 'pwaninet-post-456')
+        self.assertEqual(content['tag'], 'vasto-post-456')
 
     def test_resolve_push_content_messaging_channel(self):
-        """Test that messaging category maps to pwaninet_messages channel."""
+        """Test that messaging category maps to vasto_messages channel."""
         notification = NotificationObject.objects.create(
             recipient=self.user,
             notification_type='MESSAGE',
@@ -660,7 +660,7 @@ class PushContentCustomizationTests(TestCase):
         )
 
         content = self.adapter._resolve_push_content(notification)
-        self.assertEqual(content['channel_id'], 'pwaninet_messages')
+        self.assertEqual(content['channel_id'], 'vasto_messages')
 
     @patch('pywebpush.webpush')
     def test_webpush_payload_includes_tag_and_renotify(self, mock_webpush):
@@ -694,11 +694,11 @@ class PushContentCustomizationTests(TestCase):
         call_kwargs = mock_webpush.call_args[1]
         sent_data = json.loads(call_kwargs['data'])
 
-        self.assertEqual(sent_data['title'], 'PwaniNet')
+        self.assertEqual(sent_data['title'], 'vasto')
         self.assertIn('Grace Student pinched you', sent_data['body'])
         self.assertTrue(sent_data['renotify'])
-        self.assertEqual(sent_data['tag'], 'pwaninet-social-pinch')
-        self.assertIn('pwaninetmonochrome.png', sent_data['badge'])
+        self.assertEqual(sent_data['tag'], 'vasto-social-pinch')
+        self.assertIn('vastomonochrome.png', sent_data['badge'])
 
     @patch('notifications.delivery.adapters.get_firebase_app')
     @patch('firebase_admin.messaging.send')
@@ -728,12 +728,12 @@ class PushContentCustomizationTests(TestCase):
         mock_send.assert_called_once()
         sent_message = mock_send.call_args[0][0]
 
-        self.assertEqual(sent_message.notification.title, 'PwaniNet')
+        self.assertEqual(sent_message.notification.title, 'vasto')
         self.assertIn('Grace Student pinched you', sent_message.notification.body)
         self.assertIsNotNone(sent_message.android)
-        self.assertEqual(sent_message.android.notification.channel_id, 'pwaninet_social')
+        self.assertEqual(sent_message.android.notification.channel_id, 'vasto_social')
         self.assertEqual(sent_message.android.notification.color, '#2563eb')
-        self.assertEqual(sent_message.android.notification.icon, 'ic_stat_pwaninet')
-        self.assertEqual(sent_message.android.collapse_key, 'pwaninet-social-pinch')
+        self.assertEqual(sent_message.android.notification.icon, 'ic_stat_vasto')
+        self.assertEqual(sent_message.android.collapse_key, 'vasto-social-pinch')
 
 

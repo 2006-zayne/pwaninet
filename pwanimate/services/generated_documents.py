@@ -582,7 +582,7 @@ def _render_docx(title, message):
         section.page_width - section.left_margin - section.right_margin,
         WD_TAB_ALIGNMENT.RIGHT,
     )
-    brand_run = footer.add_run("PwaniNet  ·  Pwanimate")
+    brand_run = footer.add_run("vasto  ·  Pwanimate")
     brand_run.font.color.rgb = RGBColor(100, 116, 139)
     footer.add_run("\t")
     footer.add_run("Page ")
@@ -682,7 +682,7 @@ def _render_pdf(title, message):
                 raise RuntimeError("The response could not be rendered for PDF export.")
             page.evaluate("async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); }")
             page.emulate_media(media="print")
-            footer = """<div style='width:100%;box-sizing:border-box;padding:0 19mm;font-family:Arial,sans-serif;font-size:8pt;color:#64748b;display:flex;justify-content:space-between;align-items:center;'><span>PwaniNet · Pwanimate</span><span>Page <span class='pageNumber'></span></span></div>"""
+            footer = """<div style='width:100%;box-sizing:border-box;padding:0 19mm;font-family:Arial,sans-serif;font-size:8pt;color:#64748b;display:flex;justify-content:space-between;align-items:center;'><span>vasto · Pwanimate</span><span>Page <span class='pageNumber'></span></span></div>"""
             return page.pdf(
                 format="A4", prefer_css_page_size=True, print_background=True,
                 display_header_footer=True, footer_template=footer,

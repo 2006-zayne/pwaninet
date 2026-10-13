@@ -93,7 +93,7 @@
     });
 
     // Public API
-    window.PwaniNetPostContent = {
+    window.vastoPostContent = {
         init: function() { checkPostClamping(document); },
         checkClamping: checkPostClamping
     };
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div id="externalLinkLogo" class="d-flex align-items-center justify-content-center mx-auto mb-3 rounded-circle bg-body-secondary" style="width: 76px; height: 76px;" aria-hidden="true">
                             <i class="bi bi-globe2 text-primary" style="font-size: 2.25rem;"></i>
                         </div>
-                        <p class="mb-2">You are about to leave PwaniNet and visit an external website:</p>
+                        <p class="mb-2">You are about to leave vasto and visit an external website:</p>
                         <p class="mb-4"><strong id="externalLinkUrl" style="word-break: break-all; color: var(--bs-primary);"></strong></p>
                         <p class="text-muted small mb-0">Are you sure you want to proceed?</p>
                     </div>
@@ -213,8 +213,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (modal) modal.hide();
         }
         
-        // 1. In Capacitor Android native wrapper, launch via AndroidBridge / PwaninetBridge
-        const bridge = window.AndroidBridge || window.PwaninetBridge;
+        // 1. In Capacitor Android native wrapper, launch via AndroidBridge / vastoBridge
+        const bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.openExternalUrl === 'function') {
             bridge.openExternalUrl(targetUrl);
             return;

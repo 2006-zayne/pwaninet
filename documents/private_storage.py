@@ -15,9 +15,9 @@ class PrivateResourceStorage(Storage):
     def __init__(self):
         bucket = getattr(settings, "PWANIMATE_PRIVATE_MEDIA_BUCKET", "")
         settings_module = os.environ.get("DJANGO_SETTINGS_MODULE", "").strip().lower()
-        # PWANINET_ENV is the deployment intent. It can override a production
+        # vasto_ENV is the deployment intent. It can override a production
         # settings module when that module is used locally for device testing.
-        environment = os.environ.get("PWANINET_ENV", "").strip().lower()
+        environment = os.environ.get("vasto_ENV", "").strip().lower()
         if not environment:
             default_environment = (
                 "production" if settings_module.endswith(".production")

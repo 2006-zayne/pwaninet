@@ -5,4 +5,4 @@ docker compose up -d db redis
 ./serve.sh
 
 # Terminal 3: Secure Global Uplink
-cloudflared tunnel run pwaninet-tunnel
+cloudflared tunnel run vasto-tunnel

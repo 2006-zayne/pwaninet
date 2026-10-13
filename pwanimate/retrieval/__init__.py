@@ -13,7 +13,7 @@ from .types import (
 )
 from .services.document_retrieval import DocumentSemanticRetrievalService
 from .services.unified_retrieval import UnifiedRetrievalService
-from .adapters.pwaninet_search import PwaniNetSearchAdapter
+from .adapters.pwaninet_search import pwaninetSearchAdapter
 
 __all__ = [
     'SourceType',
@@ -23,5 +23,5 @@ __all__ = [
     'RetrievalResponse',
     'DocumentSemanticRetrievalService',
     'UnifiedRetrievalService',
-    'PwaniNetSearchAdapter',
+    'pwaninetSearchAdapter',
 ]

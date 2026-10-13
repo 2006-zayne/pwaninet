@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             model_name='user',
             name='profile_privacy',
             field=models.CharField(
-                choices=[('AUTHENTICATED', 'PwaniNet Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')],
+                choices=[('AUTHENTICATED', 'vasto Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')],
                 default='AUTHENTICATED',
                 help_text='Who can view profile information',
                 max_length=20,
@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
             model_name='user',
             name='post_privacy',
             field=models.CharField(
-                choices=[('AUTHENTICATED', 'PwaniNet Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')],
+                choices=[('AUTHENTICATED', 'vasto Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')],
                 default='AUTHENTICATED',
                 help_text='Default visibility for new posts',
                 max_length=20,

@@ -1,5 +1,5 @@
 """
-Event Publisher for PwaniNet Notification Engine v2
+Event Publisher for vasto Notification Engine v2
 
 This module provides the service for publishing platform events.
 Following the specification, events are published after actions complete successfully.

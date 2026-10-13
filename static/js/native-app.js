@@ -4,21 +4,21 @@
  */
 
 (function() {
-    window._pwaninet_native_load_time = performance.now();
-    console.log('[PWANINET-NATIVE] Script load time:', window._pwaninet_native_load_time.toFixed(2) + 'ms');
+    window._vasto_native_load_time = performance.now();
+    console.log('[vasto-NATIVE] Script load time:', window._vasto_native_load_time.toFixed(2) + 'ms');
 
     function initEarly() {
         var isNative = typeof window.Capacitor !== 'undefined' ||
                        window.hasOwnProperty('Capacitor') ||
                        document.documentElement.classList.contains('is-capacitor') ||
                        document.documentElement.classList.contains('is-native-app');
-        if (!isNative || window._pwaninet_native_ui_initialized) return;
+        if (!isNative || window._vasto_native_ui_initialized) return;
 
         document.documentElement.classList.add('is-capacitor', 'is-native-app');
         if (document.body) document.body.classList.add('is-capacitor', 'is-native-app');
 
         var earlyInitStart = performance.now();
-        console.log('[PWANINET-NATIVE] Early UI initialization started at:', earlyInitStart.toFixed(2) + 'ms');
+        console.log('[vasto-NATIVE] Early UI initialization started at:', earlyInitStart.toFixed(2) + 'ms');
 
         // 1. Configure Status Bar immediately for edge-to-edge
         initStatusBarEarly();
@@ -30,22 +30,22 @@
         var initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
         updateNavigationBarForTheme(initialTheme);
 
-        window._pwaninet_native_ui_initialized = true;
+        window._vasto_native_ui_initialized = true;
         var earlyInitEnd = performance.now();
-        console.log('[PWANINET-NATIVE] Early UI initialization complete in:', (earlyInitEnd - earlyInitStart).toFixed(2) + 'ms');
+        console.log('[vasto-NATIVE] Early UI initialization complete in:', (earlyInitEnd - earlyInitStart).toFixed(2) + 'ms');
     }
 
     // If Capacitor or AndroidBridge is already here, init immediately
-    if ((window.Capacitor && window.Capacitor.Plugins) || window.AndroidBridge || window.PwaninetBridge) {
+    if ((window.Capacitor && window.Capacitor.Plugins) || window.AndroidBridge || window.vastoBridge) {
         initEarly();
     } else {
         // Fallback: wait a few frames if we're in a native environment but bridge is lagging
         var attempts = 0;
         var checkBridge = setInterval(function() {
             attempts++;
-            if ((window.Capacitor && window.Capacitor.Plugins) || window.AndroidBridge || window.PwaninetBridge || attempts > 20) {
+            if ((window.Capacitor && window.Capacitor.Plugins) || window.AndroidBridge || window.vastoBridge || attempts > 20) {
                 clearInterval(checkBridge);
-                if ((window.Capacitor && window.Capacitor.Plugins) || window.AndroidBridge || window.PwaninetBridge) initEarly();
+                if ((window.Capacitor && window.Capacitor.Plugins) || window.AndroidBridge || window.vastoBridge) initEarly();
             }
         }, 16);
     }
@@ -61,7 +61,7 @@ async function initStatusBarEarly() {
         const isLight = theme === 'light';
 
         // Notify AndroidBridge directly for instantaneous update
-        var bridge = window.AndroidBridge || window.PwaninetBridge;
+        var bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.setSystemBarTheme === 'function') {
             bridge.setSystemBarTheme(isLight ? 'light' : 'dark');
         }
@@ -78,9 +78,9 @@ async function initStatusBarEarly() {
         await StatusBar.setStyle({ style: isLight ? 'LIGHT' : 'DARK' });
 
         var endTime = performance.now();
-        console.log('[PWANINET-NATIVE] StatusBar early init complete in:', (endTime - startTime).toFixed(2) + 'ms');
+        console.log('[vasto-NATIVE] StatusBar early init complete in:', (endTime - startTime).toFixed(2) + 'ms');
     } catch (e) {
-        console.error('[PWANINET-NATIVE] Early StatusBar init failed', e);
+        console.error('[vasto-NATIVE] Early StatusBar init failed', e);
     }
 }
 
@@ -94,7 +94,7 @@ async function initSafeAreaEarly() {
         // Function to update CSS variables from insets
         const updateInsets = (insets) => {
             if (!insets) return;
-            console.log('[PWANINET-NATIVE] Safe Area Insets Update:', JSON.stringify(insets));
+            console.log('[vasto-NATIVE] Safe Area Insets Update:', JSON.stringify(insets));
             const root = document.documentElement;
             // Some Android edge-to-edge WebViews report the navigation bar and
             // gesture region together. Keep the bottom inset useful for layout
@@ -103,25 +103,25 @@ async function initSafeAreaEarly() {
             const parsedBottomInset = Number.parseFloat(insets.bottom) || 0;
             const bottomInset = Math.max(0, Math.min(parsedBottomInset, 36));
             root.classList.add('is-capacitor', 'is-native-app');
-            root.style.setProperty('--pwaninet-safe-area-top', insets.top + 'px');
-            root.style.setProperty('--pwaninet-safe-area-bottom', bottomInset + 'px');
-            root.style.setProperty('--pwaninet-safe-area-left', insets.left + 'px');
-            root.style.setProperty('--pwaninet-safe-area-right', insets.right + 'px');
+            root.style.setProperty('--vasto-safe-area-top', insets.top + 'px');
+            root.style.setProperty('--vasto-safe-area-bottom', bottomInset + 'px');
+            root.style.setProperty('--vasto-safe-area-left', insets.left + 'px');
+            root.style.setProperty('--vasto-safe-area-right', insets.right + 'px');
 
             if (document.body) {
                 document.body.classList.add('is-capacitor', 'is-native-app');
-                document.body.style.setProperty('--pwaninet-safe-area-top', insets.top + 'px');
-                document.body.style.setProperty('--pwaninet-safe-area-bottom', bottomInset + 'px');
+                document.body.style.setProperty('--vasto-safe-area-top', insets.top + 'px');
+                document.body.style.setProperty('--vasto-safe-area-bottom', bottomInset + 'px');
             }
 
-            console.log('[PWANINET-NATIVE] Applied CSS Variables:', {
-                '--pwaninet-safe-area-top': root.style.getPropertyValue('--pwaninet-safe-area-top'),
-                '--pwaninet-safe-area-bottom': root.style.getPropertyValue('--pwaninet-safe-area-bottom')
+            console.log('[vasto-NATIVE] Applied CSS Variables:', {
+                '--vasto-safe-area-top': root.style.getPropertyValue('--vasto-safe-area-top'),
+                '--vasto-safe-area-bottom': root.style.getPropertyValue('--vasto-safe-area-bottom')
             });
         };
 
         // Listen for native Android bridge safe area events from MainActivity
-        window.addEventListener('pwaninet:safe-area-changed', function(event) {
+        window.addEventListener('vasto:safe-area-changed', function(event) {
             if (event.detail) {
                 updateInsets(event.detail);
             }
@@ -138,7 +138,7 @@ async function initSafeAreaEarly() {
                         updateInsets(result.insets);
                     }
                 } catch (err) {
-                    console.warn('[PWANINET-NATIVE] SafeArea.getSafeAreaInsets call failed:', err);
+                    console.warn('[vasto-NATIVE] SafeArea.getSafeAreaInsets call failed:', err);
                 }
             }
 
@@ -150,15 +150,15 @@ async function initSafeAreaEarly() {
                         }
                     });
                 } catch (err) {
-                    console.warn('[PWANINET-NATIVE] SafeArea.addListener failed:', err);
+                    console.warn('[vasto-NATIVE] SafeArea.addListener failed:', err);
                 }
             }
         }
 
         var endTime = performance.now();
-        console.log('[PWANINET-NATIVE] SafeArea early init complete in:', (endTime - startTime).toFixed(2) + 'ms');
+        console.log('[vasto-NATIVE] SafeArea early init complete in:', (endTime - startTime).toFixed(2) + 'ms');
     } catch (e) {
-        console.error('[PWANINET-NATIVE] Early SafeArea init failed', e);
+        console.error('[vasto-NATIVE] Early SafeArea init failed', e);
     }
 }
 
@@ -179,9 +179,9 @@ function initNativeAppEnhancements() {
     if (document.body) document.body.classList.add('is-capacitor', 'is-native-app');
 
     // Prevent duplicate initialization during HTMX swaps
-    if (window._pwaninet_native_initialized) return;
+    if (window._vasto_native_initialized) return;
 
-    console.log('[PWANINET-NATIVE] DOM-dependent initialization started at:', startTime.toFixed(2) + 'ms');
+    console.log('[vasto-NATIVE] DOM-dependent initialization started at:', startTime.toFixed(2) + 'ms');
 
     // Initialize instant button touch states
     initInstantTouchStates();
@@ -210,11 +210,11 @@ function initNativeAppEnhancements() {
     // Initialize native push notifications (Capacitor FCM / APNS)
     initNativePush();
 
-    window._pwaninet_native_initialized = true;
+    window._vasto_native_initialized = true;
 
     const endTime = performance.now();
-    console.log('[PWANINET-NATIVE] Native initialization fully complete in:', (endTime - startTime).toFixed(2) + 'ms');
-    console.log('[PWANINET-NATIVE] Total time from script load:', (endTime - window._pwaninet_native_load_time).toFixed(2) + 'ms');
+    console.log('[vasto-NATIVE] Native initialization fully complete in:', (endTime - startTime).toFixed(2) + 'ms');
+    console.log('[vasto-NATIVE] Total time from script load:', (endTime - window._vasto_native_load_time).toFixed(2) + 'ms');
 }
 
 /**
@@ -354,7 +354,7 @@ async function updateStatusBarForTheme(theme) {
         }
 
         // Instant synchronous native update
-        var bridge = window.AndroidBridge || window.PwaninetBridge;
+        var bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.setSystemBarTheme === 'function') {
             bridge.setSystemBarTheme(isLight ? 'light' : 'dark');
         }
@@ -391,8 +391,8 @@ async function updateNavigationBarForTheme(theme) {
         const style = isLight ? 'LIGHT' : 'DARK';
         const themeStr = isLight ? 'light' : 'dark';
 
-        // 1. Try AndroidBridge / PwaninetBridge JavascriptInterface (instantaneous call)
-        var bridge = window.AndroidBridge || window.PwaninetBridge;
+        // 1. Try AndroidBridge / vastoBridge JavascriptInterface (instantaneous call)
+        var bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.setNavigationBarTheme === 'function') {
             bridge.setNavigationBarTheme(themeStr);
             console.log('[NativeApp] Navigation bar theme updated via AndroidBridge to: ' + themeStr);
@@ -424,8 +424,8 @@ function initCaching() {
         const fontScale = localStorage.getItem('font_scale');
         console.log('[NativeApp] Cached preferences loaded');
         
-        if (window.PwaniNetUsername) {
-            sessionStorage.setItem('username', window.PwaniNetUsername);
+        if (window.vastoUsername) {
+            sessionStorage.setItem('username', window.vastoUsername);
         }
     } catch (error) {
         console.error('[NativeApp] Failed to initialize caching:', error);
@@ -479,7 +479,7 @@ async function ensureNativeMediaPermissions() {
     return { camera: camPerm, filesystem: fsPerm };
 }
 
-window.PwaninetPermissions = {
+window.vastoPermissions = {
     requestCamera: requestNativeCameraPermissions,
     requestFilesystem: requestNativeFilesystemPermissions,
     ensureMedia: ensureNativeMediaPermissions
@@ -576,7 +576,7 @@ async function initBackNavigation() {
                 _lastBackPressTime = now;
                 if (window.Haptics) window.Haptics.impactLight();
 
-                var bridge = window.AndroidBridge || window.PwaninetBridge;
+                var bridge = window.AndroidBridge || window.vastoBridge;
                 if (bridge && typeof bridge.showToast === 'function') {
                     bridge.showToast('Press back again to exit');
                 } else {
@@ -599,8 +599,8 @@ async function initDeepLinkNavigation() {
             if (!data || !data.url) return;
             try {
                 let targetPath = null;
-                if (data.url.startsWith('pwaninet://')) {
-                    const withoutScheme = data.url.replace('pwaninet://', '');
+                if (data.url.startsWith('vasto://')) {
+                    const withoutScheme = data.url.replace('vasto://', '');
                     const slashIndex = withoutScheme.indexOf('/');
                     targetPath = slashIndex !== -1 ? withoutScheme.substring(slashIndex) : '/' + withoutScheme;
                 } else if (data.url.startsWith('http://') || data.url.startsWith('https://')) {
@@ -626,11 +626,11 @@ async function initDeepLinkNavigation() {
 }
 
 function showInAppBackToast(message) {
-    let toast = document.getElementById('pwaninet-back-toast');
+    let toast = document.getElementById('vasto-back-toast');
     if (!toast) {
         toast = document.createElement('div');
-        toast.id = 'pwaninet-back-toast';
-        toast.style.cssText = 'position:fixed;bottom:calc(85px + var(--pwaninet-safe-area-bottom, 0px));left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.92);color:#fff;font-size:13px;font-weight:600;padding:8px 18px;border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:100000;pointer-events:none;transition:opacity 0.25s ease;backdrop-filter:blur(8px);';
+        toast.id = 'vasto-back-toast';
+        toast.style.cssText = 'position:fixed;bottom:calc(85px + var(--vasto-safe-area-bottom, 0px));left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.92);color:#fff;font-size:13px;font-weight:600;padding:8px 18px;border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:100000;pointer-events:none;transition:opacity 0.25s ease;backdrop-filter:blur(8px);';
         document.body.appendChild(toast);
     }
     toast.textContent = message;
@@ -665,7 +665,7 @@ function dismissActiveOverlays() {
     if (dismissed) return true;
 
     // Modals
-    const activeModals = document.querySelectorAll('.modal.show, #pwaninetStatusModal.show');
+    const activeModals = document.querySelectorAll('.modal.show, #vastoStatusModal.show');
     activeModals.forEach(modalEl => {
         if (window.bootstrap && window.bootstrap.Modal) {
             const modal = window.bootstrap.Modal.getInstance(modalEl);
@@ -704,8 +704,8 @@ function dismissActiveOverlays() {
  * both keep body.keyboard-open stable without double-jumping safe-area bottom padding.
  */
 function initKeyboardManager() {
-    if (window._pwaninet_keyboard_manager_initialized) return;
-    window._pwaninet_keyboard_manager_initialized = true;
+    if (window._vasto_keyboard_manager_initialized) return;
+    window._vasto_keyboard_manager_initialized = true;
 
     const NON_TEXT_INPUT_TYPES = new Set([
         'checkbox', 'radio', 'button', 'submit', 'reset',
@@ -736,7 +736,7 @@ function initKeyboardManager() {
         const body = document.body;
         const heightVal = Math.max(0, Math.round(keyboardHeightPx || 0));
         if (root) {
-            root.style.setProperty('--pwaninet-keyboard-height', heightVal + 'px');
+            root.style.setProperty('--vasto-keyboard-height', heightVal + 'px');
             root.classList.toggle('keyboard-open', isOpen);
         }
         if (body) {
@@ -807,11 +807,11 @@ function initPullToRefresh() {
     // Minimum raw finger travel (px) before the indicator even starts appearing.
     const MIN_SHOW_PX = 30;
 
-    let ptrIndicator = document.getElementById('pwaninet-ptr-indicator');
+    let ptrIndicator = document.getElementById('vasto-ptr-indicator');
     if (!ptrIndicator) {
         ptrIndicator = document.createElement('div');
-        ptrIndicator.id = 'pwaninet-ptr-indicator';
-        ptrIndicator.style.cssText = 'position:fixed;top:calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, 0px) + 8px);left:50%;transform:translate(-50%, -150%);width:36px;height:36px;border-radius:50%;background:var(--card-bg, #ffffff);box-shadow:0 3px 12px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;z-index:9998;pointer-events:none;transition:transform 0.15s cubic-bezier(0.2,0,0.2,1), opacity 0.2s ease;opacity:0;';
+        ptrIndicator.id = 'vasto-ptr-indicator';
+        ptrIndicator.style.cssText = 'position:fixed;top:calc(var(--navbar-height, 56px) + var(--vasto-safe-area-top, 0px) + 8px);left:50%;transform:translate(-50%, -150%);width:36px;height:36px;border-radius:50%;background:var(--card-bg, #ffffff);box-shadow:0 3px 12px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;z-index:9998;pointer-events:none;transition:transform 0.15s cubic-bezier(0.2,0,0.2,1), opacity 0.2s ease;opacity:0;';
         ptrIndicator.innerHTML = '<i class="bi bi-arrow-clockwise" style="font-size:18px;color:var(--primary, #2563eb);display:inline-block;transition:transform 0.2s;"></i>';
         document.body.appendChild(ptrIndicator);
     }
@@ -914,17 +914,17 @@ function initPullToRefresh() {
  * Native App Update Notification & Version Management
  */
 function injectNativeUpdateStyles() {
-    if (document.getElementById('pwaninet-native-update-styles')) return;
+    if (document.getElementById('vasto-native-update-styles')) return;
     const style = document.createElement('style');
-    style.id = 'pwaninet-native-update-styles';
+    style.id = 'vasto-native-update-styles';
     style.textContent = `
-        #pwaninet-native-update-banner {
+        #vasto-native-update-banner {
             position: fixed;
             right: 16px;
             left: 16px;
             max-width: 420px;
             margin: 0 auto;
-            bottom: calc(84px + var(--pwaninet-safe-area-bottom, 0px));
+            bottom: calc(84px + var(--vasto-safe-area-bottom, 0px));
             z-index: 10002;
             background: var(--card-bg, #ffffff);
             color: var(--text-dark, #0f172a);
@@ -932,29 +932,29 @@ function injectNativeUpdateStyles() {
             border-radius: 16px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
             overflow: hidden;
-            animation: pwaninet-banner-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: vasto-banner-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        [data-theme="dark"] #pwaninet-native-update-banner {
+        [data-theme="dark"] #vasto-native-update-banner {
             background: var(--card-bg, #1e293b);
             color: var(--text-primary, #f8fafc);
             border-color: var(--border, #334155);
         }
-        .pwaninet-native-update-inner {
+        .vasto-native-update-inner {
             display: flex;
             align-items: center;
             gap: 12px;
             padding: 12px 16px;
         }
-        .pwaninet-native-update-icon {
+        .vasto-native-update-icon {
             flex-shrink: 0;
             display: flex;
             align-items: center;
         }
-        .pwaninet-native-update-content {
+        .vasto-native-update-content {
             flex: 1;
             min-width: 0;
         }
-        .pwaninet-native-update-title {
+        .vasto-native-update-title {
             font-weight: 700;
             font-size: 14px;
             display: flex;
@@ -963,10 +963,10 @@ function injectNativeUpdateStyles() {
             line-height: 1.2;
             color: var(--text-dark, #0f172a);
         }
-        [data-theme="dark"] .pwaninet-native-update-title {
+        [data-theme="dark"] .vasto-native-update-title {
             color: var(--text-primary, #f8fafc);
         }
-        .pwaninet-native-update-badge {
+        .vasto-native-update-badge {
             background: var(--primary-light, #dbeafe);
             color: var(--primary, #2563eb);
             font-size: 10px;
@@ -975,23 +975,23 @@ function injectNativeUpdateStyles() {
             border-radius: 6px;
             letter-spacing: 0.5px;
         }
-        [data-theme="dark"] .pwaninet-native-update-badge {
+        [data-theme="dark"] .vasto-native-update-badge {
             background: #312e81;
             color: #a5b4fc;
         }
-        .pwaninet-native-update-sub {
+        .vasto-native-update-sub {
             font-size: 12px;
             color: var(--text-secondary, #64748b);
             margin-top: 3px;
             line-height: 1.3;
         }
-        .pwaninet-native-update-actions {
+        .vasto-native-update-actions {
             display: flex;
             flex-direction: column;
             gap: 6px;
             flex-shrink: 0;
         }
-        .pwaninet-native-later-btn {
+        .vasto-native-later-btn {
             background: transparent;
             border: none;
             padding: 0;
@@ -1002,13 +1002,13 @@ function injectNativeUpdateStyles() {
             text-decoration: underline;
             text-underline-offset: 2px;
         }
-        .pwaninet-native-later-btn:hover {
+        .vasto-native-later-btn:hover {
             color: var(--text-primary, #0f172a);
         }
-        [data-theme="dark"] .pwaninet-native-later-btn:hover {
+        [data-theme="dark"] .vasto-native-later-btn:hover {
             color: #ffffff;
         }
-        #pwaninet-mandatory-modal-backdrop {
+        #vasto-mandatory-modal-backdrop {
             position: fixed;
             top: 0;
             left: 0;
@@ -1023,7 +1023,7 @@ function injectNativeUpdateStyles() {
             justify-content: center;
             padding: 20px;
         }
-        .pwaninet-mandatory-modal {
+        .vasto-mandatory-modal {
             background: var(--card-bg, #ffffff);
             border-radius: 20px;
             padding: 28px 24px;
@@ -1033,7 +1033,7 @@ function injectNativeUpdateStyles() {
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
             border: 1px solid var(--border, #e2e8f0);
         }
-        [data-theme="dark"] .pwaninet-mandatory-modal {
+        [data-theme="dark"] .vasto-mandatory-modal {
             background: var(--card-bg, #1e293b);
             color: var(--text-primary, #f8fafc);
             border-color: var(--border, #334155);
@@ -1043,8 +1043,8 @@ function injectNativeUpdateStyles() {
 }
 
 async function getInstalledAppVersion() {
-    // 1. Try AndroidBridge / PwaninetBridge getAppVersionInfo
-    var bridge = window.AndroidBridge || window.PwaninetBridge;
+    // 1. Try AndroidBridge / vastoBridge getAppVersionInfo
+    var bridge = window.AndroidBridge || window.vastoBridge;
     if (bridge && typeof bridge.getAppVersionInfo === 'function') {
         try {
             var info = JSON.parse(bridge.getAppVersionInfo());
@@ -1088,7 +1088,7 @@ async function getInstalledAppVersion() {
 
     // 3. Try User-Agent parsing
     if (typeof navigator !== 'undefined' && navigator.userAgent) {
-        var uaMatch = navigator.userAgent.match(/PwaniNetApp\/Android\/([0-9\.]+)/);
+        var uaMatch = navigator.userAgent.match(/vastoApp\/Android\/([0-9\.]+)/);
         if (uaMatch && uaMatch[1]) {
             var uaBuildMatch = navigator.userAgent.match(/Build\/([0-9]+)/);
             return {
@@ -1098,8 +1098,8 @@ async function getInstalledAppVersion() {
         }
     }
 
-    var cachedVer = localStorage.getItem('pwaninet_installed_apk_version') || '1.0.0';
-    var cachedBuild = parseInt(localStorage.getItem('pwaninet_installed_apk_build') || '1', 10);
+    var cachedVer = localStorage.getItem('vasto_installed_apk_version') || '1.0.0';
+    var cachedBuild = parseInt(localStorage.getItem('vasto_installed_apk_build') || '1', 10);
     return { version: cachedVer.replace(/^v/, '').trim(), build: cachedBuild };
 }
 
@@ -1108,7 +1108,7 @@ function triggerNativeApkDownload(apkUrl) {
     if (!url.startsWith('http')) {
         url = window.location.origin + (url.startsWith('/') ? '' : '/') + url;
     }
-    var bridge = window.AndroidBridge || window.PwaninetBridge;
+    var bridge = window.AndroidBridge || window.vastoBridge;
     if (bridge && typeof bridge.openExternalUrl === 'function') {
         bridge.openExternalUrl(url);
     } else {
@@ -1138,9 +1138,9 @@ window.semverCompare = semverCompare;
 function isRunningInNativeApp() {
     return Boolean(
         (window.AndroidBridge && typeof window.AndroidBridge.getAppVersionInfo === 'function') ||
-        (window.PwaninetBridge && typeof window.PwaninetBridge.getAppVersionInfo === 'function') ||
+        (window.vastoBridge && typeof window.vastoBridge.getAppVersionInfo === 'function') ||
         (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
-        (typeof navigator !== 'undefined' && /PwaniNetApp\/Android/i.test(navigator.userAgent))
+        (typeof navigator !== 'undefined' && /vastoApp\/Android/i.test(navigator.userAgent))
     );
 }
 window.isRunningInNativeApp = isRunningInNativeApp;
@@ -1150,15 +1150,15 @@ async function checkNativeAppUpdates(manual) {
         // Strict separation: Only run native update checks when inside the native app
         if (!isRunningInNativeApp()) {
             // Clean up legacy cookie on web/PWA so it never pollutes server context
-            document.cookie = 'pwaninet_native_version=; path=/; max-age=0; SameSite=Lax';
+            document.cookie = 'vasto_native_version=; path=/; max-age=0; SameSite=Lax';
             return;
         }
 
         var installed = await getInstalledAppVersion();
         if (installed && installed.version) {
-            localStorage.setItem('pwaninet_installed_apk_version', installed.version);
-            localStorage.setItem('pwaninet_installed_apk_build', String(installed.build));
-            document.cookie = 'pwaninet_native_version=' + encodeURIComponent(installed.version) + '; path=/; max-age=31536000; SameSite=Lax';
+            localStorage.setItem('vasto_installed_apk_version', installed.version);
+            localStorage.setItem('vasto_installed_apk_build', String(installed.build));
+            document.cookie = 'vasto_native_version=' + encodeURIComponent(installed.version) + '; path=/; max-age=31536000; SameSite=Lax';
         }
 
         var res = await fetch('/api/releases/version_check/?installed_build=' + installed.build + '&installed_version=' + encodeURIComponent(installed.version));
@@ -1171,7 +1171,7 @@ async function checkNativeAppUpdates(manual) {
 
         // Real-time GitHub Releases API check fallback
         try {
-            var ghRes = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
+            var ghRes = await fetch('https://api.github.com/repos/2006-zayne/vasto/releases/latest');
             if (ghRes.ok) {
                 var ghData = await ghRes.json();
                 var ghTag = (ghData.tag_name || '').replace(/^v/, '').trim();
@@ -1212,9 +1212,9 @@ async function checkNativeAppUpdates(manual) {
             data.update_available = false;
             // Running version is the installed version or latest web version if higher
             data.running_version = semverCompare(installed.version, data.latest_version) >= 0 ? installed.version : data.latest_version;
-            var existingBanner = document.getElementById('pwaninet-native-update-banner');
+            var existingBanner = document.getElementById('vasto-native-update-banner');
             if (existingBanner) existingBanner.remove();
-            var existingModal = document.getElementById('pwaninet-mandatory-modal-backdrop');
+            var existingModal = document.getElementById('vasto-mandatory-modal-backdrop');
             if (existingModal) existingModal.remove();
         }
 
@@ -1282,7 +1282,7 @@ async function checkNativeAppUpdates(manual) {
         }
 
         if (manual && !data.update_available) {
-            alert('PwaniNet is up to date! You are running version ' + effectiveVer + '.');
+            alert('vasto is up to date! You are running version ' + effectiveVer + '.');
             return;
         }
 
@@ -1302,7 +1302,7 @@ async function checkNativeAppUpdates(manual) {
             }
 
             // Check snooze for standard optional prompt
-            var snoozedUntil = parseInt(localStorage.getItem('pwaninet_native_update_snooze') || '0', 10);
+            var snoozedUntil = parseInt(localStorage.getItem('vasto_native_update_snooze') || '0', 10);
             if (!manual && snoozedUntil && Date.now() < snoozedUntil) {
                 return;
             }
@@ -1318,31 +1318,31 @@ async function checkNativeAppUpdates(manual) {
 }
 
 function showNativeUpdateBanner(data) {
-    if (document.getElementById('pwaninet-native-update-banner')) return;
+    if (document.getElementById('vasto-native-update-banner')) return;
     injectNativeUpdateStyles();
 
     var targetVer = data.latest_apk_version || data.latest_version;
     var banner = document.createElement('div');
-    banner.id = 'pwaninet-native-update-banner';
+    banner.id = 'vasto-native-update-banner';
     banner.innerHTML = `
-        <div class="pwaninet-native-update-inner">
-            <div class="pwaninet-native-update-icon">
-                <img src="/static/images/pwaninet-app-icon.png" alt="PwaniNet" width="42" height="42" style="border-radius:10px;"/>
+        <div class="vasto-native-update-inner">
+            <div class="vasto-native-update-icon">
+                <img src="/static/images/vasto-app-icon.png" alt="vasto" width="42" height="42" style="border-radius:10px;"/>
             </div>
-            <div class="pwaninet-native-update-content">
-                <div class="pwaninet-native-update-title">
-                    <span>PwaniNet Update</span>
-                    <span class="pwaninet-native-update-badge">v${targetVer}</span>
+            <div class="vasto-native-update-content">
+                <div class="vasto-native-update-title">
+                    <span>vasto Update</span>
+                    <span class="vasto-native-update-badge">v${targetVer}</span>
                 </div>
-                <div class="pwaninet-native-update-sub">
+                <div class="vasto-native-update-sub">
                     ${data.release_title || 'New update available with performance enhancements.'}
                 </div>
             </div>
-            <div class="pwaninet-native-update-actions">
-                <button type="button" class="btn btn-primary btn-sm" id="pwaninet-native-update-download-btn">
+            <div class="vasto-native-update-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="vasto-native-update-download-btn">
                     <i class="bi bi-download me-1"></i>Update
                 </button>
-                <button type="button" class="pwaninet-native-later-btn" id="pwaninet-native-update-later-btn">
+                <button type="button" class="vasto-native-later-btn" id="vasto-native-update-later-btn">
                     Later
                 </button>
             </div>
@@ -1350,7 +1350,7 @@ function showNativeUpdateBanner(data) {
     `;
     document.body.appendChild(banner);
 
-    var dlBtn = document.getElementById('pwaninet-native-update-download-btn');
+    var dlBtn = document.getElementById('vasto-native-update-download-btn');
     if (dlBtn) {
         dlBtn.addEventListener('click', function() {
             openNativeUpdateDownloadPage();
@@ -1358,38 +1358,38 @@ function showNativeUpdateBanner(data) {
         });
     }
 
-    var laterBtn = document.getElementById('pwaninet-native-update-later-btn');
+    var laterBtn = document.getElementById('vasto-native-update-later-btn');
     if (laterBtn) {
         laterBtn.addEventListener('click', function() {
             banner.remove();
             // Snooze for 24 hours
-            localStorage.setItem('pwaninet_native_update_snooze', String(Date.now() + 86400000));
+            localStorage.setItem('vasto_native_update_snooze', String(Date.now() + 86400000));
         });
     }
 }
 
 function showMandatoryUpdateModal(data) {
-    if (document.getElementById('pwaninet-mandatory-modal-backdrop')) return;
+    if (document.getElementById('vasto-mandatory-modal-backdrop')) return;
     injectNativeUpdateStyles();
 
     var targetVer = data.latest_apk_version || data.latest_version;
     var backdrop = document.createElement('div');
-    backdrop.id = 'pwaninet-mandatory-modal-backdrop';
+    backdrop.id = 'vasto-mandatory-modal-backdrop';
     backdrop.innerHTML = `
-        <div class="pwaninet-mandatory-modal">
-            <img src="/static/images/pwaninet-app-icon.png" alt="PwaniNet" width="56" height="56" style="border-radius:14px; margin-bottom: 16px;"/>
+        <div class="vasto-mandatory-modal">
+            <img src="/static/images/vasto-app-icon.png" alt="vasto" width="56" height="56" style="border-radius:14px; margin-bottom: 16px;"/>
             <h4 style="font-weight: 700; margin-bottom: 8px;">Update Required</h4>
             <p style="font-size: 14px; color: var(--text-secondary, #64748b); margin-bottom: 20px;">
-                A critical update (v${targetVer}) is required to continue using PwaniNet. Please download and install the latest APK.
+                A critical update (v${targetVer}) is required to continue using vasto. Please download and install the latest APK.
             </p>
-            <button type="button" class="btn btn-primary w-100 py-2" id="pwaninet-mandatory-download-btn" style="font-weight: 600;">
+            <button type="button" class="btn btn-primary w-100 py-2" id="vasto-mandatory-download-btn" style="font-weight: 600;">
                 <i class="bi bi-download me-2"></i>Download & Install Update
             </button>
         </div>
     `;
     document.body.appendChild(backdrop);
 
-    var btn = document.getElementById('pwaninet-mandatory-download-btn');
+    var btn = document.getElementById('vasto-mandatory-download-btn');
     if (btn) {
         btn.addEventListener('click', function() {
             openNativeUpdateDownloadPage();
@@ -1461,35 +1461,35 @@ async function initNativePush(requestIfPrompt = false) {
 
     const PushNotifications = window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
     if (!PushNotifications) {
-        console.warn('[PWANINET-NATIVE] PushNotifications plugin not available on window.Capacitor.Plugins');
+        console.warn('[vasto-NATIVE] PushNotifications plugin not available on window.Capacitor.Plugins');
         return;
     }
 
     try {
         let permStatus = await PushNotifications.checkPermissions();
-        console.log('[PWANINET-NATIVE] Push permission status:', permStatus);
+        console.log('[vasto-NATIVE] Push permission status:', permStatus);
 
         if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
             if (requestIfPrompt) {
                 permStatus = await PushNotifications.requestPermissions();
             } else {
-                console.log('[PWANINET-NATIVE] Push permission is prompt state; deferring OS dialog to soft prompt');
+                console.log('[vasto-NATIVE] Push permission is prompt state; deferring OS dialog to soft prompt');
                 return;
             }
         }
 
         if (permStatus.receive !== 'granted') {
-            console.warn('[PWANINET-NATIVE] Push notification permission not granted:', permStatus.receive);
+            console.warn('[vasto-NATIVE] Push notification permission not granted:', permStatus.receive);
             return;
         }
 
         // Register Android Notification Channels (Android 8.0+)
-        // Unified channel 'pwaninet_notifications' + fallback channels
+        // Unified channel 'vasto_notifications' + fallback channels
         if (typeof PushNotifications.createChannel === 'function') {
             try {
                 await PushNotifications.createChannel({
-                    id: 'pwaninet_notifications',
-                    name: 'PwaniNet Notifications',
+                    id: 'vasto_notifications',
+                    name: 'vasto Notifications',
                     description: 'All social updates, mentions, posts, documents, and messages',
                     importance: 5,
                     visibility: 1,
@@ -1500,7 +1500,7 @@ async function initNativePush(requestIfPrompt = false) {
                 });
 
                 await PushNotifications.createChannel({
-                    id: 'pwaninet_social',
+                    id: 'vasto_social',
                     name: 'Social Updates',
                     description: 'Likes, comments, shares, follows, and mentions',
                     importance: 5,
@@ -1510,7 +1510,7 @@ async function initNativePush(requestIfPrompt = false) {
                 }).catch(() => {});
 
                 await PushNotifications.createChannel({
-                    id: 'pwaninet_messages',
+                    id: 'vasto_messages',
                     name: 'Direct & Group Messages',
                     description: 'Chat messages and conversation updates',
                     importance: 5,
@@ -1519,9 +1519,9 @@ async function initNativePush(requestIfPrompt = false) {
                     sound: 'default'
                 }).catch(() => {});
 
-                console.log('[PWANINET-NATIVE] Push notification channels configured successfully');
+                console.log('[vasto-NATIVE] Push notification channels configured successfully');
             } catch (chanErr) {
-                console.warn('[PWANINET-NATIVE] Failed to configure notification channels:', chanErr);
+                console.warn('[vasto-NATIVE] Failed to configure notification channels:', chanErr);
             }
         }
 
@@ -1531,18 +1531,18 @@ async function initNativePush(requestIfPrompt = false) {
         const isAndroid = platformName === 'android' || navigator.userAgent.includes('Android');
 
         if (isAndroid) {
-            let bridge = window.AndroidBridge || window.PwaninetBridge;
+            let bridge = window.AndroidBridge || window.vastoBridge;
             if (!bridge || typeof bridge.isPushNotificationsAvailable !== 'function') {
                 // Wait up to 1000ms for WebView bridge injection
                 for (let i = 0; i < 20; i++) {
                     await new Promise(r => setTimeout(r, 50));
-                    bridge = window.AndroidBridge || window.PwaninetBridge;
+                    bridge = window.AndroidBridge || window.vastoBridge;
                     if (bridge && typeof bridge.isPushNotificationsAvailable === 'function') break;
                 }
             }
             const isPushReady = bridge && typeof bridge.isPushNotificationsAvailable === 'function' && bridge.isPushNotificationsAvailable();
             if (!isPushReady) {
-                console.warn('[PWANINET-NATIVE] Native push / Firebase is not initialized on this Android build (google-services.json missing). Push registration skipped to protect app stability.');
+                console.warn('[vasto-NATIVE] Native push / Firebase is not initialized on this Android build (google-services.json missing). Push registration skipped to protect app stability.');
                 return;
             }
         }
@@ -1567,50 +1567,50 @@ async function initNativePush(requestIfPrompt = false) {
                 });
 
                 if (response.ok) {
-                    console.log('[PWANINET-NATIVE] Successfully registered native push token with backend');
-                    localStorage.setItem('pwaninet_push_subscribed', 'true');
-                    localStorage.setItem('pwaninet_fcm_token', tokenValue);
-                    localStorage.removeItem('pwaninet_pending_fcm_token');
+                    console.log('[vasto-NATIVE] Successfully registered native push token with backend');
+                    localStorage.setItem('vasto_push_subscribed', 'true');
+                    localStorage.setItem('vasto_fcm_token', tokenValue);
+                    localStorage.removeItem('vasto_pending_fcm_token');
                     return true;
                 } else {
-                    console.warn('[PWANINET-NATIVE] Failed to register native push token with backend:', response.status);
-                    localStorage.setItem('pwaninet_pending_fcm_token', tokenValue);
+                    console.warn('[vasto-NATIVE] Failed to register native push token with backend:', response.status);
+                    localStorage.setItem('vasto_pending_fcm_token', tokenValue);
                     return false;
                 }
             } catch (err) {
-                console.error('[PWANINET-NATIVE] Error registering native push token:', err);
-                localStorage.setItem('pwaninet_pending_fcm_token', tokenValue);
+                console.error('[vasto-NATIVE] Error registering native push token:', err);
+                localStorage.setItem('vasto_pending_fcm_token', tokenValue);
                 return false;
             }
         }
 
         // Check if there is a pending token from a previous run before login
-        const pendingToken = localStorage.getItem('pwaninet_pending_fcm_token');
+        const pendingToken = localStorage.getItem('vasto_pending_fcm_token');
         if (pendingToken) {
             submitFCMToken(pendingToken);
         }
 
         // Listen for successful registration
         PushNotifications.addListener('registration', async function(token) {
-            console.log('[PWANINET-NATIVE] Push registration success, token:', token.value);
+            console.log('[vasto-NATIVE] Push registration success, token:', token.value);
             if (!token || !token.value) return;
             await submitFCMToken(token.value);
         });
 
         // Listen for registration errors
         PushNotifications.addListener('registrationError', function(error) {
-            console.error('[PWANINET-NATIVE] Push registration error:', error);
+            console.error('[vasto-NATIVE] Push registration error:', error);
         });
 
         // Listen for foreground push notifications
         PushNotifications.addListener('pushNotificationReceived', function(notification) {
-            console.log('[PWANINET-NATIVE] Foreground push received:', notification);
+            console.log('[vasto-NATIVE] Foreground push received:', notification);
             showNativePushBanner(notification);
         });
 
         // Listen for user interaction on notification
         PushNotifications.addListener('pushNotificationActionPerformed', function(notification) {
-            console.log('[PWANINET-NATIVE] Push action performed:', notification);
+            console.log('[vasto-NATIVE] Push action performed:', notification);
             const data = notification.notification && notification.notification.data;
             const targetUrl = data && (data.url || data.link || data.destination_url || data.click_action);
             if (targetUrl) {
@@ -1622,17 +1622,17 @@ async function initNativePush(requestIfPrompt = false) {
         try {
             await PushNotifications.register();
         } catch (regErr) {
-            console.warn('[PWANINET-NATIVE] Push registration call failed gracefully:', regErr);
+            console.warn('[vasto-NATIVE] Push registration call failed gracefully:', regErr);
             return;
         }
 
     } catch (e) {
-        console.error('[PWANINET-NATIVE] Failed to initialize native push notifications:', e);
+        console.error('[vasto-NATIVE] Failed to initialize native push notifications:', e);
     }
 }
 
 /**
- * Display an in-app foreground notification banner matching the PwaniNet in-app notification card design.
+ * Display an in-app foreground notification banner matching the vasto in-app notification card design.
  * Renders actor avatar, title, body, and post/document thumbnail previews. Also broadcasts on-screen toast.
  */
 function showNativePushBanner(notification) {
@@ -1658,7 +1658,7 @@ function showNativePushBanner(notification) {
         }
     } catch (_) {}
 
-    const title = notification.title || data.title || 'PwaniNet';
+    const title = notification.title || data.title || 'vasto';
     const body = notification.body || data.body || '';
 
     // Broadcast native on-screen toast via AndroidBridge
@@ -1666,8 +1666,8 @@ function showNativePushBanner(notification) {
         const toastMessage = title ? `${title}: ${body}` : body;
         if (window.AndroidBridge && typeof window.AndroidBridge.showToast === 'function') {
             window.AndroidBridge.showToast(toastMessage);
-        } else if (window.PwaninetBridge && typeof window.PwaninetBridge.showToast === 'function') {
-            window.PwaninetBridge.showToast(toastMessage);
+        } else if (window.vastoBridge && typeof window.vastoBridge.showToast === 'function') {
+            window.vastoBridge.showToast(toastMessage);
         }
     } catch (_) {}
 
@@ -1687,17 +1687,17 @@ function showNativePushBanner(notification) {
     const targetUrl = data.url || data.link || data.destination_url || '/notifications/';
 
     // Remove existing banner if any
-    const existing = document.getElementById('pwaninet-foreground-push-banner');
+    const existing = document.getElementById('vasto-foreground-push-banner');
     if (existing) {
         existing.remove();
     }
 
     const banner = document.createElement('div');
-    banner.id = 'pwaninet-foreground-push-banner';
-    banner.className = 'notif-item pwaninet-native-card-banner';
+    banner.id = 'vasto-foreground-push-banner';
+    banner.className = 'notif-item vasto-native-card-banner';
     banner.style.cssText = [
         'position: fixed',
-        'top: calc(var(--pwaninet-safe-area-top, 0px) + 10px)',
+        'top: calc(var(--vasto-safe-area-top, 0px) + 10px)',
         'left: 12px',
         'right: 12px',
         'max-width: 500px',
@@ -1804,12 +1804,12 @@ window.showNativePushBanner = showNativePushBanner;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         var domReadyTime = performance.now();
-        console.log('[PWANINET-NATIVE] DOMContentLoaded at:', domReadyTime.toFixed(2) + 'ms');
-        console.log('[PWANINET-NATIVE] Time from script load to DOMReady:', (domReadyTime - window._pwaninet_native_load_time).toFixed(2) + 'ms');
+        console.log('[vasto-NATIVE] DOMContentLoaded at:', domReadyTime.toFixed(2) + 'ms');
+        console.log('[vasto-NATIVE] Time from script load to DOMReady:', (domReadyTime - window._vasto_native_load_time).toFixed(2) + 'ms');
         initNativeAppEnhancements();
     });
 } else {
     var domReadyTime = performance.now();
-    console.log('[PWANINET-NATIVE] DOM already ready at:', domReadyTime.toFixed(2) + 'ms');
+    console.log('[vasto-NATIVE] DOM already ready at:', domReadyTime.toFixed(2) + 'ms');
     initNativeAppEnhancements();
 }

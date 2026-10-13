@@ -1,5 +1,5 @@
 /**
- * PwaniNet Smart Outside-Link Chooser
+ * vasto Smart Outside-Link Chooser
  * Activates when an external link (e.g. from WhatsApp) is opened in an Android mobile browser.
  * Presents options:
  *   1. Native App (com.pwaninet.app)
@@ -19,8 +19,8 @@
             document.documentElement.classList.contains('is-native-app') ||
             document.documentElement.classList.contains('is-capacitor') ||
             typeof window.Capacitor !== 'undefined' ||
-            Boolean(window.AndroidBridge || window.PwaninetBridge) ||
-            navigator.userAgent.includes('PwaniNetApp')
+            Boolean(window.AndroidBridge || window.vastoBridge) ||
+            navigator.userAgent.includes('vastoApp')
         );
     }
 
@@ -39,16 +39,16 @@
     }
 
     function createChooserModal() {
-        if (document.getElementById('pwaninet-link-chooser-sheet')) return;
+        if (document.getElementById('vasto-link-chooser-sheet')) return;
 
         const currentPath = window.location.pathname + window.location.search;
         const nativeIntentUrl = `intent://pwaninet.app${currentPath}#Intent;scheme=https;package=com.pwaninet.app;end`;
 
         const sheet = document.createElement('div');
-        sheet.id = 'pwaninet-link-chooser-sheet';
+        sheet.id = 'vasto-link-chooser-sheet';
         sheet.innerHTML = `
             <style>
-                #pwaninet-link-chooser-backdrop {
+                #vasto-link-chooser-backdrop {
                     position: fixed;
                     inset: 0;
                     background: rgba(0, 0, 0, 0.55);
@@ -58,7 +58,7 @@
                     opacity: 0;
                     transition: opacity 0.3s ease;
                 }
-                #pwaninet-link-chooser-card {
+                #vasto-link-chooser-card {
                     position: fixed;
                     bottom: 0;
                     left: 0;
@@ -75,7 +75,7 @@
                     transform: translateY(100%);
                     transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
                 }
-                [data-theme="dark"] #pwaninet-link-chooser-card {
+                [data-theme="dark"] #vasto-link-chooser-card {
                     background: var(--card-bg, #1e293b);
                     color: var(--text-primary, #f8fafc);
                     border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -197,13 +197,13 @@
                     color: var(--text-primary, #0f172a);
                 }
             </style>
-            <div id="pwaninet-link-chooser-backdrop"></div>
-            <div id="pwaninet-link-chooser-card">
+            <div id="vasto-link-chooser-backdrop"></div>
+            <div id="vasto-link-chooser-card">
                 <div class="chooser-drag-handle"></div>
                 <div class="chooser-header">
-                    <img src="/static/images/web-app-manifest-192x192-rounded.png" alt="PwaniNet">
+                    <img src="/static/images/web-app-manifest-192x192-rounded.png" alt="vasto">
                     <div>
-                        <h5 class="chooser-title">Open with PwaniNet</h5>
+                        <h5 class="chooser-title">Open with vasto</h5>
                         <p class="chooser-subtitle">Choose where you want to view this post</p>
                     </div>
                 </div>
@@ -215,7 +215,7 @@
                                 <i class="bi bi-phone-fill"></i>
                             </div>
                             <div>
-                                <div class="chooser-opt-name">PwaniNet App</div>
+                                <div class="chooser-opt-name">vasto App</div>
                                 <div class="chooser-opt-desc">Fastest experience & offline caching</div>
                             </div>
                         </div>
@@ -229,7 +229,7 @@
                                 <i class="bi bi-window-fullscreen"></i>
                             </div>
                             <div>
-                                <div class="chooser-opt-name">PwaniNet Web App (PWA)</div>
+                                <div class="chooser-opt-name">vasto Web App (PWA)</div>
                                 <div class="chooser-opt-desc">Open in standalone WebAPK or install</div>
                             </div>
                         </div>
@@ -258,8 +258,8 @@
 
         document.body.appendChild(sheet);
 
-        const backdrop = document.getElementById('pwaninet-link-chooser-backdrop');
-        const card = document.getElementById('pwaninet-link-chooser-card');
+        const backdrop = document.getElementById('vasto-link-chooser-backdrop');
+        const card = document.getElementById('vasto-link-chooser-card');
 
         requestAnimationFrame(() => {
             backdrop.style.opacity = '1';
@@ -271,14 +271,14 @@
             card.style.transform = 'translateY(100%)';
             setTimeout(() => {
                 sheet.remove();
-                if (window.dismissPwaninetLinkChooser === closeChooser) {
-                    delete window.dismissPwaninetLinkChooser;
+                if (window.dismissvastoLinkChooser === closeChooser) {
+                    delete window.dismissvastoLinkChooser;
                 }
             }, 350);
-            sessionStorage.setItem('pwaninet_link_chooser_dismissed', 'true');
+            sessionStorage.setItem('vasto_link_chooser_dismissed', 'true');
         }
 
-        window.dismissPwaninetLinkChooser = closeChooser;
+        window.dismissvastoLinkChooser = closeChooser;
 
         backdrop.addEventListener('click', closeChooser);
         document.getElementById('chooser-dismiss-btn').addEventListener('click', closeChooser);
@@ -294,7 +294,7 @@
 
             setTimeout(() => {
                 if (Date.now() - start < 2500) {
-                    if (confirm("PwaniNet Native App is not installed. Would you like to download the APK?")) {
+                    if (confirm("vasto Native App is not installed. Would you like to download the APK?")) {
                         window.location.href = '/download/app/latest/';
                     }
                 }
@@ -318,7 +318,7 @@
         if (!isAndroid()) return;
         if (isNativeApp() || isStandalone()) return;
 
-        if (sessionStorage.getItem('pwaninet_link_chooser_dismissed') === 'true') {
+        if (sessionStorage.getItem('vasto_link_chooser_dismissed') === 'true') {
             return;
         }
 
@@ -333,6 +333,6 @@
         initLinkChooser();
     }
 
-    window.showPwaniNetLinkChooser = createChooserModal;
+    window.showvastoLinkChooser = createChooserModal;
 
 })();

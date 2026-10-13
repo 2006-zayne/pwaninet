@@ -24,14 +24,14 @@ class PwanimateUIViewTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             username="student_alice",
-            email="alice@pwaninet.local",
+            email="alice@vasto.local",
             password="testpassword123",
             first_name="Alice",
             last_name="Student",
         )
         self.other_user = User.objects.create_user(
             username="student_bob",
-            email="bob@pwaninet.local",
+            email="bob@vasto.local",
             password="testpassword123",
             first_name="Bob",
             last_name="Student",

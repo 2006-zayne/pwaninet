@@ -24,7 +24,7 @@
                         class="nav-link rounded-pill py-2 {% if active_tab == 'personalization' or not active_tab %}active{% endif %}"
                         id="mobile-tab-personalization"
                         data-tab="personalization"
-                        onclick="window.switchPwanimateSettingsTab('mobile', 'personalization')">
+                        onclick="window.switchSparkSettingsTab('mobile', 'personalization')">
                     <i class="bi bi-sliders me-1"></i>
                     <span>{% trans "Personalization" %}</span>
                 </button>
@@ -34,7 +34,7 @@
                         class="nav-link rounded-pill py-2 {% if active_tab == 'usage' %}active{% endif %}"
                         id="mobile-tab-usage"
                         data-tab="usage"
-                        onclick="window.switchPwanimateSettingsTab('mobile', 'usage')">
+                        onclick="window.switchSparkSettingsTab('mobile', 'usage')">
                     <i class="bi bi-speedometer2 me-1"></i>
                     <span>{% trans "Usage" %}</span>
                 </button>
@@ -44,7 +44,7 @@
                         class="nav-link rounded-pill py-2 {% if active_tab == 'about' %}active{% endif %}"
                         id="mobile-tab-about"
                         data-tab="about"
-                        onclick="window.switchPwanimateSettingsTab('mobile', 'about')">
+                        onclick="window.switchSparkSettingsTab('mobile', 'about')">
                     <i class="bi bi-info-circle me-1"></i>
                     <span>{% trans "About" %}</span>
                 </button>
@@ -66,7 +66,7 @@
     </div>
 </div>
 
-{# Out-of-band: ensure the navbar is Pwanimate branded #}
+{# Out-of-band: ensure the navbar is Spark branded #}
 <nav id="navbar-top" class="navbar navbar-expand-lg navbar-top fixed-top p-0" hx-swap-oob="true">
     {% include 'pwanimate/partials/pwanimate_top_nav.html' %}
 </nav>

@@ -6,7 +6,7 @@
  */
 
 class IndexedDBManager {
-    constructor(dbName = 'PwaniNetDB', version = 1) {
+    constructor(dbName = 'vastoDB', version = 1) {
         this.dbName = dbName;
         this.version = version;
         this.db = null;
@@ -232,7 +232,7 @@ class IndexedDBManager {
 // Draft-specific operations
 class DraftManager extends IndexedDBManager {
     constructor() {
-        super('PwaniNetDB', 1);
+        super('vastoDB', 1);
     }
 
     /**
@@ -308,7 +308,7 @@ class DraftManager extends IndexedDBManager {
 // Downloads metadata operations
 class DownloadsMetadataManager extends IndexedDBManager {
     constructor() {
-        super('PwaniNetDB', 1);
+        super('vastoDB', 1);
     }
 
     /**
@@ -395,7 +395,7 @@ class DownloadsMetadataManager extends IndexedDBManager {
 // Temporary data operations
 class TempDataManager extends IndexedDBManager {
     constructor() {
-        super('PwaniNetDB', 1);
+        super('vastoDB', 1);
     }
 
     /**

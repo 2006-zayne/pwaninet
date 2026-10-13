@@ -1,5 +1,5 @@
 """
-Release forms for PwaniNet Release Center.
+Release forms for vasto Release Center.
 
 Provides Django forms for release creation and editing.
 """

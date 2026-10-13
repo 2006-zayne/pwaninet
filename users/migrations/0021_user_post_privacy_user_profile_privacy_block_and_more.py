@@ -15,12 +15,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='user',
             name='post_privacy',
-            field=models.CharField(choices=[('PUBLIC', 'Everyone'), ('AUTHENTICATED', 'PwaniNet Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')], default='PUBLIC', help_text='Default visibility for new posts', max_length=20),
+            field=models.CharField(choices=[('PUBLIC', 'Everyone'), ('AUTHENTICATED', 'vasto Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')], default='PUBLIC', help_text='Default visibility for new posts', max_length=20),
         ),
         migrations.AddField(
             model_name='user',
             name='profile_privacy',
-            field=models.CharField(choices=[('PUBLIC', 'Everyone'), ('AUTHENTICATED', 'PwaniNet Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')], default='PUBLIC', help_text='Who can view profile information', max_length=20),
+            field=models.CharField(choices=[('PUBLIC', 'Everyone'), ('AUTHENTICATED', 'vasto Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')], default='PUBLIC', help_text='Who can view profile information', max_length=20),
         ),
         migrations.CreateModel(
             name='Block',

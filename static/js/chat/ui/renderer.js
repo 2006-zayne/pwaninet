@@ -215,8 +215,8 @@ export class MessageRenderer {
             }
         };
 
-        window.addEventListener('pwaninet:media-evicted', handleEviction);
-        window.addEventListener('pwaninet:download-deleted', handleEviction);
+        window.addEventListener('vasto:media-evicted', handleEviction);
+        window.addEventListener('vasto:download-deleted', handleEviction);
     }
 
     /**

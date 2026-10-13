@@ -698,7 +698,7 @@ class UploadUI {
         style.id = 'upload-banner-styles';
         style.textContent = `
             /* ================================================================
-               Pwaninet Professional Upload Banner & Floating Dock
+               vasto Professional Upload Banner & Floating Dock
                ================================================================ */
 
             .upload-banner {
@@ -738,7 +738,7 @@ class UploadUI {
             /* Mobile positioning: centered floating pill right above bottom navigation bar */
             @media (max-width: 767.98px) {
                 .upload-banner {
-                    bottom: calc(80px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                    bottom: calc(80px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
                     left: 50%;
                     transform: translateX(-50%) translateY(24px) scale(0.96);
                     width: 95%;

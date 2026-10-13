@@ -54,11 +54,11 @@ logger = logging.getLogger(__name__)
 
 # Patterns that indicate purely conversational pleasantries without substantive search intent
 CONVERSATIONAL_PATTERNS = [
-    r"^(hi|hello|hey|hiya|howdy)(\s+(there|pwanimate|friend))?[\s\.\!\?]*$",
-    r"^(good\s+(morning|afternoon|evening|day))(\s+(pwanimate|there))?[\s\.\!\?]*$",
+    r"^(hi|hello|hey|hiya|howdy)(\s+(there|Spark|friend))?[\s\.\!\?]*$",
+    r"^(good\s+(morning|afternoon|evening|day))(\s+(Spark|there))?[\s\.\!\?]*$",
     r"^(habari|sasa|mambo|niaje|jambo)[\s\.\!\?]*$",
     r"^(thanks|thank\s+you|asante(\s+sana)?)[\s\.\!\?]*$",
-    r"^(who\s+are\s+you|what\s+are\s+you|what\s+is\s+pwanimate)[\s\.\!\?]*$",
+    r"^(who\s+are\s+you|what\s+are\s+you|what\s+is\s+Spark)[\s\.\!\?]*$",
     r"^(what\s+can\s+you\s+do|how\s+can\s+you\s+help(\s+me)?)[\s\.\!\?]*$",
     r"^(help|start)[\s\.\!\?]*$",
     r"^(ok|okay|k|kk|alright|all\s+right|got\s+it|understood|makes\s+sense)[\s\.\!\?]*$",
@@ -386,7 +386,7 @@ class PwanimateOrchestrator:
                         mime_type=att_mime,
                         attachment_type="image",
                         data_bytes=data_bytes,
-                        url=getattr(att, "url", f"/api/pwanimate/attachments/{att_id}/view/"),
+                        url=getattr(att, "url", f"/api/Spark/attachments/{att_id}/view/"),
                     )
                 )
 

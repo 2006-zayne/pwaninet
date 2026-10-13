@@ -1,5 +1,5 @@
 /**
- * PwaniNet Unified Video Manager (Phase 4)
+ * vasto Unified Video Manager (Phase 4)
  * 
  * Features:
  * - Single feed IntersectionObserver (threshold: 0.65)
@@ -20,18 +20,18 @@
     // STATE & CONFIGURATION
     // ============================================================================
 
-    const username = window.PwaniNetUsername || '';
-    const storageKey = username ? `pwaninet_audio_preference_${username}` : 'pwaninet_audio_preference';
-    let isGlobalMuted = (localStorage.getItem(storageKey) || window.PwaniNetUserAudioPreference || 'muted') === 'muted';
+    const username = window.vastoUsername || '';
+    const storageKey = username ? `vasto_audio_preference_${username}` : 'vasto_audio_preference';
+    let isGlobalMuted = (localStorage.getItem(storageKey) || window.vastoUserAudioPreference || 'muted') === 'muted';
     let isProgrammaticAudioSync = false;
 
     // Auto-scroll preference (persisted per user)
-    const autoScrollKey = username ? `pwaninet_autoscroll_${username}` : 'pwaninet_autoscroll';
+    const autoScrollKey = username ? `vasto_autoscroll_${username}` : 'vasto_autoscroll';
     let isAutoScrollEnabled = localStorage.getItem(autoScrollKey) === 'true';
 
     // Auto-scroll prompt nudge — tracks when to show, snooze, and when to give up
-    const promptTsKey    = username ? `pwaninet_autoscroll_prompt_ts_${username}`    : 'pwaninet_autoscroll_prompt_ts';
-    const promptCountKey = username ? `pwaninet_autoscroll_prompt_count_${username}` : 'pwaninet_autoscroll_prompt_count';
+    const promptTsKey    = username ? `vasto_autoscroll_prompt_ts_${username}`    : 'vasto_autoscroll_prompt_ts';
+    const promptCountKey = username ? `vasto_autoscroll_prompt_count_${username}` : 'vasto_autoscroll_prompt_count';
     const PROMPT_SNOOZE_MS    = 7 * 24 * 60 * 60 * 1000; // 7 days
     const PROMPT_MAX_DISMISSALS = 3;                       // stop asking after 3 dismissals
     const PROMPT_TRIGGER_REELS  = 3;                       // show after watching N reels in the session
@@ -143,7 +143,7 @@
                           document.querySelector('[name=csrfmiddlewaretoken]');
         if (formInput && formInput.value) return formInput.value;
 
-        // 4. Try reading the active csrf cookie (prefer local configured name pwaninet_local_csrftoken, fallback to csrftoken)
+        // 4. Try reading the active csrf cookie (prefer local configured name vasto_local_csrftoken, fallback to csrftoken)
         try {
             if (document.cookie) {
                 const cookies = document.cookie.split(';');
@@ -151,7 +151,7 @@
                 let defaultToken = '';
                 for (const cookie of cookies) {
                     const [name, value] = cookie.trim().split('=');
-                    if (name === 'pwaninet_local_csrftoken') {
+                    if (name === 'vasto_local_csrftoken') {
                         localToken = decodeURIComponent(value || '');
                     } else if (name === 'csrftoken') {
                         defaultToken = decodeURIComponent(value || '');
@@ -743,7 +743,7 @@
         isGlobalMuted = !!muted;
         try {
             localStorage.setItem(storageKey, isGlobalMuted ? 'muted' : 'unmuted');
-            localStorage.setItem('pwaninet_audio_preference', isGlobalMuted ? 'muted' : 'unmuted');
+            localStorage.setItem('vasto_audio_preference', isGlobalMuted ? 'muted' : 'unmuted');
         } catch (e) {
             console.warn('[VideoManager] LocalStorage unavailable for audio preference', e);
         }
@@ -770,11 +770,11 @@
 
         // Keep GlobalAudioManager preference in sync if present
         try {
-            if (window.PwaniNetGlobalAudio && typeof window.PwaniNetGlobalAudio.getAudioPreference === 'function') {
+            if (window.vastoGlobalAudio && typeof window.vastoGlobalAudio.getAudioPreference === 'function') {
                 const targetPref = isGlobalMuted ? 'muted' : 'unmuted';
-                if (window.PwaniNetGlobalAudio.getAudioPreference() !== targetPref) {
-                    if (typeof window.PwaniNetGlobalAudio.setAudioPreference === 'function') {
-                        window.PwaniNetGlobalAudio.setAudioPreference(targetPref);
+                if (window.vastoGlobalAudio.getAudioPreference() !== targetPref) {
+                    if (typeof window.vastoGlobalAudio.setAudioPreference === 'function') {
+                        window.vastoGlobalAudio.setAudioPreference(targetPref);
                     }
                 }
             }
@@ -3222,7 +3222,7 @@
             if (typeof window.updateStatusBarForTheme === 'function') {
                 window.updateStatusBarForTheme('dark');
             } else {
-                const bridge = window.AndroidBridge || window.PwaninetBridge;
+                const bridge = window.AndroidBridge || window.vastoBridge;
                 if (bridge && typeof bridge.setSystemBarTheme === 'function') {
                     bridge.setSystemBarTheme('dark');
                 }
@@ -3441,7 +3441,7 @@
             if (typeof window.updateStatusBarForTheme === 'function') {
                 window.updateStatusBarForTheme(curTheme);
             } else {
-                const bridge = window.AndroidBridge || window.PwaninetBridge;
+                const bridge = window.AndroidBridge || window.vastoBridge;
                 if (bridge && typeof bridge.setSystemBarTheme === 'function') {
                     bridge.setSystemBarTheme(curTheme);
                 }
@@ -3486,7 +3486,7 @@
             if (typeof window.showGuestAuthPrompt === 'function') {
                 window.showGuestAuthPrompt({
                     title: 'Sign in for more options',
-                    subtitle: 'Sign in to PwaniNet to save reels, repost, customize your feed, or report content.',
+                    subtitle: 'Sign in to vasto to save reels, repost, customize your feed, or report content.',
                     icon: 'bi-sliders'
                 });
             }
@@ -3782,10 +3782,10 @@
     }
 
     function showCommentsToast(message) {
-        let toast = document.getElementById('pwaninetCommentsToast');
+        let toast = document.getElementById('vastoCommentsToast');
         if (!toast) {
             toast = document.createElement('div');
-            toast.id = 'pwaninetCommentsToast';
+            toast.id = 'vastoCommentsToast';
             toast.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-4 px-3 py-2 rounded-pill shadow bg-dark text-white text-center';
             toast.style.zIndex = '10950';
             toast.style.fontSize = '13px';
@@ -4220,7 +4220,7 @@
                     if (typeof window.showGuestAuthPrompt === 'function') {
                         window.showGuestAuthPrompt({
                             title: 'Sign in for comment options',
-                            subtitle: 'Sign in to PwaniNet to interact with comments, view profiles, and join the discussion.',
+                            subtitle: 'Sign in to vasto to interact with comments, view profiles, and join the discussion.',
                             icon: 'bi-chat-dots-fill'
                         });
                     }
@@ -4237,9 +4237,9 @@
                 closeAllSheetCommentMenus();
                 if (existingMenu) return;
 
-                const currentUserId = window.PwaniNetUserId || document.body.dataset.userId;
-                const currentUsername = window.PwaniNetUsername || document.body.dataset.userUsername;
-                const currentUserRole = window.PwaniNetUserRole || document.body.dataset.userRole;
+                const currentUserId = window.vastoUserId || document.body.dataset.userId;
+                const currentUsername = window.vastoUsername || document.body.dataset.userUsername;
+                const currentUserRole = window.vastoUserRole || document.body.dataset.userRole;
 
                 const authorId = commentEl.dataset.authorId;
                 const authorLink = commentEl.querySelector('.comment-author-link');
@@ -5056,7 +5056,7 @@
                 if (!window.isAuthenticated) {
                     if (typeof window.showGuestAuthPrompt === 'function') {
                         window.showGuestAuthPrompt({
-                            title: 'Watch more reels on PwaniNet',
+                            title: 'Watch more reels on vasto',
                             subtitle: 'Sign in to watch endless campus reels, trending videos, and discover creators.',
                             icon: 'bi-play-circle-fill'
                         });
@@ -5165,7 +5165,7 @@
             const data = e.detail;
             if (!data) return;
             const targetId = data.share_id || data.post_id;
-            const currentUserId = window.PwaniNetUserId || document.body.dataset.userId;
+            const currentUserId = window.vastoUserId || document.body.dataset.userId;
             const isCurrentUser = Boolean(data.user_id && currentUserId && String(data.user_id) === String(currentUserId));
             if (targetId) {
                 const isLiked = isCurrentUser ? data.is_liked : undefined;
@@ -5177,7 +5177,7 @@
             const data = e.detail;
             if (!data) return;
             const targetId = data.share_id || data.post_id;
-            const currentUserId = window.PwaniNetUserId || document.body.dataset.userId;
+            const currentUserId = window.vastoUserId || document.body.dataset.userId;
             const isCurrentUser = Boolean(data.user_id && currentUserId && String(data.user_id) === String(currentUserId));
             if (targetId) {
                 const isReposted = isCurrentUser ? data.is_reposted : undefined;
@@ -5324,7 +5324,7 @@
                 if (!window.isAuthenticated) {
                     if (typeof window.showGuestAuthPrompt === 'function') {
                         window.showGuestAuthPrompt({
-                            title: 'Watch more reels on PwaniNet',
+                            title: 'Watch more reels on vasto',
                             subtitle: 'Sign in to watch endless campus reels, trending videos, and discover creators.',
                             icon: 'bi-play-circle-fill'
                         });
@@ -5517,7 +5517,7 @@
                         guestWheelThrottle = true;
                         setTimeout(() => { guestWheelThrottle = false; }, 1200);
                         window.showGuestAuthPrompt({
-                            title: 'Watch more reels on PwaniNet',
+                            title: 'Watch more reels on vasto',
                             subtitle: 'Sign in to watch endless campus reels, trending videos, and discover creators.',
                             icon: 'bi-play-circle-fill'
                         });
@@ -5541,7 +5541,7 @@
                         setTimeout(() => { guestTouchThrottle = false; }, 1200);
                         if (typeof window.showGuestAuthPrompt === 'function') {
                             window.showGuestAuthPrompt({
-                                title: 'Watch more reels on PwaniNet',
+                                title: 'Watch more reels on vasto',
                                 subtitle: 'Sign in to watch endless campus reels, trending videos, and discover creators.',
                                 icon: 'bi-play-circle-fill'
                             });
@@ -6114,7 +6114,7 @@
     window.openCommentsSheet = openCommentsSheet;
     window.openReelComments = openCommentsSheet;
 
-    window.PwaniNetVideoManager = {
+    window.vastoVideoManager = {
         init,
         playVideo,
         pauseVideo,
@@ -6144,7 +6144,7 @@
         warmSnapItemMedia
     };
 
-    window.videoManager = window.PwaniNetVideoManager;
+    window.videoManager = window.vastoVideoManager;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

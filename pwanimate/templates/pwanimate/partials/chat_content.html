@@ -15,7 +15,7 @@
     <div class="offcanvas offcanvas-end pwanimate-offcanvas d-xl-none" tabindex="-1" id="pwanimateMobileMenu" aria-labelledby="pwanimateMobileMenuLabel">
         <div class="offcanvas-header border-bottom">
             <h5 class="offcanvas-title fw-bold" id="pwanimateMobileMenuLabel">
-                <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" alt="Pwanimate" style="width: 24px; height: 24px; object-fit: contain; margin-right: 8px;">
+                <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" alt="Spark" style="width: 24px; height: 24px; object-fit: contain; margin-right: 8px;">
                 <span>PWANI<span class="brand-net">MATE</span></span>
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{% trans 'Close' %}"></button>
@@ -28,7 +28,7 @@
                    class="btn btn-outline-secondary btn-sm w-100 d-flex align-items-center justify-content-center"
                    data-bypass-htmx="true"
                    hx-boost="false">
-                    <i class="bi bi-box-arrow-left me-2"></i> Back to PwaniNet
+                    <i class="bi bi-box-arrow-left me-2"></i> Back to vasto
                 </a>
 
                 {% if request.user.is_authenticated %}
@@ -324,7 +324,7 @@
     </div>
 
     <!-- Main Chat Workspace -->
-    <section class="pwanimate-chat-pane" aria-label="{% trans 'Pwanimate Chat' %}">
+    <section class="pwanimate-chat-pane" aria-label="{% trans 'Spark Chat' %}">
 
         <!-- Context Rail Reopen Toggle (Desktop only, >= 1200px, visible when context rail is closed) -->
         <div class="pwanimate-context-rail-toggle-wrapper d-none d-xl-flex" id="pwanimateContextRailToggleWrapper">
@@ -339,7 +339,7 @@
             </button>
         </div>
 
-        <!-- Persistent Study Session Header Bar (Single Thin Row below Global Pwanimate Header) -->
+        <!-- Persistent Study Session Header Bar (Single Thin Row below Global Spark Header) -->
         <div class="pwanimate-study-session-banner {% if not active_study_session and not initial_study_mode %}d-none{% endif %}"
              id="pwanimate-study-session-banner"
              data-session-id="{{ active_study_session.id|default:'' }}"
@@ -474,8 +474,8 @@
                             <div class="pwanimate-message-content">
                                 <div class="pwanimate-assistant-bubble">
                                     <div class="pwanimate-assistant-header">
-                                        <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" class="pwanimate-assistant-avatar" alt="Pwanimate" width="24" height="24">
-                                        <span>Pwanimate</span>
+                                        <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" class="pwanimate-assistant-avatar" alt="Spark" width="24" height="24">
+                                        <span>Spark</span>
                                     </div>
                                     <div class="pwanimate-markdown-body" data-raw="{{ msg.content|escape }}">{{ msg.content }}</div>
 
@@ -578,8 +578,8 @@
                      data-display-name="{{ user_display|default:'' }}"
                      data-interests="{{ student_interests|default:'' }}"
                      data-tone="{{ preferences.tone|default:'neutral' }}">
-                    <img src="{% static 'images/pwanimate/pwanimate.png' %}" class="pwanimate-hero-icon" alt="Pwanimate AI" width="88" height="88">
-                    <h2 class="pwanimate-empty-title">Pwanimate</h2>
+                    <img src="{% static 'images/pwanimate/pwanimate.png' %}" class="pwanimate-hero-icon" alt="Spark AI" width="88" height="88">
+                    <h2 class="pwanimate-empty-title">Spark</h2>
                     <p class="pwanimate-empty-greeting" id="pwanimate-empty-greeting" aria-live="polite"></p>
                     <p class="pwanimate-empty-question" id="pwanimate-empty-question"></p>
 
@@ -686,7 +686,7 @@
                                 </div>
                                 <h3 class="pwanimate-study-card-title" id="pwanimate-study-card-title">Document</h3>
                                 <p class="pwanimate-study-card-subtitle mb-0" id="pwanimate-study-card-subtitle">
-                                    {% trans "Flip pages in the Context Rail to devour this document page by page with Pwanimate." %}
+                                    {% trans "Flip pages in the Context Rail to devour this document page by page with Spark." %}
                                 </p>
                             </div>
                         </div>
@@ -710,13 +710,13 @@
                         </div>
                     </div>
 
-                    <div class="pwanimate-suggestion-grid" id="pwanimate-empty-suggestions" aria-label="Try asking Pwanimate">
+                    <div class="pwanimate-suggestion-grid" id="pwanimate-empty-suggestions" aria-label="Try asking Spark">
                     </div>
                 </div>
             {% endif %}
             <div class="pwanimate-chat-disclaimer{% if not active_conversation or not messages %} d-none{% endif %}" id="pwanimate-chat-disclaimer">
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
-                <span>{% trans "Pwanimate can make mistakes. Please verify important details." %}</span>
+                <span>{% trans "Spark can make mistakes. Please verify important details." %}</span>
             </div>
         </div>
 
@@ -786,13 +786,13 @@
                 </div>
 
                 <div class="pwanimate-composer-standard" id="pwanimate-composer-standard">
-                <label for="pwanimate-input" class="visually-hidden">{% trans "Message Pwanimate" %}</label>
+                <label for="pwanimate-input" class="visually-hidden">{% trans "Message Spark" %}</label>
                 <div class="pwanimate-composer-input-row">
                     <textarea id="pwanimate-input"
                               class="pwanimate-textarea"
                               rows="1"
-                              placeholder="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}{% trans 'Ask a study question...' %}{% else %}{% trans 'Ask Pwanimate anything...' %}{% endif %}"
-                              aria-label="{% trans 'Message Pwanimate' %}">{{ initial_prompt }}</textarea>
+                              placeholder="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}{% trans 'Ask a study question...' %}{% else %}{% trans 'Ask Spark anything...' %}{% endif %}"
+                              aria-label="{% trans 'Message Spark' %}">{{ initial_prompt }}</textarea>
                 </div>
                 <div class="pwanimate-composer-action-row">
                     <div class="pwanimate-composer-actions-start d-flex align-items-center gap-1">
@@ -882,13 +882,13 @@
         </div>
     </section>
 
-    <!-- Pwanimate Attachment Modal & Bottom Sheet (UI Prepared) -->
+    <!-- Spark Attachment Modal & Bottom Sheet (UI Prepared) -->
     <div class="pwanimate-attachment-modal" id="pwanimateAttachmentModal">
         <div class="pwanimate-attachment-modal-content">
             <div class="pwanimate-attachment-sheet-handle"></div>
             <div class="pwanimate-attachment-modal-header">
                 <h4 class="pwanimate-attachment-modal-title">{% trans "Add attachment" %}</h4>
-                <button class="pwanimate-attachment-modal-close" id="closePwanimateAttachmentModal" type="button" aria-label="Close">
+                <button class="pwanimate-attachment-modal-close" id="closeSparkAttachmentModal" type="button" aria-label="Close">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
@@ -1061,7 +1061,7 @@
                                         <ul class="small mb-2 ps-3" id="pwanimateCkptDemonstratedList"></ul>
                                     </div>
                                     <div class="mb-2">
-                                        <div class="small fw-semibold text-primary"><i class="bi bi-book me-1"></i>{% trans "Concepts Explained by Pwanimate" %}</div>
+                                        <div class="small fw-semibold text-primary"><i class="bi bi-book me-1"></i>{% trans "Concepts Explained by Spark" %}</div>
                                         <ul class="small mb-2 ps-3" id="pwanimateCkptExplainedList"></ul>
                                     </div>
                                     <div class="mb-2">
@@ -1150,7 +1150,7 @@
         </div>
     </div>
 
-    <!-- Pwanimate Dedicated Settings Modal -->
+    <!-- Spark Dedicated Settings Modal -->
     {% include 'pwanimate/settings/partials/settings_modal.html' %}
 </div>
 
@@ -1171,14 +1171,14 @@
         if (!window.DocumentViewer) {
             scriptsToLoad.push("{% static 'documents/js/document-viewer.js' %}");
         }
-        if (typeof window.initPwanimate !== 'function') {
+        if (typeof window.initSpark !== 'function') {
             scriptsToLoad.push("{% static 'js/pwanimate/pwanimate-chat.js' %}?v={{ pwanimate_version|default:'2.0.0' }}-20261011-2");
         }
 
         function loadNext() {
             if (scriptsToLoad.length === 0) {
-                if (typeof window.initPwanimate === 'function') {
-                    window.initPwanimate();
+                if (typeof window.initSpark === 'function') {
+                    window.initSpark();
                 }
                 return;
             }
@@ -1192,16 +1192,16 @@
 
         if (scriptsToLoad.length > 0) {
             loadNext();
-        } else if (typeof window.initPwanimate === 'function') {
-            window.initPwanimate();
+        } else if (typeof window.initSpark === 'function') {
+            window.initSpark();
         }
     })();
 
-    // Pwanimate Attachment UI Wiring
-    function initPwanimateAttachmentUI() {
+    // Spark Attachment UI Wiring
+    function initSparkAttachmentUI() {
         const attachBtn = document.getElementById('pwanimateAttachBtn');
         const modal = document.getElementById('pwanimateAttachmentModal');
-        const closeBtn = document.getElementById('closePwanimateAttachmentModal');
+        const closeBtn = document.getElementById('closeSparkAttachmentModal');
         if (!attachBtn || !modal) return;
 
         attachBtn.addEventListener('click', (e) => {
@@ -1230,13 +1230,13 @@
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initPwanimateAttachmentUI);
+        document.addEventListener('DOMContentLoaded', initSparkAttachmentUI);
     } else {
-        initPwanimateAttachmentUI();
+        initSparkAttachmentUI();
     }
     document.addEventListener('htmx:afterSwap', function(evt) {
         if (evt.detail && (evt.detail.target.id === 'page-content-target' || evt.detail.target.id === 'pwanimate-root')) {
-            initPwanimateAttachmentUI();
+            initSparkAttachmentUI();
         }
     });
 </script>

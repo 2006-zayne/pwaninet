@@ -1,7 +1,7 @@
 """
 users/services/two_factor_service.py
 
-Two-factor authentication (TOTP RFC 6238) service for PwaniNet.
+Two-factor authentication (TOTP RFC 6238) service for vasto.
 Handles secret generation, authenticated encryption at rest, verification
 with clock drift tolerance, concurrency-safe replay protection, and provisioning URIs.
 """
@@ -46,7 +46,7 @@ def _get_fernet() -> MultiFernet:
             key_list = [k.strip().encode('utf-8') for k in raw_keys.split(',') if k.strip()]
         else:
             # Deterministic SHA256-derived key from SECRET_KEY
-            derived = hashlib.sha256(b"pwaninet-mfa-encryption:" + settings.SECRET_KEY.encode('utf-8')).digest()
+            derived = hashlib.sha256(b"vasto-mfa-encryption:" + settings.SECRET_KEY.encode('utf-8')).digest()
             key_list = [base64.urlsafe_b64encode(derived)]
 
         fernet_instances = [Fernet(k) for k in key_list]
@@ -164,7 +164,7 @@ def get_provisioning_uri(user, issuer: Optional[str] = None) -> str:
         raise TwoFactorError("2FA is not initialized for this user.")
 
     totp = get_totp_object(two_factor)
-    issuer_name = issuer or getattr(settings, 'TOTP_ISSUER', 'PwaniNet')
+    issuer_name = issuer or getattr(settings, 'TOTP_ISSUER', 'vasto')
     return totp.provisioning_uri(name=user.username, issuer_name=issuer_name)
 
 

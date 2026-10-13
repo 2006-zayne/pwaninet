@@ -2,7 +2,7 @@
 Types and Data Structures for Pwanimate People Discovery.
 
 Defines structured query requests and grounded candidate representations
-for discovering real PwaniNet users based on skills, interests, academic
+for discovering real vasto users based on skills, interests, academic
 alignment, and collaboration readiness.
 """
 
@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class PeopleQuery:
     """
-    Structured query representation for discovering PwaniNet users.
+    Structured query representation for discovering vasto users.
 
     Attributes:
         raw_query: Original user input string.
@@ -34,7 +34,7 @@ class PeopleQuery:
 @dataclass
 class PersonResult:
     """
-    Structured, factual representation of a discoverable PwaniNet user.
+    Structured, factual representation of a discoverable vasto user.
 
     Strictly excludes sensitive authentication and contact attributes
     (email, phone, password, tokens, session IDs).

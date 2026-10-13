@@ -1,5 +1,5 @@
 """
-Rules Engine for PwaniNet Notification Engine v2
+Rules Engine for vasto Notification Engine v2
 
 This module implements the Rules Engine that transforms platform events into user notifications.
 Following the specification, it evaluates events against rules and creates Notification Objects.

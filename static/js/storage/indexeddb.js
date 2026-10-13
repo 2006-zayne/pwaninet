@@ -1,11 +1,11 @@
 /**
- * IndexedDB Manager for PwaniNet Storage System
+ * IndexedDB Manager for vasto Storage System
  * Handles metadata storage for downloads, cache, and temporary data
  */
 
 class IndexedDBManager {
     constructor() {
-        this.dbName = 'PwaniNetStorage';
+        this.dbName = 'vastoStorage';
         this.dbVersion = 1;
         this.db = null;
         this.stores = {

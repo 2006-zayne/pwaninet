@@ -284,14 +284,14 @@ class ToolRouter:
         return None
 
     def _match_site_info(self, query: str, lower_query: str) -> Optional[ToolRoute]:
-        """Match questions about PwaniNet or Pwanimate itself."""
+        """Match questions about vasto or Pwanimate itself."""
         site_patterns = [
-            r"^(?:what\s+is|about|tell\s+me\s+about|describe)\s+pwaninet[\s\?\.]*$",
+            r"^(?:what\s+is|about|tell\s+me\s+about|describe)\s+vasto[\s\?\.]*$",
             r"^(?:what\s+is|about|tell\s+me\s+about|describe)\s+pwanimate[\s\?\.]*$",
             r"^(?:what\s+can\s+you\s+do|how\s+can\s+you\s+help(?:\s+me)?|what\s+are\s+your\s+(?:features?|capabilities?))[\s\?\.]*$",
             r"^(?:who\s+are\s+you|what\s+are\s+you)[\s\?\.]*$",
-            r"^(?:how\s+does\s+pwaninet\s+work|how\s+does\s+this\s+(?:site|platform|app)\s+work)[\s\?\.]*$",
-            r"^(?:pwaninet|pwanimate)\s+features?[\s\?\.]*$",
+            r"^(?:how\s+does\s+vasto\s+work|how\s+does\s+this\s+(?:site|platform|app)\s+work)[\s\?\.]*$",
+            r"^(?:vasto|pwanimate)\s+features?[\s\?\.]*$",
             r"^help[\s\?\.]*$",
         ]
         for pattern in site_patterns:

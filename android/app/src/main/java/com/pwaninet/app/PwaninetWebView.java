@@ -1,4 +1,4 @@
-package com.pwaninet.app;
+package com.vasto.app;
 
 import android.content.Context;
 import android.net.Uri;
@@ -27,12 +27,12 @@ import java.io.InputStream;
  *
  * By default Android's WebView does not declare any contentMimeTypes on its
  * EditorInfo, so Gboard/SwiftKey refuse to insert screenshots, clipboard images,
- * GIFs or stickers and show "PwaniNet does not allow attachments here".
+ * GIFs or stickers and show "Pwaninet does not allow attachments here".
  *
  * This subclass declares image MIME types and wraps the InputConnection with a
  * commitContent listener. The committed image is read natively (with the
  * temporary URI grant from the keyboard) and handed to the web layer through a
- * `pwaninet:native-image-paste` window event, where MediaPicker attaches it to
+ * `vasto:native-image-paste` window event, where MediaPicker attaches it to
  * the focused comment composer.
  */
 public class PwaninetWebView extends CapacitorWebView {
@@ -123,7 +123,7 @@ public class PwaninetWebView extends CapacitorWebView {
             detail.put("mimeType", mimeType);
             detail.put("data", base64);
         } catch (Exception ignored) {}
-        final String js = "window.dispatchEvent(new CustomEvent('pwaninet:native-image-paste', {detail:" + detail + "}));";
+        final String js = "window.dispatchEvent(new CustomEvent('vasto:native-image-paste', {detail:" + detail + "}));";
         new Handler(Looper.getMainLooper()).post(() -> evaluateJavascript(js, null));
     }
 }

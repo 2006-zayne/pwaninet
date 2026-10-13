@@ -1,4 +1,4 @@
-# PwaniNet Developer Guide
+# vasto Developer Guide
 
 This guide takes a new developer from a clean clone to a fully running local development environment. It covers prerequisites, setup, architecture, common tasks, and troubleshooting.
 
@@ -85,7 +85,7 @@ git --version
 
 ```bash
 git clone <repository-url>
-cd pwaninet
+cd vasto
 ```
 
 ### Create a virtual environment
@@ -136,8 +136,8 @@ Open `.env` in your editor. The file contains placeholder values for local devel
 
 ```bash
 # Database
-DB_NAME=pwaninet
-DB_USER=pwaninet
+DB_NAME=vasto
+DB_USER=vasto
 DB_PASSWORD=local_password
 DB_HOST=127.0.0.1
 DB_PORT=5432
@@ -271,7 +271,7 @@ The site is now available at:
 | `http://127.0.0.1:8000/pwanimate/` | Pwanimate AI assistant |
 | `http://127.0.0.1:8000/api/docs/` | API Swagger documentation |
 | `http://127.0.0.1:8000/api/redoc/` | API ReDoc documentation |
-| `http://127.0.0.1:8000/about/` | About PwaniNet |
+| `http://127.0.0.1:8000/about/` | About vasto |
 | `http://127.0.0.1:8000/privacy/` | Privacy Policy |
 | `http://127.0.0.1:8000/licenses/` | Licences and attributions |
 | `http://127.0.0.1:8000/pwanimate-about/` | About Pwanimate |
@@ -303,13 +303,13 @@ In a separate terminal (with virtual environment activated):
 **Linux/macOS:**
 ```bash
 export DJANGO_SETTINGS_MODULE=pwaninet.settings.local
-celery -A pwaninet worker -l info
+celery -A vasto worker -l info
 ```
 
 **Windows PowerShell:**
 ```powershell
 $env:DJANGO_SETTINGS_MODULE = "pwaninet.settings.local"
-celery -A pwaninet worker -l info
+celery -A vasto worker -l info
 ```
 
 ### Start Celery Beat (scheduled tasks)
@@ -317,14 +317,14 @@ celery -A pwaninet worker -l info
 In another terminal:
 
 ```bash
-celery -A pwaninet beat -l info
+celery -A vasto beat -l info
 ```
 
 Celery Beat runs scheduled jobs such as document ingestion reconciliation (every 10 minutes).
 
 ### Task queues
 
-Tasks are routed to named queues configured in `pwaninet/settings/base.py`. If a task appears not to run, check the queue configuration and ensure a worker is consuming from that queue.
+Tasks are routed to named queues configured in `vasto/settings/base.py`. If a task appears not to run, check the queue configuration and ensure a worker is consuming from that queue.
 
 ---
 
@@ -393,7 +393,7 @@ Embeddings convert document chunks into vector representations for semantic sear
 
 ### Document ingestion
 
-Documents uploaded to PwaniNet are automatically processed:
+Documents uploaded to vasto are automatically processed:
 
 1. **Extraction** — Text is extracted from PDF, DOCX, PPTX, or TXT files
 2. **Chunking** — Content is split into 400-600 token chunks with structure awareness
@@ -520,16 +520,16 @@ python manage.py test --settings=pwaninet.settings.local
 
 ```bash
 # Start worker
-celery -A pwaninet worker -l info
+celery -A vasto worker -l info
 
 # Start beat (scheduled tasks)
-celery -A pwaninet beat -l info
+celery -A vasto beat -l info
 
 # Start worker + beat together (development)
-celery -A pwaninet worker -B -l info
+celery -A vasto worker -B -l info
 
 # Monitor (requires Flower)
-celery -A pwaninet flower --port=5555
+celery -A vasto flower --port=5555
 ```
 
 ### Docker
@@ -559,7 +559,7 @@ docker compose up -d --build
 
 | App | Location | Purpose |
 |---|---|---|
-| `pwaninet` | `pwaninet/` | Project settings, root URLs, ASGI/WSGI, Celery config |
+| `vasto` | `vasto/` | Project settings, root URLs, ASGI/WSGI, Celery config |
 | `pwanimate` | `pwanimate/` | AI assistant (RAG, tools, orchestration) |
 | `documents` | `documents/` | Academic document repository with academic hierarchy |
 | `posts` | `posts/` | Social feed (text, images, video, reels) |
@@ -576,7 +576,7 @@ docker compose up -d --build
 
 ### Key patterns
 
-- **Settings modules**: `pwaninet/settings/base.py` contains shared config; `local.py`, `production.py`, and `test.py` override per environment.
+- **Settings modules**: `vasto/settings/base.py` contains shared config; `local.py`, `production.py`, and `test.py` override per environment.
 - **App structure**: Each Django app follows the standard layout with `models.py`, `views.py`, `urls.py`, `serializers.py` (for API apps), `services/`, `tasks/`, and `templates/`.
 - **Authorization**: Privacy and visibility checks are enforced at the queryset level in services, not just in views.
 - **Search**: PostgreSQL full-text search with `SearchVectorField` and trigram similarity fallback. Search vectors are updated via Django signals.
@@ -590,7 +590,7 @@ docker compose up -d --build
 
 - Ensure Docker containers are running: `docker compose ps`
 - Check `DB_HOST` and `DB_PORT` in `.env`
-- Verify PostgreSQL is accepting connections: `docker compose exec db psql -U pwaninet -d pwaninet`
+- Verify PostgreSQL is accepting connections: `docker compose exec db psql -U vasto -d vasto`
 
 ### Redis connection errors
 
@@ -622,9 +622,9 @@ docker compose up -d --build
 
 ### Celery tasks not running
 
-- Ensure Celery worker is started: `celery -A pwaninet worker -l info`
+- Ensure Celery worker is started: `celery -A vasto worker -l info`
 - Ensure Redis is running (broker)
-- Check task routing configuration in `pwaninet/settings/base.py`
+- Check task routing configuration in `vasto/settings/base.py`
 - Verify `DJANGO_SETTINGS_MODULE=pwaninet.settings.local` is set
 
 ---

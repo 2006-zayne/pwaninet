@@ -1,5 +1,5 @@
 /**
- * PwaniNet Unified Haptics Engine
+ * vasto Unified Haptics Engine
  * Provides ultra-responsive, zero-latency tactile feedback for Android Capacitor and Web
  * Cascades: AndroidBridge (0ms sync) -> Capacitor.Plugins.Haptics -> navigator.vibrate
  */
@@ -27,7 +27,7 @@
 
             // Respect user preference if explicitly disabled
             try {
-                const saved = localStorage.getItem('pwaninet_haptics_enabled');
+                const saved = localStorage.getItem('vasto_haptics_enabled');
                 if (saved === 'false') {
                     this.enabled = false;
                 }
@@ -93,7 +93,7 @@
             if (!this._canTrigger()) return;
 
             // Tier 1: Direct synchronous native bridge (0ms delay)
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.hapticImpact === 'function') {
                 try {
                     bridge.hapticImpact('light');
@@ -123,7 +123,7 @@
         impactMedium() {
             if (!this._canTrigger()) return;
 
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.hapticImpact === 'function') {
                 try {
                     bridge.hapticImpact('medium');
@@ -151,7 +151,7 @@
         impactHeavy() {
             if (!this._canTrigger()) return;
 
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.hapticImpact === 'function') {
                 try {
                     bridge.hapticImpact('heavy');
@@ -179,7 +179,7 @@
         selection() {
             if (!this._canTrigger()) return;
 
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.hapticSelection === 'function') {
                 try {
                     bridge.hapticSelection();
@@ -207,7 +207,7 @@
         success() {
             if (!this._canTrigger()) return;
 
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.hapticNotification === 'function') {
                 try {
                     bridge.hapticNotification('success');
@@ -235,7 +235,7 @@
         warning() {
             if (!this._canTrigger()) return;
 
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.hapticNotification === 'function') {
                 try {
                     bridge.hapticNotification('warning');
@@ -263,7 +263,7 @@
         error() {
             if (!this._canTrigger()) return;
 
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.hapticNotification === 'function') {
                 try {
                     bridge.hapticNotification('error');
@@ -292,7 +292,7 @@
             if (!this._canTrigger()) return;
             const ms = Math.max(10, Math.min(durationMs || 200, 2000));
 
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.vibrate === 'function') {
                 try {
                     bridge.vibrate(ms);
@@ -320,7 +320,7 @@
         setEnabled(enable) {
             this.enabled = Boolean(enable);
             try {
-                localStorage.setItem('pwaninet_haptics_enabled', this.enabled ? 'true' : 'false');
+                localStorage.setItem('vasto_haptics_enabled', this.enabled ? 'true' : 'false');
             } catch (e) {}
         }
     }

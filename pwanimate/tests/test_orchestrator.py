@@ -99,12 +99,12 @@ class OrchestratorPromptsTestCase(SimpleTestCase):
 
     # --- Identity ---
 
-    def test_tutor_prompt_identifies_pwanimate_as_pwaninet_assistant(self):
-        self.assertIn("PwaniNet", SYSTEM_INSTRUCTION_TUTOR)
+    def test_tutor_prompt_identifies_pwanimate_as_vasto_assistant(self):
+        self.assertIn("vasto", SYSTEM_INSTRUCTION_TUTOR)
         self.assertIn("Pwanimate", SYSTEM_INSTRUCTION_TUTOR)
 
-    def test_conversational_prompt_identifies_pwanimate_as_pwaninet_assistant(self):
-        self.assertIn("PwaniNet", SYSTEM_INSTRUCTION_CONVERSATIONAL)
+    def test_conversational_prompt_identifies_pwanimate_as_vasto_assistant(self):
+        self.assertIn("vasto", SYSTEM_INSTRUCTION_CONVERSATIONAL)
         self.assertIn("Pwanimate", SYSTEM_INSTRUCTION_CONVERSATIONAL)
 
     # --- Capability awareness ---
@@ -486,7 +486,7 @@ class PwanimateChatAPITestCase(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(
             username="test_student",
-            email="student@pwaninet.local",
+            email="student@vasto.local",
             password="testpassword123",
         )
         # Setup mock orchestrator with mock embedding and LLM providers

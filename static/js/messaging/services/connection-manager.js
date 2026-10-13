@@ -15,11 +15,11 @@ class ConnectionManager {
         this.broadcastChannel = null;
         
         // Storage keys
-        this.STORAGE_KEY = 'pwaninet_connection_state';
-        this.HEARTBEAT_KEY = 'pwaninet_heartbeat';
+        this.STORAGE_KEY = 'vasto_connection_state';
+        this.HEARTBEAT_KEY = 'vasto_heartbeat';
         
         // Broadcast channel for cross-tab communication
-        this.BROADCAST_CHANNEL = 'pwaninet_connections';
+        this.BROADCAST_CHANNEL = 'vasto_connections';
         
         // Heartbeat interval (5 seconds)
         this.HEARTBEAT_INTERVAL = 5000;

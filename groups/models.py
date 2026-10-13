@@ -11,7 +11,7 @@ class JoinPolicy(models.TextChoices):
 
 
 class PostVisibility(models.TextChoices):
-    EVERYONE = "everyone", "Everyone in Pwaninet"
+    EVERYONE = "everyone", "Everyone in vasto"
     MEMBERS_ONLY = "members_only", "Only Members"
 
 

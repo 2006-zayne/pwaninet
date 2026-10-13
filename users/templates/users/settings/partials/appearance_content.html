@@ -6,7 +6,7 @@
       <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
     </a>
     <h1 class="page-title">{% trans "Appearance" %}</h1>
-    <p class="page-subtitle">{% trans "Customize how PwaniNet looks and feels" %}</p>
+    <p class="page-subtitle">{% trans "Customize how vasto looks and feels" %}</p>
   </div>
 
   <div class="settings-list-container">
@@ -892,7 +892,7 @@
         html.setAttribute('data-theme', resolvedTheme);
         localStorage.setItem('theme', theme);
       }
-      var bridge = window.AndroidBridge || window.PwaninetBridge;
+      var bridge = window.AndroidBridge || window.vastoBridge;
       if (bridge && typeof bridge.setSystemBarTheme === 'function') {
         bridge.setSystemBarTheme(resolvedTheme);
       }

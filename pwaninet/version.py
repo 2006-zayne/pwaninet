@@ -1,5 +1,5 @@
 """
-PwaniNet Version Module
+vasto Version Module
 Single source of truth for application versioning and release metadata.
 Dynamically resolves version and build numbers from Git tags and environment,
 matching the mobile app build releases automatically.
@@ -66,7 +66,7 @@ def resolve_version():
 _latest_version_cache = {"version": None, "timestamp": 0}
 
 
-def fetch_github_latest_release(repo="2006-zayne/pwaninet", timeout=3):
+def fetch_github_latest_release(repo="2006-zayne/vasto", timeout=3):
     """
     Fetch the latest release tag from GitHub Releases API or web redirect.
     Cached for 60 seconds to respect GitHub rate limits.
@@ -89,7 +89,7 @@ def fetch_github_latest_release(repo="2006-zayne/pwaninet", timeout=3):
         opener = urllib.request.build_opener(NoRedirect)
         req = urllib.request.Request(
             f'https://github.com/{repo}/releases/latest',
-            headers={'User-Agent': 'Mozilla/5.0 (compatible; PwaniNetServer/1.0)'}
+            headers={'User-Agent': 'Mozilla/5.0 (compatible; vastoServer/1.0)'}
         )
         try:
             with opener.open(req, timeout=timeout) as resp:
@@ -113,7 +113,7 @@ def fetch_github_latest_release(repo="2006-zayne/pwaninet", timeout=3):
     try:
         import urllib.request
         import json
-        headers = {'User-Agent': 'PwaniNet-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
+        headers = {'User-Agent': 'vasto-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
         gh_token = os.environ.get('GITHUB_TOKEN')
         if gh_token:
             headers['Authorization'] = f'Bearer {gh_token}'
@@ -199,7 +199,7 @@ NATIVE_PATHS = ['android/', 'package.json', 'package-lock.json', 'capacitor.conf
 _latest_apk_version_cache = {"version": None, "timestamp": 0}
 
 
-def fetch_github_latest_apk_release(repo="2006-zayne/pwaninet", timeout=5):
+def fetch_github_latest_apk_release(repo="2006-zayne/vasto", timeout=5):
     """
     Fetch the latest release tag from GitHub Releases API that has an .apk asset attached.
     Cached for 10 minutes.
@@ -220,7 +220,7 @@ def fetch_github_latest_apk_release(repo="2006-zayne/pwaninet", timeout=5):
         try:
             req_latest = urllib.request.Request(
                 f'https://api.github.com/repos/{repo}/releases/latest',
-                headers={'User-Agent': 'PwaniNet-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
+                headers={'User-Agent': 'vasto-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
             )
             with urllib.request.urlopen(req_latest, timeout=timeout) as resp:
                 if resp.status == 200:
@@ -241,7 +241,7 @@ def fetch_github_latest_apk_release(repo="2006-zayne/pwaninet", timeout=5):
         # 2. General path: query recent releases
         req = urllib.request.Request(
             f'https://api.github.com/repos/{repo}/releases?per_page=10',
-            headers={'User-Agent': 'PwaniNet-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
+            headers={'User-Agent': 'vasto-App/1.0', 'Accept': 'application/vnd.github.v3+json'}
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 200:
@@ -372,7 +372,7 @@ def resolve_git_branch():
 # Module-level exports for backwards compatibility
 __version__ = resolve_version()
 __build_number__ = resolve_build_number()
-__environment__ = os.environ.get('PWANINET_ENV', 'development')
+__environment__ = os.environ.get('vasto_ENV', 'development')
 __release_date__ = datetime.utcnow().isoformat() + 'Z'
 __git_commit__ = resolve_git_commit()
 __git_branch__ = resolve_git_branch()
@@ -386,7 +386,7 @@ def get_version_info():
     return {
         'version': resolve_version(),
         'build_number': resolve_build_number(),
-        'environment': os.environ.get('PWANINET_ENV', 'development'),
+        'environment': os.environ.get('vasto_ENV', 'development'),
         'release_date': __release_date__,
         'git_commit': resolve_git_commit(),
         'git_branch': resolve_git_branch(),
@@ -408,8 +408,8 @@ def clear_version_cache():
     _latest_apk_version_cache["timestamp"] = 0
     try:
         from django.core.cache import cache
-        cache.delete('github_latest_release:2006-zayne/pwaninet')
-        cache.delete('github_latest_apk_release:2006-zayne/pwaninet')
+        cache.delete('github_latest_release:2006-zayne/vasto')
+        cache.delete('github_latest_apk_release:2006-zayne/vasto')
     except Exception:
         pass
 

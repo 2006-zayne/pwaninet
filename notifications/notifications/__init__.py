@@ -1,5 +1,5 @@
 """
-Notifications module for PwaniNet Notification Engine v2
+Notifications module for vasto Notification Engine v2
 
 This module provides the notification object infrastructure.
 Notification Objects represent information intended for specific users.

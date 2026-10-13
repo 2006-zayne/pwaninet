@@ -1,5 +1,5 @@
 /**
- * PwaniNet "What's New" Modal
+ * vasto "What's New" Modal
  * Shows release notes for unviewed releases to users.
  * This is separate from the update manager - it shows release notes even when no update is needed.
  */
@@ -173,7 +173,7 @@
                         ${releaseData.mandatory_update ? `
                         <div class="alert alert-warning mt-3 mb-0">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            This is a mandatory update. Please update to continue using PwaniNet.
+                            This is a mandatory update. Please update to continue using vasto.
                         </div>
                         ` : ''}
                         
@@ -260,7 +260,7 @@
     }
 
     // Expose API for manual checks
-    window.PwaniNetWhatsNew = {
+    window.vastoWhatsNew = {
         checkForUnviewedReleases,
         showWhatsNewModal: fetchReleaseDetailsAndShowModal,
         showReleaseById: fetchReleaseDetailsAndShowModal

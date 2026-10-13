@@ -69,7 +69,7 @@
         });
     }
 
-    global.PwaniNetPasswordStrength = {
+    global.vastoPasswordStrength = {
         scorePassword: scorePassword,
         meetsMinimum: meetsMinimum,
         bindStrengthMeter: bindStrengthMeter,

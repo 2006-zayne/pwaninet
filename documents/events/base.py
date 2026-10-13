@@ -1,7 +1,7 @@
 """Base domain event classes.
 
 Domain events provide a decoupled way for the repository to communicate
-with other PwaniNet modules (notifications, activity feeds, achievements, etc.)
+with other vasto modules (notifications, activity feeds, achievements, etc.)
 without creating direct dependencies.
 """
 

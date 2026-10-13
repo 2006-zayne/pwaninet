@@ -153,7 +153,7 @@ public class MainActivity extends BridgeActivity {
                 try {
                     File publicMediaDir = Environment.getExternalStoragePublicDirectory(
                         isVideo ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_PICTURES);
-                    File appMediaDir = new File(publicMediaDir, "PwaniNet");
+                    File appMediaDir = new File(publicMediaDir, "Vasto");
                     if (!appMediaDir.exists() && !appMediaDir.mkdirs()) {
                         throw new IOException("Could not create public media directory");
                     }
@@ -182,7 +182,7 @@ public class MainActivity extends BridgeActivity {
             values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename);
             values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mimeType);
             values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
-                isVideo ? "Movies/PwaniNet" : "Pictures/PwaniNet");
+                isVideo ? "Movies/Vasto" : "Pictures/Vasto");
             values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
             Uri target = null;
             try {
@@ -501,7 +501,7 @@ public class MainActivity extends BridgeActivity {
             if (level != null) detail.put("level", level);
             if (error != null) detail.put("error", error);
         } catch (Exception ignored) {}
-        String js = "window.dispatchEvent(new CustomEvent('pwaninet:native-speech', {detail:" + detail + "}));";
+        String js = "window.dispatchEvent(new CustomEvent('vasto:native-speech', {detail:" + detail + "}));";
         runOnUiThread(() -> {
             if (getBridge() != null && getBridge().getWebView() != null) {
                 getBridge().getWebView().evaluateJavascript(js, null);
@@ -561,8 +561,8 @@ public class MainActivity extends BridgeActivity {
                 NotificationManager notificationManager = getSystemService(NotificationManager.class);
                 if (notificationManager != null) {
                     NotificationChannel defaultChannel = new NotificationChannel(
-                        "pwaninet_notifications",
-                        "PwaniNet Notifications",
+                        "vasto_notifications",
+                        "Vasto Notifications",
                         NotificationManager.IMPORTANCE_HIGH
                     );
                     defaultChannel.setDescription("All social updates, mentions, posts, documents, and messages");
@@ -572,7 +572,7 @@ public class MainActivity extends BridgeActivity {
                     notificationManager.createNotificationChannel(defaultChannel);
 
                     NotificationChannel socialChannel = new NotificationChannel(
-                        "pwaninet_social",
+                        "vasto_social",
                         "Social Updates",
                         NotificationManager.IMPORTANCE_HIGH
                     );
@@ -581,7 +581,7 @@ public class MainActivity extends BridgeActivity {
                     notificationManager.createNotificationChannel(socialChannel);
 
                     NotificationChannel messagesChannel = new NotificationChannel(
-                        "pwaninet_messages",
+                        "vasto_messages",
                         "Direct & Group Messages",
                         NotificationManager.IMPORTANCE_HIGH
                     );
@@ -624,8 +624,8 @@ public class MainActivity extends BridgeActivity {
                     "      window.Capacitor.Plugins.NavigationBar.setStyle({ style: isLight ? 'LIGHT' : 'DARK' });" +
                     "    }" +
                     "  }" +
-                    "  if (!window._pwaninet_native_theme_observer_active) {" +
-                    "    window._pwaninet_native_theme_observer_active = true;" +
+                    "  if (!window._vasto_native_theme_observer_active) {" +
+                    "    window._vasto_native_theme_observer_active = true;" +
                     "    var observer = new MutationObserver(function(mutations) {" +
                     "      for (var i = 0; i < mutations.length; i++) {" +
                     "        if (mutations[i].attributeName === 'data-theme') {" +
@@ -759,7 +759,7 @@ public class MainActivity extends BridgeActivity {
                     appCode = pInfo.versionCode;
                 }
             } catch (Exception ignored) {}
-            settings.setUserAgentString(defaultUserAgent + " PwaniNetApp/Android/" + appVersion + " (Build/" + appCode + ")");
+            settings.setUserAgentString(defaultUserAgent + " VastoApp/Android/" + appVersion + " (Build/" + appCode + ")");
         }
         
         // Restore WebView state if available
@@ -787,7 +787,7 @@ public class MainActivity extends BridgeActivity {
 
         String path = null;
         String scheme = data.getScheme();
-        if ("pwaninet".equalsIgnoreCase(scheme)) {
+        if ("vasto".equalsIgnoreCase(scheme)) {
             String host = data.getHost();
             String dataPath = data.getPath();
             if (host != null && !host.isEmpty() && !host.contains(".")) {
@@ -1187,18 +1187,18 @@ public class MainActivity extends BridgeActivity {
                     "  root.classList.add('is-capacitor', 'is-native-app');" +
                     "  root.classList.toggle('keyboard-open', imeOpen);" +
                     "  root.dataset.imeVisible = imeOpen ? 'true' : 'false';" +
-                    "  root.style.setProperty('--pwaninet-safe-area-top', '%dpx');" +
-                    "  root.style.setProperty('--pwaninet-safe-area-bottom', '%dpx');" +
-                    "  root.style.setProperty('--pwaninet-safe-area-left', '%dpx');" +
-                    "  root.style.setProperty('--pwaninet-safe-area-right', '%dpx');" +
-                    "  root.style.setProperty('--pwaninet-keyboard-height', '%dpx');" +
+                    "  root.style.setProperty('--vasto-safe-area-top', '%dpx');" +
+                    "  root.style.setProperty('--vasto-safe-area-bottom', '%dpx');" +
+                    "  root.style.setProperty('--vasto-safe-area-left', '%dpx');" +
+                    "  root.style.setProperty('--vasto-safe-area-right', '%dpx');" +
+                    "  root.style.setProperty('--vasto-keyboard-height', '%dpx');" +
                     "  if (document.body) {" +
                     "    document.body.classList.add('is-capacitor', 'is-native-app');" +
                     "    document.body.classList.toggle('keyboard-open', imeOpen);" +
-                    "    document.body.style.setProperty('--pwaninet-safe-area-top', '%dpx');" +
-                    "    document.body.style.setProperty('--pwaninet-safe-area-bottom', '%dpx');" +
+                    "    document.body.style.setProperty('--vasto-safe-area-top', '%dpx');" +
+                    "    document.body.style.setProperty('--vasto-safe-area-bottom', '%dpx');" +
                     "  }" +
-                    "  window.dispatchEvent(new CustomEvent('pwaninet:safe-area-changed', { detail: { top: %d, bottom: %d, left: %d, right: %d, imeVisible: imeOpen, imeHeight: %d } }));" +
+                    "  window.dispatchEvent(new CustomEvent('vasto:safe-area-changed', { detail: { top: %d, bottom: %d, left: %d, right: %d, imeVisible: imeOpen, imeHeight: %d } }));" +
                     "})();",
                     lastImeVisible ? "true" : "false",
                     lastSafeTop, effectiveSafeBottom, lastSafeLeft, lastSafeRight,
@@ -1233,12 +1233,12 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 String filename = URLUtil.guessFileName(url, contentDisposition, mimeType);
-                filename = filename == null ? "pwaninet-resource" : filename.replaceAll("[\\\\/:*?\"<>|]", "_");
+                filename = filename == null ? "vasto-resource" : filename.replaceAll("[\\\\/:*?\"<>|]", "_");
                 DownloadManager.Request downloadRequest = new DownloadManager.Request(downloadUri)
                     .setTitle(filename)
-                    .setDescription("Downloading from PwaniNet")
+                    .setDescription("Downloading from Vasto")
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "PwaniNet/" + filename);
+                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Vasto/" + filename);
 
                 if (mimeType != null && !mimeType.isEmpty()) downloadRequest.setMimeType(mimeType);
                 if (userAgent != null && !userAgent.isEmpty()) downloadRequest.addRequestHeader("User-Agent", userAgent);
@@ -1246,7 +1246,7 @@ public class MainActivity extends BridgeActivity {
                 if (cookies != null && !cookies.isEmpty()) downloadRequest.addRequestHeader("Cookie", cookies);
 
                 downloadManager.enqueue(downloadRequest);
-                Toast.makeText(this, "Download started. Find it in Downloads/PwaniNet", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Download started. Find it in Downloads/Vasto", Toast.LENGTH_LONG).show();
             } catch (Exception error) {
                 System.err.println("[MainActivity] Could not start WebView download: " + error.getMessage());
                 Toast.makeText(this, "Unable to start download", Toast.LENGTH_SHORT).show();
@@ -1256,7 +1256,7 @@ public class MainActivity extends BridgeActivity {
 
     private String startMediaDownload(String url, String filename, String mimeType, String category) {
         if (url == null || !url.startsWith("https://") && !url.startsWith("http://")) return "failed";
-        String safeName = filename == null || filename.trim().isEmpty() ? "pwaninet-media" : filename;
+        String safeName = filename == null || filename.trim().isEmpty() ? "vasto-media" : filename;
         safeName = safeName.replaceAll("[\\\\/:*?\"<>|]", "_");
         boolean isImage = "image".equalsIgnoreCase(category);
         boolean isVideo = "video".equalsIgnoreCase(category) || "reels".equalsIgnoreCase(category);
@@ -1276,7 +1276,7 @@ public class MainActivity extends BridgeActivity {
             final String mediaType = resolvedMimeType;
             final String webViewUserAgent = getBridge() != null && getBridge().getWebView() != null
                 ? getBridge().getWebView().getSettings().getUserAgentString()
-                : System.getProperty("http.agent", "PwaniNet");
+                : System.getProperty("http.agent", "Vasto");
             new Thread(() -> {
                 Uri target = null;
                 try {
@@ -1305,7 +1305,7 @@ public class MainActivity extends BridgeActivity {
                         responseMimeType != null && responseMimeType.startsWith(isVideo ? "video/" : "image/")
                             ? responseMimeType : mediaType);
                     values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
-                        isVideo ? "Movies/PwaniNet" : "Pictures/PwaniNet");
+                        isVideo ? "Movies/Vasto" : "Pictures/Vasto");
                     values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
                     target = getContentResolver().insert(collection, values);
                     if (target == null) throw new IOException("Could not create gallery media entry");
@@ -1328,7 +1328,7 @@ public class MainActivity extends BridgeActivity {
                     System.err.println("[MainActivity] Gallery download failed: " + error.getMessage());
                     runOnUiThread(() -> Toast.makeText(this, "Could not save media. Check your connection and try again.", Toast.LENGTH_LONG).show());
                 }
-            }, "pwaninet-media-download").start();
+            }, "vasto-media-download").start();
             Toast.makeText(this, "Saving to your gallery…", Toast.LENGTH_SHORT).show();
             return "started";
         }
@@ -1347,13 +1347,13 @@ public class MainActivity extends BridgeActivity {
                 : isVideo ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS;
             DownloadManager.Request request = new DownloadManager.Request(uri)
                 .setTitle(safeName)
-                .setDescription("Downloading from PwaniNet")
+                .setDescription("Downloading from Vasto")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationInExternalPublicDir(destinationDirectory, "PwaniNet/" + safeName);
+                .setDestinationInExternalPublicDir(destinationDirectory, "Vasto/" + safeName);
             request.setMimeType(resolvedMimeType);
             String cookies = CookieManager.getInstance().getCookie(url);
             if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
-            request.addRequestHeader("User-Agent", System.getProperty("http.agent", "PwaniNet"));
+            request.addRequestHeader("User-Agent", System.getProperty("http.agent", "Vasto"));
             manager.enqueue(request);
             Toast.makeText(this, "Download started. You can find it in your gallery or Downloads.", Toast.LENGTH_LONG).show();
             return "started";

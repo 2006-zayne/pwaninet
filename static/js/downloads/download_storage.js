@@ -1,6 +1,6 @@
 /**
- * PwaniNet Unified Download Storage (IndexedDB)
- * Database: pwaninet_downloads_v1
+ * vasto Unified Download Storage (IndexedDB)
+ * Database: vasto_downloads_v1
  * Stores:
  *   - metadata: Record metadata for downloaded items (both native filesystem references and web blobs)
  *   - blobs: Binary Blob storage for PWA / Web offline persistence
@@ -8,7 +8,7 @@
 
 class DownloadStorage {
     constructor() {
-        this.dbName = 'pwaninet_downloads_v1';
+        this.dbName = 'vasto_downloads_v1';
         this.dbVersion = 1;
         this.db = null;
         this.initPromise = null;
@@ -185,7 +185,7 @@ class DownloadStorage {
 
             tx.oncomplete = () => {
                 try {
-                    window.dispatchEvent(new CustomEvent('pwaninet:download-deleted', { detail: { id } }));
+                    window.dispatchEvent(new CustomEvent('vasto:download-deleted', { detail: { id } }));
                 } catch (_) {}
                 resolve(true);
             };

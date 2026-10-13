@@ -1,11 +1,11 @@
 /**
- * Cache Manager for PwaniNet
+ * Cache Manager for vasto
  * Handles browser cache management using Cache API
  */
 
 class CacheManager {
     constructor() {
-        this.cacheName = 'PwaniNetCache';
+        this.cacheName = 'vastoCache';
         this.indexedDBManager = null;
         this.initialized = false;
     }

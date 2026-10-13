@@ -86,7 +86,7 @@ class ReleaseListSerializer(serializers.ModelSerializer):
 
 class VersionCheckSerializer(serializers.Serializer):
     """Serializer for version check response"""
-    current_version = serializers.CharField(help_text="Current app version from pwaninet/version.py")
+    current_version = serializers.CharField(help_text="Current app version from Vasto/version.py")
     current_build_number = serializers.IntegerField(help_text="Current build number")
     latest_version = serializers.CharField(help_text="Latest published version")
     latest_build_number = serializers.IntegerField(help_text="Latest build number")

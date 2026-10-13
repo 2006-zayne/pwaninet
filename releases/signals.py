@@ -1,5 +1,5 @@
 """
-Release signals for PwaniNet Release Center.
+Release signals for vasto Release Center.
 
 Provides audit trail for release operations.
 Tracks status changes, publishing, and other important events.

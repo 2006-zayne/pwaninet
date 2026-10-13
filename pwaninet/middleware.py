@@ -1,5 +1,5 @@
 """
-Custom middleware for Pwaninet.
+Custom middleware for vasto.
 """
 from django.utils.deprecation import MiddlewareMixin
 from django.utils import translation

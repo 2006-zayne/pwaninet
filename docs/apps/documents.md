@@ -25,6 +25,6 @@ Mounted at `/documents/`. `documents/urls.py` includes the web repository, docum
 ## Developer notes
 
 - The app has both public and private file paths. Private resources must continue to use the controlled file-serving path and must not become publicly accessible through a CDN by accident.
-- Storage backend settings are in `pwaninet/settings/base.py`; local `media/` storage is the default, and R2 is optional through environment settings.
+- Storage backend settings are in `vasto/settings/base.py`; local `media/` storage is the default, and R2 is optional through environment settings.
 - Past papers, lecture notes, and other academic materials can have third-party rights restrictions. Check provenance and permission before bulk-importing or exposing a file.
 - Uploads, downloads, reports, and document search may create user activity records; preserve privacy and authorization filters.

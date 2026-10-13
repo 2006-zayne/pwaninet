@@ -27,7 +27,7 @@ from pwanimate.retrieval.types import (
 )
 from pwanimate.retrieval.services.document_retrieval import DocumentSemanticRetrievalService
 from pwanimate.retrieval.services.unified_retrieval import UnifiedRetrievalService
-from pwanimate.retrieval.adapters.pwaninet_search import PwaniNetSearchAdapter
+from pwanimate.retrieval.adapters.pwaninet_search import pwaninetSearchAdapter
 
 User = get_user_model()
 
@@ -36,7 +36,7 @@ class RetrievalTestCase(TestCase):
     def setUp(self):
         self.mock_provider = MockEmbeddingProvider(dimensions=768)
         self.doc_service = DocumentSemanticRetrievalService(embedding_provider=self.mock_provider)
-        self.search_adapter = PwaniNetSearchAdapter()
+        self.search_adapter = pwaninetSearchAdapter()
         self.unified_service = UnifiedRetrievalService(
             document_service=self.doc_service,
             search_adapter=self.search_adapter,
@@ -45,30 +45,30 @@ class RetrievalTestCase(TestCase):
         # Users
         self.uploader = User.objects.create_user(
             username='uploader_user',
-            email='uploader@pwaninet.local',
+            email='uploader@vasto.local',
             first_name='Alice',
             last_name='Uploader'
         )
         self.student_cs = User.objects.create_user(
             username='cs_student',
-            email='cs@pwaninet.local',
+            email='cs@vasto.local',
             first_name='Bob',
             last_name='Coder'
         )
         self.student_bio = User.objects.create_user(
             username='bio_student',
-            email='bio@pwaninet.local',
+            email='bio@vasto.local',
             first_name='Charlie',
             last_name='Darwin'
         )
         self.president_user = User.objects.create_user(
             username='pres_user',
-            email='pres@pwaninet.local',
+            email='pres@vasto.local',
             global_role='PRESIDENT'
         )
         self.staff_user = User.objects.create_user(
             username='staff_user',
-            email='staff@pwaninet.local',
+            email='staff@vasto.local',
             is_staff=True
         )
 
@@ -543,19 +543,19 @@ class PageAwareDocumentRetrievalTestCase(TestCase):
         # Users
         self.uploader = User.objects.create_user(
             username='page_uploader',
-            email='page_uploader@pwaninet.local',
+            email='page_uploader@vasto.local',
             first_name='Grace',
             last_name='Hopper'
         )
         self.student_cs = User.objects.create_user(
             username='page_student_cs',
-            email='page_cs@pwaninet.local',
+            email='page_cs@vasto.local',
             first_name='Alan',
             last_name='Turing'
         )
         self.student_bio = User.objects.create_user(
             username='page_student_bio',
-            email='page_bio@pwaninet.local',
+            email='page_bio@vasto.local',
             first_name='Gregor',
             last_name='Mendel'
         )

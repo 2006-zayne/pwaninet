@@ -15,7 +15,7 @@ from documents.models import Document
 
 class DocumentDetailTool(BaseDomainTool):
     """
-    Retrieve sanitized metadata and engagement metrics for a PwaniNet document.
+    Retrieve sanitized metadata and engagement metrics for a vasto document.
     """
     name = "document_detail"
     description = (

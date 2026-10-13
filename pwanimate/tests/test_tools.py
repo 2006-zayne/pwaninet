@@ -363,14 +363,14 @@ class UserProfileToolTestCase(TestCase):
             bio="CS Sophomore",
             headline="Open source enthusiast",
             profile_privacy=PrivacyLevel.PUBLIC,
-            email="alice@pwaninet.local",
+            email="alice@vasto.local",
         )
         self.followers_user = User.objects.create_user(
             username="bob_followers",
             first_name="Bob",
             last_name="Jones",
             profile_privacy=PrivacyLevel.FOLLOWERS,
-            email="bob@pwaninet.local",
+            email="bob@vasto.local",
         )
         Follow.objects.create(follower=self.follower, followed=self.followers_user)
 
@@ -378,7 +378,7 @@ class UserProfileToolTestCase(TestCase):
             username="charlie_private",
             first_name="Charlie",
             profile_privacy=PrivacyLevel.PRIVATE,
-            email="charlie@pwaninet.local",
+            email="charlie@vasto.local",
         )
 
         self.tool = UserProfileTool()
@@ -409,7 +409,7 @@ class UserProfileToolTestCase(TestCase):
         result = self.tool.execute(user=self.followers_user, username="bob_followers")
         self.assertTrue(result.success)
         # Self gets to see their own email
-        self.assertEqual(result.data["email"], "bob@pwaninet.local")
+        self.assertEqual(result.data["email"], "bob@vasto.local")
 
     def test_private_profile_denied_to_other_users(self):
         with self.assertRaises(ToolPermissionError):
@@ -421,7 +421,7 @@ class UserProfileToolTestCase(TestCase):
 
         result_staff = self.tool.execute(user=self.staff_user, username="charlie_private")
         self.assertTrue(result_staff.success)
-        self.assertEqual(result_staff.data["email"], "charlie@pwaninet.local")
+        self.assertEqual(result_staff.data["email"], "charlie@vasto.local")
 
 
 class NotificationSummaryToolTestCase(TestCase):

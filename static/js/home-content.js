@@ -3,7 +3,7 @@ if (!window.homeContentScriptLoaded) {
     window.homeContentScriptLoaded = true;
 
     // Scroll-aware auto-pause for standalone audio elements
-    // All video playback is unified and handled exclusively by PwaniNetVideoManager (static/js/video-manager.js)
+    // All video playback is unified and handled exclusively by vastoVideoManager (static/js/video-manager.js)
     (function() {
         let currentPlayingAudio = null;
         const observerOptions = {

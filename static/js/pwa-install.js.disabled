@@ -180,10 +180,10 @@ class PWAInstallManager {
         banner.innerHTML = `
             <div class="pwa-install-content">
                 <div class="pwa-install-icon">
-                    <img src="/static/images/web-app-manifest-192x192.png" alt="PwaniNet">
+                    <img src="/static/images/web-app-manifest-192x192.png" alt="Vasto">
                 </div>
                 <div class="pwa-install-text">
-                    <h4>Install PwaniNet</h4>
+                    <h4>Install Vasto</h4>
                     <p>Get the full campus experience - install our app for faster access and offline features!</p>
                 </div>
                 <div class="pwa-install-actions">
@@ -420,7 +420,7 @@ class PWAInstallManager {
         reminder.innerHTML = `
             <div class="reminder-content">
                 <i class="bi bi-info-circle"></i>
-                <span>Install PwaniNet for the best experience!</span>
+                <span>Install Vasto for the best experience!</span>
                 <button onclick="this.parentElement.parentElement.remove()">×</button>
             </div>
         `;
@@ -500,7 +500,7 @@ class PWAInstallManager {
         success.innerHTML = `
             <div class="success-content">
                 <i class="bi bi-check-circle"></i>
-                <span>PwaniNet installed successfully!</span>
+                <span>Vasto installed successfully!</span>
             </div>
         `;
 
@@ -564,7 +564,7 @@ class PWAInstallManager {
         instructions.className = 'pwa-install-instructions';
         instructions.innerHTML = `
             <div class="instructions-content">
-                <h4><i class="bi bi-download"></i> How to Install PwaniNet</h4>
+                <h4><i class="bi bi-download"></i> How to Install Vasto</h4>
                 <div class="instructions-steps">
                     ${this.getInstallSteps()}
                 </div>
@@ -652,7 +652,7 @@ class PWAInstallManager {
             return `
                 <ol>
                     <li>Click the menu icon (⋮) in the address bar</li>
-                    <li>Select "Install PwaniNet"</li>
+                    <li>Select "Install Vasto"</li>
                     <li>Click "Install" in the dialog</li>
                 </ol>
             `;
@@ -677,7 +677,7 @@ class PWAInstallManager {
                 <ol>
                     <li>Look for "Install" or "Add to Home Screen" in your browser menu</li>
                     <li>Follow the on-screen instructions</li>
-                    <li>Enjoy the PwaniNet app experience!</li>
+                    <li>Enjoy the Vasto app experience!</li>
                 </ol>
             `;
         }

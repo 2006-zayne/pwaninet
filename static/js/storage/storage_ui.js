@@ -1,5 +1,5 @@
 /**
- * Storage UI Manager for PwaniNet
+ * Storage UI Manager for vasto
  * Handles UI components for storage management
  */
 

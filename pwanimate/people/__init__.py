@@ -2,7 +2,7 @@
 Pwanimate People Discovery & Peer Recommendation Module.
 
 Exports structured data types and discovery services for finding,
-ranking, and recommending real PwaniNet users.
+ranking, and recommending real vasto users.
 """
 
 from pwanimate.people.types import PeopleQuery, PersonResult

@@ -1,12 +1,12 @@
-# Swahili translations for PwaniNet
-# This file is distributed under the same license as the PwaniNet package.
+# Swahili translations for vasto
+# This file is distributed under the same license as the vasto package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: PwaniNet\n"
+"Project-Id-Version: vasto\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 02:42+0300\n"
+"POT-Creation-Date: 2026-10-13 03:18+0300\n"
 "PO-Revision-Date: 2026-07-22 09:00+0300\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Swahili\n"
@@ -21,10 +21,10 @@ msgstr "Shiriki maoni"
 
 #: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:10
 msgid ""
-"Report a problem or suggest an improvement. The PwaniNet team will review "
-"your message."
+"Report a problem or suggest an improvement. The vasto team will review your "
+"message."
 msgstr ""
-"Ripoti tatizo au pendekeza maboresho. Timu ya PwaniNet itapitia ujumbe wako."
+"Ripoti tatizo au pendekeza maboresho. Timu ya vasto itapitia ujumbe wako."
 
 #: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:16
 msgid "Thanks—your feedback was sent to the admin team."
@@ -47,8 +47,8 @@ msgid "Message"
 msgstr "Ujumbe"
 
 #: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:46
-msgid "Tell us what happened or what would make PwaniNet better…"
-msgstr "Tuambie kilichotokea au jinsi PwaniNet inavyoweza kuboreshwa…"
+msgid "Tell us what happened or what would make vasto better…"
+msgstr "Tuambie kilichotokea au jinsi vasto inavyoweza kuboreshwa…"
 
 #: admin_dashboard/templates/admin_dashboard/partials/feedback_composer.html:50
 msgid "Send feedback"
@@ -59,9 +59,10 @@ msgid "Open in Pwanimate context"
 msgstr "Fungua katika muktadha wa Pwanimate"
 
 #: documents/templates/documents/partials/document_detail_context_rail.html:46
-#: posts/templates/posts/partials/media_video_player.html:8
-#: posts/templates/posts/partials/media_video_player.html:9
-#: templates/base.html:2244
+#: posts/templates/posts/partials/media_video_player.html:10
+#: posts/templates/posts/partials/media_video_player.html:11
+#: posts/templates/posts/partials/post_detail_content.html:163
+#: templates/base.html:2444
 msgid "Download"
 msgstr "Pakua"
 
@@ -107,8 +108,8 @@ msgid "Uploaded"
 msgstr "Imepakiwa"
 
 #: documents/templates/documents/partials/document_detail_context_rail.html:127
-#: pwanimate/templates/pwanimate/partials/conversation_list.html:17
-#: users/templates/users/partials/profile_content.html:533
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:42
+#: users/templates/users/partials/profile_content.html:560
 msgid "ago"
 msgstr "iliyopita"
 
@@ -130,52 +131,52 @@ msgid "Uploaded by"
 msgstr "Imepakiwa na"
 
 #: documents/templates/documents/partials/document_detail_context_rail.html:195
-#: templates/partials/desktop_left_rail.html:40
+#: templates/partials/desktop_left_rail.html:61
 #: users/templates/users/partials/profile_floating_actions.html:15
 msgid "Documents"
 msgstr "Nyaraka"
 
 #: documents/templates/documents/partials/document_detail_context_rail.html:197
-#: documents/templates/documents/partials/documents_context_rail.html:146
-#: groups/templates/groups/partials/groups_dashboard_context_rail.html:78
+#: documents/templates/documents/partials/documents_context_rail.html:169
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:79
 #: groups/templates/groups/partials/groups_detail_context_rail.html:62
 #: groups/templates/groups/partials/groups_detail_context_rail.html:185
 #: groups/templates/groups/partials/groups_detail_context_rail.html:216
 #: posts/templates/posts/partials/home_context_rail.html:93
-#: pwanimate/templates/pwanimate/partials/chat_content.html:40
+#: pwanimate/templates/pwanimate/partials/chat_content.html:48
 #: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:46
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:111
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:112
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:145
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:146
 #: pwanimate/templates/pwanimate/settings/partials/settings_mobile_page.html:16
 #: pwanimate/templates/pwanimate/settings/partials/settings_modal.html:17
 #: templates/downloads/partials/download_page_content.html:127
 #: templates/partials/default_context_rail.html:43
-#: templates/partials/desktop_left_rail.html:106
-#: users/templates/users/partials/profile_context_rail.html:428
-#: users/templates/users/partials/profile_context_rail.html:459
+#: templates/partials/desktop_left_rail.html:142
+#: users/templates/users/partials/profile_context_rail.html:468
+#: users/templates/users/partials/profile_context_rail.html:499
 #: users/templates/users/settings/partials/index_content.html:7
 msgid "Settings"
 msgstr "Mipangilio"
 
 #: documents/templates/documents/partials/document_detail_context_rail.html:199
-#: documents/templates/documents/partials/documents_context_rail.html:148
-#: groups/templates/groups/partials/groups_dashboard_context_rail.html:80
+#: documents/templates/documents/partials/documents_context_rail.html:171
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:81
 #: groups/templates/groups/partials/groups_detail_context_rail.html:218
 #: posts/templates/posts/partials/home_context_rail.html:95
 #: templates/partials/default_context_rail.html:45
-#: users/templates/users/partials/profile_context_rail.html:461
+#: users/templates/users/partials/profile_context_rail.html:501
 msgid "Privacy"
 msgstr "Faragha"
 
-#: documents/templates/documents/partials/document_floating_actions.html:15
+#: documents/templates/documents/partials/document_floating_actions.html:16
 #: documents/templates/documents/partials/documents_context_rail.html:35
-#: documents/templates/documents/partials/documents_context_rail.html:46
+#: documents/templates/documents/partials/documents_context_rail.html:56
 #: documents/templates/documents/partials/home_content.html:37
-#: templates/partials/desktop_left_rail.html:52
+#: templates/partials/desktop_left_rail.html:73
 msgid "My Library"
 msgstr "Maktaba yangu"
 
-#: documents/templates/documents/partials/document_floating_actions.html:30
+#: documents/templates/documents/partials/document_floating_actions.html:31
 msgid "Upload"
 msgstr "Pakia"
 
@@ -192,40 +193,48 @@ msgstr ""
 "nafasi yako binafsi."
 
 #: documents/templates/documents/partials/documents_context_rail.html:25
-#: documents/templates/documents/partials/documents_context_rail.html:41
+#: documents/templates/documents/partials/documents_context_rail.html:51
 #: documents/templates/documents/partials/home_content.html:27
 msgid "Upload Document"
 msgstr "Pakia waraka"
 
-#: documents/templates/documents/partials/documents_context_rail.html:59
+#: documents/templates/documents/partials/documents_context_rail.html:45
+#: documents/templates/documents/partials/documents_context_rail.html:92
+#: templates/partials/desktop_left_rail.html:84
+#, fuzzy
+#| msgid "Academic Info"
+msgid "Academic & Units"
+msgstr "Taarifa za kitaaluma"
+
+#: documents/templates/documents/partials/documents_context_rail.html:69
 msgid "Library Shortcuts"
 msgstr "Njia za mkato za maktaba"
 
-#: documents/templates/documents/partials/documents_context_rail.html:68
+#: documents/templates/documents/partials/documents_context_rail.html:78
 msgid "Overview"
 msgstr "Muhtasari"
 
-#: documents/templates/documents/partials/documents_context_rail.html:82
+#: documents/templates/documents/partials/documents_context_rail.html:105
 msgid "My Uploads"
 msgstr "Nilizopakia"
 
-#: documents/templates/documents/partials/documents_context_rail.html:95
+#: documents/templates/documents/partials/documents_context_rail.html:118
 msgid "Saved Bookmarks"
 msgstr "Vialamisho vilivyohifadhiwa"
 
-#: documents/templates/documents/partials/documents_context_rail.html:108
+#: documents/templates/documents/partials/documents_context_rail.html:131
 msgid "Downloaded Materials"
 msgstr "Nyenzo zilizopakuliwa"
 
-#: documents/templates/documents/partials/documents_context_rail.html:121
+#: documents/templates/documents/partials/documents_context_rail.html:144
 msgid "Viewing History"
 msgstr "Historia ya kutazama"
 
-#: documents/templates/documents/partials/documents_context_rail.html:135
+#: documents/templates/documents/partials/documents_context_rail.html:158
 msgid "Sharing Guidelines"
 msgstr "Mwongozo wa kushiriki"
 
-#: documents/templates/documents/partials/documents_context_rail.html:138
+#: documents/templates/documents/partials/documents_context_rail.html:161
 msgid ""
 "Ensure uploaded papers, notes, and study guides are clear, properly "
 "categorized, and follow university academic integrity standards."
@@ -234,16 +243,16 @@ msgstr ""
 "imeainishwa vizuri na inafuata viwango vya uadilifu wa kitaaluma vya chuo "
 "kikuu."
 
-#: documents/templates/documents/partials/documents_context_rail.html:150
-#: groups/templates/groups/partials/groups_dashboard_context_rail.html:82
+#: documents/templates/documents/partials/documents_context_rail.html:173
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:83
 #: groups/templates/groups/partials/groups_detail_context_rail.html:220
 #: posts/templates/posts/partials/home_context_rail.html:97
 #: pwanimate/templates/pwanimate/settings/partials/settings_mobile_page.html:49
 #: pwanimate/templates/pwanimate/settings/partials/settings_modal.html:59
 #: templates/partials/default_context_rail.html:47
-#: users/templates/users/partials/profile_content.html:306
-#: users/templates/users/partials/profile_context_rail.html:287
-#: users/templates/users/partials/profile_context_rail.html:463
+#: users/templates/users/partials/profile_content.html:333
+#: users/templates/users/partials/profile_context_rail.html:327
+#: users/templates/users/partials/profile_context_rail.html:503
 #: users/templates/users/partials/pwanimate_profile_card.html:43
 msgid "About"
 msgstr "Kuhusu"
@@ -251,8 +260,8 @@ msgstr "Kuhusu"
 #: documents/templates/documents/partials/documents_navigation_partial.html:9
 #: groups/templates/groups/partials/groups_dashboard_navigation_partial.html:11
 #: groups/templates/groups/partials/groups_detail_navigation_partial.html:12
-#: posts/templates/posts/partials/home_navigation_partial.html:581
-#: templates/base.html:1917
+#: posts/templates/posts/partials/home_navigation_partial.html:590
+#: templates/base.html:2117
 #: users/templates/users/partials/profile_navigation_partial.html:16
 msgid "Contextual Information"
 msgstr "Taarifa za muktadha"
@@ -261,8 +270,8 @@ msgstr "Taarifa za muktadha"
 #: groups/templates/groups/partials/groups_dashboard_navigation_partial.html:18
 #: groups/templates/groups/partials/groups_detail_navigation_partial.html:19
 #: notifications/templates/notifications/partials/notifications_navigation_partial.html:17
-#: posts/templates/posts/partials/home_navigation_partial.html:588
-#: templates/base.html:1853
+#: posts/templates/posts/partials/home_navigation_partial.html:597
+#: templates/base.html:2053
 #: users/templates/users/partials/profile_navigation_partial.html:23
 #: users/templates/users/settings/partials/settings_navigation_partial.html:19
 msgid "Global Navigation"
@@ -272,15 +281,15 @@ msgstr "Urambazaji mkuu"
 msgid "Your Groups"
 msgstr "Vikundi vyako"
 
-#: groups/templates/groups/partials/groups_dashboard_context_rail.html:55
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:56
 msgid "You haven't joined any groups yet."
 msgstr "Bado hujajiunga na kikundi chochote."
 
-#: groups/templates/groups/partials/groups_dashboard_context_rail.html:67
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:68
 msgid "How groups work"
 msgstr "Jinsi vikundi vinavyofanya kazi"
 
-#: groups/templates/groups/partials/groups_dashboard_context_rail.html:70
+#: groups/templates/groups/partials/groups_dashboard_context_rail.html:71
 msgid ""
 "Join study groups to access shared class discussions, course materials, and "
 "connect with peers. Create your own group to collaborate on projects."
@@ -329,7 +338,7 @@ msgstr "Wanachama"
 
 #: groups/templates/groups/partials/groups_detail_context_rail.html:115
 #: groups/templates/groups/partials/groups_detail_context_rail.html:148
-#: users/templates/users/partials/profile_content.html:465
+#: users/templates/users/partials/profile_content.html:492
 msgid "Posts"
 msgstr "Machapisho"
 
@@ -346,40 +355,64 @@ msgid "Status"
 msgstr "Hali"
 
 #: groups/templates/groups/partials/groups_detail_context_rail.html:153
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:27
 msgid "Active"
 msgstr "Inaendelea"
 
 #: groups/templates/groups/partials/groups_detail_context_rail.html:164
-#: users/templates/users/partials/profile_context_rail.html:407
+#: users/templates/users/partials/profile_context_rail.html:447
 msgid "Shortcuts"
 msgstr "Njia za mkato"
 
 #: groups/templates/groups/partials/groups_detail_context_rail.html:196
-#: users/templates/users/partials/profile_context_rail.html:449
+#: users/templates/users/partials/profile_context_rail.html:489
 msgid "All Groups"
 msgstr "Vikundi vyote"
 
 #: groups/templates/groups/partials/groups_detail_context_rail.html:206
 #: templates/partials/default_context_rail.html:23
-#: users/templates/users/partials/profile_context_rail.html:439
+#: users/templates/users/partials/profile_context_rail.html:479
 msgid "Course Materials"
 msgstr "Nyenzo za kozi"
 
-#: posts/templates/posts/home.html:330
-#: posts/templates/posts/partials/home_navigation_partial.html:329
+#: messaging/templates/messaging/partials/conversation_media_items.html:8
+#, fuzzy
+#| msgid "No posts have been shared with you yet."
+msgid "No photos or videos shared yet"
+msgstr "Bado hakuna machapisho yaliyoshirikiwa nawe."
+
+#: messaging/templates/messaging/partials/conversation_media_items.html:51
+msgid "No documents shared yet"
+msgstr ""
+
+#: messaging/templates/messaging/partials/conversation_media_items.html:91
+msgid "No audio messages shared yet"
+msgstr ""
+
+#: messaging/templates/messaging/partials/conversation_media_items.html:129
+msgid "No links shared yet"
+msgstr ""
+
+#: posts/templates/posts/home.html:332
+#: posts/templates/posts/partials/home_navigation_partial.html:331
 #: search/templates/search/partials/search_navigation_partial.html:234
 msgid "Search friends, documents, posts…"
 msgstr "Tafuta marafiki, nyaraka, machapisho…"
 
-#: posts/templates/posts/home.html:338
-#: posts/templates/posts/partials/home_navigation_partial.html:337
+#: posts/templates/posts/home.html:340
+#: posts/templates/posts/partials/home_navigation_partial.html:339
 #: search/templates/search/partials/search_navigation_partial.html:236
-msgid "Search PwaniNet"
-msgstr "Tafuta kwenye PwaniNet"
+msgid "Search vasto"
+msgstr "Tafuta kwenye vasto"
+
+#: posts/templates/posts/home.html:371
+#: posts/templates/posts/partials/home_navigation_partial.html:369
+msgid "Dismiss profile reminder"
+msgstr ""
 
 #: posts/templates/posts/offline_media_viewer.html:4
-msgid "Offline Media Library - PwaniNet"
-msgstr "Maktaba ya midia ya nje ya mtandao - PwaniNet"
+msgid "Offline Media Library - vasto"
+msgstr "Maktaba ya midia ya nje ya mtandao - vasto"
 
 #: posts/templates/posts/partials/create_post_content.html:917
 msgid "New Post"
@@ -393,47 +426,47 @@ msgstr "Unda Chapisho"
 msgid "Discard"
 msgstr "Tupa"
 
-#: posts/templates/posts/partials/create_post_content.html:954
+#: posts/templates/posts/partials/create_post_content.html:955
 msgid "Posting in"
 msgstr "Inachapisha katika"
 
-#: posts/templates/posts/partials/create_post_content.html:965
+#: posts/templates/posts/partials/create_post_content.html:971
 msgid "What's on your mind?"
 msgstr "Unachofikiria?"
 
-#: posts/templates/posts/partials/create_post_content.html:1084
-#: templates/base.html:2776 templates/partials/desktop_left_rail.html:142
-#: templates/partials/top_nav.html:54
+#: posts/templates/posts/partials/create_post_content.html:1090
+#: templates/base.html:3046 templates/partials/desktop_left_rail.html:186
+#: templates/partials/top_nav.html:73
 msgid "Post"
 msgstr "Chapisha"
 
-#: posts/templates/posts/partials/create_post_content.html:1101
-#: pwanimate/templates/pwanimate/partials/chat_content.html:506
-#: pwanimate/templates/pwanimate/partials/chat_content.html:507
-#: pwanimate/templates/pwanimate/partials/chat_content.html:593
+#: posts/templates/posts/partials/create_post_content.html:1107
+#: pwanimate/templates/pwanimate/partials/chat_content.html:803
+#: pwanimate/templates/pwanimate/partials/chat_content.html:804
+#: pwanimate/templates/pwanimate/partials/chat_content.html:890
 msgid "Add attachment"
 msgstr "Ongeza kiambatisho"
 
-#: posts/templates/posts/partials/create_post_content.html:1111
-#: pwanimate/templates/pwanimate/partials/chat_content.html:603
+#: posts/templates/posts/partials/create_post_content.html:1117
+#: pwanimate/templates/pwanimate/partials/chat_content.html:900
 msgid "Camera"
 msgstr "Kamera"
 
-#: posts/templates/posts/partials/create_post_content.html:1117
+#: posts/templates/posts/partials/create_post_content.html:1123
 #: posts/templates/posts/partials/offline_media_viewer_content.html:49
 #: posts/templates/posts/partials/offline_media_viewer_content.html:83
-#: pwanimate/templates/pwanimate/partials/chat_content.html:609
+#: pwanimate/templates/pwanimate/partials/chat_content.html:906
 msgid "Photos"
 msgstr "Picha"
 
-#: posts/templates/posts/partials/create_post_content.html:1123
+#: posts/templates/posts/partials/create_post_content.html:1129
 msgid "Video"
 msgstr "Video"
 
-#: posts/templates/posts/partials/create_post_content.html:1129
+#: posts/templates/posts/partials/create_post_content.html:1135
 #: posts/templates/posts/partials/offline_media_viewer_content.html:61
 #: posts/templates/posts/partials/offline_media_viewer_content.html:93
-#: pwanimate/templates/pwanimate/partials/chat_content.html:615
+#: pwanimate/templates/pwanimate/partials/chat_content.html:912
 msgid "Docs"
 msgstr "Nyaraka"
 
@@ -483,47 +516,47 @@ msgstr "Ondoa kupenda chapisho"
 msgid "Like post"
 msgstr "Penda chapisho"
 
-#: posts/templates/posts/partials/media_video_player.html:17
-#: posts/templates/posts/partials/post_card.html:124
-#: posts/templates/posts/partials/reel_card.html:126
+#: posts/templates/posts/partials/media_video_player.html:19
+#: posts/templates/posts/partials/post_card.html:132
+#: posts/templates/posts/partials/reel_card.html:138
 msgid "Watch Fullscreen"
 msgstr "Tazama kwenye skrini nzima"
 
-#: posts/templates/posts/partials/media_video_player.html:18
+#: posts/templates/posts/partials/media_video_player.html:20
 msgid "Expand to fullscreen"
 msgstr "Panua hadi skrini nzima"
 
-#: posts/templates/posts/partials/media_video_player.html:49
+#: posts/templates/posts/partials/media_video_player.html:51
 msgid "Play or pause video"
 msgstr "Cheza au sitisha video"
 
-#: posts/templates/posts/partials/media_video_player.html:61
 #: posts/templates/posts/partials/media_video_player.html:63
-#: posts/templates/posts/partials/reel_card.html:273
+#: posts/templates/posts/partials/media_video_player.html:65
+#: posts/templates/posts/partials/reel_card.html:286
 msgid "Buffering…"
 msgstr "Inapakia…"
 
-#: posts/templates/posts/partials/media_video_player.html:74
-#: posts/templates/posts/partials/media_video_player.html:75
-#: posts/templates/posts/partials/reel_card.html:309
-#: posts/templates/posts/partials/reel_card.html:310
+#: posts/templates/posts/partials/media_video_player.html:76
+#: posts/templates/posts/partials/media_video_player.html:77
+#: posts/templates/posts/partials/reel_card.html:322
+#: posts/templates/posts/partials/reel_card.html:323
 msgid "Toggle mute"
 msgstr "Washa au zima sauti"
 
-#: posts/templates/posts/partials/media_video_player.html:83
-#: posts/templates/posts/partials/reel_card.html:318
+#: posts/templates/posts/partials/media_video_player.html:85
+#: posts/templates/posts/partials/reel_card.html:331
 msgid "Seek"
 msgstr "Tafuta"
 
-#: posts/templates/posts/partials/media_video_player.html:91
+#: posts/templates/posts/partials/media_video_player.html:93
 msgid "HD processing…"
 msgstr "Inachakata HD…"
 
-#: posts/templates/posts/partials/media_video_player.html:93
+#: posts/templates/posts/partials/media_video_player.html:95
 msgid "Processing failed"
 msgstr "Uchakataji umeshindwa"
 
-#: posts/templates/posts/partials/media_video_player.html:95
+#: posts/templates/posts/partials/media_video_player.html:97
 msgid "Preparing…"
 msgstr "Inatayarisha…"
 
@@ -558,6 +591,8 @@ msgid "Audios"
 msgstr "Sauti"
 
 #: posts/templates/posts/partials/offline_media_viewer_content.html:73
+#: pwanimate/templates/pwanimate/partials/chat_content.html:93
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:93
 msgid "All"
 msgstr "Zote"
 
@@ -595,10 +630,10 @@ msgstr "Bado hakuna midia iliyopakuliwa"
 
 #: posts/templates/posts/partials/offline_media_viewer_content.html:125
 msgid ""
-"Files you download while browsing PwaniNet will automatically be saved here "
-"for full offline streaming and viewing."
+"Files you download while browsing vasto will automatically be saved here for "
+"full offline streaming and viewing."
 msgstr ""
-"Faili unazopakua unapotumia PwaniNet zitahifadhiwa hapa kiotomatiki ili "
+"Faili unazopakua unapotumia vasto zitahifadhiwa hapa kiotomatiki ili "
 "uzitazame bila intaneti."
 
 #: posts/templates/posts/partials/offline_media_viewer_content.html:128
@@ -609,165 +644,235 @@ msgstr "Vinjari mtiririko"
 msgid "Save to Phone"
 msgstr "Hifadhi kwenye simu"
 
-#: posts/templates/posts/partials/post_card.html:106
-#: posts/templates/posts/partials/reel_card.html:109
-msgid "Public"
-msgstr "Hadharani"
+#: posts/templates/posts/partials/post_card.html:109
+#: posts/templates/posts/partials/reel_card.html:116
+msgid "Only me"
+msgstr ""
 
-#: posts/templates/posts/partials/post_card.html:114
+#: posts/templates/posts/partials/post_card.html:111
 #: posts/templates/posts/partials/reel_card.html:118
+#, fuzzy
+#| msgid "Followers"
+msgid "Followers only"
+msgstr "Wafuataji"
+
+#: posts/templates/posts/partials/post_card.html:113
+#: posts/templates/posts/partials/reel_card.html:120
+#, fuzzy
+#| msgid "Block student"
+msgid "vasto students"
+msgstr "Mzuie mwanafunzi"
+
+#: posts/templates/posts/partials/post_card.html:122
+#: posts/templates/posts/partials/reel_card.html:130
 msgid "Post options"
 msgstr "Chaguo za chapisho"
 
-#: posts/templates/posts/partials/post_card.html:132
-#: posts/templates/posts/partials/post_card.html:450
-#: posts/templates/posts/partials/reel_card.html:132
-#: posts/templates/posts/partials/reel_card.html:344
+#: posts/templates/posts/partials/post_card.html:140
+#: posts/templates/posts/partials/post_card.html:459
+#: posts/templates/posts/partials/post_card.html:460
+#: posts/templates/posts/partials/reel_card.html:144
+#: posts/templates/posts/partials/reel_card.html:357
+#: posts/templates/posts/partials/reel_card.html:358
 #: posts/templates/posts/partials/repost_scatter_cluster.html:18
-#: templates/base.html:2108 templates/base.html:2120 templates/base.html:2224
-#: templates/base.html:2228 templates/base.html:2598 templates/base.html:5159
+#: templates/base.html:2308 templates/base.html:2320 templates/base.html:2424
+#: templates/base.html:2428 templates/base.html:2820 templates/base.html:5726
 msgid "Repost"
 msgstr "Chapisha tena"
 
-#: posts/templates/posts/partials/post_card.html:140
-#: posts/templates/posts/partials/reel_card.html:140
+#: posts/templates/posts/partials/post_card.html:148
+#: posts/templates/posts/partials/reel_card.html:152
 msgid "Hide post"
 msgstr "Ficha chapisho"
 
-#: posts/templates/posts/partials/post_card.html:150
-#: posts/templates/posts/partials/reel_card.html:150
+#: posts/templates/posts/partials/post_card.html:158
+#: posts/templates/posts/partials/reel_card.html:162
 msgid "Hide posts from"
 msgstr "Ficha machapisho kutoka kwa"
 
-#: posts/templates/posts/partials/post_card.html:156
-#: posts/templates/posts/partials/reel_card.html:156
+#: posts/templates/posts/partials/post_card.html:164
+#: posts/templates/posts/partials/reel_card.html:168
 msgid "Share to profile"
 msgstr "Shiriki kwenye wasifu"
 
-#: posts/templates/posts/partials/post_card.html:162
-#: posts/templates/posts/partials/reel_card.html:162 templates/base.html:2248
-#: templates/base.html:2252 templates/base.html:2355 templates/base.html:4950
+#: posts/templates/posts/partials/post_card.html:170
+#: posts/templates/posts/partials/reel_card.html:174 templates/base.html:2448
+#: templates/base.html:2452 templates/base.html:2555 templates/base.html:5503
 msgid "Copy Link"
 msgstr "Nakili kiungo"
 
-#: posts/templates/posts/partials/post_card.html:168
-#: posts/templates/posts/partials/reel_card.html:168 templates/base.html:2132
+#: posts/templates/posts/partials/post_card.html:176
+#: posts/templates/posts/partials/reel_card.html:180 templates/base.html:2332
 msgid "Report post"
 msgstr "Ripoti chapisho"
 
-#: posts/templates/posts/partials/post_card.html:182
+#: posts/templates/posts/partials/post_card.html:191
 msgid "Download Media"
 msgstr "Pakua midia"
 
-#: posts/templates/posts/partials/post_card.html:192
-#: posts/templates/posts/partials/reel_card.html:192
+#: posts/templates/posts/partials/post_card.html:201
+#: posts/templates/posts/partials/reel_card.html:205
 msgid "Are you sure you want to delete this post?"
 msgstr "Una uhakika unataka kufuta chapisho hili?"
 
-#: posts/templates/posts/partials/post_card.html:195
-#: posts/templates/posts/partials/reel_card.html:195
+#: posts/templates/posts/partials/post_card.html:204
+#: posts/templates/posts/partials/reel_card.html:208
 msgid "Delete post"
 msgstr "Futa chapisho"
 
-#: posts/templates/posts/partials/post_card.html:440
-#: posts/templates/posts/partials/reel_card.html:334
+#: posts/templates/posts/partials/post_card.html:449
+#: posts/templates/posts/partials/reel_card.html:347
 msgid "Comment"
 msgstr "Toa maoni"
 
-#: posts/templates/posts/partials/post_card.html:461
-#: posts/templates/posts/partials/reel_card.html:355
+#: posts/templates/posts/partials/post_card.html:459
+#: posts/templates/posts/partials/reel_card.html:357
+#, fuzzy
+#| msgid "Sign in to repost"
+msgid "Undo repost"
+msgstr "Ingia ili kushiriki tena"
+
+#: posts/templates/posts/partials/post_card.html:460
+#: posts/templates/posts/partials/post_card.html:462
+#: posts/templates/posts/partials/reel_card.html:358
+#: posts/templates/posts/partials/reel_card.html:360 templates/base.html:2824
+#: templates/base.html:5726
+msgid "Reposted"
+msgstr "Imeshirikiwa tena"
+
+#: posts/templates/posts/partials/post_card.html:472
+#: posts/templates/posts/partials/reel_card.html:370
 msgid "Share post"
 msgstr "Shiriki chapisho"
 
-#: posts/templates/posts/partials/post_card.html:463
-#: posts/templates/posts/partials/reel_card.html:357 templates/base.html:2612
-#: templates/base.html:2615
+#: posts/templates/posts/partials/post_card.html:474
+#: posts/templates/posts/partials/post_detail_content.html:162
+#: posts/templates/posts/partials/reel_card.html:372 templates/base.html:2835
+#: templates/base.html:2838
 msgid "Share"
 msgstr "Shiriki"
 
-#: posts/templates/posts/partials/post_card.html:494
+#: posts/templates/posts/partials/post_card.html:510
 msgid "Write a comment..."
 msgstr "Andika maoni..."
 
-#: posts/templates/posts/partials/post_card.html:500
+#: posts/templates/posts/partials/post_card.html:514
+#: posts/templates/posts/partials/post_detail_content.html:252
+#: templates/base.html:2672 templates/base.html:2947
+msgid "Attach photo as sticker"
+msgstr ""
+
+#: posts/templates/posts/partials/post_card.html:523
+#: posts/templates/posts/partials/post_detail_content.html:261
+#: templates/base.html:2681 templates/base.html:2956
+msgid "Emoji, GIFs & Stickers"
+msgstr ""
+
+#: posts/templates/posts/partials/post_card.html:529
 msgid "Submit comment"
 msgstr "Wasilisha maoni"
 
 #: posts/templates/posts/partials/post_content.html:18
 #: posts/templates/posts/partials/post_content.html:22
-#: posts/templates/posts/partials/reel_card.html:216
-#: posts/templates/posts/partials/reel_card.html:218
+#: posts/templates/posts/partials/reel_card.html:229
+#: posts/templates/posts/partials/reel_card.html:231
 msgid "See more"
 msgstr "Tazama zaidi"
 
 #: posts/templates/posts/partials/post_content.html:19
-#: posts/templates/posts/partials/reel_card.html:216
+#: posts/templates/posts/partials/reel_card.html:229
 msgid "See less"
 msgstr "Tazama machache"
 
-#: posts/templates/posts/partials/post_detail_content.html:113
-#: posts/templates/posts/partials/post_detail_content.html:119
+#: posts/templates/posts/partials/post_detail_content.html:129
+#: posts/templates/posts/partials/post_detail_content.html:135
+#: templates/base.html:2771
+msgid "Back to feed"
+msgstr "Rudi kwenye mtiririko"
+
+#: posts/templates/posts/partials/post_detail_content.html:129
+#: posts/templates/posts/partials/post_detail_content.html:135
 msgid "Back"
 msgstr "Rudi"
 
-#: posts/templates/posts/partials/post_detail_content.html:118
-#: templates/base.html:5557
-msgid "Sign in to explore PwaniNet"
-msgstr "Ingia ili kuchunguza PwaniNet"
+#: posts/templates/posts/partials/post_detail_content.html:134
+#: templates/base.html:6140
+msgid "Sign in to explore vasto"
+msgstr "Ingia ili kuchunguza vasto"
 
-#: posts/templates/posts/partials/post_detail_content.html:118
-msgid ""
-"Join PwaniNet to browse the campus feed, groups, and academic materials."
+#: posts/templates/posts/partials/post_detail_content.html:134
+msgid "Join vasto to browse the campus feed, groups, and academic materials."
 msgstr ""
-"Jiunge na PwaniNet ili kuvinjari mtiririko wa chuo, vikundi na nyenzo za "
-"masomo."
+"Jiunge na vasto ili kuvinjari mtiririko wa chuo, vikundi na nyenzo za masomo."
 
-#: posts/templates/posts/partials/post_detail_content.html:156
+#: posts/templates/posts/partials/post_detail_content.html:160
+msgid "Like image"
+msgstr ""
+
+#: posts/templates/posts/partials/post_detail_content.html:161
+#, fuzzy
+#| msgid "Comment"
+msgid "Comment on image"
+msgstr "Toa maoni"
+
+#: posts/templates/posts/partials/post_detail_content.html:162
+#, fuzzy
+#| msgid "Share via"
+msgid "Share image"
+msgstr "Shiriki kupitia"
+
+#: posts/templates/posts/partials/post_detail_content.html:163
+#, fuzzy
+#| msgid "Download Media"
+msgid "Download image"
+msgstr "Pakua midia"
+
+#: posts/templates/posts/partials/post_detail_content.html:247
 msgid "Add comment..."
 msgstr "Ongeza maoni..."
 
-#: posts/templates/posts/partials/post_detail_content.html:157
+#: posts/templates/posts/partials/post_detail_content.html:248
 msgid "Add a comment"
 msgstr "Ongeza maoni"
 
-#: posts/templates/posts/partials/post_detail_content.html:161
+#: posts/templates/posts/partials/post_detail_content.html:266
 msgid "Send comment"
 msgstr "Tuma maoni"
 
-#: posts/templates/posts/partials/post_detail_content.html:176
-msgid "Join PwaniNet to participate"
-msgstr "Jiunge na PwaniNet ili kushiriki"
+#: posts/templates/posts/partials/post_detail_content.html:282
+msgid "Join vasto to participate"
+msgstr "Jiunge na vasto ili kushiriki"
 
-#: posts/templates/posts/partials/post_detail_content.html:177
+#: posts/templates/posts/partials/post_detail_content.html:283
 msgid "Sign in to like, comment, and connect with students."
 msgstr "Ingia ili kupenda, kutoa maoni na kuwasiliana na wanafunzi."
 
-#: posts/templates/posts/partials/post_detail_content.html:181
-#: templates/base.html:2528
+#: posts/templates/posts/partials/post_detail_content.html:287
+#: templates/base.html:2748
 msgid "Sign In"
 msgstr "Ingia"
 
-#: posts/templates/posts/partials/post_detail_content.html:184
+#: posts/templates/posts/partials/post_detail_content.html:290
 msgid "Create Account"
 msgstr "Fungua akaunti"
 
-#: posts/templates/posts/partials/reel_card.html:182
+#: posts/templates/posts/partials/reel_card.html:195
 msgid "Download Reel"
 msgstr "Pakua video fupi"
 
-#: posts/templates/posts/partials/reel_card.html:262
+#: posts/templates/posts/partials/reel_card.html:275
 msgid "Play or pause reel"
 msgstr "Cheza au sitisha video fupi"
 
-#: posts/templates/posts/partials/reel_card.html:275
+#: posts/templates/posts/partials/reel_card.html:288
 msgid "Loading…"
 msgstr "Inapakia…"
 
-#: posts/templates/posts/partials/reel_card.html:289
+#: posts/templates/posts/partials/reel_card.html:302
 msgid "Full Screen"
 msgstr "Skrini nzima"
 
-#: posts/templates/posts/partials/reel_card.html:290
+#: posts/templates/posts/partials/reel_card.html:303
 msgid "Expand reel"
 msgstr "Panua video fupi"
 
@@ -776,12 +881,12 @@ msgid "Campus Reels"
 msgstr "Video fupi za chuo"
 
 #: posts/templates/posts/partials/reels_carousel.html:17
-#: templates/base.html:2198 templates/base.html:2219
+#: templates/base.html:2398 templates/base.html:2419
 msgid "Scroll left"
 msgstr "Sogeza kushoto"
 
 #: posts/templates/posts/partials/reels_carousel.html:20
-#: templates/base.html:2207 templates/base.html:2295
+#: templates/base.html:2407 templates/base.html:2495
 msgid "Scroll right"
 msgstr "Sogeza kulia"
 
@@ -797,13 +902,19 @@ msgstr "Wewe"
 #: posts/templates/posts/partials/repost_header_banner.html:17
 #: posts/templates/posts/partials/repost_header_banner.html:25
 #: posts/templates/posts/partials/repost_header_banner.html:31
+#: venv/lib/python3.12/site-packages/django/db/models/base.py:1600
+#: venv/lib/python3.12/site-packages/django/forms/models.py:908
 msgid "and"
 msgstr "na"
 
 #: posts/templates/posts/partials/repost_header_banner.html:33
-#: users/templates/users/partials/profile_content.html:531
+#: users/templates/users/partials/profile_content.html:558
 msgid "reposted this"
 msgstr "ameshiriki tena chapisho hili"
+
+#: posts/templates/posts/partials/repost_scatter_cluster.html:25
+msgid "More people you follow reposted this"
+msgstr ""
 
 #: posts/templates/posts/partials/shared_post_card.html:30
 msgid "shared the mobile app with"
@@ -821,15 +932,16 @@ msgstr "Pakua programu ya simu"
 msgid "This post is no longer available."
 msgstr "Chapisho hili halipatikani tena."
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:13
-#: pwanimate/templates/pwanimate/partials/chat_content.html:116
-#: pwanimate/templates/pwanimate/partials/chat_content.html:639
-#: pwanimate/templates/pwanimate/partials/chat_content.html:669
-#: pwanimate/templates/pwanimate/partials/chat_content.html:689
+#: pwanimate/templates/pwanimate/partials/chat_content.html:21
+#: pwanimate/templates/pwanimate/partials/chat_content.html:154
+#: pwanimate/templates/pwanimate/partials/chat_content.html:936
+#: pwanimate/templates/pwanimate/partials/chat_content.html:966
+#: pwanimate/templates/pwanimate/partials/chat_content.html:986
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1001
 #: pwanimate/templates/pwanimate/settings/partials/settings_modal.html:23
-#: templates/base.html:1966 templates/base.html:2109 templates/base.html:2133
-#: templates/base.html:2176 templates/base.html:2320 templates/base.html:2441
-#: templates/base.html:2512
+#: templates/base.html:2166 templates/base.html:2309 templates/base.html:2333
+#: templates/base.html:2376 templates/base.html:2520 templates/base.html:2641
+#: templates/base.html:2732
 #: users/templates/users/settings/partials/active_devices_content.html:135
 #: users/templates/users/settings/partials/blocked_content.html:67
 #: users/templates/users/settings/partials/hidden_content.html:66
@@ -840,80 +952,98 @@ msgstr "Chapisho hili halipatikani tena."
 msgid "Close"
 msgstr "Funga"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:61
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:69
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:90
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:91
+#: pwanimate/templates/pwanimate/partials/chat_content.html:69
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:70
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:124
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:125
 msgid "New Chat"
 msgstr "Mazungumzo mapya"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:66
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:71
-msgid "Chat History"
+#: pwanimate/templates/pwanimate/partials/chat_content.html:79
+#: pwanimate/templates/pwanimate/partials/chat_content.html:101
+#: pwanimate/templates/pwanimate/partials/chat_content.html:358
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:80
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:102
+#, fuzzy
+#| msgid "Study Group"
+msgid "Study"
+msgstr "Kikundi cha masomo"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:85
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:84
+#, fuzzy
+#| msgid "Chat History"
+msgid "History"
 msgstr "Historia ya mazungumzo"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:76
+#: pwanimate/templates/pwanimate/partials/chat_content.html:86
+#, fuzzy
+#| msgid "Delete conversation"
+msgid "Filter mobile conversations"
+msgstr "Futa mazungumzo"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:114
 msgid "Logout"
 msgstr "Toka"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:99
-#: pwanimate/templates/pwanimate/partials/chat_content.html:158
+#: pwanimate/templates/pwanimate/partials/chat_content.html:137
+#: pwanimate/templates/pwanimate/partials/chat_content.html:196
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:29
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:115
 msgid "Preview"
 msgstr "Hakiki"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:111
-#: pwanimate/templates/pwanimate/partials/chat_content.html:300
+#: pwanimate/templates/pwanimate/partials/chat_content.html:149
+#: pwanimate/templates/pwanimate/partials/chat_content.html:338
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:42
 msgid "Context"
 msgstr "Muktadha"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:132
-#: pwanimate/templates/pwanimate/partials/chat_content.html:226
-#: pwanimate/templates/pwanimate/partials/chat_content.html:365
-#: pwanimate/templates/pwanimate/partials/chat_content.html:389
-#: pwanimate/templates/pwanimate/partials/chat_content.html:391
-#: pwanimate/templates/pwanimate/partials/chat_content.html:396
+#: pwanimate/templates/pwanimate/partials/chat_content.html:170
+#: pwanimate/templates/pwanimate/partials/chat_content.html:264
+#: pwanimate/templates/pwanimate/partials/chat_content.html:497
+#: pwanimate/templates/pwanimate/partials/chat_content.html:523
+#: pwanimate/templates/pwanimate/partials/chat_content.html:525
+#: pwanimate/templates/pwanimate/partials/chat_content.html:530
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:84
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:193
 msgid "Document"
 msgstr "Waraka"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:140
+#: pwanimate/templates/pwanimate/partials/chat_content.html:178
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:93
 msgid "+ Add to Context"
 msgstr "+ Ongeza kwenye muktadha"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:167
-#: pwanimate/templates/pwanimate/partials/chat_content.html:254
+#: pwanimate/templates/pwanimate/partials/chat_content.html:205
+#: pwanimate/templates/pwanimate/partials/chat_content.html:292
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:124
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:225
 msgid "Thumbnail"
 msgstr "Picha ya kijipicha"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:181
+#: pwanimate/templates/pwanimate/partials/chat_content.html:219
 msgid "Resource Preview"
 msgstr "Hakiki nyenzo"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:188
+#: pwanimate/templates/pwanimate/partials/chat_content.html:226
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:145
 msgid "Open Document"
 msgstr "Fungua waraka"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:190
-#: pwanimate/templates/pwanimate/partials/chat_content.html:276
+#: pwanimate/templates/pwanimate/partials/chat_content.html:228
+#: pwanimate/templates/pwanimate/partials/chat_content.html:314
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:147
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:247
 msgid "Open in new tab"
 msgstr "Fungua kwenye kichupo kipya"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:203
+#: pwanimate/templates/pwanimate/partials/chat_content.html:241
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:163
 msgid "Working Context"
 msgstr "Muktadha wa kazi"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:205
+#: pwanimate/templates/pwanimate/partials/chat_content.html:243
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:164
 msgid ""
 "No working materials attached yet. Inspect citations in the Preview tab and "
@@ -923,134 +1053,310 @@ msgstr ""
 "cha Hakikisho kisha ubofye '+ Ongeza kwenye muktadha' ili kuhifadhi marejeo "
 "muhimu unapozungumza."
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:207
+#: pwanimate/templates/pwanimate/partials/chat_content.html:245
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:169
 msgid "Add context item"
 msgstr "Ongeza kipengee cha muktadha"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:217
+#: pwanimate/templates/pwanimate/partials/chat_content.html:255
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:182
 msgid "Add a book"
 msgstr "Ongeza kitabu"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:232
+#: pwanimate/templates/pwanimate/partials/chat_content.html:270
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:199
 msgid "Remove from working context"
 msgstr "Ondoa kwenye muktadha wa kazi"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:234
+#: pwanimate/templates/pwanimate/partials/chat_content.html:272
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:201
 msgid "Remove"
 msgstr "Ondoa"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:249
+#: pwanimate/templates/pwanimate/partials/chat_content.html:287
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:219
 msgid "Context item"
 msgstr "Kipengee cha muktadha"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:274
+#: pwanimate/templates/pwanimate/partials/chat_content.html:312
 #: pwanimate/templates/pwanimate/partials/pwanimate_context_rail.html:245
 msgid "Open Original"
 msgstr "Fungua ya asili"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:289
-msgid "Pwanimate Chat"
-msgstr "Mazungumzo ya Pwanimate"
+#: pwanimate/templates/pwanimate/partials/chat_content.html:327
+#, fuzzy
+#| msgid "Back to Chat"
+msgid "Spark Chat"
+msgstr "Rudi kwenye mazungumzo"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:297
-#: pwanimate/templates/pwanimate/partials/chat_content.html:298
+#: pwanimate/templates/pwanimate/partials/chat_content.html:335
+#: pwanimate/templates/pwanimate/partials/chat_content.html:336
 msgid "Open Context Rail"
 msgstr "Fungua paneli ya muktadha"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:331
+#: pwanimate/templates/pwanimate/partials/chat_content.html:354
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:29
+msgid "Paused"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:356
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:31
+#, fuzzy
+#| msgid "Completion"
+msgid "Completed"
+msgstr "Ukamilishi"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:364
+#: pwanimate/templates/pwanimate/partials/chat_content.html:618
+#, fuzzy
+#| msgid "Current Session"
+msgid "Study Session"
+msgstr "Kipindi cha sasa"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:366
+#, fuzzy
+#| msgid "Current Session"
+msgid "New Study Session"
+msgstr "Kipindi cha sasa"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:381
+msgid "View or save learning checkpoint"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:382
+#: pwanimate/templates/pwanimate/partials/chat_content.html:384
+msgid "Checkpoint"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:389
+msgid "Generate study summary, export PDF/Word, or save to Collection"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:390
+msgid "Summary & Save"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:392
+msgid "Summary"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:399
+msgid "Resume study session"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:399
+#, fuzzy
+#| msgid "Latest Version"
+msgid "Pause study session"
+msgstr "Toleo jipya zaidi"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:400
+#: pwanimate/templates/pwanimate/partials/chat_content.html:403
+msgid "Resume"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:400
+#: pwanimate/templates/pwanimate/partials/chat_content.html:403
+msgid "Pause"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:409
+msgid "End study session (preserves full history)"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:410
+#, fuzzy
+#| msgid "Current Session"
+msgid "End session"
+msgstr "Kipindi cha sasa"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:412
+#, fuzzy
+#| msgid "and"
+msgid "End"
+msgstr "na"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:431
+msgid "Dismiss notice"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:463
 msgid "Copy message"
 msgstr "Nakili ujumbe"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:334
+#: pwanimate/templates/pwanimate/partials/chat_content.html:466
 msgid "Edit message"
 msgstr "Hariri ujumbe"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:358
+#: pwanimate/templates/pwanimate/partials/chat_content.html:490
 msgid "Sources referenced"
 msgstr "Vyanzo vilivyorejelewa"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:407
+#: pwanimate/templates/pwanimate/partials/chat_content.html:541
 msgid "Citations"
 msgstr "Marejeo"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:422
+#: pwanimate/templates/pwanimate/partials/chat_content.html:556
 msgid "Save response to My Resources"
 msgstr "Hifadhi jibu kwenye Nyenzo Zangu"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:426
+#: pwanimate/templates/pwanimate/partials/chat_content.html:560
 msgid "Download PDF"
 msgstr "Pakua PDF"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:427
+#: pwanimate/templates/pwanimate/partials/chat_content.html:561
 msgid "Download Word document"
 msgstr "Pakua waraka wa Word"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:430
+#: pwanimate/templates/pwanimate/partials/chat_content.html:564
 msgid "Copy answer"
 msgstr "Nakili jibu"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:457
-msgid "Pwanimate can make mistakes. Please verify important details."
+#: pwanimate/templates/pwanimate/partials/chat_content.html:603
+msgid "Active Study Session"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:605
+#, fuzzy
+#| msgid "Current Session"
+msgid "Paused Study Session"
+msgstr "Kipindi cha sasa"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:627
+#: pwanimate/templates/pwanimate/partials/chat_content.html:628
+msgid "Dismiss banner"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:635
+msgid "Focus:"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:643
+#, fuzzy
+#| msgid "Recommended for most users."
+msgid "Recommended next step:"
+msgstr "Inapendekezwa kwa watumiaji wengi."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:660
+#, fuzzy
+#| msgid "Current Session"
+msgid "Resume Session"
+msgstr "Kipindi cha sasa"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:668
+msgid "Start New Study Session"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:689
+msgid ""
+"Flip pages in the Context Rail to devour this document page by page with "
+"Spark."
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:696
+msgid "Summarize entire book"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:700
+#: pwanimate/templates/pwanimate/partials/chat_content.html:740
+msgid "Explain Page 1"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:704
+msgid "Key takeaways from Page 1"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:708
+#: pwanimate/templates/pwanimate/partials/chat_content.html:748
+msgid "Quiz me on this page"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:719
+#, fuzzy
+#| msgid "Pwanimate can make mistakes. Please verify important details."
+msgid "Spark can make mistakes. Please verify important details."
 msgstr "Pwanimate inaweza kukosea. Tafadhali hakiki taarifa muhimu."
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:492
-#: pwanimate/templates/pwanimate/partials/chat_content.html:498
-msgid "Message Pwanimate"
-msgstr "Tuma ujumbe kwa Pwanimate"
+#: pwanimate/templates/pwanimate/partials/chat_content.html:734
+msgid "Get an overview summary of the entire document"
+msgstr ""
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:497
-msgid "Message Pwanimate..."
-msgstr "Tuma ujumbe kwa Pwanimate..."
+#: pwanimate/templates/pwanimate/partials/chat_content.html:736
+msgid "Summarize book"
+msgstr ""
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:517
+#: pwanimate/templates/pwanimate/partials/chat_content.html:744
+msgid "Key takeaways (p. 1)"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:757
+msgid "Study command suggestion"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:760
+msgid ""
+"Activate persistent Study Mode with learning checkpoints & document tracking"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:789
+#: pwanimate/templates/pwanimate/partials/chat_content.html:795
+#, fuzzy
+#| msgid "Message"
+msgid "Message Spark"
+msgstr "Ujumbe"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:794
+msgid "Ask a study question..."
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:794
+msgid "Ask Spark anything..."
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:814
 msgid "Select AI Model"
 msgstr "Chagua modeli ya AI"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:522
+#: pwanimate/templates/pwanimate/partials/chat_content.html:819
 msgid "AI Model Selection"
 msgstr "Uteuzi wa modeli ya AI"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:530
+#: pwanimate/templates/pwanimate/partials/chat_content.html:827
 msgid "Auto (Recommended)"
 msgstr "Kiotomatiki (Inapendekezwa)"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:531
+#: pwanimate/templates/pwanimate/partials/chat_content.html:828
 msgid "Automatic multi-tier failover"
 msgstr "Uhamishaji wa kiotomatiki kati ya viwango"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:547
+#: pwanimate/templates/pwanimate/partials/chat_content.html:844
 msgid "View Quotas & Models..."
 msgstr "Tazama viwango na modeli..."
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:557
-#: pwanimate/templates/pwanimate/partials/chat_content.html:558
+#: pwanimate/templates/pwanimate/partials/chat_content.html:854
+#: pwanimate/templates/pwanimate/partials/chat_content.html:855
 msgid "Dictate a message"
 msgstr "Tamka ujumbe"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:565
-#: pwanimate/templates/pwanimate/partials/chat_content.html:566
+#: pwanimate/templates/pwanimate/partials/chat_content.html:862
+#: pwanimate/templates/pwanimate/partials/chat_content.html:863
 msgid "Send message"
 msgstr "Tuma ujumbe"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:621
+#: pwanimate/templates/pwanimate/partials/chat_content.html:918
 msgid "Files"
 msgstr "Faili"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:625
+#: pwanimate/templates/pwanimate/partials/chat_content.html:922
 msgid "Supported: Images (JPEG, PNG, GIF, WebP), PDFs, and Text Documents"
 msgstr ""
 "Vinavyokubaliwa: Picha (JPEG, PNG, GIF, WebP), PDF na nyaraka za maandishi"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:636
+#: pwanimate/templates/pwanimate/partials/chat_content.html:933
 msgid "Add a book to context"
 msgstr "Ongeza kitabu kwenye muktadha"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:637
+#: pwanimate/templates/pwanimate/partials/chat_content.html:934
 msgid ""
 "Search the document repository and choose a book to open in your context "
 "rail."
@@ -1058,31 +1364,31 @@ msgstr ""
 "Tafuta kwenye hazina ya nyaraka na uchague kitabu cha kufungua kwenye paneli "
 "ya muktadha."
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:642
+#: pwanimate/templates/pwanimate/partials/chat_content.html:939
 msgid "Search repository books"
 msgstr "Tafuta vitabu kwenye hazina"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:645
+#: pwanimate/templates/pwanimate/partials/chat_content.html:942
 msgid "Search books by title or topic…"
 msgstr "Tafuta vitabu kwa jina au mada…"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:648
+#: pwanimate/templates/pwanimate/partials/chat_content.html:945
 msgid "Type at least two characters to search the repository."
 msgstr "Andika angalau herufi mbili ili kutafuta kwenye hazina."
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:662
+#: pwanimate/templates/pwanimate/partials/chat_content.html:959
 msgid "AI Models & Quotas"
 msgstr "Modeli na viwango vya AI"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:665
+#: pwanimate/templates/pwanimate/partials/chat_content.html:962
 msgid "Refresh quota status"
 msgstr "Onyesha upya hali ya kiwango"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:667
+#: pwanimate/templates/pwanimate/partials/chat_content.html:964
 msgid "Refresh"
 msgstr "Onyesha upya"
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:674
+#: pwanimate/templates/pwanimate/partials/chat_content.html:971
 msgid ""
 "Select an AI model to manually override default routing, or keep Auto for "
 "automatic zero-downtime failover between tiers."
@@ -1090,36 +1396,201 @@ msgstr ""
 "Chagua modeli ya AI ili kubatilisha mwenyewe uelekezaji chaguomsingi, au "
 "acha Kiotomatiki ili mfumo ubadilishe viwango bila kukatika."
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:681
+#: pwanimate/templates/pwanimate/partials/chat_content.html:978
 msgid "Loading models..."
 msgstr "Inapakia modeli..."
 
-#: pwanimate/templates/pwanimate/partials/chat_content.html:687
+#: pwanimate/templates/pwanimate/partials/chat_content.html:984
 msgid "Multi-tier rate limit protection active"
 msgstr "Ulinzi wa kikomo cha matumizi wa viwango vingi unatumika"
 
+#: pwanimate/templates/pwanimate/partials/chat_content.html:999
+msgid "Study Mode Progress & Summary"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1013
+msgid "Learning Checkpoint"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1024
+msgid "Session Summary & Save to Collection"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1034
+msgid "Learning Objective"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1035
+msgid "e.g. Understand conditional probability and Bayes theorem"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1038
+#, fuzzy
+#| msgid "Current Device"
+msgid "Current Topic"
+msgstr "Kifaa cha sasa"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1040
+msgid "Current topic or chapter"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1041
+#: templates/base.html:2436 templates/base.html:2831
+msgid "Save"
+msgstr "Hifadhi"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1047
+#, fuzzy
+#| msgid "Latest Version"
+msgid "Latest Learning Checkpoint"
+msgstr "Toleo jipya zaidi"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1050
+msgid "Update Checkpoint Now"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1056
+msgid ""
+"No learning checkpoint generated yet. Ask a few study questions or click "
+"'Update Checkpoint Now' to snapshot your progress."
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1060
+msgid "Concepts Demonstrated by You (Verified)"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1064
+msgid "Concepts Explained by Spark"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1068
+msgid "Open Questions & Misconceptions to Revisit"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1072
+msgid "Assistant's Inferred Understanding Note"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1076
+#, fuzzy
+#| msgid "Recommended for most users."
+msgid "Recommended Next Step:"
+msgstr "Inapendekezwa kwa watumiaji wengi."
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1087
+msgid ""
+"Review or edit your structured study summary before downloading or saving it "
+"to a Collection."
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1091
+msgid "Generate Summary"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1094
+msgid "PDF"
+msgstr "PDF"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1097
+msgid "Word"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1103
+msgid "Study Summary Markdown"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1107
+msgid ""
+"Click Generate Summary to synthesize your study session into structured "
+"notes..."
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1114
+msgid "Save Summary to a Document Collection"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1118
+msgid "Choose Existing Collection"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1120
+msgid "-- Or create a new collection below --"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1124
+msgid "Or New Collection Name"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1125
+msgid "e.g. Exam Revision Notes"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1128
+#, fuzzy
+#| msgid "Document"
+msgid "Document Format"
+msgstr "Waraka"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1130
+msgid "PDF Document (.pdf)"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1131
+#, fuzzy
+#| msgid "Upload Document"
+msgid "Word Document (.docx)"
+msgstr "Pakia waraka"
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1135
+msgid "Collection Item Note (Optional)"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1136
+msgid "Optional note for this summary"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/chat_content.html:1140
+#, fuzzy
+#| msgid "Save to Phone"
+msgid "Save to Collection"
+msgstr "Hifadhi kwenye simu"
+
 #: pwanimate/templates/pwanimate/partials/chat_navigation_partial.html:13
-msgid "Pwanimate Navigation"
-msgstr "Urambazaji wa Pwanimate"
+#, fuzzy
+#| msgid "Main Navigation"
+msgid "Spark Navigation"
+msgstr "Urambazaji mkuu"
 
 #: pwanimate/templates/pwanimate/partials/chat_navigation_partial.html:20
-msgid "Pwanimate Resources"
+#, fuzzy
+#| msgid "Pwanimate Resources"
+msgid "Spark Resources"
 msgstr "Nyenzo za Pwanimate"
 
-#: pwanimate/templates/pwanimate/partials/conversation_list.html:14
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:19
+#, fuzzy
+#| msgid "AI Model Selection"
+msgid "Study Mode Session"
+msgstr "Uteuzi wa modeli ya AI"
+
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:21
 msgid "New Conversation"
 msgstr "Mazungumzo mapya"
 
-#: pwanimate/templates/pwanimate/partials/conversation_list.html:23
-#: pwanimate/templates/pwanimate/partials/conversation_list.html:24
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:49
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:50
 msgid "Delete conversation"
 msgstr "Futa mazungumzo"
 
-#: pwanimate/templates/pwanimate/partials/conversation_list.html:32
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:60
+msgid "No study sessions yet. Toggle Study Mode or type @study to begin!"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:62
 msgid "No conversations yet. Ask a question to start one!"
 msgstr "Bado hakuna mazungumzo. Uliza swali ili kuanza!"
 
-#: pwanimate/templates/pwanimate/partials/conversation_list.html:42
+#: pwanimate/templates/pwanimate/partials/conversation_list.html:73
 msgid "Loading more conversations…"
 msgstr "Inapakia mazungumzo zaidi…"
 
@@ -1128,20 +1599,20 @@ msgid "Discovered Students & Peers"
 msgstr "Wanafunzi na wenzao waliogunduliwa"
 
 #: pwanimate/templates/pwanimate/partials/person_card.html:67
-#: users/templates/users/partials/profile_content.html:322
-#: users/templates/users/partials/profile_context_rail.html:304
+#: users/templates/users/partials/profile_content.html:349
+#: users/templates/users/partials/profile_context_rail.html:344
 msgid "Open to Projects"
 msgstr "Wazi kwa Miradi"
 
 #: pwanimate/templates/pwanimate/partials/person_card.html:71
-#: users/templates/users/partials/profile_content.html:324
-#: users/templates/users/partials/profile_context_rail.html:306
+#: users/templates/users/partials/profile_content.html:351
+#: users/templates/users/partials/profile_context_rail.html:346
 msgid "Open to Study Groups"
 msgstr "Wazi kwa Vikundi vya Masomo"
 
 #: pwanimate/templates/pwanimate/partials/person_card.html:75
-#: users/templates/users/partials/profile_content.html:326
-#: users/templates/users/partials/profile_context_rail.html:308
+#: users/templates/users/partials/profile_content.html:353
+#: users/templates/users/partials/profile_context_rail.html:348
 msgid "Open to Networking"
 msgstr "Wazi kwa Mtandao"
 
@@ -1209,14 +1680,14 @@ msgstr ""
 "marejeo."
 
 #: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:13
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:101
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:102
-msgid "Back to PwaniNet"
-msgstr "Rudi kwenye PwaniNet"
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:135
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:136
+msgid "Back to vasto"
+msgstr "Rudi kwenye vasto"
 
 #: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:14
-msgid "PwaniNet"
-msgstr "PwaniNet"
+msgid "vasto"
+msgstr "vasto"
 
 #: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:20
 #: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:21
@@ -1235,8 +1706,18 @@ msgstr "Hali nyeusi"
 msgid "System Theme"
 msgstr "Mandhari ya mfumo"
 
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:83
-#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:84
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:74
+msgid "Start a new Study Mode session"
+msgstr ""
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:85
+#, fuzzy
+#| msgid "Delete conversation"
+msgid "Filter conversations"
+msgstr "Futa mazungumzo"
+
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:117
+#: pwanimate/templates/pwanimate/partials/pwanimate_left_rail.html:118
 msgid "Expand sidebar"
 msgstr "Panua upau wa pembeni"
 
@@ -1246,12 +1727,14 @@ msgid "Open working context"
 msgstr "Fungua muktadha wa kazi"
 
 #: pwanimate/templates/pwanimate/settings/index.html:5
-msgid "Settings - Pwanimate"
+#, fuzzy
+#| msgid "Settings - Pwanimate"
+msgid "Settings - Spark"
 msgstr "Mipangilio - Pwanimate"
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:12
-msgid "The Official Intelligent Assistant for Pwani University Students"
-msgstr "Msaidizi rasmi mahiri wa wanafunzi wa Chuo Kikuu cha Pwani"
+msgid "Your AI Academic Companion"
+msgstr ""
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:13
 #, python-format
@@ -1259,21 +1742,27 @@ msgid "Version %(ver)s"
 msgstr "Toleo %(ver)s"
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:18
-msgid "What is Pwanimate?"
+#, fuzzy
+#| msgid "What is Pwanimate?"
+msgid "What is Spark?"
 msgstr "Pwanimate ni nini?"
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:20
+#, fuzzy
+#| msgid ""
+#| "Pwanimate is an AI academic companion natively integrated into vasto. "
+#| "Built specifically for Pwani University, Pwanimate bridges campus "
+#| "academic records, lecture materials, student collaboration, and course "
+#| "information to help you navigate your academic journey."
 msgid ""
-"Pwanimate is an AI academic companion natively integrated into PwaniNet. "
-"Built specifically for Pwani University, Pwanimate bridges campus academic "
-"records, lecture materials, student collaboration, and course information to "
-"help you navigate your academic journey."
+"Spark is an AI academic companion natively integrated into Vasto. Spark "
+"bridges campus academic records, lecture materials, student collaboration, "
+"and course information to help you navigate your academic journey."
 msgstr ""
 "Pwanimate ni msaidizi wa masomo unaotumia AI na umejumuishwa moja kwa moja "
-"kwenye PwaniNet. Umetengenezwa mahsusi kwa Chuo Kikuu cha Pwani, "
-"ukiunganisha kumbukumbu za kitaaluma za chuo, nyenzo za mihadhara, "
-"ushirikiano wa wanafunzi na taarifa za kozi ili kukusaidia katika safari "
-"yako ya masomo."
+"kwenye vasto. Umetengenezwa mahsusi kwa Chuo Kikuu cha Pwani, ukiunganisha "
+"kumbukumbu za kitaaluma za chuo, nyenzo za mihadhara, ushirikiano wa "
+"wanafunzi na taarifa za kozi ili kukusaidia katika safari yako ya masomo."
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:26
 msgid "Key Capabilities"
@@ -1338,12 +1827,20 @@ msgid "Academic Boundaries & Privacy"
 msgstr "Mipaka ya kitaaluma na faragha"
 
 #: pwanimate/templates/pwanimate/settings/partials/about_content.html:79
+#, fuzzy
+#| msgid ""
+#| "Pwanimate only accesses campus documents and platform records you are "
+#| "authorized to view. Your personal instructions and preference settings "
+#| "are private to your account and never shared with peers or external "
+#| "services. Pwanimate is an advisory assistant and study tool designed to "
+#| "augment your learning, not replace faculty instruction or university "
+#| "grading systems."
 msgid ""
-"Pwanimate only accesses campus documents and platform records you are "
-"authorized to view. Your personal instructions and preference settings are "
-"private to your account and never shared with peers or external services. "
-"Pwanimate is an advisory assistant and study tool designed to augment your "
-"learning, not replace faculty instruction or university grading systems."
+"Spark only accesses campus documents and platform records you are authorized "
+"to view. Your personal instructions and preference settings are private to "
+"your account and never shared with peers or external services. Spark is an "
+"advisory assistant and study tool designed to augment your learning, not "
+"replace faculty instruction or university grading systems."
 msgstr ""
 "Pwanimate hufikia tu nyaraka za chuo na kumbukumbu za jukwaa ambazo "
 "umeidhinishwa kuona. Maagizo na mapendeleo yako ni ya faragha kwenye akaunti "
@@ -1358,8 +1855,12 @@ msgid "Personalization"
 msgstr "Ubinafsishaji"
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:13
+#, fuzzy
+#| msgid ""
+#| "Configure how Pwanimate interacts with you across conversations and "
+#| "academic inquiries."
 msgid ""
-"Configure how Pwanimate interacts with you across conversations and academic "
+"Configure how Spark interacts with you across conversations and academic "
 "inquiries."
 msgstr ""
 "Weka jinsi Pwanimate inavyowasiliana nawe kwenye mazungumzo na maswali ya "
@@ -1370,7 +1871,9 @@ msgid "Saved!"
 msgstr "Imehifadhiwa!"
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:21
-msgid "Your Pwanimate preferences have been updated."
+#, fuzzy
+#| msgid "Your Pwanimate preferences have been updated."
+msgid "Your Spark preferences have been updated."
 msgstr "Mapendeleo yako ya Pwanimate yamesasishwa."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:30
@@ -1378,16 +1881,22 @@ msgid "Please correct the following errors:"
 msgstr "Tafadhali sahihisha hitilafu zifuatazo:"
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:45
-msgid "What should Pwanimate call you?"
+#, fuzzy
+#| msgid "What should Pwanimate call you?"
+msgid "What should Spark call you?"
 msgstr "Pwanimate ikuitaje?"
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:48
+#, fuzzy
+#| msgid ""
+#| "Optional. This only changes how Pwanimate addresses you in chat, and does "
+#| "not alter your vasto account or display name."
 msgid ""
-"Optional. This only changes how Pwanimate addresses you in chat, and does "
-"not alter your PwaniNet account or display name."
+"Optional. This only changes how Spark addresses you in chat, and does not "
+"alter your vasto account or display name."
 msgstr ""
 "Si lazima. Hii hubadilisha tu jinsi Pwanimate inavyokuita kwenye mazungumzo; "
-"haibadilishi akaunti au jina lako la kuonyesha la PwaniNet."
+"haibadilishi akaunti au jina lako la kuonyesha la vasto."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:56
 msgid "e.g. Zayne"
@@ -1398,7 +1907,9 @@ msgid "Conversational Tone"
 msgstr "Mtindo wa mazungumzo"
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:69
-msgid "Select the general manner in which Pwanimate frames its responses."
+#, fuzzy
+#| msgid "Select the general manner in which Pwanimate frames its responses."
+msgid "Select the general manner in which Spark frames its responses."
 msgstr "Chagua namna ya jumla ambayo Pwanimate itatumia kuunda majibu yake."
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:75
@@ -1478,10 +1989,15 @@ msgid "Personal Instructions"
 msgstr "Maagizo binafsi"
 
 #: pwanimate/templates/pwanimate/settings/partials/personalization_content.html:140
+#, fuzzy
+#| msgid ""
+#| "Tell Pwanimate how you would like it to work with you. These instructions "
+#| "guide conversational style, but do not override university policies, "
+#| "safety rules, or privacy boundaries."
 msgid ""
-"Tell Pwanimate how you would like it to work with you. These instructions "
-"guide conversational style, but do not override university policies, safety "
-"rules, or privacy boundaries."
+"Tell Spark how you would like it to work with you. These instructions guide "
+"conversational style, but do not override university policies, safety rules, "
+"or privacy boundaries."
 msgstr ""
 "Eleza jinsi unavyotaka Pwanimate ishirikiane nawe. Maagizo haya huongoza "
 "mtindo wa mazungumzo, lakini hayabatilishi sera za chuo kikuu, kanuni za "
@@ -1524,15 +2040,21 @@ msgid "Usage & Activity"
 msgstr "Matumizi na shughuli"
 
 #: pwanimate/templates/pwanimate/settings/partials/usage_content.html:6
+#, fuzzy
+#| msgid ""
+#| "Overview of your Pwanimate activity, conversational threads, and platform "
+#| "capabilities."
 msgid ""
-"Overview of your Pwanimate activity, conversational threads, and platform "
+"Overview of your Spark activity, conversational threads, and platform "
 "capabilities."
 msgstr ""
 "Muhtasari wa shughuli zako za Pwanimate, mazungumzo na uwezo wa jukwaa."
 
 #: pwanimate/templates/pwanimate/settings/partials/usage_content.html:25
-msgid "Pwanimate Active"
-msgstr "Pwanimate inatumika"
+#, fuzzy
+#| msgid "Active"
+msgid "Spark Active"
+msgstr "Inaendelea"
 
 #: pwanimate/templates/pwanimate/settings/partials/usage_content.html:31
 msgid "Connected Account"
@@ -1563,9 +2085,14 @@ msgstr ""
 "wa rasilimali vinatengenezwa kwa sasisho lijalo."
 
 #: pwanimate/templates/pwanimate/settings/partials/usage_content.html:53
+#, fuzzy
+#| msgid ""
+#| "Pwanimate is currently available for your academic studies, peer "
+#| "discovery, and course inquiries under standard Pwani University "
+#| "acceptable academic use and fair use guidelines."
 msgid ""
-"Pwanimate is currently available for your academic studies, peer discovery, "
-"and course inquiries under standard Pwani University acceptable academic use "
+"Spark is currently available for your academic studies, peer discovery, and "
+"course inquiries under standard Kenyan Universities acceptable academic use "
 "and fair use guidelines."
 msgstr ""
 "Kwa sasa Pwanimate inapatikana kwa masomo yako, kutafuta wanafunzi wenzako "
@@ -1604,6 +2131,7 @@ msgid "Recent searches"
 msgstr "Utafutaji wa hivi karibuni"
 
 #: search/templates/search/partials/search_navigation_partial.html:261
+#: venv/lib/python3.12/site-packages/django/forms/widgets.py:527
 msgid "Clear"
 msgstr "Futa"
 
@@ -1635,524 +2163,547 @@ msgstr "Rudi mwanzo"
 msgid "Go Back"
 msgstr "Rudi nyuma"
 
-#: templates/base.html:1874
+#: templates/admin/base_site.html:4
+msgid "vasto Admin Portal"
+msgstr ""
+
+#: templates/admin/base_site.html:10
+#, fuzzy
+#| msgid "Citations"
+msgid "Administration"
+msgstr "Marejeo"
+
+#: templates/admin/base_site.html:21
+#, fuzzy
+#| msgid "Return to Home"
+msgid "Return to vasto App"
+msgstr "Rudi mwanzo"
+
+#: templates/admin/base_site.html:24
+msgid "Admin Dashboard"
+msgstr ""
+
+#: templates/base.html:2074
 #: users/templates/users/settings/partials/two_factor_content.html:300
 msgid "Protect Your Account with 2FA"
 msgstr "Linda akaunti yako kwa 2FA"
 
-#: templates/base.html:1875
+#: templates/base.html:2075
 msgid "Add an extra layer of security to your student account."
 msgstr "Ongeza hatua nyingine ya usalama kwenye akaunti yako ya mwanafunzi."
 
-#: templates/base.html:1880
+#: templates/base.html:2080
 msgid "Enable"
 msgstr "Washa"
 
-#: templates/base.html:1936 templates/base.html:1937
+#: templates/base.html:2136 templates/base.html:2137
 msgid "Back to top"
 msgstr "Rudi juu"
 
-#: templates/base.html:1964
-msgid "Install PwaniNet on Android"
-msgstr "Sakinisha PwaniNet kwenye Android"
+#: templates/base.html:2164
+msgid "Install vasto on Android"
+msgstr "Sakinisha vasto kwenye Android"
 
-#: templates/base.html:1973
-msgid "PwaniNet APK QR Code"
-msgstr "Msimbo wa QR wa APK ya PwaniNet"
+#: templates/base.html:2173
+msgid "vasto APK QR Code"
+msgstr "Msimbo wa QR wa APK ya vasto"
 
-#: templates/base.html:1980
+#: templates/base.html:2180
 msgid "Point your phone's camera or QR scanner at the code above."
 msgstr "Elekeza kamera ya simu au kichanganuzi cha QR kwenye msimbo ulio juu."
 
-#: templates/base.html:1987
+#: templates/base.html:2187
 msgid "Scan the QR code and tap Download APK."
 msgstr "Changanua msimbo wa QR kisha uguse Pakua APK."
 
-#: templates/base.html:1991
+#: templates/base.html:2191
 msgid "If prompted by Chrome, select Download anyway."
 msgstr "Chrome ikiuliza, chagua Pakua hata hivyo."
 
-#: templates/base.html:1995
+#: templates/base.html:2195
 msgid "Open the downloaded file and tap Install."
 msgstr "Fungua faili lililopakuliwa kisha uguse Sakinisha."
 
-#: templates/base.html:2006
+#: templates/base.html:2206
 #: templates/downloads/partials/download_page_content.html:297
 msgid "Copy"
 msgstr "Nakili"
 
-#: templates/base.html:2026 templates/base.html:4946
+#: templates/base.html:2226 templates/base.html:5499
 msgid "Copied!"
 msgstr "Imenakiliwa!"
 
-#: templates/base.html:2089
+#: templates/base.html:2289
 msgid "Downloading on this device?"
 msgstr "Unapakua kwenye kifaa hiki?"
 
-#: templates/base.html:2091
+#: templates/base.html:2291
 msgid "Download directly on your computer"
 msgstr "Pakua moja kwa moja kwenye kompyuta yako"
 
-#: templates/base.html:2095
+#: templates/base.html:2295
 msgid "View Downloads Page"
 msgstr "Tazama ukurasa wa vipakuliwa"
 
-#: templates/base.html:2117
+#: templates/base.html:2317
 msgid "Add a comment (optional)"
 msgstr "Ongeza maoni (hiari)"
 
-#: templates/base.html:2118
+#: templates/base.html:2318
 msgid "What do you think?"
 msgstr "Unafikiria nini?"
 
-#: templates/base.html:2142
+#: templates/base.html:2342
 msgid "Reason for reporting"
 msgstr "Sababu ya kuripoti"
 
-#: templates/base.html:2144
+#: templates/base.html:2344
 msgid "Select a reason"
 msgstr "Chagua sababu"
 
-#: templates/base.html:2145
+#: templates/base.html:2345
 msgid "Spam"
 msgstr "Barua taka"
 
-#: templates/base.html:2146
+#: templates/base.html:2346
 msgid "Inappropriate content"
 msgstr "Maudhui yasiyofaa"
 
-#: templates/base.html:2147
+#: templates/base.html:2347
 msgid "Harassment"
 msgstr "Unyanyasaji"
 
-#: templates/base.html:2148
+#: templates/base.html:2348
 msgid "False information"
 msgstr "Taarifa za uongo"
 
-#: templates/base.html:2149
+#: templates/base.html:2349
 msgid "Copyright or ownership concern"
 msgstr "Wasiwasi kuhusu hakimiliki au umiliki"
 
-#: templates/base.html:2150
+#: templates/base.html:2350
 msgid "Privacy concern"
 msgstr "Wasiwasi wa faragha"
 
-#: templates/base.html:2151
+#: templates/base.html:2351
 msgid "Other"
 msgstr "Nyingine"
 
-#: templates/base.html:2155
+#: templates/base.html:2355
 msgid "Additional details (optional)"
 msgstr "Maelezo ya ziada (si lazima)"
 
-#: templates/base.html:2156
+#: templates/base.html:2356
 msgid "Please provide more details about why you are reporting this post..."
 msgstr "Tafadhali eleza zaidi kwa nini unaripoti chapisho hili..."
 
-#: templates/base.html:2159
+#: templates/base.html:2359
 msgid "Submit Report"
 msgstr "Wasilisha ripoti"
 
-#: templates/base.html:2173 templates/base.html:5062
+#: templates/base.html:2373 templates/base.html:5615
 msgid "Share to"
 msgstr "Shiriki kwa"
 
-#: templates/base.html:2187
+#: templates/base.html:2387
 msgid "Search friends or groups..."
 msgstr "Tafuta marafiki au vikundi..."
 
-#: templates/base.html:2194
-msgid "Send on PwaniNet"
-msgstr "Tuma kwenye PwaniNet"
+#: templates/base.html:2394
+msgid "Send on vasto"
+msgstr "Tuma kwenye vasto"
 
-#: templates/base.html:2204
+#: templates/base.html:2404
 msgid "Loading friends & groups..."
 msgstr "Inapakia marafiki na vikundi..."
 
-#: templates/base.html:2217
+#: templates/base.html:2417
 msgid "Share via"
 msgstr "Shiriki kupitia"
 
-#: templates/base.html:2232 templates/base.html:2328 templates/base.html:2605
+#: templates/base.html:2432 templates/base.html:2528 templates/base.html:2828
 msgid "Save to Library"
 msgstr "Hifadhi kwenye maktaba"
 
-#: templates/base.html:2236 templates/base.html:2608
-msgid "Save"
-msgstr "Hifadhi"
-
-#: templates/base.html:2240
+#: templates/base.html:2440
 msgid "Download Video"
 msgstr "Pakua video"
 
-#: templates/base.html:2288 templates/base.html:2292
+#: templates/base.html:2488 templates/base.html:2492
 msgid "More"
 msgstr "Zaidi"
 
-#: templates/base.html:2288
+#: templates/base.html:2488
 msgid "More options"
 msgstr "Chaguo zaidi"
 
-#: templates/base.html:2316
+#: templates/base.html:2516
 msgid "Reel Options"
 msgstr "Chaguo za video fupi"
 
-#: templates/base.html:2329
+#: templates/base.html:2529
 msgid "Bookmark this reel to revisit later"
 msgstr "Weka alama kwenye video hii fupi ili uitazame tena baadaye"
 
-#: templates/base.html:2337
+#: templates/base.html:2537
 msgid "Repost Reel"
 msgstr "Shiriki tena video fupi"
 
-#: templates/base.html:2338
+#: templates/base.html:2538
 msgid "Share this with your followers"
 msgstr "Shiriki hili na wafuasi wako"
 
-#: templates/base.html:2346
+#: templates/base.html:2546
 msgid "Share to Groups / WhatsApp"
 msgstr "Shiriki kwa vikundi / WhatsApp"
 
-#: templates/base.html:2347
+#: templates/base.html:2547
 msgid "Send to campus groups or friends"
 msgstr "Tuma kwa vikundi vya chuo au marafiki"
 
-#: templates/base.html:2356
+#: templates/base.html:2556
 msgid "Copy reel link to clipboard"
 msgstr "Nakili kiungo cha video fupi"
 
-#: templates/base.html:2364
+#: templates/base.html:2564
 msgid "Save for Offline"
 msgstr "Hifadhi kwa matumizi bila intaneti"
 
-#: templates/base.html:2365
+#: templates/base.html:2565
 msgid "Watch without using cellular data"
 msgstr "Tazama bila kutumia data ya simu"
 
-#: templates/base.html:2373
+#: templates/base.html:2573
 msgid "Not Interested"
 msgstr "Sipendezwi"
 
-#: templates/base.html:2374
+#: templates/base.html:2574
 msgid "Hide this reel from your feed"
 msgstr "Ficha video hii fupi kwenye mtiririko wako"
 
-#: templates/base.html:2382
+#: templates/base.html:2582
 msgid "Report Reel"
 msgstr "Ripoti video fupi"
 
-#: templates/base.html:2383
+#: templates/base.html:2583
 msgid "Flag inappropriate content"
 msgstr "Ripoti maudhui yasiyofaa"
 
-#: templates/base.html:2391
+#: templates/base.html:2591
 msgid "Delete Reel"
 msgstr "Futa video fupi"
 
-#: templates/base.html:2392
+#: templates/base.html:2592
 msgid "Permanently remove your reel"
 msgstr "Ondoa video yako fupi kabisa"
 
-#: templates/base.html:2402
+#: templates/base.html:2602
 msgid "Auto-scroll"
 msgstr "Kusogeza kiotomatiki"
 
-#: templates/base.html:2403
+#: templates/base.html:2603
 msgid "Automatically advance to the next reel when it ends"
 msgstr "Nenda kiotomatiki kwenye video fupi inayofuata hii ikiisha"
 
-#: templates/base.html:2405
+#: templates/base.html:2605
 msgid "Off"
 msgstr "Zima"
 
-#: templates/base.html:2413 templates/base.html:2417
+#: templates/base.html:2613 templates/base.html:2617
 msgid "Video Quality"
 msgstr "Ubora wa video"
 
-#: templates/base.html:2414
+#: templates/base.html:2614
 msgid "Adaptive bitrate"
 msgstr "Kiwango cha biti kinachobadilika"
 
-#: templates/base.html:2438 templates/base.html:2573 templates/base.html:2591
-#: templates/base.html:2686
+#: templates/base.html:2638 templates/base.html:2795 templates/base.html:2813
+#: templates/base.html:2909
 msgid "Comments"
 msgstr "Maoni"
 
-#: templates/base.html:2446 templates/base.html:2697
+#: templates/base.html:2646 templates/base.html:2920
 msgid "Loading comments..."
 msgstr "Inapakia maoni..."
 
-#: templates/base.html:2453 templates/base.html:2705
+#: templates/base.html:2653 templates/base.html:2928
 msgid "Replying to"
 msgstr "Unamjibu"
 
-#: templates/base.html:2454 templates/base.html:2706
+#: templates/base.html:2654 templates/base.html:2929
 msgid "Cancel reply"
 msgstr "Ghairi jibu"
 
-#: templates/base.html:2463 templates/base.html:2715
+#: templates/base.html:2668 templates/base.html:2943
 msgid "Add a comment..."
 msgstr "Ongeza maoni..."
 
-#: templates/base.html:2466 templates/base.html:2718
+#: templates/base.html:2685 templates/base.html:2960
 msgid "Send"
 msgstr "Tuma"
 
-#: templates/base.html:2520 templates/base.html:5438
+#: templates/base.html:2740 templates/base.html:6021
 msgid "Sign in to explore more"
 msgstr "Ingia ili kuchunguza zaidi"
 
-#: templates/base.html:2522
+#: templates/base.html:2742
 msgid ""
-"Join the PwaniNet campus network to like, comment, and connect with fellow "
+"Join the vasto campus network to like, comment, and connect with fellow "
 "students."
 msgstr ""
-"Jiunge na mtandao wa chuo wa PwaniNet ili kupenda, kutoa maoni na "
-"kuwasiliana na wanafunzi wenzako."
+"Jiunge na mtandao wa chuo wa vasto ili kupenda, kutoa maoni na kuwasiliana "
+"na wanafunzi wenzako."
 
-#: templates/base.html:2531
+#: templates/base.html:2751
 msgid "Create an Account"
 msgstr "Fungua akaunti"
 
-#: templates/base.html:2536
+#: templates/base.html:2756
 msgid "Maybe later"
 msgstr "Labda baadaye"
 
-#: templates/base.html:2549
+#: templates/base.html:2769
 msgid "Reels viewer"
 msgstr "Kitazamaji cha video fupi"
 
-#: templates/base.html:2551
-msgid "Back to feed"
-msgstr "Rudi kwenye mtiririko"
-
-#: templates/base.html:2551
+#: templates/base.html:2771
 msgid "Close Reels"
 msgstr "Funga video fupi"
 
-#: templates/base.html:2570 templates/base.html:2571
+#: templates/base.html:2774
+#, fuzzy
+#| msgid "Loading…"
+msgid "Closing…"
+msgstr "Inapakia…"
+
+#: templates/base.html:2792 templates/base.html:2793
 msgid "Open Comments"
 msgstr "Fungua maoni"
 
-#: templates/base.html:2584
+#: templates/base.html:2806
 msgid "Like"
 msgstr "Penda"
 
-#: templates/base.html:2619
+#: templates/base.html:2842
 msgid "Mute / Unmute"
 msgstr "Zima / washa sauti"
 
-#: templates/base.html:2619
+#: templates/base.html:2842
 msgid "Toggle Mute"
 msgstr "Washa au zima sauti"
 
-#: templates/base.html:2622
+#: templates/base.html:2845
 msgid "Sound"
 msgstr "Sauti"
 
-#: templates/base.html:2628
+#: templates/base.html:2851
 msgid "Previous Reel"
 msgstr "Video fupi iliyotangulia"
 
-#: templates/base.html:2631
+#: templates/base.html:2854
 msgid "Next Reel"
 msgstr "Video fupi inayofuata"
 
-#: templates/base.html:2638
+#: templates/base.html:2861
 msgid "Reel details and comments"
 msgstr "Maelezo na maoni ya video fupi"
 
-#: templates/base.html:2662
+#: templates/base.html:2885
+#: venv/lib/python3.12/site-packages/click/core.py:1199
 msgid "Options"
 msgstr "Chaguo"
 
-#: templates/base.html:2665
+#: templates/base.html:2888
 msgid "Close comments rail"
 msgstr "Funga paneli ya maoni"
 
-#: templates/base.html:2677
+#: templates/base.html:2900
 msgid "Original Audio"
 msgstr "Sauti ya asili"
 
-#: templates/base.html:2688
+#: templates/base.html:2911
 msgid "Refresh comments"
 msgstr "Onyesha upya maoni"
 
-#: templates/base.html:2742 templates/base.html:2744
+#: templates/base.html:2985 templates/base.html:2987
 #: templates/partials/desktop_left_rail.html:15
-#: templates/partials/top_nav.html:24
+#: templates/partials/top_nav.html:25
 msgid "Home"
 msgstr "Nyumbani"
 
-#: templates/base.html:2756 templates/base.html:2761
+#: templates/base.html:2999 templates/base.html:3004
 #: templates/partials/desktop_left_rail.html:29
-#: templates/partials/top_nav.html:38
+#: templates/partials/top_nav.html:39
 msgid "Groups"
 msgstr "Vikundi"
 
-#: templates/base.html:2774
+#: templates/base.html:3017 templates/base.html:3032
+#: templates/partials/desktop_left_rail.html:49
+#: templates/partials/top_nav.html:47 templates/partials/top_nav.html:62
+#, fuzzy
+#| msgid "New Chat"
+msgid "Chats"
+msgstr "Mazungumzo mapya"
+
+#: templates/base.html:3044
 msgid "Create Post"
 msgstr "Unda chapisho"
 
-#: templates/base.html:2789 templates/base.html:2804
-#: templates/partials/desktop_left_rail.html:83
+#: templates/base.html:3059 templates/base.html:3074
+#: templates/partials/desktop_left_rail.html:115
 #: users/templates/users/settings/partials/notification_preferences_content.html:8
 msgid "Notifications"
 msgstr "Arifa"
 
-#: templates/base.html:2816 templates/base.html:2818
-#: templates/partials/desktop_left_rail.html:95
+#: templates/base.html:3086 templates/base.html:3088 templates/base.html:3092
+#: templates/partials/desktop_left_rail.html:127
+#: templates/partials/desktop_left_rail.html:131
 msgid "Profile"
 msgstr "Wasifu"
 
-#: templates/base.html:4798
+#: templates/base.html:5351
 msgid "App shared successfully!"
 msgstr "Programu imeshirikiwa!"
 
-#: templates/base.html:4805
+#: templates/base.html:5358
 msgid "Failed to share"
 msgstr "Imeshindwa kushiriki"
 
-#: templates/base.html:4812
+#: templates/base.html:5365
 msgid "Network error while sharing"
 msgstr "Hitilafu ya mtandao wakati wa kushiriki"
 
-#: templates/base.html:4948
+#: templates/base.html:5501
 msgid "Link copied to clipboard!"
 msgstr "Kiungo kimenakiliwa!"
 
-#: templates/base.html:5010
+#: templates/base.html:5563
 msgid "Share Mobile App"
 msgstr "Shiriki programu ya simu"
 
-#: templates/base.html:5012 users/services/invite_service.py:124
+#: templates/base.html:5565 users/services/invite_service.py:124
 msgid ""
-"📱 Download the official PwaniNet Android app for campus updates, course "
+"📱 Download the official vasto Android app for campus updates, course "
 "groups, and offline access:"
 msgstr ""
-"📱 Pakua programu rasmi ya PwaniNet ya Android ili kupata masasisho ya chuo, "
+"📱 Pakua programu rasmi ya vasto ya Android ili kupata masasisho ya chuo, "
 "vikundi vya kozi na ufikiaji bila intaneti:"
 
-#: templates/base.html:5028
-msgid "Invite to PwaniNet"
-msgstr "Alika kwenye PwaniNet"
+#: templates/base.html:5581
+msgid "Invite to vasto"
+msgstr "Alika kwenye vasto"
 
-#: templates/base.html:5030 users/services/invite_service.py:125
+#: templates/base.html:5583 users/services/invite_service.py:125
 msgid ""
-"🎓 Join me on PwaniNet! Connect with classmates, access course groups, and "
+"🎓 Join me on vasto! Connect with classmates, access course groups, and "
 "collaborate:"
 msgstr ""
-"🎓 Jiunge nami kwenye PwaniNet! Wasiliana na wanafunzi wenzako, jiunge na "
+"🎓 Jiunge nami kwenye vasto! Wasiliana na wanafunzi wenzako, jiunge na "
 "vikundi vya kozi na mshirikiane:"
 
-#: templates/base.html:5159
-msgid "Reposted"
-msgstr "Imeshirikiwa tena"
-
-#: templates/base.html:5174 templates/base.html:5527
+#: templates/base.html:5741 templates/base.html:6110
 msgid "Sign in to repost"
 msgstr "Ingia ili kushiriki tena"
 
-#: templates/base.html:5175 templates/base.html:5528
+#: templates/base.html:5742 templates/base.html:6111
 msgid "Sign in to repost this to your followers and campus profile."
 msgstr ""
 "Ingia ili kushiriki hili tena na wafuasi wako na kwenye wasifu wako wa chuo."
 
-#: templates/base.html:5196
+#: templates/base.html:5763
 msgid "Reposted to your profile!"
 msgstr "Imeshirikiwa tena kwenye wasifu wako!"
 
-#: templates/base.html:5196
+#: templates/base.html:5763
 msgid "Repost removed"
 msgstr "Ushiriki tena umeondolewa"
 
-#: templates/base.html:5217
+#: templates/base.html:5786
 msgid "Could not update repost"
 msgstr "Imeshindwa kusasisha ushiriki tena"
 
-#: templates/base.html:5235 templates/base.html:5533
+#: templates/base.html:5804 templates/base.html:6116
 msgid "Sign in to save"
 msgstr "Ingia ili kuhifadhi"
 
-#: templates/base.html:5236 templates/base.html:5534
+#: templates/base.html:5805 templates/base.html:6117
 msgid "Save your favorite posts and reels to your personal library."
 msgstr ""
 "Hifadhi machapisho na video fupi unazopenda kwenye maktaba yako binafsi."
 
-#: templates/base.html:5259 templates/base.html:5539
+#: templates/base.html:5833 templates/base.html:6122
 msgid "Sign in to download"
 msgstr "Ingia ili kupakua"
 
-#: templates/base.html:5260 templates/base.html:5540
+#: templates/base.html:5834 templates/base.html:6123
 msgid "Sign in to save videos and academic materials for offline viewing."
 msgstr ""
 "Ingia ili kuhifadhi video na nyenzo za masomo kwa kutazama bila intaneti."
 
-#: templates/base.html:5439
+#: templates/base.html:6022
 msgid ""
-"Join the PwaniNet campus community to like, comment, and connect with "
-"students."
+"Join the vasto campus community to like, comment, and connect with students."
 msgstr ""
-"Jiunge na jumuiya ya chuo ya PwaniNet ili kupenda, kutoa maoni na "
-"kuwasiliana na wanafunzi."
+"Jiunge na jumuiya ya chuo ya vasto ili kupenda, kutoa maoni na kuwasiliana "
+"na wanafunzi."
 
-#: templates/base.html:5515
+#: templates/base.html:6098
 msgid "Sign in to like"
 msgstr "Ingia ili kupenda"
 
-#: templates/base.html:5516
+#: templates/base.html:6099
 msgid "Create an account or sign in to like this post and support the author."
 msgstr ""
 "Fungua akaunti au ingia ili kupenda chapisho hili na kumuunga mkono "
 "mwandishi."
 
-#: templates/base.html:5521
+#: templates/base.html:6104
 msgid "Sign in to comment"
 msgstr "Ingia ili kutoa maoni"
 
-#: templates/base.html:5522
+#: templates/base.html:6105
 msgid ""
 "Sign in to post comments, reply to students, and share your perspective."
 msgstr "Ingia ili kutoa maoni, kuwajibu wanafunzi na kushiriki mtazamo wako."
 
-#: templates/base.html:5545
+#: templates/base.html:6128
 msgid "Sign in for more options"
 msgstr "Ingia kwa chaguo zaidi"
 
-#: templates/base.html:5546
+#: templates/base.html:6129
 msgid ""
-"Sign in to PwaniNet to save posts, repost, customize your feed, or report "
+"Sign in to vasto to save posts, repost, customize your feed, or report "
 "content."
 msgstr ""
-"Ingia kwenye PwaniNet ili kuhifadhi machapisho, kuyashiriki tena, "
-"kubinafsisha mtiririko wako au kuripoti maudhui."
+"Ingia kwenye vasto ili kuhifadhi machapisho, kuyashiriki tena, kubinafsisha "
+"mtiririko wako au kuripoti maudhui."
 
-#: templates/base.html:5551
+#: templates/base.html:6134
 msgid "Sign in to view profiles"
 msgstr "Ingia ili kuona wasifu"
 
-#: templates/base.html:5552
+#: templates/base.html:6135
 msgid ""
 "Sign in to connect with students, see courses, and view their campus "
 "activity."
 msgstr "Ingia ili kuwasiliana na wanafunzi, kuona kozi na shughuli zao chuoni."
 
-#: templates/base.html:5558
+#: templates/base.html:6141
 msgid ""
-"Join PwaniNet to explore campus groups, discover trending posts, and access "
+"Join vasto to explore campus groups, discover trending posts, and access "
 "past papers."
 msgstr ""
-"Jiunge na PwaniNet ili kuchunguza vikundi vya chuo, kugundua machapisho "
+"Jiunge na vasto ili kuchunguza vikundi vya chuo, kugundua machapisho "
 "yanayovuma na kupata mitihani ya zamani."
 
 #: templates/downloads/download_page.html:5
 #: templates/downloads/partials/download_page_content.html:5
-msgid "Download PwaniNet — Web App (PWA) & Mobile APK"
-msgstr "Pakua PwaniNet — programu ya wavuti (PWA) na APK ya simu"
+msgid "Download vasto — Web App (PWA) & Mobile APK"
+msgstr "Pakua vasto — programu ya wavuti (PWA) na APK ya simu"
 
 #: templates/downloads/partials/download_page_content.html:20
-msgid "Download PwaniNet"
-msgstr "Pakua PwaniNet"
+msgid "Download vasto"
+msgstr "Pakua vasto"
 
 #: templates/downloads/partials/download_page_content.html:22
 msgid ""
@@ -2187,8 +2738,8 @@ msgid "When downloading, Chrome will pop up:"
 msgstr "Unapopakua, Chrome itaonyesha ujumbe:"
 
 #: templates/downloads/partials/download_page_content.html:70
-msgid "File might be harmful. Do you want to download pwaninet.apk anyway?"
-msgstr "Faili linaweza kuwa hatari. Unataka kupakua pwaninet.apk hata hivyo?"
+msgid "File might be harmful. Do you want to download vasto.apk anyway?"
+msgstr "Faili linaweza kuwa hatari. Unataka kupakua vasto.apk hata hivyo?"
 
 #: templates/downloads/partials/download_page_content.html:73
 #: templates/downloads/partials/download_page_content.html:99
@@ -2211,11 +2762,11 @@ msgstr "Pakua hata hivyo"
 #: templates/downloads/partials/download_page_content.html:75
 #, python-format
 msgid ""
-"Chrome shows this standard warning for all APKs outside Google Play. "
-"PwaniNet is 100%% verified & safe."
+"Chrome shows this standard warning for all APKs outside Google Play. vasto "
+"is 100%% verified & safe."
 msgstr ""
 "Chrome huonyesha tahadhari hii ya kawaida kwa APK zote zilizo nje ya Google "
-"Play. PwaniNet imethibitishwa kuwa salama kwa 100%%."
+"Play. vasto imethibitishwa kuwa salama kwa 100%%."
 
 #: templates/downloads/partials/download_page_content.html:86
 msgid "Warning 2"
@@ -2390,8 +2941,8 @@ msgid "Install Web App"
 msgstr "Sakinisha programu ya wavuti"
 
 #: templates/downloads/partials/download_page_content.html:188
-msgid "PwaniNet launches in its own clean window."
-msgstr "PwaniNet itafunguka kwenye dirisha lake tofauti."
+msgid "vasto launches in its own clean window."
+msgstr "vasto itafunguka kwenye dirisha lake tofauti."
 
 #: templates/downloads/partials/download_page_content.html:200
 msgid "Instructions Read"
@@ -2431,7 +2982,7 @@ msgid "Download Mobile APK"
 msgstr "Pakua APK ya simu"
 
 #: templates/downloads/partials/download_page_content.html:234
-#: users/templates/users/settings/partials/index_content.html:94
+#: users/templates/users/settings/partials/index_content.html:95
 msgid "Update App"
 msgstr "Sasisha programu"
 
@@ -2484,14 +3035,14 @@ msgstr ""
 "kupakua APK moja kwa moja kwenye simu."
 
 #: templates/downloads/partials/download_page_content.html:304
-msgid "PwaniNet QR Code"
-msgstr "Msimbo wa QR wa PwaniNet"
+msgid "vasto QR Code"
+msgstr "Msimbo wa QR wa vasto"
 
-#: templates/legal/about.html:6 templates/registration/login.html:217
-#: users/templates/users/settings/partials/about_content.html:7
-#: users/templates/users/settings/partials/about_content.html:98
-msgid "About PwaniNet"
-msgstr "Kuhusu PwaniNet"
+#: templates/legal/about.html:6
+#, fuzzy
+#| msgid "About vasto"
+msgid "About Vasto"
+msgstr "Kuhusu vasto"
 
 #: templates/legal/licenses.html:6
 #: users/templates/users/settings/partials/about_content.html:100
@@ -2499,8 +3050,16 @@ msgid "Licences and attributions"
 msgstr "Leseni na shukrani"
 
 #: templates/legal/privacy.html:6
-msgid "PwaniNet Privacy Policy"
-msgstr "Sera ya faragha ya PwaniNet"
+#, fuzzy
+#| msgid "vasto Privacy Policy"
+msgid "Vasto Privacy Policy"
+msgstr "Sera ya faragha ya vasto"
+
+#: templates/legal/pwanimate.html:6
+#, fuzzy
+#| msgid "About Group"
+msgid "About Spark"
+msgstr "Kuhusu kikundi"
 
 #: templates/partials/default_context_rail.html:13
 msgid ""
@@ -2522,55 +3081,73 @@ msgstr "Urambazaji mkuu"
 msgid "New group activity"
 msgstr "Shughuli mpya ya kikundi"
 
-#: templates/partials/desktop_left_rail.html:61
-msgid "Pwanimate"
-msgstr "Pwanimate"
+#: templates/partials/desktop_left_rail.html:93
+msgid "Spark"
+msgstr ""
 
-#: templates/partials/desktop_left_rail.html:117
+#: templates/partials/desktop_left_rail.html:153
 msgid "Download App"
 msgstr "Pakua programu"
 
-#: templates/partials/desktop_left_rail.html:148
+#: templates/partials/desktop_left_rail.html:165
+msgid "Admin Panel"
+msgstr ""
+
+#: templates/partials/desktop_left_rail.html:169
+#: templates/partials/top_nav.html:110 templates/partials/top_nav.html:111
+#: users/templates/users/partials/profile_content.html:106
+msgid "Django Admin Site"
+msgstr ""
+
+#: templates/partials/desktop_left_rail.html:173
+msgid "Django Admin"
+msgstr ""
+
+#: templates/partials/desktop_left_rail.html:192
 msgid "Log In"
 msgstr "Ingia"
 
 #: templates/partials/top_nav.html:133
+msgid "Theme Toggle"
+msgstr ""
+
+#: templates/partials/top_nav.html:173
 msgid "Login"
 msgstr "Ingia"
 
-#: templates/registration/login.html:127
+#: templates/registration/login.html:128
 msgid "Welcome back"
 msgstr "Karibu tena"
 
-#: templates/registration/login.html:128
-msgid "Sign in to your PwaniNet account to continue."
-msgstr "Ingia kwenye akaunti yako ya PwaniNet ili kuendelea."
+#: templates/registration/login.html:129
+msgid "Sign in to your vasto account to continue."
+msgstr "Ingia kwenye akaunti yako ya vasto ili kuendelea."
 
-#: templates/registration/login.html:154
+#: templates/registration/login.html:155
 msgid "Authentication Failed"
 msgstr "Uthibitishaji umeshindwa"
 
-#: templates/registration/login.html:181
+#: templates/registration/login.html:182
 msgid "Forgot password?"
 msgstr "Umesahau nenosiri?"
 
-#: templates/registration/login.html:191
+#: templates/registration/login.html:192
 msgid "This field cannot be empty"
 msgstr "Uga huu hauwezi kuwa wazi"
 
-#: templates/registration/login.html:197
+#: templates/registration/login.html:198
 msgid "Sign in"
 msgstr "Ingia"
 
-#: templates/registration/login.html:205
-msgid "New to PwaniNet?"
-msgstr "Mgeni kwenye PwaniNet?"
-
 #: templates/registration/login.html:206
+msgid "New to vasto?"
+msgstr "Mgeni kwenye vasto?"
+
+#: templates/registration/login.html:207
 msgid "Create an account"
 msgstr "Fungua akaunti"
 
-#: templates/registration/login.html:213
+#: templates/registration/login.html:214
 #: templates/registration/login_2fa.html:206
 #: templates/registration/password_recovery_identify.html:142
 #: templates/registration/password_recovery_set_new.html:150
@@ -2578,16 +3155,22 @@ msgstr "Fungua akaunti"
 msgid "← Back to Public View"
 msgstr "← Rudi kwenye Mtazamo wa Umma"
 
-#: templates/registration/login.html:215
+#: templates/registration/login.html:216
 #: users/templates/users/settings/partials/about_content.html:99
 msgid "Privacy Policy"
 msgstr "Sera ya faragha"
 
-#: templates/registration/login.html:219
+#: templates/registration/login.html:218
+#: users/templates/users/settings/partials/about_content.html:7
+#: users/templates/users/settings/partials/about_content.html:98
+msgid "About vasto"
+msgstr "Kuhusu vasto"
+
+#: templates/registration/login.html:220
 msgid "Licences"
 msgstr "Leseni"
 
-#: templates/registration/login.html:371
+#: templates/registration/login.html:372
 msgid "Authenticate & Enter"
 msgstr "Tambulisha na Ingia"
 
@@ -2870,11 +3453,11 @@ msgid "Bio hidden by profile privacy"
 msgstr "Wasifu mfupi umefichwa kwa sababu ya mipangilio ya faragha"
 
 #: users/templates/users/partials/profile_content.html:83
-#: users/templates/users/partials/profile_content.html:207
-#: users/templates/users/partials/profile_content.html:309
+#: users/templates/users/partials/profile_content.html:234
+#: users/templates/users/partials/profile_content.html:336
 #: users/templates/users/partials/profile_context_rail.html:79
-#: users/templates/users/partials/profile_context_rail.html:199
-#: users/templates/users/partials/profile_context_rail.html:291
+#: users/templates/users/partials/profile_context_rail.html:222
+#: users/templates/users/partials/profile_context_rail.html:331
 msgid "This information is hidden by the profile owner."
 msgstr "Taarifa hii imefichwa na mmiliki wa wasifu."
 
@@ -2884,277 +3467,297 @@ msgstr "Taarifa hii imefichwa na mmiliki wa wasifu."
 msgid "Pwani University Student."
 msgstr "Mwanafunzi wa Chuo Kikuu cha Pwani."
 
-#: users/templates/users/partials/profile_content.html:110
+#: users/templates/users/partials/profile_content.html:109
+msgid "DJANGO ADMIN"
+msgstr ""
+
+#: users/templates/users/partials/profile_content.html:118
+msgid "ADMIN DASHBOARD"
+msgstr ""
+
+#: users/templates/users/partials/profile_content.html:128
 #: users/templates/users/partials/profile_context_rail.html:106
 msgid "UPDATE PROFILE"
 msgstr "SASISHA WASILIFU"
 
-#: users/templates/users/partials/profile_content.html:113
-#: users/templates/users/partials/profile_context_rail.html:109
+#: users/templates/users/partials/profile_content.html:137
+#: users/templates/users/partials/profile_context_rail.html:115
+msgid "ACADEMIC & UNITS"
+msgstr ""
+
+#: users/templates/users/partials/profile_content.html:140
+#: users/templates/users/partials/profile_context_rail.html:118
 msgid "SETTINGS"
 msgstr "MIPANGILIO"
 
-#: users/templates/users/partials/profile_content.html:116
-#: users/templates/users/partials/profile_context_rail.html:112
+#: users/templates/users/partials/profile_content.html:143
+#: users/templates/users/partials/profile_context_rail.html:121
 msgid "SWITCH ACCOUNT"
 msgstr "BADILISHA AKAUNTI"
 
-#: users/templates/users/partials/profile_content.html:121
-#: users/templates/users/partials/profile_context_rail.html:117
+#: users/templates/users/partials/profile_content.html:148
+#: users/templates/users/partials/profile_context_rail.html:126
 msgid "LOGOUT"
 msgstr "ONDOKA"
 
-#: users/templates/users/partials/profile_content.html:136
-#: users/templates/users/partials/profile_content.html:140
-#: users/templates/users/partials/profile_content.html:145
-#: users/templates/users/partials/profile_context_rail.html:131
-#: users/templates/users/partials/profile_context_rail.html:135
-#: users/templates/users/partials/profile_context_rail.html:137
+#: users/templates/users/partials/profile_content.html:163
+#: users/templates/users/partials/profile_content.html:167
+#: users/templates/users/partials/profile_content.html:172
+#: users/templates/users/partials/profile_context_rail.html:140
+#: users/templates/users/partials/profile_context_rail.html:144
+#: users/templates/users/partials/profile_context_rail.html:146
 #: users/templates/users/partials/pwanimate_profile_card.html:23
 msgid "Followers"
 msgstr "Wafuataji"
 
-#: users/templates/users/partials/profile_content.html:155
-#: users/templates/users/partials/profile_content.html:159
-#: users/templates/users/partials/profile_content.html:164
-#: users/templates/users/partials/profile_context_rail.html:145
-#: users/templates/users/partials/profile_context_rail.html:149
-#: users/templates/users/partials/profile_context_rail.html:151
+#: users/templates/users/partials/profile_content.html:182
+#: users/templates/users/partials/profile_content.html:186
+#: users/templates/users/partials/profile_content.html:191
+#: users/templates/users/partials/profile_context_rail.html:154
+#: users/templates/users/partials/profile_context_rail.html:158
+#: users/templates/users/partials/profile_context_rail.html:160
 #: users/templates/users/partials/pwanimate_profile_card.html:24
 msgid "Following"
 msgstr "Unafuata"
 
-#: users/templates/users/partials/profile_content.html:170
-#: users/templates/users/partials/profile_context_rail.html:156
+#: users/templates/users/partials/profile_content.html:197
+#: users/templates/users/partials/profile_context_rail.html:165
 #: users/templates/users/partials/pwanimate_profile_card.html:25
 msgid "Likes"
 msgstr "Mapendeleo"
 
-#: users/templates/users/partials/profile_content.html:181
-#: users/templates/users/partials/profile_content.html:185
-#: users/templates/users/partials/profile_context_rail.html:167
-#: users/templates/users/partials/profile_context_rail.html:171
+#: users/templates/users/partials/profile_content.html:208
+#: users/templates/users/partials/profile_content.html:212
+#: users/templates/users/partials/profile_context_rail.html:176
+#: users/templates/users/partials/profile_context_rail.html:180
 msgid "Pinches Sent"
 msgstr "Pinches Zilizotumwa"
 
-#: users/templates/users/partials/profile_content.html:193
-#: users/templates/users/partials/profile_content.html:197
-#: users/templates/users/partials/profile_context_rail.html:179
-#: users/templates/users/partials/profile_context_rail.html:183
+#: users/templates/users/partials/profile_content.html:220
+#: users/templates/users/partials/profile_content.html:224
+#: users/templates/users/partials/profile_context_rail.html:188
+#: users/templates/users/partials/profile_context_rail.html:192
 msgid "Pinches Received"
 msgstr "Pinches Zilizopokelewa"
 
-#: users/templates/users/partials/profile_content.html:205
+#: users/templates/users/partials/profile_content.html:232
 msgid "Academic Details"
 msgstr "Maelezo ya Kielimu"
 
-#: users/templates/users/partials/profile_content.html:207
-#: users/templates/users/partials/profile_context_rail.html:199
+#: users/templates/users/partials/profile_content.html:234
+#: users/templates/users/partials/profile_context_rail.html:222
 msgid "Academic details hidden by profile privacy"
 msgstr "Maelezo ya kitaaluma yamefichwa kwa sababu ya mipangilio ya faragha"
 
-#: users/templates/users/partials/profile_content.html:213
-#: users/templates/users/partials/profile_context_rail.html:206
+#: users/templates/users/partials/profile_content.html:240
+#: users/templates/users/partials/profile_context_rail.html:229
 #: users/templates/users/partials/pwanimate_profile_card.html:33
 msgid "Programme"
 msgstr "Programu ya masomo"
 
-#: users/templates/users/partials/profile_content.html:218
-#: users/templates/users/partials/profile_context_rail.html:211
+#: users/templates/users/partials/profile_content.html:245
+#: users/templates/users/partials/profile_context_rail.html:234
 #: users/templates/users/partials/pwanimate_profile_card.html:34
 msgid "Department"
 msgstr "Idara"
 
-#: users/templates/users/partials/profile_content.html:223
-#: users/templates/users/partials/profile_content.html:248
+#: users/templates/users/partials/profile_content.html:250
+#: users/templates/users/partials/profile_content.html:275
+#: users/templates/users/partials/profile_context_rail.html:239
 msgid "School"
 msgstr "Shule"
 
-#: users/templates/users/partials/profile_content.html:230
+#: users/templates/users/partials/profile_content.html:257
 msgid "Academic Level"
 msgstr "Kiwango cha masomo"
 
-#: users/templates/users/partials/profile_content.html:236
+#: users/templates/users/partials/profile_content.html:263
 msgid "Academic Year"
 msgstr "Mwaka wa masomo"
 
-#: users/templates/users/partials/profile_content.html:242
+#: users/templates/users/partials/profile_content.html:269
+#: users/templates/users/partials/profile_context_rail.html:263
 msgid "Semester"
 msgstr "Muhula"
 
-#: users/templates/users/partials/profile_content.html:252
-#: users/templates/users/partials/profile_context_rail.html:217
+#: users/templates/users/partials/profile_content.html:279
+#: users/templates/users/partials/profile_context_rail.html:246
 #: users/templates/users/partials/pwanimate_profile_card.html:33
 msgid "Course"
 msgstr "Kozi"
 
-#: users/templates/users/partials/profile_content.html:256
-#: users/templates/users/partials/profile_context_rail.html:223
+#: users/templates/users/partials/profile_content.html:283
+#: users/templates/users/partials/profile_context_rail.html:252
+#: users/templates/users/partials/profile_context_rail.html:257
 #: users/templates/users/partials/pwanimate_profile_card.html:35
 msgid "Year"
 msgstr "Mwaka"
 
-#: users/templates/users/partials/profile_content.html:261
+#: users/templates/users/partials/profile_content.html:288
 msgid "No academic information available"
 msgstr "Hakuna taarifa za kitaaluma zinazopatikana"
 
-#: users/templates/users/partials/profile_content.html:270
-#: users/templates/users/partials/profile_context_rail.html:246
+#: users/templates/users/partials/profile_content.html:297
+#: users/templates/users/partials/profile_context_rail.html:286
 msgid "Profile Completion"
 msgstr "Ukamilishi wa Wasifu"
 
-#: users/templates/users/partials/profile_content.html:271
+#: users/templates/users/partials/profile_content.html:298
 msgid "Hide"
 msgstr "Ficha"
 
-#: users/templates/users/partials/profile_content.html:282
+#: users/templates/users/partials/profile_content.html:309
 msgid "Completion"
 msgstr "Ukamilishi"
 
-#: users/templates/users/partials/profile_content.html:287
+#: users/templates/users/partials/profile_content.html:314
 msgid "Suggestions to improve your profile:"
 msgstr "Mapendekezo ya kuboresha wasifu wako:"
 
-#: users/templates/users/partials/profile_content.html:289
+#: users/templates/users/partials/profile_content.html:316
 msgid "Add a headline to introduce yourself better"
 msgstr "Ongeza kichwa cha habari kujitambulisha vizuri zaidi"
 
-#: users/templates/users/partials/profile_content.html:292
+#: users/templates/users/partials/profile_content.html:319
 msgid "Add skills so classmates can discover your strengths"
 msgstr "Ongeza ujuzi ili wanafunzi wenzako waweze kugundua nguvu zako"
 
-#: users/templates/users/partials/profile_content.html:295
+#: users/templates/users/partials/profile_content.html:322
 msgid "Add projects to showcase your work"
 msgstr "Ongeza miradi kuonyesha kazi yako"
 
-#: users/templates/users/partials/profile_content.html:298
+#: users/templates/users/partials/profile_content.html:325
 msgid "Add interests to find like-minded classmates"
 msgstr "Ongeza maslahi kupata wanafunzi wenye mawazo sawa"
 
-#: users/templates/users/partials/profile_content.html:309
-#: users/templates/users/partials/profile_context_rail.html:291
+#: users/templates/users/partials/profile_content.html:336
+#: users/templates/users/partials/profile_context_rail.html:331
 msgid "Profile details hidden by profile privacy"
 msgstr "Maelezo ya wasifu yamefichwa kwa sababu ya mipangilio ya faragha"
 
-#: users/templates/users/partials/profile_content.html:328
-#: users/templates/users/partials/profile_context_rail.html:310
+#: users/templates/users/partials/profile_content.html:355
+#: users/templates/users/partials/profile_context_rail.html:350
 msgid "Not Looking"
 msgstr "Haatafuti"
 
-#: users/templates/users/partials/profile_content.html:338
-#: users/templates/users/partials/profile_context_rail.html:318
+#: users/templates/users/partials/profile_content.html:365
+#: users/templates/users/partials/profile_context_rail.html:358
 #: users/templates/users/partials/pwanimate_profile_card.html:45
 msgid "Interests"
 msgstr "Maslahi"
 
-#: users/templates/users/partials/profile_content.html:345
-#: users/templates/users/partials/profile_context_rail.html:325
+#: users/templates/users/partials/profile_content.html:372
+#: users/templates/users/partials/profile_context_rail.html:365
 #: users/templates/users/partials/pwanimate_profile_card.html:46
 msgid "Skills"
 msgstr "Ujuzi"
 
-#: users/templates/users/partials/profile_content.html:356
-#: users/templates/users/partials/profile_context_rail.html:336
+#: users/templates/users/partials/profile_content.html:383
+#: users/templates/users/partials/profile_context_rail.html:376
 #: users/templates/users/partials/pwanimate_profile_card.html:47
 msgid "Projects"
 msgstr "Miradi"
 
-#: users/templates/users/partials/profile_content.html:362
-#: users/templates/users/partials/profile_context_rail.html:343
+#: users/templates/users/partials/profile_content.html:389
+#: users/templates/users/partials/profile_context_rail.html:383
 #: users/templates/users/partials/pwanimate_profile_card.html:47
 msgid "View Project"
 msgstr "Angalia Mradi"
 
-#: users/templates/users/partials/profile_content.html:371
-#: users/templates/users/partials/profile_context_rail.html:353
+#: users/templates/users/partials/profile_content.html:398
+#: users/templates/users/partials/profile_context_rail.html:393
 #: users/templates/users/partials/pwanimate_profile_card.html:48
 msgid "Links"
 msgstr "Viungo"
 
-#: users/templates/users/partials/profile_content.html:402
-#: users/templates/users/partials/profile_content.html:405
+#: users/templates/users/partials/profile_content.html:429
+#: users/templates/users/partials/profile_content.html:432
 msgid "View More About"
 msgstr "Angalia Zaidi Kuhusu"
 
-#: users/templates/users/partials/profile_content.html:403
+#: users/templates/users/partials/profile_content.html:430
 msgid "View Less About"
 msgstr "Angalia Punguzo Kuhusu"
 
-#: users/templates/users/partials/profile_content.html:459
+#: users/templates/users/partials/profile_content.html:486
 msgid "This student chose to hide their profile and posts."
 msgstr "Mwanafunzi huyu amechagua kuficha wasifu na machapisho yake."
 
-#: users/templates/users/partials/profile_content.html:470
+#: users/templates/users/partials/profile_content.html:497
 msgid "Reposts"
 msgstr "Machapisho yaliyoshirikiwa tena"
 
-#: users/templates/users/partials/profile_content.html:482
+#: users/templates/users/partials/profile_content.html:509
 msgid "Shared with me"
 msgstr "Yameshirikiwa nami"
 
-#: users/templates/users/partials/profile_content.html:500
+#: users/templates/users/partials/profile_content.html:527
 msgid "hasn't posted anything yet."
 msgstr "hajachapisha kitu bado."
 
-#: users/templates/users/partials/profile_content.html:507
+#: users/templates/users/partials/profile_content.html:534
 msgid "Loading..."
 msgstr "Inapakia..."
 
-#: users/templates/users/partials/profile_content.html:548
+#: users/templates/users/partials/profile_content.html:575
 msgid "You haven't reposted anything yet."
 msgstr "Bado hujashiriki chapisho lolote tena."
 
-#: users/templates/users/partials/profile_content.html:550
+#: users/templates/users/partials/profile_content.html:577
 msgid "hasn't reposted anything yet."
 msgstr "bado hajashiriki chapisho lolote tena."
 
-#: users/templates/users/partials/profile_content.html:567
+#: users/templates/users/partials/profile_content.html:594
 msgid "No posts have been shared with you yet."
 msgstr "Bado hakuna machapisho yaliyoshirikiwa nawe."
 
-#: users/templates/users/partials/profile_context_rail.html:196
+#: users/templates/users/partials/profile_context_rail.html:206
 #: users/templates/users/partials/pwanimate_profile_card.html:31
 msgid "Academic Info"
 msgstr "Taarifa za kitaaluma"
 
-#: users/templates/users/partials/profile_context_rail.html:228
+#: users/templates/users/partials/profile_context_rail.html:217
+msgid "Units Dashboard"
+msgstr ""
+
+#: users/templates/users/partials/profile_context_rail.html:268
 #: users/templates/users/partials/pwanimate_profile_card.html:36
 msgid "Joined"
 msgstr "Alijiunga"
 
-#: users/templates/users/partials/profile_context_rail.html:260
+#: users/templates/users/partials/profile_context_rail.html:300
 msgid "Suggestions to improve:"
 msgstr "Mapendekezo ya kuboresha:"
 
-#: users/templates/users/partials/profile_context_rail.html:262
+#: users/templates/users/partials/profile_context_rail.html:302
 msgid "Add a headline"
 msgstr "Ongeza kichwa cha wasifu"
 
-#: users/templates/users/partials/profile_context_rail.html:265
+#: users/templates/users/partials/profile_context_rail.html:305
 msgid "Add skills"
 msgstr "Ongeza ujuzi"
 
-#: users/templates/users/partials/profile_context_rail.html:268
+#: users/templates/users/partials/profile_context_rail.html:308
 msgid "Add projects"
 msgstr "Ongeza miradi"
 
-#: users/templates/users/partials/profile_context_rail.html:271
+#: users/templates/users/partials/profile_context_rail.html:311
 msgid "Add interests"
 msgstr "Ongeza mambo yanayokuvutia"
 
-#: users/templates/users/partials/profile_context_rail.html:386
+#: users/templates/users/partials/profile_context_rail.html:426
 msgid "About You"
 msgstr "Kuhusu wewe"
 
-#: users/templates/users/partials/profile_context_rail.html:388
+#: users/templates/users/partials/profile_context_rail.html:428
 msgid "Add your headline, skills, and projects to complete your profile."
 msgstr "Ongeza kichwa cha wasifu, ujuzi na miradi ili kukamilisha wasifu wako."
 
-#: users/templates/users/partials/profile_context_rail.html:396
+#: users/templates/users/partials/profile_context_rail.html:436
 msgid "Add Profile Details"
 msgstr "Ongeza maelezo ya wasifu"
 
-#: users/templates/users/partials/profile_context_rail.html:418
+#: users/templates/users/partials/profile_context_rail.html:458
 msgid "Edit Profile"
 msgstr "Hariri wasifu"
 
@@ -3279,8 +3882,8 @@ msgid "Appearance"
 msgstr "Mwonekano"
 
 #: users/templates/users/settings/partials/appearance_content.html:9
-msgid "Customize how PwaniNet looks and feels"
-msgstr "Badilisha jinsi PwaniNet inavyonekana na kuhisi"
+msgid "Customize how vasto looks and feels"
+msgstr "Badilisha jinsi vasto inavyonekana na kuhisi"
 
 #: users/templates/users/settings/partials/appearance_content.html:18
 msgid "Theme"
@@ -3651,11 +4254,11 @@ msgstr "Rudi kwenye wasifu"
 msgid "Manage your account preferences and application settings"
 msgstr "Dhibiti mapendeleo ya akaunti na mipangilio ya programu"
 
-#: users/templates/users/settings/partials/index_content.html:39
-msgid "Download PwaniNet Mobile App"
-msgstr "Pakua programu ya simu ya PwaniNet"
+#: users/templates/users/settings/partials/index_content.html:40
+msgid "Download vasto Mobile App"
+msgstr "Pakua programu ya simu ya vasto"
 
-#: users/templates/users/settings/partials/index_content.html:43
+#: users/templates/users/settings/partials/index_content.html:44
 msgid ""
 "Install the official native Android app for faster performance, smoother "
 "animations, and instant background push notifications."
@@ -3663,85 +4266,85 @@ msgstr ""
 "Sakinisha programu rasmi asilia ya Android ili kupata utendaji wa haraka, "
 "miondoko laini na arifa za papo hapo za chinichini."
 
-#: users/templates/users/settings/partials/index_content.html:46
-#: users/templates/users/settings/partials/index_content.html:160
+#: users/templates/users/settings/partials/index_content.html:47
+#: users/templates/users/settings/partials/index_content.html:161
 msgid "Latest Version"
 msgstr "Toleo jipya zaidi"
 
-#: users/templates/users/settings/partials/index_content.html:48
+#: users/templates/users/settings/partials/index_content.html:49
 msgid "Direct APK Download"
 msgstr "Upakuaji wa APK moja kwa moja"
 
-#: users/templates/users/settings/partials/index_content.html:54
+#: users/templates/users/settings/partials/index_content.html:55
 msgid "All Options"
 msgstr "Chaguo zote"
 
-#: users/templates/users/settings/partials/index_content.html:58
+#: users/templates/users/settings/partials/index_content.html:59
 msgid "Download APK"
 msgstr "Pakua APK"
 
-#: users/templates/users/settings/partials/index_content.html:62
+#: users/templates/users/settings/partials/index_content.html:63
 msgid "Install on your phone"
 msgstr "Sakinisha kwenye simu yako"
 
-#: users/templates/users/settings/partials/index_content.html:65
-#: users/templates/users/settings/partials/index_content.html:99
+#: users/templates/users/settings/partials/index_content.html:66
+#: users/templates/users/settings/partials/index_content.html:100
 msgid "Share App with Friends"
 msgstr "Shiriki programu na marafiki"
 
-#: users/templates/users/settings/partials/index_content.html:66
-#: users/templates/users/settings/partials/index_content.html:100
+#: users/templates/users/settings/partials/index_content.html:67
+#: users/templates/users/settings/partials/index_content.html:101
 msgid "Share App"
 msgstr "Shiriki programu"
 
-#: users/templates/users/settings/partials/index_content.html:80
-msgid "PwaniNet for Android"
-msgstr "PwaniNet ya Android"
-
 #: users/templates/users/settings/partials/index_content.html:81
-#: users/templates/users/settings/partials/index_content.html:87
+msgid "vasto for Android"
+msgstr "vasto ya Android"
+
+#: users/templates/users/settings/partials/index_content.html:82
+#: users/templates/users/settings/partials/index_content.html:88
 msgid "Installed"
 msgstr "Imesakinishwa"
 
-#: users/templates/users/settings/partials/index_content.html:84
+#: users/templates/users/settings/partials/index_content.html:85
 msgid "Running the official native Android app."
 msgstr "Unatumia programu rasmi asilia ya Android."
 
-#: users/templates/users/settings/partials/index_content.html:89
-#: users/templates/users/settings/partials/index_content.html:164
+#: users/templates/users/settings/partials/index_content.html:90
+#: users/templates/users/settings/partials/index_content.html:165
 msgid "Latest"
 msgstr "Ya hivi karibuni"
 
-#: users/templates/users/settings/partials/index_content.html:97
+#: users/templates/users/settings/partials/index_content.html:98
 msgid "Check for Updates"
 msgstr "Angalia masasisho"
 
-#: users/templates/users/settings/partials/index_content.html:114
-#: users/templates/users/settings/partials/index_content.html:129
-msgid "Invite Friends to PwaniNet"
-msgstr "Alika marafiki kwenye PwaniNet"
-
 #: users/templates/users/settings/partials/index_content.html:115
+#: users/templates/users/settings/partials/index_content.html:130
+msgid "Invite Friends to vasto"
+msgstr "Alika marafiki kwenye vasto"
+
+#: users/templates/users/settings/partials/index_content.html:116
 msgid "Classmates"
 msgstr "Wanafunzi wenzako"
 
-#: users/templates/users/settings/partials/index_content.html:118
+#: users/templates/users/settings/partials/index_content.html:119
 msgid ""
-"Know students or friends who aren't on PwaniNet yet? Send them a friendly "
+"Know students or friends who aren't on vasto yet? Send them a friendly "
 "invite link to join course groups, share notes, and collaborate."
 msgstr ""
-"Unawajua wanafunzi au marafiki ambao bado hawapo PwaniNet? Watumie kiungo "
-"cha mwaliko wajiunge na vikundi vya kozi, washiriki dondoo na kushirikiana."
+"Unawajua wanafunzi au marafiki ambao bado hawapo vasto? Watumie kiungo cha "
+"mwaliko wajiunge na vikundi vya kozi, washiriki dondoo na kushirikiana."
 
-#: users/templates/users/settings/partials/index_content.html:122
+#: users/templates/users/settings/partials/index_content.html:123
 msgid "clicks"
 msgstr "mibofyo"
 
-#: users/templates/users/settings/partials/index_content.html:124
+#: users/templates/users/settings/partials/index_content.html:125
 msgid "joined"
 msgstr "waliojiunga"
 
-#: users/templates/users/settings/partials/index_content.html:130
+#: users/templates/users/settings/partials/index_content.html:131
 msgid "Invite Friends"
 msgstr "Alika marafiki"
 
@@ -3806,8 +4409,8 @@ msgid "Choose who can see your new posts by default"
 msgstr "Chagua ni nani anayeweza kuona machapisho yako mapya kwa chaguomsingi"
 
 #: users/templates/users/settings/partials/post_privacy_content.html:38
-msgid "Only PwaniNet users can see your new posts"
-msgstr "Watumiaji wa PwaniNet pekee wanaweza kuona machapisho yako mapya"
+msgid "Only vasto users can see your new posts"
+msgstr "Watumiaji wa vasto pekee wanaweza kuona machapisho yako mapya"
 
 #: users/templates/users/settings/partials/post_privacy_content.html:40
 msgid "Only your followers can see your new posts"
@@ -3919,8 +4522,8 @@ msgid "Choose who can see your profile information"
 msgstr "Chagua ni nani anayeweza kuona taarifa za wasifu wako"
 
 #: users/templates/users/settings/partials/profile_privacy_content.html:38
-msgid "Only PwaniNet users can view your profile"
-msgstr "Watumiaji wa PwaniNet pekee wanaweza kuona wasifu wako"
+msgid "Only vasto users can view your profile"
+msgstr "Watumiaji wa vasto pekee wanaweza kuona wasifu wako"
 
 #: users/templates/users/settings/partials/profile_privacy_content.html:40
 msgid "Only your followers can view your profile"
@@ -4125,11 +4728,11 @@ msgstr "Thibitisha na uzime 2FA"
 
 #: users/templates/users/settings/partials/two_factor_content.html:302
 msgid ""
-"Two-factor authentication adds an extra layer of security to your PwaniNet "
+"Two-factor authentication adds an extra layer of security to your vasto "
 "account. Once enabled, you'll enter a 6-digit verification code from your "
 "authenticator app whenever you perform sensitive security actions."
 msgstr ""
-"Uthibitishaji wa hatua mbili huongeza ulinzi wa akaunti yako ya PwaniNet. "
+"Uthibitishaji wa hatua mbili huongeza ulinzi wa akaunti yako ya vasto. "
 "Ukiwashwa, utaweka msimbo wa uthibitishaji wa tarakimu 6 kutoka kwenye "
 "programu yako unapotekeleza hatua nyeti za usalama."
 
@@ -4177,23 +4780,23 @@ msgstr "Misimbo yote imenakiliwa!"
 msgid "Downloading\\u2026"
 msgstr "Inapakua…"
 
-#: users/views.py:375
+#: users/views.py:406
 msgid "Too many recovery attempts. Please wait 5 minutes before trying again."
 msgstr ""
 "Majaribio mengi mno ya kurejesha akaunti. Tafadhali subiri dakika 5 kabla ya "
 "kujaribu tena."
 
-#: users/views.py:383
+#: users/views.py:414
 msgid "Please enter your username."
 msgstr "Tafadhali weka jina lako la mtumiaji."
 
-#: users/views.py:393
+#: users/views.py:424
 msgid "No account found with that username. Please verify and try again."
 msgstr ""
 "Hakuna akaunti yenye jina hilo la mtumiaji. Tafadhali hakiki kisha ujaribu "
 "tena."
 
-#: users/views.py:400
+#: users/views.py:431
 msgid ""
 "Two-Factor Authentication is not enabled for this account. Self-service "
 "recovery requires 2FA or a recovery code. Please contact support."
@@ -4202,44 +4805,44 @@ msgstr ""
 "akaunti mwenyewe unahitaji 2FA au msimbo wa kurejesha. Tafadhali wasiliana "
 "na usaidizi."
 
-#: users/views.py:436
+#: users/views.py:467
 msgid "Your recovery session expired. Please start over."
 msgstr "Kipindi chako cha kurejesha akaunti kimeisha. Tafadhali anza tena."
 
-#: users/views.py:455
+#: users/views.py:486
 msgid "Too many incorrect verification attempts. Please start over."
 msgstr ""
 "Majaribio mengi mno ya uthibitishaji yasiyo sahihi. Tafadhali anza tena."
 
-#: users/views.py:477
+#: users/views.py:508
 msgid "Invalid verification code. Please check and try again."
 msgstr ""
 "Msimbo wa uthibitishaji si sahihi. Tafadhali hakiki kisha ujaribu tena."
 
-#: users/views.py:512
+#: users/views.py:543
 msgid "Your password reset authorization has expired. Please start over."
 msgstr "Ruhusa ya kuweka upya nenosiri lako imeisha. Tafadhali anza tena."
 
-#: users/views.py:531
+#: users/views.py:562
 msgid "Please enter a new password."
 msgstr "Tafadhali weka nenosiri jipya."
 
-#: users/views.py:533
+#: users/views.py:564
 msgid "The two password fields did not match."
 msgstr "Sehemu mbili za nenosiri hazikulingana."
 
-#: users/views.py:556
+#: users/views.py:587
 msgid ""
 "Your password has been reset successfully. Please log in with your new "
 "password."
 msgstr ""
 "Nenosiri lako limewekwa upya. Tafadhali ingia kwa kutumia nenosiri jipya."
 
-#: users/views.py:1463 users/views.py:1505
+#: users/views.py:1505 users/views.py:1547
 msgid "Two-factor authentication is already enabled."
 msgstr "Uthibitishaji wa hatua mbili tayari umewashwa."
 
-#: users/views.py:1536
+#: users/views.py:1578
 msgid ""
 "Invalid verification code. Please check the time on your device and "
 "authenticator app and try again."
@@ -4247,41 +4850,1783 @@ msgstr ""
 "Msimbo wa uthibitishaji si sahihi. Hakiki saa kwenye kifaa na programu yako "
 "ya uthibitishaji kisha ujaribu tena."
 
-#: users/views.py:1548 users/views.py:1580
+#: users/views.py:1590 users/views.py:1622
 msgid "Invalid request method."
 msgstr "Njia ya ombi si sahihi."
 
-#: users/views.py:1556 users/views.py:1589
+#: users/views.py:1598 users/views.py:1631
 msgid "Two-factor authentication is not enabled."
 msgstr "Uthibitishaji wa hatua mbili haujawashwa."
 
-#: users/views.py:1561
+#: users/views.py:1603
 msgid "Please provide your 6-digit authenticator code to disable 2FA."
 msgstr "Tafadhali weka msimbo wa tarakimu 6 wa uthibitishaji ili kuzima 2FA."
 
-#: users/views.py:1566
+#: users/views.py:1608
 msgid "Two-factor authentication has been successfully disabled."
 msgstr "Uthibitishaji wa hatua mbili umezimwa kwa mafanikio."
 
-#: users/views.py:1569
+#: users/views.py:1611
 msgid ""
 "Invalid authentication code. Could not disable two-factor authentication."
 msgstr ""
 "Msimbo wa uthibitishaji si sahihi. Imeshindwa kuzima uthibitishaji wa hatua "
 "mbili."
 
-#: users/views.py:1594
+#: users/views.py:1636
 msgid ""
 "Please provide your 6-digit authenticator code to regenerate recovery codes."
 msgstr ""
 "Tafadhali weka msimbo wa tarakimu 6 wa uthibitishaji ili kutengeneza upya "
 "misimbo ya kurejesha."
 
-#: users/views.py:1606
+#: users/views.py:1648
 msgid "Invalid authentication code. Could not regenerate recovery codes."
 msgstr ""
 "Msimbo wa uthibitishaji si sahihi. Imeshindwa kutengeneza upya misimbo ya "
 "kurejesha."
+
+#: venv/lib/python3.12/site-packages/click/_termui_impl.py:633
+#, python-brace-format
+msgid "{editor}: Editing failed"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/_termui_impl.py:637
+#, python-brace-format
+msgid "{editor}: Editing failed: {e}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:1143
+#: venv/lib/python3.12/site-packages/click/core.py:1180
+#, python-brace-format
+msgid "{text} {deprecated_message}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:1274
+#, python-brace-format
+msgid "Got unexpected extra argument ({args})"
+msgid_plural "Got unexpected extra arguments ({args})"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:1293
+msgid "DeprecationWarning: The command {name!r} is deprecated.{extra_message}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:1477
+msgid "Aborted!"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:1851
+#, fuzzy
+#| msgid "Comments"
+msgid "Commands"
+msgstr "Maoni"
+
+#: venv/lib/python3.12/site-packages/click/core.py:1882
+msgid "Missing command."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:1960
+msgid "No such command {name!r}."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:2385
+msgid "Value must be an iterable."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:2408
+#, python-brace-format
+msgid "Takes {nargs} values but 1 was given."
+msgid_plural "Takes {nargs} values but {len} were given."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:2597
+msgid ""
+"DeprecationWarning: The {param_type} {name!r} is deprecated.{extra_message}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:3079
+#, python-brace-format
+msgid "env var: {var}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:3082
+#, python-brace-format
+msgid "default: {default}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/core.py:3146
+msgid "(dynamic)"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/decorators.py:465
+#, fuzzy, python-format
+#| msgid "Version %(ver)s"
+msgid "%(prog)s, version %(version)s"
+msgstr "Toleo %(ver)s"
+
+#: venv/lib/python3.12/site-packages/click/decorators.py:522
+msgid "Show the version and exit."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/decorators.py:548
+msgid "Show this message and exit."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:50
+#: venv/lib/python3.12/site-packages/click/exceptions.py:89
+#, fuzzy, python-brace-format
+#| msgid "Copy message"
+msgid "Error: {message}"
+msgstr "Nakili ujumbe"
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:81
+#, python-brace-format
+msgid "Try '{command} {option}' for help."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:130
+#, python-brace-format
+msgid "Invalid value: {message}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:132
+#, python-brace-format
+msgid "Invalid value for {param_hint}: {message}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:190
+msgid "Missing argument"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:192
+#, fuzzy
+#| msgid "Post options"
+msgid "Missing option"
+msgstr "Chaguo za chapisho"
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:194
+msgid "Missing parameter"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:196
+#, python-brace-format
+msgid "Missing {param_type}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:203
+#, python-brace-format
+msgid "Missing parameter: {param_name}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:223
+#, python-brace-format
+msgid "No such option: {name}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:235
+#, python-brace-format
+msgid "Did you mean {possibility}?"
+msgid_plural "(Possible options: {possibilities})"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:282
+msgid "unknown error"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/exceptions.py:289
+msgid "Could not open file {filename!r}: {message}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/parser.py:199
+msgid "Argument {name!r} takes {nargs} values."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/parser.py:381
+msgid "Option {name!r} does not take a value."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/parser.py:444
+msgid "Option {name!r} requires an argument."
+msgid_plural "Option {name!r} requires {nargs} arguments."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/click/shell_completion.py:332
+msgid "Shell completion is not supported for Bash versions older than 4.4."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/shell_completion.py:339
+msgid "Couldn't detect Bash version, shell completion is not supported."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/termui.py:173
+#, fuzzy
+#| msgid "Delete conversation"
+msgid "Repeat for confirmation"
+msgstr "Futa mazungumzo"
+
+#: venv/lib/python3.12/site-packages/click/termui.py:189
+msgid "Error: The value you entered was invalid."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/termui.py:191
+#, fuzzy, python-brace-format
+#| msgid "Copy message"
+msgid "Error: {e.message}"
+msgstr "Nakili ujumbe"
+
+#: venv/lib/python3.12/site-packages/click/termui.py:202
+#, fuzzy
+#| msgid "The two password fields did not match."
+msgid "Error: The two entered values do not match."
+msgstr "Sehemu mbili za nenosiri hazikulingana."
+
+#: venv/lib/python3.12/site-packages/click/termui.py:261
+msgid "Error: invalid input"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/termui.py:880
+msgid "Press any key to continue..."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:332
+#, python-brace-format
+msgid ""
+"Choose from:\n"
+"\t{choices}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:369
+msgid "{value!r} is not {choice}."
+msgid_plural "{value!r} is not one of {choices}."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:460
+msgid "{value!r} does not match the format {format}."
+msgid_plural "{value!r} does not match the formats {formats}."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:482
+msgid "{value!r} is not a valid {number_type}."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:538
+#, python-brace-format
+msgid "{value} is not in the range {range}."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:719
+msgid "{value!r} is not a valid boolean. Recognized values: {states}"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:747
+msgid "{value!r} is not a valid UUID."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:937
+#, fuzzy
+#| msgid "Profile"
+msgid "file"
+msgstr "Wasifu"
+
+#: venv/lib/python3.12/site-packages/click/types.py:939
+msgid "directory"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:941
+msgid "path"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:988
+msgid "{name} {filename!r} does not exist."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:997
+msgid "{name} {filename!r} is a file."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:1005
+msgid "{name} {filename!r} is a directory."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:1014
+msgid "{name} {filename!r} is not readable."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:1023
+msgid "{name} {filename!r} is not writable."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:1032
+msgid "{name} {filename!r} is not executable."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/click/types.py:1099
+#, python-brace-format
+msgid "{len_type} values are required, but {len_value} was given."
+msgid_plural "{len_type} values are required, but {len_value} were given."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/contrib/messages/apps.py:16
+#, fuzzy
+#| msgid "Message"
+msgid "Messages"
+msgstr "Ujumbe"
+
+#: venv/lib/python3.12/site-packages/django/contrib/sitemaps/apps.py:8
+msgid "Site Maps"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/contrib/staticfiles/apps.py:9
+msgid "Static Files"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/contrib/syndication/apps.py:7
+#, fuzzy
+#| msgid "Citations"
+msgid "Syndication"
+msgstr "Marejeo"
+
+#. Translators: String used to replace omitted page numbers in elided page
+#. range generated by paginators, e.g. [1, 2, '…', 5, 6, 7, '…', 9, 10].
+#: venv/lib/python3.12/site-packages/django/core/paginator.py:30
+msgid "…"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/paginator.py:32
+msgid "That page number is not an integer"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/paginator.py:33
+msgid "That page number is less than 1"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/paginator.py:34
+msgid "That page contains no results"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:22
+msgid "Enter a valid value."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:70
+msgid "Enter a valid domain name."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:153
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:774
+msgid "Enter a valid URL."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:200
+msgid "Enter a valid integer."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:211
+msgid "Enter a valid email address."
+msgstr ""
+
+#. Translators: "letters" means latin letters: a-z and A-Z.
+#: venv/lib/python3.12/site-packages/django/core/validators.py:289
+msgid ""
+"Enter a valid “slug” consisting of letters, numbers, underscores or hyphens."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:297
+msgid ""
+"Enter a valid “slug” consisting of Unicode letters, numbers, underscores, or "
+"hyphens."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:309
+#: venv/lib/python3.12/site-packages/django/core/validators.py:318
+#: venv/lib/python3.12/site-packages/django/core/validators.py:332
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2220
+#, python-format
+msgid "Enter a valid %(protocol)s address."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:311
+msgid "IPv4"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:320
+#: venv/lib/python3.12/site-packages/django/utils/ipv6.py:43
+msgid "IPv6"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:334
+msgid "IPv4 or IPv6"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:375
+msgid "Enter only digits separated by commas."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:381
+#, python-format
+msgid "Ensure this value is %(limit_value)s (it is %(show_value)s)."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:416
+#, python-format
+msgid "Ensure this value is less than or equal to %(limit_value)s."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:425
+#, python-format
+msgid "Ensure this value is greater than or equal to %(limit_value)s."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:434
+#, python-format
+msgid "Ensure this value is a multiple of step size %(limit_value)s."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:441
+#, python-format
+msgid ""
+"Ensure this value is a multiple of step size %(limit_value)s, starting from "
+"%(offset)s, e.g. %(offset)s, %(valid_value1)s, %(valid_value2)s, and so on."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:473
+#, python-format
+msgid ""
+"Ensure this value has at least %(limit_value)d character (it has "
+"%(show_value)d)."
+msgid_plural ""
+"Ensure this value has at least %(limit_value)d characters (it has "
+"%(show_value)d)."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:491
+#, python-format
+msgid ""
+"Ensure this value has at most %(limit_value)d character (it has "
+"%(show_value)d)."
+msgid_plural ""
+"Ensure this value has at most %(limit_value)d characters (it has "
+"%(show_value)d)."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:514
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:365
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:404
+msgid "Enter a number."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:516
+#, python-format
+msgid "Ensure that there are no more than %(max)s digit in total."
+msgid_plural "Ensure that there are no more than %(max)s digits in total."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:521
+#, python-format
+msgid "Ensure that there are no more than %(max)s decimal place."
+msgid_plural "Ensure that there are no more than %(max)s decimal places."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:526
+#, python-format
+msgid ""
+"Ensure that there are no more than %(max)s digit before the decimal point."
+msgid_plural ""
+"Ensure that there are no more than %(max)s digits before the decimal point."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:597
+#, python-format
+msgid ""
+"File extension “%(extension)s” is not allowed. Allowed extensions are: "
+"%(allowed_extensions)s."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/core/validators.py:659
+msgid "Null characters are not allowed."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/base.py:1602
+#, python-format
+msgid "%(model_name)s with this %(field_labels)s already exists."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/constraints.py:22
+#, python-format
+msgid "Constraint “%(name)s” is violated."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:134
+#, python-format
+msgid "Value %(value)r is not a valid choice."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:135
+#, fuzzy
+#| msgid "This field cannot be empty"
+msgid "This field cannot be null."
+msgstr "Uga huu hauwezi kuwa wazi"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:136
+#, fuzzy
+#| msgid "This field cannot be empty"
+msgid "This field cannot be blank."
+msgstr "Uga huu hauwezi kuwa wazi"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:137
+#, python-format
+msgid "%(model_name)s with this %(field_label)s already exists."
+msgstr ""
+
+#. Translators: The 'lookup_type' is one of 'date', 'year' or
+#. 'month'. Eg: "Title must be unique for pub_date year"
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:141
+#, python-format
+msgid ""
+"%(field_label)s must be unique for %(date_field_label)s %(lookup_type)s."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:180
+#, python-format
+msgid "Field of type: %(field_type)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1162
+#, python-format
+msgid "“%(value)s” value must be either True or False."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1163
+#, python-format
+msgid "“%(value)s” value must be either True, False, or None."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1165
+msgid "Boolean (Either True or False)"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1215
+#, python-format
+msgid "String (up to %(max_length)s)"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1217
+msgid "String (unlimited)"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1326
+msgid "Comma-separated integers"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1427
+#, python-format
+msgid ""
+"“%(value)s” value has an invalid date format. It must be in YYYY-MM-DD "
+"format."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1431
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1566
+#, python-format
+msgid ""
+"“%(value)s” value has the correct format (YYYY-MM-DD) but it is an invalid "
+"date."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1435
+#, fuzzy
+#| msgid "Shared with me"
+msgid "Date (without time)"
+msgstr "Yameshirikiwa nami"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1562
+#, python-format
+msgid ""
+"“%(value)s” value has an invalid format. It must be in YYYY-MM-DD HH:MM[:ss[."
+"uuuuuu]][TZ] format."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1570
+#, python-format
+msgid ""
+"“%(value)s” value has the correct format (YYYY-MM-DD HH:MM[:ss[.uuuuuu]]"
+"[TZ]) but it is an invalid date/time."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1575
+#, fuzzy
+#| msgid "Shared with me"
+msgid "Date (with time)"
+msgstr "Yameshirikiwa nami"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1702
+#, python-format
+msgid "“%(value)s” value must be a decimal number."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1704
+msgid "Decimal number"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1864
+#, python-format
+msgid ""
+"“%(value)s” value has an invalid format. It must be in [DD] [[HH:]MM:]ss[."
+"uuuuuu] format."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1868
+msgid "Duration"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1920
+msgid "Email address"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:1945
+#, fuzzy
+#| msgid "File Type"
+msgid "File path"
+msgstr "Aina ya faili"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2023
+#, python-format
+msgid "“%(value)s” value must be a float."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2025
+msgid "Floating point number"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2065
+#, python-format
+msgid "“%(value)s” value must be an integer."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2067
+#, fuzzy
+#| msgid "Inter"
+msgid "Integer"
+msgstr "Inter"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2163
+msgid "Big (8 byte) integer"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2180
+msgid "Small integer"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2188
+msgid "IPv4 address"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2219
+msgid "IP address"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2310
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2311
+#, python-format
+msgid "“%(value)s” value must be either None, True or False."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2313
+msgid "Boolean (Either True, False or None)"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2364
+#, fuzzy
+#| msgid "Posting in"
+msgid "Positive big integer"
+msgstr "Inachapisha katika"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2379
+msgid "Positive integer"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2394
+msgid "Positive small integer"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2410
+#, python-format
+msgid "Slug (up to %(max_length)s)"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2446
+msgid "Text"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2526
+#, python-format
+msgid ""
+"“%(value)s” value has an invalid format. It must be in HH:MM[:ss[.uuuuuu]] "
+"format."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2530
+#, python-format
+msgid ""
+"“%(value)s” value has the correct format (HH:MM[:ss[.uuuuuu]]) but it is an "
+"invalid time."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2534
+msgid "Time"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2642
+msgid "URL"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2666
+msgid "Raw binary data"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2731
+#, python-format
+msgid "“%(value)s” is not a valid UUID."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/__init__.py:2733
+msgid "Universally unique identifier"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/files.py:244
+#, fuzzy
+#| msgid "Files"
+msgid "File"
+msgstr "Faili"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/files.py:420
+msgid "Image"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/json.py:24
+#, fuzzy
+#| msgid "Subject"
+msgid "A JSON object"
+msgstr "Mada"
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/json.py:26
+msgid "Value must be valid JSON."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/related.py:979
+#, python-format
+msgid "%(model)s instance with %(field)s %(value)r is not a valid choice."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/related.py:982
+msgid "Foreign Key (type determined by related field)"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/related.py:1276
+msgid "One-to-one relationship"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/related.py:1333
+#, python-format
+msgid "%(from)s-%(to)s relationship"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/related.py:1335
+#, python-format
+msgid "%(from)s-%(to)s relationships"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/db/models/fields/related.py:1383
+msgid "Many-to-many relationship"
+msgstr ""
+
+#. Translators: If found as last label character, these punctuation
+#. characters will prevent the default label_suffix to be appended to the label
+#: venv/lib/python3.12/site-packages/django/forms/boundfield.py:185
+msgid ":?.!"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:94
+msgid "This field is required."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:314
+msgid "Enter a whole number."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:485
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:1257
+msgid "Enter a valid date."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:508
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:1258
+msgid "Enter a valid time."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:535
+msgid "Enter a valid date/time."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:569
+msgid "Enter a valid duration."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:570
+#, python-brace-format
+msgid "The number of days must be between {min_days} and {max_days}."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:639
+msgid "No file was submitted. Check the encoding type on the form."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:640
+msgid "No file was submitted."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:641
+msgid "The submitted file is empty."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:643
+#, python-format
+msgid "Ensure this filename has at most %(max)d character (it has %(length)d)."
+msgid_plural ""
+"Ensure this filename has at most %(max)d characters (it has %(length)d)."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:648
+msgid "Please either submit a file or check the clear checkbox, not both."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:716
+msgid ""
+"Upload a valid image. The file you uploaded was either not an image or a "
+"corrupted image."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:879
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:965
+#: venv/lib/python3.12/site-packages/django/forms/models.py:1592
+#, python-format
+msgid "Select a valid choice. %(value)s is not one of the available choices."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:967
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:1086
+#: venv/lib/python3.12/site-packages/django/forms/models.py:1590
+msgid "Enter a list of values."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:1087
+msgid "Enter a complete value."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:1329
+msgid "Enter a valid UUID."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/fields.py:1359
+msgid "Enter a valid JSON."
+msgstr ""
+
+#. Translators: This is the default suffix added to form field labels
+#: venv/lib/python3.12/site-packages/django/forms/forms.py:97
+msgid ":"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/forms.py:239
+#, python-format
+msgid "(Hidden field %(name)s) %(error)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/formsets.py:61
+#, python-format
+msgid ""
+"ManagementForm data is missing or has been tampered with. Missing fields: "
+"%(field_names)s. You may need to file a bug report if the issue persists."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/formsets.py:65
+#, python-format
+msgid "Please submit at most %(num)d form."
+msgid_plural "Please submit at most %(num)d forms."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/forms/formsets.py:70
+#, python-format
+msgid "Please submit at least %(num)d form."
+msgid_plural "Please submit at least %(num)d forms."
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/forms/formsets.py:484
+#: venv/lib/python3.12/site-packages/django/forms/formsets.py:491
+msgid "Order"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/formsets.py:499
+#, fuzzy
+#| msgid "Delete post"
+msgid "Delete"
+msgstr "Futa chapisho"
+
+#: venv/lib/python3.12/site-packages/django/forms/models.py:901
+#, python-format
+msgid "Please correct the duplicate data for %(field)s."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/models.py:906
+#, python-format
+msgid "Please correct the duplicate data for %(field)s, which must be unique."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/models.py:913
+#, python-format
+msgid ""
+"Please correct the duplicate data for %(field_name)s which must be unique "
+"for the %(lookup)s in %(date_field)s."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/models.py:922
+#, fuzzy
+#| msgid "Please correct the following errors:"
+msgid "Please correct the duplicate values below."
+msgstr "Tafadhali sahihisha hitilafu zifuatazo:"
+
+#: venv/lib/python3.12/site-packages/django/forms/models.py:1359
+msgid "The inline value did not match the parent instance."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/models.py:1450
+msgid "Select a valid choice. That choice is not one of the available choices."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/models.py:1594
+#, python-format
+msgid "“%(pk)s” is not a valid value."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/utils.py:229
+#, python-format
+msgid ""
+"%(datetime)s couldn’t be interpreted in time zone %(current_timezone)s; it "
+"may be ambiguous or it may not exist."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/widgets.py:528
+#, fuzzy
+#| msgid "Current Device"
+msgid "Currently"
+msgstr "Kifaa cha sasa"
+
+#: venv/lib/python3.12/site-packages/django/forms/widgets.py:529
+#, fuzzy
+#| msgid "Channel"
+msgid "Change"
+msgstr "Njia"
+
+#: venv/lib/python3.12/site-packages/django/forms/widgets.py:866
+msgid "Unknown"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/widgets.py:867
+msgid "Yes"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/forms/widgets.py:868
+msgid "No"
+msgstr ""
+
+#. Translators: Please do not add spaces around commas.
+#: venv/lib/python3.12/site-packages/django/template/defaultfilters.py:873
+msgid "yes,no,maybe"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/template/defaultfilters.py:903
+#: venv/lib/python3.12/site-packages/django/template/defaultfilters.py:920
+#, python-format
+msgid "%(size)d byte"
+msgid_plural "%(size)d bytes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/template/defaultfilters.py:922
+#, python-format
+msgid "%s KB"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/template/defaultfilters.py:924
+#, python-format
+msgid "%s MB"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/template/defaultfilters.py:926
+#, python-format
+msgid "%s GB"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/template/defaultfilters.py:928
+#, python-format
+msgid "%s TB"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/template/defaultfilters.py:930
+#, python-format
+msgid "%s PB"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dateformat.py:74
+msgid "p.m."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dateformat.py:75
+msgid "a.m."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dateformat.py:80
+msgid "PM"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dateformat.py:81
+msgid "AM"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dateformat.py:153
+#, fuzzy
+#| msgid "Light"
+msgid "midnight"
+msgstr "Nuru"
+
+#: venv/lib/python3.12/site-packages/django/utils/dateformat.py:155
+msgid "noon"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:7
+#: venv/lib/python3.12/site-packages/tornado/locale.py:295
+msgid "Monday"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:8
+#: venv/lib/python3.12/site-packages/tornado/locale.py:296
+msgid "Tuesday"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:9
+#: venv/lib/python3.12/site-packages/tornado/locale.py:297
+msgid "Wednesday"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:10
+#: venv/lib/python3.12/site-packages/tornado/locale.py:298
+msgid "Thursday"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:11
+#: venv/lib/python3.12/site-packages/tornado/locale.py:299
+msgid "Friday"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:12
+#: venv/lib/python3.12/site-packages/tornado/locale.py:300
+msgid "Saturday"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:13
+#: venv/lib/python3.12/site-packages/tornado/locale.py:301
+msgid "Sunday"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:16
+msgid "Mon"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:17
+msgid "Tue"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:18
+msgid "Wed"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:19
+msgid "Thu"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:20
+msgid "Fri"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:21
+#, fuzzy
+#| msgid "Status"
+msgid "Sat"
+msgstr "Hali"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:22
+#, fuzzy
+#| msgid "Sound"
+msgid "Sun"
+msgstr "Sauti"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:25
+#: venv/lib/python3.12/site-packages/tornado/locale.py:281
+msgid "January"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:26
+#: venv/lib/python3.12/site-packages/tornado/locale.py:282
+msgid "February"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:27
+#: venv/lib/python3.12/site-packages/tornado/locale.py:283
+msgid "March"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:28
+#: venv/lib/python3.12/site-packages/tornado/locale.py:284
+msgid "April"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:29
+#: venv/lib/python3.12/site-packages/tornado/locale.py:285
+msgid "May"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:30
+#: venv/lib/python3.12/site-packages/tornado/locale.py:286
+msgid "June"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:31
+#: venv/lib/python3.12/site-packages/tornado/locale.py:287
+msgid "July"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:32
+#: venv/lib/python3.12/site-packages/tornado/locale.py:288
+msgid "August"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:33
+#: venv/lib/python3.12/site-packages/tornado/locale.py:289
+#, fuzzy
+#| msgid "Members"
+msgid "September"
+msgstr "Wanachama"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:34
+#: venv/lib/python3.12/site-packages/tornado/locale.py:290
+msgid "October"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:35
+#: venv/lib/python3.12/site-packages/tornado/locale.py:291
+#, fuzzy
+#| msgid "Members"
+msgid "November"
+msgstr "Wanachama"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:36
+#: venv/lib/python3.12/site-packages/tornado/locale.py:292
+#, fuzzy
+#| msgid "Members"
+msgid "December"
+msgstr "Wanachama"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:39
+#, fuzzy
+#| msgid "and"
+msgid "jan"
+msgstr "na"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:40
+msgid "feb"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:41
+msgid "mar"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:42
+msgid "apr"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:43
+msgid "may"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:44
+msgid "jun"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:45
+msgid "jul"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:46
+#, fuzzy
+#| msgid "ago"
+msgid "aug"
+msgstr "iliyopita"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:47
+msgid "sep"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:48
+msgid "oct"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:49
+msgid "nov"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:50
+msgid "dec"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:53
+msgctxt "abbrev. month"
+msgid "Jan."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:54
+msgctxt "abbrev. month"
+msgid "Feb."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:55
+msgctxt "abbrev. month"
+msgid "March"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:56
+msgctxt "abbrev. month"
+msgid "April"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:57
+msgctxt "abbrev. month"
+msgid "May"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:58
+msgctxt "abbrev. month"
+msgid "June"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:59
+msgctxt "abbrev. month"
+msgid "July"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:60
+msgctxt "abbrev. month"
+msgid "Aug."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:61
+msgctxt "abbrev. month"
+msgid "Sept."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:62
+msgctxt "abbrev. month"
+msgid "Oct."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:63
+msgctxt "abbrev. month"
+msgid "Nov."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:64
+msgctxt "abbrev. month"
+msgid "Dec."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:67
+msgctxt "alt. month"
+msgid "January"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:68
+msgctxt "alt. month"
+msgid "February"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:69
+msgctxt "alt. month"
+msgid "March"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:70
+msgctxt "alt. month"
+msgid "April"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:71
+msgctxt "alt. month"
+msgid "May"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:72
+msgctxt "alt. month"
+msgid "June"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:73
+msgctxt "alt. month"
+msgid "July"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:74
+msgctxt "alt. month"
+msgid "August"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:75
+#, fuzzy
+#| msgid "Members"
+msgctxt "alt. month"
+msgid "September"
+msgstr "Wanachama"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:76
+msgctxt "alt. month"
+msgid "October"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:77
+#, fuzzy
+#| msgid "Members"
+msgctxt "alt. month"
+msgid "November"
+msgstr "Wanachama"
+
+#: venv/lib/python3.12/site-packages/django/utils/dates.py:78
+#, fuzzy
+#| msgid "Members"
+msgctxt "alt. month"
+msgid "December"
+msgstr "Wanachama"
+
+#: venv/lib/python3.12/site-packages/django/utils/ipv6.py:20
+msgid "This is not a valid IPv6 address."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/text.py:76
+#, python-format
+msgctxt "String to return when truncating text"
+msgid "%(truncated_text)s…"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/text.py:282
+#, fuzzy
+#| msgid "More"
+msgid "or"
+msgstr "Zaidi"
+
+#. Translators: This string is used as a separator between list elements
+#: venv/lib/python3.12/site-packages/django/utils/text.py:301
+#: venv/lib/python3.12/site-packages/django/utils/timesince.py:135
+msgid ", "
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/utils/timesince.py:8
+#, python-format
+msgid "%(num)d year"
+msgid_plural "%(num)d years"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/utils/timesince.py:9
+#, python-format
+msgid "%(num)d month"
+msgid_plural "%(num)d months"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/utils/timesince.py:10
+#, python-format
+msgid "%(num)d week"
+msgid_plural "%(num)d weeks"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/utils/timesince.py:11
+#, python-format
+msgid "%(num)d day"
+msgid_plural "%(num)d days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/utils/timesince.py:12
+#, python-format
+msgid "%(num)d hour"
+msgid_plural "%(num)d hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/utils/timesince.py:13
+#, python-format
+msgid "%(num)d minute"
+msgid_plural "%(num)d minutes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: venv/lib/python3.12/site-packages/django/views/csrf.py:29
+msgid "Forbidden"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/csrf.py:30
+msgid "CSRF verification failed. Request aborted."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/csrf.py:34
+msgid ""
+"You are seeing this message because this HTTPS site requires a “Referer "
+"header” to be sent by your web browser, but none was sent. This header is "
+"required for security reasons, to ensure that your browser is not being "
+"hijacked by third parties."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/csrf.py:40
+msgid ""
+"If you have configured your browser to disable “Referer” headers, please re-"
+"enable them, at least for this site, or for HTTPS connections, or for “same-"
+"origin” requests."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/csrf.py:45
+msgid ""
+"If you are using the <meta name=\"referrer\" content=\"no-referrer\"> tag or "
+"including the “Referrer-Policy: no-referrer” header, please remove them. The "
+"CSRF protection requires the “Referer” header to do strict referer checking. "
+"If you’re concerned about privacy, use alternatives like <a "
+"rel=\"noreferrer\" …> for links to third-party sites."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/csrf.py:54
+msgid ""
+"You are seeing this message because this site requires a CSRF cookie when "
+"submitting forms. This cookie is required for security reasons, to ensure "
+"that your browser is not being hijacked by third parties."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/csrf.py:60
+msgid ""
+"If you have configured your browser to disable cookies, please re-enable "
+"them, at least for this site, or for “same-origin” requests."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/csrf.py:66
+#, fuzzy
+#| msgid "No academic information available"
+msgid "More information is available with DEBUG=True."
+msgstr "Hakuna taarifa za kitaaluma zinazopatikana"
+
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:44
+msgid "No year specified"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:64
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:115
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:214
+msgid "Date out of range"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:94
+msgid "No month specified"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:147
+msgid "No day specified"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:194
+msgid "No week specified"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:353
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:384
+#, python-format
+msgid "No %(verbose_name_plural)s available"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:680
+#, python-format
+msgid ""
+"Future %(verbose_name_plural)s not available because %(class_name)s."
+"allow_future is False."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/dates.py:720
+#, python-format
+msgid "Invalid date string “%(datestr)s” given format “%(format)s”"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/detail.py:56
+#, python-format
+msgid "No %(verbose_name)s found matching the query"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/list.py:70
+msgid "Page is not “last”, nor can it be converted to an int."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/list.py:77
+#, python-format
+msgid "Invalid page (%(page_number)s): %(message)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/generic/list.py:173
+#, python-format
+msgid "Empty list and “%(class_name)s.allow_empty” is False."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/static.py:49
+msgid "Directory indexes are not allowed here."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/static.py:51
+#, python-format
+msgid "“%(path)s” does not exist"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/static.py:68
+#: venv/lib/python3.12/site-packages/django/views/templates/directory_index.html:8
+#: venv/lib/python3.12/site-packages/django/views/templates/directory_index.html:11
+#, python-format
+msgid "Index of %(directory)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:7
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:204
+msgid "The install worked successfully! Congratulations!"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:206
+#, python-format
+msgid ""
+"View <a href=\"https://docs.djangoproject.com/en/%(version)s/releases/\" "
+"target=\"_blank\" rel=\"noopener\">release notes</a> for Django %(version)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:208
+#, python-format
+msgid ""
+"You are seeing this page because <a href=\"https://docs.djangoproject.com/en/"
+"%(version)s/ref/settings/#debug\" target=\"_blank\" "
+"rel=\"noopener\">DEBUG=True</a> is in your settings file and you have not "
+"configured any URLs."
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:217
+#, fuzzy
+#| msgid "Open Document"
+msgid "Django Documentation"
+msgstr "Fungua waraka"
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:218
+msgid "Topics, references, &amp; how-to’s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:226
+msgid "Tutorial: A Polling App"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:227
+msgid "Get started with Django"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:235
+msgid "Django Community"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/django/views/templates/default_urlconf.html:236
+msgid "Connect, get help, or contribute"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/drf_spectacular/openapi.py:1364
+#: venv/lib/python3.12/site-packages/drf_spectacular/openapi.py:1417
+#: venv/lib/python3.12/site-packages/drf_spectacular/openapi.py:1421
+#: venv/lib/python3.12/site-packages/drf_spectacular/openapi.py:1425
+#, fuzzy
+#| msgid "Response Style"
+msgid "No response body"
+msgstr "Mtindo wa majibu"
+
+#: venv/lib/python3.12/site-packages/drf_spectacular/openapi.py:1389
+#: venv/lib/python3.12/site-packages/drf_spectacular/openapi.py:1441
+msgid "Unspecified response body"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/drf_spectacular/plumbing.py:475
+#, python-format
+msgid "Token-based authentication with required prefix \"%s\""
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/drf_spectacular/views.py:45
+msgid ""
+"\n"
+"    OpenApi3 schema for this API. Format can be selected via content "
+"negotiation.\n"
+"\n"
+"    - YAML: application/vnd.oai.openapi\n"
+"    - JSON: application/vnd.oai.openapi+json\n"
+"    "
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/kombu/transport/qpid.py:1311
+#, python-format
+msgid "Attempting to connect to qpid with SASL mechanism %s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/kombu/transport/qpid.py:1316
+#, python-format
+msgid "Connected to qpid with SASL mechanism %s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/kombu/transport/qpid.py:1334
+#, python-format
+msgid "Unable to connect to qpid with SASL mechanism %s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:377
+msgid "1 second ago"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:383
+msgid "1 minute ago"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:388
+msgid "1 hour ago"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:391
+#, python-format
+msgid "%(time)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:393
+msgid "yesterday"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:393
+#, python-format
+msgid "yesterday at %(time)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:395
+#, python-format
+msgid "%(weekday)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:395
+#, python-format
+msgid "%(weekday)s at %(time)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:398
+#: venv/lib/python3.12/site-packages/tornado/locale.py:451
+#, python-format
+msgid "%(month_name)s %(day)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:400
+#, python-format
+msgid "%(month_name)s %(day)s at %(time)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:405
+#, python-format
+msgid "%(month_name)s %(day)s, %(year)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:407
+#, python-format
+msgid "%(month_name)s %(day)s, %(year)s at %(time)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:445
+#, python-format
+msgid "%(weekday)s, %(month_name)s %(day)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/locale.py:468
+#, python-format
+msgid "%(commas)s and %(last)s"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/test/locale_test.py:68
+#, fuzzy
+#| msgid "Light"
+msgctxt "law"
+msgid "right"
+msgstr "Nuru"
+
+#: venv/lib/python3.12/site-packages/tornado/test/locale_test.py:69
+#, fuzzy
+#| msgid "Light"
+msgctxt "good"
+msgid "right"
+msgstr "Nuru"
+
+#: venv/lib/python3.12/site-packages/tornado/test/locale_test.py:70
+#: venv/lib/python3.12/site-packages/tornado/test/locale_test.py:72
+msgctxt "organization"
+msgid "club"
+msgstr ""
+
+#: venv/lib/python3.12/site-packages/tornado/test/locale_test.py:74
+#: venv/lib/python3.12/site-packages/tornado/test/locale_test.py:75
+msgctxt "stick"
+msgid "club"
+msgstr ""
+
+#~ msgid "Public"
+#~ msgstr "Hadharani"
+
+#~ msgid "Pwanimate Chat"
+#~ msgstr "Mazungumzo ya Pwanimate"
+
+#~ msgid "Message Pwanimate"
+#~ msgstr "Tuma ujumbe kwa Pwanimate"
+
+#~ msgid "Message Pwanimate..."
+#~ msgstr "Tuma ujumbe kwa Pwanimate..."
+
+#~ msgid "Pwanimate Navigation"
+#~ msgstr "Urambazaji wa Pwanimate"
+
+#~ msgid "The Official Intelligent Assistant for Pwani University Students"
+#~ msgstr "Msaidizi rasmi mahiri wa wanafunzi wa Chuo Kikuu cha Pwani"
+
+#~ msgid "Pwanimate Active"
+#~ msgstr "Pwanimate inatumika"
+
+#~ msgid "Pwanimate"
+#~ msgstr "Pwanimate"
 
 #~ msgid "Download Update"
 #~ msgstr "Pakua sasisho"
@@ -4328,9 +6673,6 @@ msgstr ""
 #~ msgid "Clear search"
 #~ msgstr "Futa utafutaji"
 
-#~ msgid "PDF"
-#~ msgstr "PDF"
-
 #~ msgid "Share to Users"
 #~ msgstr "Shiriki kwa Watumiaji"
 
@@ -4364,8 +6706,8 @@ msgstr ""
 #~ msgid "Share with selected groups"
 #~ msgstr "Shiriki na vikundi vilivyochaguliwa"
 
-#~ msgid "Identify yourself to access the PwaniNet feed."
-#~ msgstr "Jitambulishe ili kupata PwaniNet feed."
+#~ msgid "Identify yourself to access the vasto feed."
+#~ msgstr "Jitambulishe ili kupata vasto feed."
 
 #~ msgid "New to the squad?"
 #~ msgstr "Mpya kwenye kundi?"

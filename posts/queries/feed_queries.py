@@ -29,9 +29,9 @@ def get_prioritized_feed_queryset(user, following_ids, user_group_ids):
         & (Q(group__isnull=True) | Q(group_id__in=user_group_ids))
     )
 
-    # Seed an unconnected student's feed with posts shared to PwaniNet.
+    # Seed an unconnected student's feed with posts shared to vasto.
     # Group posts enter independently only when the group allows everyone
-    # on PwaniNet to see them; visible_posts_for applies the final privacy check.
+    # on vasto to see them; visible_posts_for applies the final privacy check.
     filters |= (
         Q(author_id=user.id)
         | Q(group__isnull=True, visibility__in=['PUBLIC', 'AUTHENTICATED'])

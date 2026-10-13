@@ -1,7 +1,7 @@
 """
 Base contracts and abstractions for Pwanimate Domain Tools.
 
-Domain tools expose read-only capabilities over existing PwaniNet domain
+Domain tools expose read-only capabilities over existing vasto domain
 services and models. They enforce strict parameter validation, authorization
 checks, zero loopback HTTP calls, and return deterministic, JSON-serializable
 dictionaries.

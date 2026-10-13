@@ -1,7 +1,7 @@
 """
 Site Content Service for Pwanimate.
 
-Loads and caches PwaniNet/Pwanimate site content from markdown files
+Loads and caches vasto/Pwanimate site content from markdown files
 so Pwanimate can answer questions about the platform itself.
 """
 
@@ -16,7 +16,7 @@ _cache: Dict[str, str] = {}
 
 
 class SiteContentService:
-    """Loads and caches PwaniNet site content markdown files."""
+    """Loads and caches vasto site content markdown files."""
 
     @classmethod
     def _ensure_loaded(cls) -> None:

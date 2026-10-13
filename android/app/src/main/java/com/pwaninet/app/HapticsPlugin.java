@@ -1,4 +1,4 @@
-package com.pwaninet.app;
+package com.vasto.app;
 
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;

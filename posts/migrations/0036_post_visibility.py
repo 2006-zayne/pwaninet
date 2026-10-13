@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             model_name='post',
             name='visibility',
             field=models.CharField(
-                choices=[('PUBLIC', 'Legacy public post'), ('AUTHENTICATED', 'PwaniNet Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')],
+                choices=[('PUBLIC', 'Legacy public post'), ('AUTHENTICATED', 'vasto Users'), ('FOLLOWERS', 'Followers Only'), ('PRIVATE', 'Only Me')],
                 db_index=True,
                 default='AUTHENTICATED',
                 max_length=20,

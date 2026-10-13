@@ -6,7 +6,7 @@ Pwanimate exposes one `web_search` tool. The tool calls `WebSearchRouter`, which
 
 The search provider only retrieves results. The existing Pwanimate tool adapter turns those results into grounded context items for the selected answer model. The answer model receives citation labels and source URLs through the existing response source metadata. Search results are treated as untrusted external evidence, not instructions. Provider names and credentials are hidden from the model-facing tool schema.
 
-The LLM-assisted selector only chooses web search for an explicit online lookup or information that may have changed. Stable concepts do not trigger a web request. PwaniNet documents, posts, groups, people, policies, and private account data continue through their existing tools and retrieval paths.
+The LLM-assisted selector only chooses web search for an explicit online lookup or information that may have changed. Stable concepts do not trigger a web request. vasto documents, posts, groups, people, policies, and private account data continue through their existing tools and retrieval paths.
 
 ## Configuration
 

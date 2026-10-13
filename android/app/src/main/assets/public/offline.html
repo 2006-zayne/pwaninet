@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PwaniNet - Offline</title>
+    <title>vasto - Offline</title>
     <style>
         /* Theme variables matching base.html exactly */
         :root, [data-theme="light"] {
@@ -201,7 +201,7 @@
         </p>
         
         <div class="action-buttons">
-            <a href="https://pwaninet.app/?view_cache=1" class="action-button">
+            <a href="https://vasto.app/?view_cache=1" class="action-button">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 19v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2"></path>
                     <polyline points="7 9 12 4 17 9"></polyline>
@@ -209,7 +209,7 @@
                 </svg>
                 <span>VIEW CACHED PAGES</span>
             </a>
-            <a href="https://pwaninet.app/offline-media/" class="action-button">
+            <a href="https://vasto.app/offline-media/" class="action-button">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="7 10 12 15 17 10"></polyline>
@@ -217,7 +217,7 @@
                 </svg>
                 <span>VIEW DOWNLOADED MEDIA</span>
             </a>
-            <button class="action-button" onclick="window.location.href='https://pwaninet.app'">
+            <button class="action-button" onclick="window.location.href='https://vasto.app'">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M23 4v6h-6"></path>
                     <path d="M1 20v-6h6"></path>
@@ -256,13 +256,13 @@
         function attemptReconnect() {
             if (isReconnecting) return;
             isReconnecting = true;
-            fetch('https://pwaninet.app/api/health/', { mode: 'no-cors', cache: 'no-store' })
+            fetch('https://vasto.app/api/health/', { mode: 'no-cors', cache: 'no-store' })
                 .then(() => {
                     if (checkInterval) {
                         clearInterval(checkInterval);
                         checkInterval = null;
                     }
-                    window.location.href = 'https://pwaninet.app';
+                    window.location.href = 'https://vasto.app';
                 })
                 .catch(() => {
                     isReconnecting = false;
