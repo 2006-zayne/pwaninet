@@ -597,21 +597,20 @@ class NativePWAInstallManager {
     }
 
     initSilentDownload() {
+        // NOTE: hidden-iframe downloads are intentionally NOT used here.
+        // GitHub release URLs (and our own endpoint, which 302s to GitHub)
+        // send X-Frame-Options: deny, so iframe loads are refused and the
+        // file never downloads. A top-level navigation to an attachment URL
+        // starts the download while keeping the current page in place.
         const triggerSilentDownload = (url) => {
-            let iframe = document.getElementById('vasto-download-target');
-            if (!iframe) {
-                iframe = document.createElement('iframe');
-                iframe.id = 'vasto-download-target';
-                iframe.name = 'vasto-download-target';
-                iframe.style.display = 'none';
-                iframe.style.width = '0';
-                iframe.style.height = '0';
-                iframe.style.border = 'none';
-                document.body.appendChild(iframe);
-            }
             const targetUrl = url || 'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk';
-            iframe.src = targetUrl;
-            console.log('[PWA] Triggered silent APK download via iframe:', targetUrl);
+            const anchor = document.createElement('a');
+            anchor.href = targetUrl;
+            anchor.rel = 'noopener';
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            console.log('[PWA] Triggered APK download via top-level navigation:', targetUrl);
         };
 
         // Expose globally

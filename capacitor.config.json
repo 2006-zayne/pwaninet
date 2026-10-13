@@ -13,14 +13,13 @@
       "launchAutoHide": true,
       "backgroundColor": "#0f172a",
       "androidSplashResourceName": "splash",
-      "androidScaleType": "CENTER_CROP",
+      "androidScaleType": "CENTER",
       "androidSpinnerStyle": "large",
       "iosSpinnerStyle": "small",
       "spinnerColor": "#2563eb",
       "showSpinner": false,
       "splashFullScreen": true,
       "splashImmersive": true,
-      "layoutName": "splash_screen",
       "useDialog": true
     },
     "StatusBar": {

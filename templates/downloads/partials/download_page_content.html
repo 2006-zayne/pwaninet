@@ -572,22 +572,18 @@
                 }
                 apkBtn.disabled = true;
 
-                // Trigger file download silently via hidden iframe without page navigation
+                // Trigger file download via top-level navigation (see
+                // window.triggervastoDownload note on why iframes are not used).
+                // Attachment responses start the download and keep this page.
                 if (typeof window.triggervastoDownload === 'function') {
                     window.triggervastoDownload(downloadUrl);
                 } else {
-                    let iframe = document.getElementById('vasto-download-target');
-                    if (!iframe) {
-                        iframe = document.createElement('iframe');
-                        iframe.id = 'vasto-download-target';
-                        iframe.name = 'vasto-download-target';
-                        iframe.style.display = 'none';
-                        iframe.style.width = '0';
-                        iframe.style.height = '0';
-                        iframe.style.border = 'none';
-                        document.body.appendChild(iframe);
-                    }
-                    iframe.src = downloadUrl;
+                    const anchor = document.createElement('a');
+                    anchor.href = downloadUrl;
+                    anchor.rel = 'noopener';
+                    document.body.appendChild(anchor);
+                    anchor.click();
+                    anchor.remove();
                 }
 
                 setTimeout(function() {

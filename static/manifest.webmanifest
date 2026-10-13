@@ -128,7 +128,7 @@
     {
       "platform": "play",
       "id": "com.vasto.app",
-      "url": "https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk"
+      "url": "https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk"
     }
   ],
   "prefer_related_applications": false,
