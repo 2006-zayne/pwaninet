@@ -229,7 +229,7 @@
                         <button type="button" 
                                 id="apk-download-trigger-btn" 
                                 class="btn btn-success btn-lg w-100 fw-bold py-3 shadow-sm d-flex align-items-center justify-content-center gap-2"
-                                data-download-url="{{ github_apk_url|default:'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk' }}"
+                                data-download-url="{{ github_apk_url|default:'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk' }}"
                                 data-default-label="{% trans 'Download Mobile APK' %}"
                                 data-update-label="{% trans 'Update App' %}"
                                 data-running-label="{% trans 'Native APK Running' %}"
@@ -563,7 +563,7 @@
         if (apkBtn) {
             apkBtn.onclick = function(e) {
                 e.preventDefault();
-                const downloadUrl = apkBtn.getAttribute('data-download-url') || 'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk';
+                const downloadUrl = apkBtn.getAttribute('data-download-url') || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk';
 
                 if (apkBtn.disabled) return;
                 const originalHtml = apkBtnText ? apkBtnText.innerHTML : getNativeAppLabel('data-default-label', 'Download Mobile APK');

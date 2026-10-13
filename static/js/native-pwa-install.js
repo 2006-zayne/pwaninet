@@ -603,7 +603,7 @@ class NativePWAInstallManager {
         // file never downloads. A top-level navigation to an attachment URL
         // starts the download while keeping the current page in place.
         const triggerSilentDownload = (url) => {
-            const targetUrl = url || 'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk';
+            const targetUrl = url || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk';
             const anchor = document.createElement('a');
             anchor.href = targetUrl;
             anchor.rel = 'noopener';
@@ -627,7 +627,7 @@ class NativePWAInstallManager {
                 }
                 e.preventDefault();
                 e.stopPropagation();
-                triggerSilentDownload(link.href || 'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk');
+                triggerSilentDownload(link.href || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk');
             }
         });
     }

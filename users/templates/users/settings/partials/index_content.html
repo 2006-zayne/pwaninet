@@ -144,7 +144,7 @@
         let tag = (cached && Date.now() - cachedTime < 300000) ? cached : null;
 
         if (!tag) {
-          const res = await fetch('https://api.github.com/repos/2006-zayne/vasto/releases/latest');
+          const res = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
           if (res.ok) {
             const data = await res.json();
             tag = (data.tag_name || '').replace(/^v/, '').trim();

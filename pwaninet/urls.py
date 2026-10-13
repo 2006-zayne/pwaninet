@@ -104,7 +104,7 @@ def redirect_messaging(request):
     """Redirect any messaging URLs to home page since messaging is frozen for MVP"""
     return HttpResponseRedirect('/')
 
-GITHUB_RELEASE_APK_URL = 'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk'
+GITHUB_RELEASE_APK_URL = 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk'
 
 
 from django.core.signing import TimestampSigner, BadSignature
@@ -138,7 +138,7 @@ def download_android_apk(request):
         except BadSignature:
             return HttpResponseForbidden("Invalid or expired download token.")
     
-    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk')
+    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk')
     
     if getattr(settings, 'REDIRECT_APK_TO_GITHUB', True) and not getattr(settings, 'DEBUG', False):
         return HttpResponseRedirect(github_url)
@@ -174,7 +174,7 @@ def downloads_page_view(request):
       * Unknown sources / APK sideloading walkthrough
       * PWA install guidelines for iOS Safari & Android Chrome
     """
-    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/vasto/releases/latest/download/vasto.apk')
+    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk')
     
     # Resolve encrypted referral link for sharing from this page
     app_invite_token = ''

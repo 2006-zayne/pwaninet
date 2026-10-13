@@ -66,7 +66,7 @@ def resolve_version():
 _latest_version_cache = {"version": None, "timestamp": 0}
 
 
-def fetch_github_latest_release(repo="2006-zayne/vasto", timeout=3):
+def fetch_github_latest_release(repo="2006-zayne/pwaninet", timeout=3):
     """
     Fetch the latest release tag from GitHub Releases API or web redirect.
     Cached for 60 seconds to respect GitHub rate limits.
@@ -199,7 +199,7 @@ NATIVE_PATHS = ['android/', 'package.json', 'package-lock.json', 'capacitor.conf
 _latest_apk_version_cache = {"version": None, "timestamp": 0}
 
 
-def fetch_github_latest_apk_release(repo="2006-zayne/vasto", timeout=5):
+def fetch_github_latest_apk_release(repo="2006-zayne/pwaninet", timeout=5):
     """
     Fetch the latest release tag from GitHub Releases API that has an .apk asset attached.
     Cached for 10 minutes.
@@ -408,8 +408,8 @@ def clear_version_cache():
     _latest_apk_version_cache["timestamp"] = 0
     try:
         from django.core.cache import cache
-        cache.delete('github_latest_release:2006-zayne/vasto')
-        cache.delete('github_latest_apk_release:2006-zayne/vasto')
+        cache.delete('github_latest_release:2006-zayne/pwaninet')
+        cache.delete('github_latest_apk_release:2006-zayne/pwaninet')
     except Exception:
         pass
 

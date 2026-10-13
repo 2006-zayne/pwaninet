@@ -1171,7 +1171,7 @@ async function checkNativeAppUpdates(manual) {
 
         // Real-time GitHub Releases API check fallback
         try {
-            var ghRes = await fetch('https://api.github.com/repos/2006-zayne/vasto/releases/latest');
+            var ghRes = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
             if (ghRes.ok) {
                 var ghData = await ghRes.json();
                 var ghTag = (ghData.tag_name || '').replace(/^v/, '').trim();
