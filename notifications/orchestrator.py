@@ -1,5 +1,5 @@
 """
-Notification Orchestrator for PwaniNet Notification Engine v2
+Notification Orchestrator for vasto Notification Engine v2
 
 This module provides the Notification Orchestrator that coordinates all notification
 engines in the correct order to create an end-to-end notification pipeline.

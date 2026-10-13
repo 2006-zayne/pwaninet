@@ -1,5 +1,5 @@
 """
-Event Processor for PwaniNet Notification Engine v2
+Event Processor for vasto Notification Engine v2
 
 This module processes PlatformEvents through the notification pipeline.
 It connects PlatformEvent creation to the Rules Engine to create NotificationObjects.

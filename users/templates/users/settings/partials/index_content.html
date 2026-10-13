@@ -26,18 +26,18 @@
 
   {% include 'admin_dashboard/partials/feedback_composer.html' with category_choices=feedback_category_choices %}
 
-  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_about' icon_class='bi-info-circle' title='About PwaniNet' subtitle='Version, support, licenses...' is_htmx=True %}
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_about' icon_class='bi-info-circle' title='About vasto' subtitle='Version, support, licenses...' is_htmx=True %}
 </div>
 
 <!-- Mobile App Download Card (hidden inside native container) -->
 <div class="settings-app-download-card apk-download-card native-app-hidden" id="settings-apk-download-card">
   <div class="settings-app-download-inner">
     <div class="settings-app-download-icon">
-      <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="PwaniNet" width="48" height="48" style="border-radius:12px; object-fit: cover;" />
+      <img src="{% static 'images/vasto-app-icon.png' %}" alt="vasto" width="48" height="48" style="border-radius:12px; object-fit: cover;" />
     </div>
     <div class="settings-app-download-content">
       <div class="settings-app-download-title">
-        <span>{% trans "Download PwaniNet Mobile App" %}</span>
+        <span>{% trans "Download vasto Mobile App" %}</span>
         <span class="settings-app-badge">APK</span>
       </div>
       <p class="settings-app-download-desc">
@@ -55,7 +55,7 @@
         <i class="bi bi-grid-fill me-1"></i> {% trans "All Options" %}
       </a>
       <!-- Mobile: Direct APK Download Link (targets hidden iframe for zero page reload) -->
-      <a href="{% url 'download_android_apk' %}" target="pwaninet-download-target" data-apk-download="true" class="btn btn-primary btn-sm d-inline-flex d-md-none align-items-center" download="pwaninet.apk" hx-boost="false">
+      <a href="{% url 'download_android_apk' %}" target="vasto-download-target" data-apk-download="true" class="btn btn-primary btn-sm d-inline-flex d-md-none align-items-center" download="vasto.apk" hx-boost="false">
         <i class="bi bi-download me-1"></i> {% trans "Download APK" %}
       </a>
       <!-- Desktop: Install on your phone Modal Trigger -->
@@ -74,11 +74,11 @@
 <div class="settings-app-download-card apk-download-card native-app-only" id="settings-native-update-card">
   <div class="settings-app-download-inner">
     <div class="settings-app-download-icon">
-      <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="PwaniNet" width="48" height="48" style="border-radius:12px; object-fit: cover;" />
+      <img src="{% static 'images/vasto-app-icon.png' %}" alt="vasto" width="48" height="48" style="border-radius:12px; object-fit: cover;" />
     </div>
     <div class="settings-app-download-content">
       <div class="settings-app-download-title">
-        <span>{% trans "PwaniNet for Android" %}</span>
+        <span>{% trans "vasto for Android" %}</span>
         <span class="settings-app-badge" id="native-app-status-badge">{% trans "Installed" %}</span>
       </div>
       <p class="settings-app-download-desc" id="native-app-update-desc">
@@ -104,7 +104,7 @@
   </div>
 </div>
 
-<!-- Invite Friends to PwaniNet Card (Hidden in Settings next to download APK section) -->
+<!-- Invite Friends to vasto Card (Hidden in Settings next to download APK section) -->
 <div class="settings-app-download-card apk-download-card mb-3" id="settings-invite-friends-card" style="border-left: 4px solid var(--primary, #2563eb);">
   <div class="settings-app-download-inner">
     <div class="settings-app-download-icon d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(37, 99, 235, 0.1); color: var(--primary, #2563eb);">
@@ -112,11 +112,11 @@
     </div>
     <div class="settings-app-download-content">
       <div class="settings-app-download-title">
-        <span>{% trans "Invite Friends to PwaniNet" %}</span>
+        <span>{% trans "Invite Friends to vasto" %}</span>
         <span class="settings-app-badge bg-success text-white">{% trans "Classmates" %}</span>
       </div>
       <p class="settings-app-download-desc">
-        {% trans "Know students or friends who aren't on PwaniNet yet? Send them a friendly invite link to join course groups, share notes, and collaborate." %}
+        {% trans "Know students or friends who aren't on vasto yet? Send them a friendly invite link to join course groups, share notes, and collaborate." %}
       </p>
       {% if invite_data.platform_invite %}
       <div class="settings-app-download-meta">
@@ -127,7 +127,7 @@
       {% endif %}
     </div>
     <div class="settings-app-download-action">
-      <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-share-mode="platform_invite" data-share-url="{{ invite_data.platform_invite.url|default:global_platform_invite_url }}" data-share-text="{{ invite_data.platform_invite.text }}" title="{% trans 'Invite Friends to PwaniNet' %}">
+      <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center" data-bs-toggle="modal" data-bs-target="#globalShareModal" data-share-mode="platform_invite" data-share-url="{{ invite_data.platform_invite.url|default:global_platform_invite_url }}" data-share-text="{{ invite_data.platform_invite.text }}" title="{% trans 'Invite Friends to vasto' %}">
         <i class="bi bi-send-fill me-1"></i> {% trans "Invite Friends" %}
       </button>
     </div>
@@ -139,8 +139,8 @@
   (function() {
     async function syncLatestReleaseFromGitHub() {
       try {
-        const cached = sessionStorage.getItem('pwaninet_gh_latest');
-        const cachedTime = parseInt(sessionStorage.getItem('pwaninet_gh_latest_time') || '0', 10);
+        const cached = sessionStorage.getItem('vasto_gh_latest');
+        const cachedTime = parseInt(sessionStorage.getItem('vasto_gh_latest_time') || '0', 10);
         let tag = (cached && Date.now() - cachedTime < 300000) ? cached : null;
 
         if (!tag) {
@@ -149,8 +149,8 @@
             const data = await res.json();
             tag = (data.tag_name || '').replace(/^v/, '').trim();
             if (tag) {
-              sessionStorage.setItem('pwaninet_gh_latest', tag);
-              sessionStorage.setItem('pwaninet_gh_latest_time', String(Date.now()));
+              sessionStorage.setItem('vasto_gh_latest', tag);
+              sessionStorage.setItem('vasto_gh_latest_time', String(Date.now()));
             }
           }
         }
@@ -169,7 +169,7 @@
           }
         }
       } catch (e) {
-        console.warn('[PwaniNet] GitHub release sync error:', e);
+        console.warn('[vasto] GitHub release sync error:', e);
       }
     }
 

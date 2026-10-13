@@ -1,5 +1,5 @@
 /**
- * PwaniNet - Offline Media Library & Fullscreen Reels Engine
+ * vasto - Offline Media Library & Fullscreen Reels Engine
  * Handles offline video streaming, document viewing, photos, and audio playback.
  */
 
@@ -98,8 +98,8 @@
 
         // Remove keydown listener
         window.removeEventListener('keydown', handleReelsKeyDown);
-        window.removeEventListener('pwaninet:download-completed', handleDownloadUpdate);
-        window.removeEventListener('pwaninet:download-deleted', handleDownloadUpdate);
+        window.removeEventListener('vasto:download-completed', handleDownloadUpdate);
+        window.removeEventListener('vasto:download-deleted', handleDownloadUpdate);
     }
 
     async function loadItems() {
@@ -230,10 +230,10 @@
         window.addEventListener('keydown', handleReelsKeyDown);
 
         // Reactive updates
-        window.removeEventListener('pwaninet:download-completed', handleDownloadUpdate);
-        window.removeEventListener('pwaninet:download-deleted', handleDownloadUpdate);
-        window.addEventListener('pwaninet:download-completed', handleDownloadUpdate);
-        window.addEventListener('pwaninet:download-deleted', handleDownloadUpdate);
+        window.removeEventListener('vasto:download-completed', handleDownloadUpdate);
+        window.removeEventListener('vasto:download-deleted', handleDownloadUpdate);
+        window.addEventListener('vasto:download-completed', handleDownloadUpdate);
+        window.addEventListener('vasto:download-deleted', handleDownloadUpdate);
 
         // Stop fallback video playback on modal close
         const videoModal = document.getElementById('offlineVideoModal');
@@ -994,7 +994,7 @@
         } else {
             icon.className = 'bi bi-cloud-arrow-down';
             title.textContent = 'No downloaded media yet';
-            desc.textContent = 'Files you download while browsing PwaniNet will automatically be saved here for full offline streaming and viewing.';
+            desc.textContent = 'Files you download while browsing vasto will automatically be saved here for full offline streaming and viewing.';
         }
     }
 

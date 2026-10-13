@@ -3,7 +3,7 @@
  * Handles tiered installation flow:
  *  1. Standard Mobile Browser: Can see both PWA install and APK download options.
  *  2. Installed Standalone PWA: Suppress PWA install prompt, show APK upgrade banner on Android.
- *  3. Native APK (Capacitor / PwaniNetApp): Suppress both prompts completely.
+ *  3. Native APK (Capacitor / vastoApp): Suppress both prompts completely.
  */
 
 // Explicit environment detection functions
@@ -12,8 +12,8 @@ function isNativeAppContainer() {
         document.documentElement.classList.contains('is-native-app') ||
         document.documentElement.classList.contains('is-capacitor') ||
         typeof window.Capacitor !== 'undefined' ||
-        Boolean(window.AndroidBridge || window.PwaninetBridge) ||
-        navigator.userAgent.includes('PwaniNetApp')
+        Boolean(window.AndroidBridge || window.vastoBridge) ||
+        navigator.userAgent.includes('vastoApp')
     );
 }
 
@@ -111,8 +111,8 @@ class NativePWAInstallManager {
         // Automatically clean up banner on HTMX navigation to the downloads page
         document.addEventListener('htmx:afterSwap', () => {
             if (window.location.pathname.startsWith('/downloads') || window.location.pathname.startsWith('/download/')) {
-                const b = document.getElementById('pwaninet-install-banner') ||
-                          document.getElementById('pwaninet-apk-banner') ||
+                const b = document.getElementById('vasto-install-banner') ||
+                          document.getElementById('vasto-apk-banner') ||
                           document.getElementById('pwa-install-banner');
                 if (b) b.remove();
             }
@@ -129,12 +129,12 @@ class NativePWAInstallManager {
         this.deferredPrompt = null;
         localStorage.setItem('pwaInstalled', 'true');
 
-        const banners = document.querySelectorAll('#pwaninet-install-banner, #pwaninet-apk-banner, #pwa-install-banner');
+        const banners = document.querySelectorAll('#vasto-install-banner, #vasto-apk-banner, #pwa-install-banner');
         banners.forEach(b => b.remove());
 
-        const genericBanners = document.querySelectorAll('[id*="install"]:not(#pwaninet-install-banner):not(#pwa-install-trigger-btn), [class*="install"]:not([class*="apk"]):not(#pwa-install-trigger-btn)');
+        const genericBanners = document.querySelectorAll('[id*="install"]:not(#vasto-install-banner):not(#pwa-install-trigger-btn), [class*="install"]:not([class*="apk"]):not(#pwa-install-trigger-btn)');
         genericBanners.forEach(b => {
-            if (b.id !== 'pwaninet-install-banner' && !b.closest('#pwaninet-install-banner') && b.id !== 'pwa-install-trigger-btn') {
+            if (b.id !== 'vasto-install-banner' && !b.closest('#vasto-install-banner') && b.id !== 'pwa-install-trigger-btn') {
                 b.remove();
             }
         });
@@ -160,19 +160,19 @@ class NativePWAInstallManager {
         }
 
         // Check if user permanently opted out ("Never")
-        if (localStorage.getItem('pwaninet_unified_install_never') === 'true' ||
-            localStorage.getItem('pwaninet_apk_banner_never') === 'true') {
+        if (localStorage.getItem('vasto_unified_install_never') === 'true' ||
+            localStorage.getItem('vasto_apk_banner_never') === 'true') {
             return;
         }
 
         // Legacy check for prior dismissals
-        if (localStorage.getItem('pwaninet_apk_banner_dismissed') === 'true') {
+        if (localStorage.getItem('vasto_apk_banner_dismissed') === 'true') {
             return;
         }
 
         // Check if currently snoozed ("Not now")
-        const snoozedUntil = parseInt(localStorage.getItem('pwaninet_unified_install_snoozed_until') ||
-                                      localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
+        const snoozedUntil = parseInt(localStorage.getItem('vasto_unified_install_snoozed_until') ||
+                                      localStorage.getItem('vasto_apk_banner_snoozed_until') || '0', 10);
         if (snoozedUntil && Date.now() < snoozedUntil) {
             return;
         }
@@ -186,12 +186,12 @@ class NativePWAInstallManager {
         setTimeout(() => {
             if (isNativeAppContainer()) return;
             if (window.location.pathname.startsWith('/downloads') || window.location.pathname.startsWith('/download/')) return;
-            if (localStorage.getItem('pwaninet_unified_install_never') === 'true' ||
-                localStorage.getItem('pwaninet_apk_banner_never') === 'true') return;
-            if (localStorage.getItem('pwaninet_apk_banner_dismissed') === 'true') return;
+            if (localStorage.getItem('vasto_unified_install_never') === 'true' ||
+                localStorage.getItem('vasto_apk_banner_never') === 'true') return;
+            if (localStorage.getItem('vasto_apk_banner_dismissed') === 'true') return;
 
-            const currentSnooze = parseInt(localStorage.getItem('pwaninet_unified_install_snoozed_until') ||
-                                           localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
+            const currentSnooze = parseInt(localStorage.getItem('vasto_unified_install_snoozed_until') ||
+                                           localStorage.getItem('vasto_apk_banner_snoozed_until') || '0', 10);
             if (currentSnooze && Date.now() < currentSnooze) return;
 
             this.showUnifiedInstallBanner();
@@ -201,17 +201,17 @@ class NativePWAInstallManager {
     showUnifiedInstallBanner() {
         if (isNativeAppContainer()) return;
         if (window.location.pathname.startsWith('/downloads') || window.location.pathname.startsWith('/download/')) return;
-        if (localStorage.getItem('pwaninet_unified_install_never') === 'true' ||
-            localStorage.getItem('pwaninet_apk_banner_never') === 'true') return;
-        if (localStorage.getItem('pwaninet_apk_banner_dismissed') === 'true') return;
+        if (localStorage.getItem('vasto_unified_install_never') === 'true' ||
+            localStorage.getItem('vasto_apk_banner_never') === 'true') return;
+        if (localStorage.getItem('vasto_apk_banner_dismissed') === 'true') return;
 
-        const snoozedUntil = parseInt(localStorage.getItem('pwaninet_unified_install_snoozed_until') ||
-                                      localStorage.getItem('pwaninet_apk_banner_snoozed_until') || '0', 10);
+        const snoozedUntil = parseInt(localStorage.getItem('vasto_unified_install_snoozed_until') ||
+                                      localStorage.getItem('vasto_apk_banner_snoozed_until') || '0', 10);
         if (snoozedUntil && Date.now() < snoozedUntil) return;
 
         // Ensure ONLY ONE banner exists in the DOM
-        if (document.getElementById('pwaninet-install-banner') ||
-            document.getElementById('pwaninet-apk-banner') ||
+        if (document.getElementById('vasto-install-banner') ||
+            document.getElementById('vasto-apk-banner') ||
             document.getElementById('pwa-install-banner')) {
             return;
         }
@@ -220,32 +220,32 @@ class NativePWAInstallManager {
 
         const isStandalone = isStandalonePWA();
         const banner = document.createElement('div');
-        banner.id = 'pwaninet-install-banner';
-        banner.className = 'pwaninet-banner-toast';
+        banner.id = 'vasto-install-banner';
+        banner.className = 'vasto-banner-toast';
         banner.innerHTML = `
-            <div class="pwaninet-apk-banner-inner">
-                <div class="pwaninet-apk-banner-icon">
-                    <img src="/static/images/pwaninet-app-icon.png" alt="PwaniNet" width="42" height="42" style="border-radius:10px;"/>
+            <div class="vasto-apk-banner-inner">
+                <div class="vasto-apk-banner-icon">
+                    <img src="/static/images/vasto-app-icon.png" alt="vasto" width="42" height="42" style="border-radius:10px;"/>
                 </div>
-                <div class="pwaninet-apk-banner-content">
-                    <div class="pwaninet-apk-banner-title">
-                        <span>PwaniNet App</span>
-                        <span class="pwaninet-apk-badge">Install</span>
+                <div class="vasto-apk-banner-content">
+                    <div class="vasto-apk-banner-title">
+                        <span>vasto App</span>
+                        <span class="vasto-apk-badge">Install</span>
                     </div>
-                    <div class="pwaninet-apk-banner-sub">
+                    <div class="vasto-apk-banner-sub">
                         ${isStandalone ? 'Get the native Android APK for faster speed & background push.' : 'Install the Web App (PWA) or download the Android APK.'}
                     </div>
                 </div>
-                <div class="pwaninet-apk-banner-actions">
-                    <a id="pwaninet-unified-download-btn" href="/downloads/" class="btn btn-primary btn-sm">
+                <div class="vasto-apk-banner-actions">
+                    <a id="vasto-unified-download-btn" href="/downloads/" class="btn btn-primary btn-sm">
                         <i class="bi bi-download me-1"></i>Download
                     </a>
-                    <div class="pwaninet-apk-banner-secondary-actions">
-                        <button id="pwaninet-unified-snooze-btn" class="pwaninet-btn-text" type="button" title="Remind me in 7 days">
+                    <div class="vasto-apk-banner-secondary-actions">
+                        <button id="vasto-unified-snooze-btn" class="vasto-btn-text" type="button" title="Remind me in 7 days">
                             Not now
                         </button>
-                        <span class="pwaninet-action-divider">•</span>
-                        <button id="pwaninet-unified-never-btn" class="pwaninet-btn-text" type="button" title="Don't show again">
+                        <span class="vasto-action-divider">•</span>
+                        <button id="vasto-unified-never-btn" class="vasto-btn-text" type="button" title="Don't show again">
                             Never
                         </button>
                     </div>
@@ -255,17 +255,17 @@ class NativePWAInstallManager {
 
         document.body.appendChild(banner);
 
-        const downloadBtn = document.getElementById('pwaninet-unified-download-btn');
-        const snoozeBtn = document.getElementById('pwaninet-unified-snooze-btn');
-        const neverBtn = document.getElementById('pwaninet-unified-never-btn');
+        const downloadBtn = document.getElementById('vasto-unified-download-btn');
+        const snoozeBtn = document.getElementById('vasto-unified-snooze-btn');
+        const neverBtn = document.getElementById('vasto-unified-never-btn');
 
         // "Not now" -> snooze for 7 days
         if (snoozeBtn) {
             snoozeBtn.addEventListener('click', () => {
                 banner.remove();
                 const sevenDaysLater = Date.now() + (7 * 24 * 60 * 60 * 1000);
-                localStorage.setItem('pwaninet_unified_install_snoozed_until', sevenDaysLater.toString());
-                localStorage.setItem('pwaninet_apk_banner_snoozed_until', sevenDaysLater.toString());
+                localStorage.setItem('vasto_unified_install_snoozed_until', sevenDaysLater.toString());
+                localStorage.setItem('vasto_apk_banner_snoozed_until', sevenDaysLater.toString());
                 console.log('[PWA] Unified banner snoozed for 7 days');
             });
         }
@@ -274,8 +274,8 @@ class NativePWAInstallManager {
         if (neverBtn) {
             neverBtn.addEventListener('click', () => {
                 banner.remove();
-                localStorage.setItem('pwaninet_unified_install_never', 'true');
-                localStorage.setItem('pwaninet_apk_banner_never', 'true');
+                localStorage.setItem('vasto_unified_install_never', 'true');
+                localStorage.setItem('vasto_apk_banner_never', 'true');
                 console.log('[PWA] Unified banner dismissed permanently');
             });
         }
@@ -284,8 +284,8 @@ class NativePWAInstallManager {
         if (downloadBtn) {
             downloadBtn.addEventListener('click', () => {
                 const fourteenDaysLater = Date.now() + (14 * 24 * 60 * 60 * 1000);
-                localStorage.setItem('pwaninet_unified_install_snoozed_until', fourteenDaysLater.toString());
-                localStorage.setItem('pwaninet_apk_banner_snoozed_until', fourteenDaysLater.toString());
+                localStorage.setItem('vasto_unified_install_snoozed_until', fourteenDaysLater.toString());
+                localStorage.setItem('vasto_apk_banner_snoozed_until', fourteenDaysLater.toString());
                 setTimeout(() => {
                     if (banner.parentNode) banner.parentNode.removeChild(banner);
                 }, 300);
@@ -294,18 +294,18 @@ class NativePWAInstallManager {
     }
 
     injectBannerStyles() {
-        if (document.getElementById('pwaninet-banner-styles')) return;
+        if (document.getElementById('vasto-banner-styles')) return;
 
         const style = document.createElement('style');
-        style.id = 'pwaninet-banner-styles';
+        style.id = 'vasto-banner-styles';
         style.textContent = `
-            #pwaninet-install-banner, #pwaninet-apk-banner, #pwa-install-banner {
+            #vasto-install-banner, #vasto-apk-banner, #pwa-install-banner {
                 position: fixed;
                 right: 16px;
                 left: 16px;
                 max-width: 420px;
                 margin: 0 auto;
-                bottom: calc(84px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                bottom: calc(84px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
                 z-index: 10001;
                 background: var(--card-bg, #ffffff);
                 color: var(--text-dark, #0f172a);
@@ -315,11 +315,11 @@ class NativePWAInstallManager {
                 overflow: hidden;
                 backdrop-filter: blur(12px);
                 -webkit-backdrop-filter: blur(12px);
-                animation: pwaninet-banner-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                animation: vasto-banner-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             @media (min-width: 768px) {
-                #pwaninet-install-banner, #pwaninet-apk-banner, #pwa-install-banner {
+                #vasto-install-banner, #vasto-apk-banner, #pwa-install-banner {
                     left: auto;
                     right: 24px;
                     bottom: 24px;
@@ -327,25 +327,25 @@ class NativePWAInstallManager {
                 }
             }
 
-            .pwaninet-apk-banner-inner, .pwa-install-inner {
+            .vasto-apk-banner-inner, .pwa-install-inner {
                 display: flex;
                 gap: 12px;
                 align-items: center;
                 padding: 12px 14px;
             }
 
-            .pwaninet-apk-banner-icon, .pwa-install-left {
+            .vasto-apk-banner-icon, .pwa-install-left {
                 flex-shrink: 0;
                 display: flex;
                 align-items: center;
             }
 
-            .pwaninet-apk-banner-content, .pwa-install-body {
+            .vasto-apk-banner-content, .pwa-install-body {
                 flex: 1;
                 min-width: 0;
             }
 
-            .pwaninet-apk-banner-title, .pwa-install-title {
+            .vasto-apk-banner-title, .pwa-install-title {
                 font-weight: 700;
                 font-size: 14px;
                 color: var(--text-dark, #0f172a);
@@ -355,7 +355,7 @@ class NativePWAInstallManager {
                 line-height: 1.2;
             }
 
-            .pwaninet-apk-badge {
+            .vasto-apk-badge {
                 background: var(--primary-light, #dbeafe);
                 color: var(--primary, #2563eb);
                 font-size: 10px;
@@ -366,26 +366,26 @@ class NativePWAInstallManager {
                 letter-spacing: 0.5px;
             }
 
-            [data-theme="dark"] .pwaninet-apk-badge {
+            [data-theme="dark"] .vasto-apk-badge {
                 background: var(--primary-light, #312e81);
                 color: #a5b4fc;
             }
 
-            .pwaninet-apk-banner-sub, .pwa-install-sub {
+            .vasto-apk-banner-sub, .pwa-install-sub {
                 font-size: 12px;
                 color: var(--text-secondary, #64748b);
                 margin-top: 3px;
                 line-height: 1.3;
             }
 
-            .pwaninet-apk-banner-actions, .pwa-install-actions {
+            .vasto-apk-banner-actions, .pwa-install-actions {
                 display: flex;
                 flex-direction: column;
                 gap: 6px;
                 flex-shrink: 0;
             }
 
-            .pwaninet-apk-banner-actions .btn, .pwa-install-actions .btn {
+            .vasto-apk-banner-actions .btn, .pwa-install-actions .btn {
                 font-size: 12px;
                 padding: 6px 12px;
                 border-radius: 8px;
@@ -398,7 +398,7 @@ class NativePWAInstallManager {
                 cursor: pointer;
             }
 
-            .pwaninet-apk-banner-secondary-actions {
+            .vasto-apk-banner-secondary-actions {
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -406,7 +406,7 @@ class NativePWAInstallManager {
                 margin-top: 2px;
             }
 
-            .pwaninet-btn-text {
+            .vasto-btn-text {
                 background: transparent;
                 border: none;
                 padding: 0;
@@ -419,25 +419,25 @@ class NativePWAInstallManager {
                 text-underline-offset: 2px;
             }
 
-            .pwaninet-btn-text:hover {
+            .vasto-btn-text:hover {
                 color: var(--text-dark, #0f172a);
             }
 
-            [data-theme="dark"] .pwaninet-btn-text {
+            [data-theme="dark"] .vasto-btn-text {
                 color: var(--text-secondary, #94a3b8);
             }
 
-            [data-theme="dark"] .pwaninet-btn-text:hover {
+            [data-theme="dark"] .vasto-btn-text:hover {
                 color: #ffffff;
             }
 
-            .pwaninet-action-divider {
+            .vasto-action-divider {
                 font-size: 10px;
                 color: var(--text-secondary, #94a3b8);
                 opacity: 0.6;
             }
 
-            @keyframes pwaninet-banner-fade-up {
+            @keyframes vasto-banner-fade-up {
                 from {
                     opacity: 0;
                     transform: translateY(16px);
@@ -543,13 +543,13 @@ class NativePWAInstallManager {
         div.id = id;
         div.innerHTML = `
             <div class="pwa-install-instr">
-                <div><strong>Install PwaniNet</strong></div>
+                <div><strong>Install vasto</strong></div>
                 <div style="font-size:13px; margin-top:6px">Tap Share → Add to Home Screen (iOS) or use Install in browser menu (Android/Desktop)</div>
                 <button id="pwa-install-instr-dismiss" style="margin-top:8px;padding:6px 10px;border-radius:8px;border:none;background:var(--primary, #2563eb);color:#fff">Got it</button>
             </div>
         `;
         const style = document.createElement('style');
-        style.textContent = `#${id}{position:fixed;left:16px;right:16px;bottom:calc(84px + var(--pwaninet-safe-area-bottom, 0px));background:rgba(0,0,0,0.85);color:#fff;padding:12px;border-radius:12px;z-index:10001;text-align:center}`;
+        style.textContent = `#${id}{position:fixed;left:16px;right:16px;bottom:calc(84px + var(--vasto-safe-area-bottom, 0px));background:rgba(0,0,0,0.85);color:#fff;padding:12px;border-radius:12px;z-index:10001;text-align:center}`;
         document.head.appendChild(style);
         document.body.appendChild(div);
         document.getElementById('pwa-install-instr-dismiss').addEventListener('click', () => div.remove());
@@ -558,9 +558,9 @@ class NativePWAInstallManager {
     showInstallReminder() {
         const r = document.createElement('div');
         r.className = 'pwa-install-reminder';
-        r.innerHTML = '<div style="padding:8px 12px;background:var(--primary, #2563eb);color:#fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15)">Install PwaniNet for best experience</div>';
+        r.innerHTML = '<div style="padding:8px 12px;background:var(--primary, #2563eb);color:#fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15)">Install vasto for best experience</div>';
         r.style.position = 'fixed';
-        r.style.bottom = 'calc(84px + var(--pwaninet-safe-area-bottom, 0px))';
+        r.style.bottom = 'calc(84px + var(--vasto-safe-area-bottom, 0px))';
         r.style.right = '16px';
         r.style.zIndex = '10001';
         document.body.appendChild(r);
@@ -571,7 +571,7 @@ class NativePWAInstallManager {
         const s = document.createElement('div');
         s.innerHTML = '<div style="padding:10px 14px;background:#10b981;color:#fff;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15)">Installed ✓</div>';
         s.style.position = 'fixed';
-        s.style.bottom = 'calc(84px + var(--pwaninet-safe-area-bottom, 0px))';
+        s.style.bottom = 'calc(84px + var(--vasto-safe-area-bottom, 0px))';
         s.style.right = '16px';
         s.style.zIndex = '10001';
         document.body.appendChild(s);
@@ -597,25 +597,24 @@ class NativePWAInstallManager {
     }
 
     initSilentDownload() {
+        // NOTE: hidden-iframe downloads are intentionally NOT used here.
+        // GitHub release URLs (and our own endpoint, which 302s to GitHub)
+        // send X-Frame-Options: deny, so iframe loads are refused and the
+        // file never downloads. A top-level navigation to an attachment URL
+        // starts the download while keeping the current page in place.
         const triggerSilentDownload = (url) => {
-            let iframe = document.getElementById('pwaninet-download-target');
-            if (!iframe) {
-                iframe = document.createElement('iframe');
-                iframe.id = 'pwaninet-download-target';
-                iframe.name = 'pwaninet-download-target';
-                iframe.style.display = 'none';
-                iframe.style.width = '0';
-                iframe.style.height = '0';
-                iframe.style.border = 'none';
-                document.body.appendChild(iframe);
-            }
-            const targetUrl = url || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk';
-            iframe.src = targetUrl;
-            console.log('[PWA] Triggered silent APK download via iframe:', targetUrl);
+            const targetUrl = url || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk';
+            const anchor = document.createElement('a');
+            anchor.href = targetUrl;
+            anchor.rel = 'noopener';
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            console.log('[PWA] Triggered APK download via top-level navigation:', targetUrl);
         };
 
         // Expose globally
-        window.triggerPwaninetDownload = triggerSilentDownload;
+        window.triggervastoDownload = triggerSilentDownload;
 
         // Global click interceptor: prevents top-level page navigation & reloads on downloads
         document.addEventListener('click', (e) => {
@@ -628,7 +627,7 @@ class NativePWAInstallManager {
                 }
                 e.preventDefault();
                 e.stopPropagation();
-                triggerSilentDownload(link.href || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk');
+                triggerSilentDownload(link.href || 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk');
             }
         });
     }

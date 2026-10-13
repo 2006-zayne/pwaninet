@@ -206,7 +206,7 @@ MFA_ENCRYPTION_KEY = os.environ.get('MFA_ENCRYPTION_KEY', None)
 TOTP_DIGITS = int(os.environ.get('TOTP_DIGITS', 6))
 TOTP_INTERVAL = int(os.environ.get('TOTP_INTERVAL', 30))
 TOTP_ALLOWED_DRIFT = int(os.environ.get('TOTP_ALLOWED_DRIFT', 1))
-TOTP_ISSUER = os.environ.get('TOTP_ISSUER', 'PwaniNet')
+TOTP_ISSUER = os.environ.get('TOTP_ISSUER', 'pwaninet')
 RECOVERY_CODE_COUNT = int(os.environ.get('RECOVERY_CODE_COUNT', 8))
 
 # Caching configuration
@@ -274,7 +274,7 @@ SIMPLE_JWT = {
 
 # drf-spectacular settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Pwaninet API',
+    'TITLE': 'Vasto API',
     'DESCRIPTION': 'Social networking platform for students and academic communities',
     'VERSION': version.__version__,
     'SERVE_INCLUDE_SCHEMA': False,

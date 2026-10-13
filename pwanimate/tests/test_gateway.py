@@ -566,7 +566,7 @@ class OpenRouterLLMProviderTestCase(SimpleTestCase):
         # Check attribution headers
         call_args = mock_post.call_args
         self.assertEqual(call_args[1]["headers"]["Authorization"], "Bearer sk-or-test-key")
-        self.assertEqual(call_args[1]["headers"]["HTTP-Referer"], "https://pwaninet.local")
+        self.assertEqual(call_args[1]["headers"]["HTTP-Referer"], "https://vasto.local")
         self.assertEqual(call_args[1]["headers"]["X-Title"], "Pwanimate")
 
     @patch("requests.Session.post")

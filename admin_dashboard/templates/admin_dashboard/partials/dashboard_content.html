@@ -116,18 +116,18 @@
 
     function loadChartJs() {
       if (window.Chart) return Promise.resolve(window.Chart);
-      if (window.pwaninetChartJsPromise) return window.pwaninetChartJsPromise;
-      window.pwaninetChartJsPromise = new Promise((resolve, reject) => {
+      if (window.vastoChartJsPromise) return window.vastoChartJsPromise;
+      window.vastoChartJsPromise = new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
         script.onload = () => resolve(window.Chart);
         script.onerror = () => {
-          window.pwaninetChartJsPromise = null;
+          window.vastoChartJsPromise = null;
           reject(new Error('Chart.js failed to load'));
         };
         document.head.appendChild(script);
       });
-      return window.pwaninetChartJsPromise;
+      return window.vastoChartJsPromise;
     }
 
     function renderDashboardCharts() {
@@ -172,13 +172,13 @@
       });
     }
 
-    window.pwaninetRenderDashboardCharts = renderDashboardCharts;
+    window.vastoRenderDashboardCharts = renderDashboardCharts;
     renderDashboardCharts();
-    if (!window.pwaninetDashboardChartEventsBound) {
-      window.pwaninetDashboardChartEventsBound = true;
+    if (!window.vastoDashboardChartEventsBound) {
+      window.vastoDashboardChartEventsBound = true;
       const renderCurrentDashboardCharts = () => {
-        if (typeof window.pwaninetRenderDashboardCharts === 'function') {
-          window.pwaninetRenderDashboardCharts();
+        if (typeof window.vastoRenderDashboardCharts === 'function') {
+          window.vastoRenderDashboardCharts();
         }
       };
       document.addEventListener('htmx:afterSwap', renderCurrentDashboardCharts);

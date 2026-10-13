@@ -1,5 +1,5 @@
 """
-Unified Recommendation Engine for PwaniNet.
+Unified Recommendation Engine for vasto.
 Orchestrates multi-domain recommendations across Users, Groups, and Documents.
 """
 

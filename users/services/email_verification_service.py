@@ -29,10 +29,10 @@ def send_verification_email(user):
     context = {
         'user': user,
         'verification_url': verification_url,
-        'site_name': 'Pwaninet',
+        'site_name': 'vasto',
     }
     
-    subject = 'Verify your email address on Pwaninet'
+    subject = 'Verify your email address on vasto'
     html_message = render_to_string('users/emails/verification_email.html', context)
     plain_message = render_to_string('users/emails/verification_email.txt', context)
     

@@ -12,7 +12,7 @@ class WebSearchTool(BaseDomainTool):
     description = (
         "Search public websites whenever a public answer needs current, recent, or independently "
         "verified facts, even when the student did not explicitly request a search. Use for public web facts only; "
-        "use PwaniNet tools for campus posts, documents, people, groups, or private account data. "
+        "use vasto tools for campus posts, documents, people, groups, or private account data. "
         "Returns source titles, URLs, snippets, dates, and relevance scores."
     )
     parameters_schema = {

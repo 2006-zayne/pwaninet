@@ -1,5 +1,5 @@
 /**
- * PwaniNet - Offline Media Library & Reels Viewer Styles
+ * vasto - Offline Media Library & Reels Viewer Styles
  */
 
 .btn-gradient-reels {
@@ -91,9 +91,9 @@
     left: 0;
     right: 0;
     z-index: 35;
-    padding-top: calc(14px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
-    padding-left: calc(14px + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)));
-    padding-right: calc(14px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+    padding-top: calc(14px + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px)));
+    padding-left: calc(14px + var(--vasto-safe-area-left, env(safe-area-inset-left, 0px)));
+    padding-right: calc(14px + var(--vasto-safe-area-right, env(safe-area-inset-right, 0px)));
     padding-bottom: 12px;
     background: linear-gradient(180deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 100%);
     pointer-events: auto;
@@ -102,7 +102,7 @@
 .reels-top-center-counter {
     position: absolute;
     left: 50%;
-    top: calc(14px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) + 19px);
+    top: calc(14px + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px)) + 19px);
     transform: translate(-50%, -50%);
     pointer-events: none;
     z-index: 40;
@@ -238,8 +238,8 @@
     justify-content: flex-end;
     align-items: center;
     gap: 18px;
-    padding-bottom: calc(75px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-    padding-right: var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(75px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+    padding-right: var(--vasto-safe-area-right, env(safe-area-inset-right, 0px));
     background: rgba(0, 0, 0, 0.18) !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -324,9 +324,9 @@
 
 .offline-reels-bottom-info {
     position: absolute;
-    left: calc(16px + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)));
-    bottom: calc(16px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-    right: calc(75px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+    left: calc(16px + var(--vasto-safe-area-left, env(safe-area-inset-left, 0px)));
+    bottom: calc(16px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+    right: calc(75px + var(--vasto-safe-area-right, env(safe-area-inset-right, 0px)));
     z-index: 25;
     pointer-events: auto;
     text-shadow: 0 1px 4px rgba(0,0,0,0.85);
@@ -394,14 +394,14 @@ body.in-reels-mode nav {
 
 /* Safe area padding for offline media hub */
 .offline-media-container {
-    padding-left: calc(0.5rem + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)));
-    padding-right: calc(0.5rem + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
-    padding-bottom: calc(90px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+    padding-left: calc(0.5rem + var(--vasto-safe-area-left, env(safe-area-inset-left, 0px)));
+    padding-right: calc(0.5rem + var(--vasto-safe-area-right, env(safe-area-inset-right, 0px)));
+    padding-bottom: calc(90px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
 }
 @media (min-width: 768px) {
     .offline-media-container {
-        padding-left: calc(1.5rem + var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px)));
-        padding-right: calc(1.5rem + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+        padding-left: calc(1.5rem + var(--vasto-safe-area-left, env(safe-area-inset-left, 0px)));
+        padding-right: calc(1.5rem + var(--vasto-safe-area-right, env(safe-area-inset-right, 0px)));
     }
 }
 
@@ -411,9 +411,9 @@ body.in-reels-mode nav {
     #offlineVideoModal .modal-content,
     #offlineImageModal .modal-content,
     #offlineAudioModal .modal-content {
-        padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px));
-        padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px));
-        padding-left: var(--pwaninet-safe-area-left, env(safe-area-inset-left, 0px));
-        padding-right: var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px));
+        padding-top: var(--vasto-safe-area-top, env(safe-area-inset-top, 0px));
+        padding-bottom: var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px));
+        padding-left: var(--vasto-safe-area-left, env(safe-area-inset-left, 0px));
+        padding-right: var(--vasto-safe-area-right, env(safe-area-inset-right, 0px));
     }
 }

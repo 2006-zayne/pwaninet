@@ -1,5 +1,5 @@
 /**
- * Sync Manager for PwaniNet Messaging
+ * Sync Manager for vasto Messaging
  * Handles synchronization between offline cache and server
  */
 

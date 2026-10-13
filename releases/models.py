@@ -7,7 +7,7 @@ import json
 
 class Release(models.Model):
     """
-    Release model for managing PWANINET versions and releases.
+    Release model for managing vasto versions and releases.
     Supports future expansion for release channels, staged rollouts, etc.
     """
     

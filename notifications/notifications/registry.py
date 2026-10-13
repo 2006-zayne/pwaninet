@@ -1,5 +1,5 @@
 """
-Notification Registry for PwaniNet Notification Engine v2
+Notification Registry for vasto Notification Engine v2
 
 This module provides centralized registries for notification-related enums.
 Following the specification and avoiding string literals throughout the codebase.

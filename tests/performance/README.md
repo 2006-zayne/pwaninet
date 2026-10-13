@@ -1,4 +1,4 @@
-# PwaniNet performance test kit
+# vasto performance test kit
 
 This kit separates the two timing questions:
 
@@ -57,7 +57,7 @@ Use a normal browser signed into a staging test account (one user is enough):
 
 1. Open DevTools Console and paste the contents of `tests/performance/browser_probe.js`.
 2. Click Home, Profile, and Groups a few times, including one cold load if relevant.
-3. Run `PwaniNetPerfProbe.download()` in the Console.
+3. Run `vastoPerfProbe.download()` in the Console.
 4. Keep the downloaded JSON together with the matching Locust and server logs.
 
 The JSON contains URLs, timings, browser details, response byte lengths, request IDs, and long-task durations. Review it before sharing; it may reveal the test username and staging route names.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`users` owns PwaniNet accounts, profile information, authentication-related workflows, account security, privacy choices, and relationships between users.
+`users` owns vasto accounts, profile information, authentication-related workflows, account security, privacy choices, and relationships between users.
 
 ## Main data
 

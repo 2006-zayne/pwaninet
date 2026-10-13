@@ -37,7 +37,7 @@ class PwanimateRenderingApiTests(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(
             username="student_render_test",
-            email="render_test@pwaninet.local",
+            email="render_test@vasto.local",
             password="testpassword123",
         )
 
@@ -147,7 +147,7 @@ class PwanimateTemplateRenderingTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="student_template_test",
-            email="template_test@pwaninet.local",
+            email="template_test@vasto.local",
             password="testpassword123",
         )
         self.conversation = PwanimateConversation.objects.create(

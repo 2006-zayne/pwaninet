@@ -33,7 +33,7 @@ Internal operator/developer document. Do not link this file from the student-fac
 ## Licences and release readiness
 
 - **Third-party licence inventory:** review Python and JavaScript dependencies, vendored libraries, fonts, icons, images, and Android/native components. Add all required notices before exposing the student-facing licence note.
-- **Project code licence:** PwaniNet has no open-source licence selected. Keep the repository marked `UNLICENSED`; do not imply that MIT or any other reuse licence applies.
+- **Project code licence:** vasto has no open-source licence selected. Keep the repository marked `UNLICENSED`; do not imply that MIT or any other reuse licence applies.
 - **Public pages and links:** implement the approved About and Privacy pages and the short licence notice. Link Privacy from login and Settings → About; link About and licence information where appropriate. Keep the internal documentation index and this issue list unavailable from student-facing navigation.
 - **Effective date and changes:** set the policy effective date and decide how material updates will be communicated.
 - **Launch feature scope:** confirm direct messaging remains disabled in production; it is frozen until further notice.

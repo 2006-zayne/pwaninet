@@ -1,5 +1,5 @@
 /**
- * Offline UI Components for PwaniNet Messaging
+ * Offline UI Components for vasto Messaging
  * Handles UI elements for offline messaging experience
  */
 

@@ -1,14 +1,15 @@
 {% load static %}
 {% load i18n %}
 <div class="container d-flex justify-content-between align-items-center h-100 flex-nowrap px-2 px-sm-3">
-    <a class="nav-brand-tactical"
+    <a class="nav-brand-tactical d-flex align-items-center text-decoration-none"
        href="{% url 'posts:home' %}"
        hx-get="{% url 'posts:home' %}"
        hx-target="#page-content-target"
        hx-swap="innerHTML"
        hx-push-url="true"
        hx-history="true">
-        PWANI<span class="brand-net">NET</span>
+        <img src="{% static 'images/vasto-transparent.png' %}" alt="vasto" style="width: 32px; height: 32px; object-fit: contain; margin-right: 8px;">
+        <span>VASTO</span>
     </a>
 
     <div class="d-none d-md-flex d-lg-none gap-1 gap-md-2">
@@ -115,15 +116,15 @@
         {% endif %}
 
         {% if request.user.is_authenticated %}
-        <!-- Pwanimate Quick Entry (Mobile & Desktop) -->
+        <!-- Spark Quick Entry (Mobile & Desktop) -->
         <a href="{% url 'pwanimate:index' %}"
            class="btn btn-link p-0 text-decoration-none d-flex align-items-center justify-content-center"
            style="color: var(--primary, #2563eb); width: 28px; height: 28px;"
-           title="Pwanimate AI Assistant"
-           aria-label="Pwanimate AI Assistant"
+           title="Spark AI Assistant"
+           aria-label="Spark AI Assistant"
            data-bypass-htmx="true"
            hx-boost="false">
-            <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" alt="Pwanimate" style="width: 24px; height: 24px; object-fit: contain;">
+            <img src="{% static 'images/pwanimate/pwanimate-transparent.png' %}" alt="Spark" style="width: 24px; height: 24px; object-fit: contain;">
         </a>
         {% endif %}
 

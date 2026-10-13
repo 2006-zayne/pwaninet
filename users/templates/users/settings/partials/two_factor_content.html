@@ -223,7 +223,7 @@
         <div class="card card-body border-0 shadow-sm p-4 rounded-3" style="background: var(--page-bg); border: 1px solid var(--border) !important;">
           <h6 class="fw-bold text-dark mb-1" data-theme-text>{% trans "Regenerate Recovery Codes" %}</h6>
           <p class="text-secondary small mb-3">
-            {% trans "Regenerating will permanently invalidate all existing recovery codes. Enter your current 6-digit authenticator code to confirm." %}
+            {% trans "Regenerating will permanently invalidate all existing recovery codes. Enter your current 6-digit authenticator code or a recovery code to confirm." %}
           </p>
           <form method="POST" action="{% url 'users:settings_two_factor_regenerate_codes' %}" hx-post="{% url 'users:settings_two_factor_regenerate_codes' %}" hx-target="#page-content-target" hx-swap="innerHTML">
             {% csrf_token %}
@@ -262,7 +262,7 @@
         <div class="collapse mt-3" id="disableCollapse">
           <div class="card card-body border-0 shadow-sm p-3 rounded-3" style="background: var(--page-bg); border: 1px solid rgba(220, 53, 69, 0.3) !important;">
             <p class="small text-danger fw-semibold mb-2">
-              <i class="bi bi-shield-exclamation me-1"></i>{% trans "Enter your 6-digit authenticator code to confirm disabling 2FA:" %}
+              <i class="bi bi-shield-exclamation me-1"></i>{% trans "Enter your 6-digit authenticator code or a recovery code to confirm disabling 2FA:" %}
             </p>
             <form method="POST" action="{% url 'users:settings_two_factor_disable' %}" hx-post="{% url 'users:settings_two_factor_disable' %}" hx-target="#page-content-target" hx-swap="innerHTML">
               {% csrf_token %}
@@ -299,7 +299,7 @@
       </div>
       <h3 class="fw-bold mb-2 text-dark" data-theme-text>{% trans "Protect Your Account with 2FA" %}</h3>
       <p class="text-secondary mb-4 mx-auto" style="max-width: 520px;">
-        {% trans "Two-factor authentication adds an extra layer of security to your PwaniNet account. Once enabled, you'll enter a 6-digit verification code from your authenticator app whenever you perform sensitive security actions." %}
+        {% trans "Two-factor authentication adds an extra layer of security to your vasto account. Once enabled, you'll enter a 6-digit verification code from your authenticator app whenever you perform sensitive security actions." %}
       </p>
 
       <div class="row g-3 text-start mx-auto mb-4" style="max-width: 640px;">
@@ -436,7 +436,7 @@ function downloadRecoveryCodesFile(username) {
 
   var lines = [
     "==================================================",
-    "  PwaniNet Two-Factor Authentication Recovery Codes",
+    "  vasto Two-Factor Authentication Recovery Codes",
     "  Account: " + username,
     "  Generated: " + new Date().toISOString().split('T')[0],
     "==================================================",
@@ -463,7 +463,7 @@ function downloadRecoveryCodesFile(username) {
   var a = document.createElement("a");
   a.style.display = "none";
   a.href = url;
-  a.download = "pwaninet-recovery-codes-" + username + ".txt";
+  a.download = "vasto-recovery-codes-" + username + ".txt";
   document.body.appendChild(a);
   a.click();
   setTimeout(function() {

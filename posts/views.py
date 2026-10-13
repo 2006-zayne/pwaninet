@@ -1502,7 +1502,7 @@ def share_post_view(request, share_id):
 @login_required
 def share_app_to_users_view(request):
     """
-    Handle sharing the mobile app referral link directly to friends on PwaniNet.
+    Handle sharing the mobile app referral link directly to friends on vasto.
     Creates SharedPost entries of type 'app_link' which display on the recipient's
     profile under the 'Shared with me' tab as a clickable download card.
     """
@@ -1547,9 +1547,9 @@ def share_app_to_users_view(request):
                     shared_to=recipient,
                     share_type='app_link',
                     shared_link=app_url,
-                    shared_link_title='PwaniNet Mobile App (Android APK)',
-                    shared_link_description='Download the official PwaniNet Android app for campus updates, course groups, and offline access.',
-                    message=message or 'Check out the PwaniNet Android app!'
+                    shared_link_title='vasto Mobile App (Android APK)',
+                    shared_link_description='Download the official vasto Android app for campus updates, course groups, and offline access.',
+                    message=message or 'Check out the vasto Android app!'
                 )
                 shared_count += 1
 
@@ -1566,13 +1566,13 @@ def share_app_to_users_view(request):
                         context_id=str(invite.id) if 'invite' in locals() and invite else '0',
                         audience=str(recipient.id),
                         metadata={
-                            'message': message[:100] if message else 'Shared the PwaniNet Mobile App with you',
+                            'message': message[:100] if message else 'Shared the vasto Mobile App with you',
                             'sharer_username': request.user.username,
                             'recipient_username': recipient.username,
                             'recipient_id': str(recipient.id),
-                            'thumbnail_url': '/static/images/pwaninet-app-icon.png',
+                            'thumbnail_url': '/static/images/vasto-app-icon.png',
                             'resource_type': 'APP',
-                            'post_content': 'Download the official PwaniNet Android app',
+                            'post_content': 'Download the official vasto Android app',
                             'actor_username': request.user.username,
                             'download_url': '/download/app/latest/',
                             'shared_post_id': shared_post.id,

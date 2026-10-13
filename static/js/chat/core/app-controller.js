@@ -210,7 +210,7 @@ export class AppController {
                     try {
                         const senderName = message.senderName || message.senderUsername || (document.body.dataset.receiverName || 'New Message');
                         const bodySnippet = message.content || (message.attachments?.length ? 'Sent an attachment' : 'New message');
-                        const avatar = message.senderAvatar || document.body.dataset.receiverAvatar || '/static/images/pwaninetmonochrome.png';
+                        const avatar = message.senderAvatar || document.body.dataset.receiverAvatar || '/static/images/vastomonochrome.png';
                         const notif = new Notification(senderName, {
                             body: bodySnippet,
                             icon: avatar,

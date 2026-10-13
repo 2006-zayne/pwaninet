@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`pwanimate` is the assistant experience inside PwaniNet. It stores conversations, messages, user preferences, attachments, and searchable document chunks. Its current implementation is built in this repository; it does not use the separately vendored LangChain checkout as its runtime orchestration layer.
+`pwanimate` is the assistant experience inside vasto. It stores conversations, messages, user preferences, attachments, and searchable document chunks. Its current implementation is built in this repository; it does not use the separately vendored LangChain checkout as its runtime orchestration layer.
 
 ## Main data
 

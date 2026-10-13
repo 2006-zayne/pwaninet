@@ -1,7 +1,7 @@
 """
-Privacy and User Discoverability Service for PwaniNet.
+Privacy and User Discoverability Service for vasto.
 
-Provides authoritative, reusable query filters that enforce PwaniNet's
+Provides authoritative, reusable query filters that enforce vasto's
 profile privacy levels, bidirectional block rules, hidden authors, and
 author preferences across people discovery, recommendations, and search.
 """
@@ -18,7 +18,7 @@ def apply_user_discovery_exclusions(
     following_ids: Optional[Any] = None,
 ) -> QuerySet:
     """
-    Apply authoritative PwaniNet privacy and social relationship exclusions
+    Apply authoritative vasto privacy and social relationship exclusions
     to a candidate User queryset.
 
     Rules enforced:
@@ -128,7 +128,7 @@ def visible_posts_for(viewer: Optional[Any], queryset: Optional[QuerySet] = None
         Q(author_id=viewer.pk) |
         (Q(group__isnull=True) & normal_visibility) |
         (Q(group_id__in=group_ids) & normal_visibility) |
-        # An Everyone group explicitly widens its posts to all PwaniNet users,
+        # An Everyone group explicitly widens its posts to all vasto users,
         # including viewers who do not follow the individual author.
         (Q(group__post_visibility='everyone') & Q(visibility__in=['PUBLIC', PrivacyLevel.AUTHENTICATED, PrivacyLevel.FOLLOWERS]))
     )

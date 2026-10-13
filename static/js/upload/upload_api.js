@@ -50,13 +50,13 @@ class UploadAPI {
             }
         } catch (_) {}
 
-        // Try cookies (checks both production 'csrftoken' and local 'pwaninet_local_csrftoken')
+        // Try cookies (checks both production 'csrftoken' and local 'vasto_local_csrftoken')
         try {
             if (document.cookie) {
                 const cookies = document.cookie.split(';');
                 for (const cookie of cookies) {
                     const [name, value] = cookie.trim().split('=');
-                    if (name === 'csrftoken' || name === 'pwaninet_local_csrftoken') {
+                    if (name === 'csrftoken' || name === 'vasto_local_csrftoken') {
                         return decodeURIComponent(value);
                     }
                 }

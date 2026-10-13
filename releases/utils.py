@@ -1,5 +1,5 @@
 """
-Semantic version utilities for PwaniNet Release Center.
+Semantic version utilities for vasto Release Center.
 
 Provides reusable helpers for version parsing, comparison, and generation.
 Follows semantic versioning specification (semver.org).

@@ -15,11 +15,11 @@ from groups.queries.group_queries import is_group_member, get_group_posts
 
 class GroupAnnouncementsTool(BaseDomainTool):
     """
-    Retrieve announcements and posts from a PwaniNet group.
+    Retrieve announcements and posts from a vasto group.
     """
     name = "group_announcements"
     description = (
-        "Retrieve recent posts and announcements from a PwaniNet group. "
+        "Retrieve recent posts and announcements from a vasto group. "
         "Enforces group membership requirements for members-only groups."
     )
     parameters_schema = {

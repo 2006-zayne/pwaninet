@@ -1,6 +1,8 @@
-# PwaniNet
+# vasto
 
-PwaniNet is a Django-based student community and learning-resource platform for students at Pwani University. It brings together student profiles and connections, a social feed, groups, direct messaging, an academic document repository, an AI assistant (Pwanimate), notifications, unified search, recommendations, and a Progressive Web App (PWA) experience. An Android wrapper built with Capacitor is also included.
+vasto is a Django-based student community and learning-resource platform for students at Pwani University. It brings together student profiles and connections, a social feed, groups, direct messaging, an academic document repository, an AI assistant (Spark, formerly Pwanimate), notifications, unified search, recommendations, and a Progressive Web App (PWA) experience. An Android wrapper built with Capacitor is also included.
+
+Vasto was formerly known as Pwaninet. The service domain (pwaninet.app), app identifiers, and technical references may still use the previous name; they refer to the same service.
 
 ## Table of contents
 
@@ -41,7 +43,7 @@ PwaniNet is a Django-based student community and learning-resource platform for 
 - Bookmark, rate, share, and request documents
 - Moderation workflow with status tracking
 
-### Pwanimate (AI assistant)
+### Spark (AI assistant, formerly Pwanimate)
 
 - Custom RAG (retrieval-augmented generation) system with document chunking, pgvector embeddings, and hybrid semantic + lexical search
 - 9 domain tools: academic lookup, document detail, group announcements, notification summary, people discovery, user profile, content search, web search, and local time
@@ -51,7 +53,7 @@ PwaniNet is a Django-based student community and learning-resource platform for 
 - File attachment support (PDF, DOCX, PPTX, images, text)
 - Web search via Tavily, Brave Search, or Serper
 - Personalized preferences (tone, response style, personal instructions)
-- See [About Pwanimate](templates/legal/pwanimate.html) for full capability list
+- See [About Spark](templates/legal/pwanimate.html) for full capability list
 
 ### People and profiles
 
@@ -121,7 +123,7 @@ PwaniNet is a Django-based student community and learning-resource platform for 
 
    ```bash
    git clone <repository-url>
-   cd pwaninet
+   cd vasto
    ```
 
 2. **Create and activate a virtual environment**
@@ -181,13 +183,13 @@ PwaniNet is a Django-based student community and learning-resource platform for 
 
    ```bash
    export DJANGO_SETTINGS_MODULE=pwaninet.settings.local
-   celery -A pwaninet worker -l info
+   celery -A vasto worker -l info
    ```
 
 10. **Start Celery Beat (optional, for scheduled tasks)**
 
     ```bash
-    celery -A pwaninet beat -l info
+    celery -A vasto beat -l info
     ```
 
 The site is now running at `http://127.0.0.1:8000/`. The admin panel is at `/admin/`. API documentation is at `/api/docs/`.
@@ -204,26 +206,26 @@ The site is now running at `http://127.0.0.1:8000/`. The admin panel is at `/adm
 
 ### Student-facing pages
 
-- [About PwaniNet](templates/legal/about.html) — Platform overview
+- [About vasto](templates/legal/about.html) — Platform overview
 - [Privacy Policy](templates/legal/privacy.html) — Data handling practices
 - [Licences and attributions](templates/legal/licenses.html) — Third-party notices
-- [About Pwanimate](templates/legal/pwanimate.html) — AI assistant capabilities
+- [About Spark](templates/legal/pwanimate.html) — AI assistant capabilities
 
 ## Project structure
 
 ```
-pwaninet/
+vasto/
 ├── manage.py                  # Django management entry point
 ├── requirements.txt           # Python dependencies
 ├── docker-compose.yml         # PostgreSQL + Redis for local dev
 ├── Dockerfile                 # Production image (Daphne + Gunicorn)
-├── pwaninet/                  # Project configuration
+├── vasto/                  # Project configuration
 │   ├── settings/              # base.py, local.py, production.py, test.py
 │   ├── urls.py                # Root URL configuration
 │   ├── asgi.py                # ASGI application (Daphne)
 │   ├── wsgi.py                # WSGI application (Gunicorn)
 │   └── celery.py              # Celery app configuration
-├── pwanimate/                 # AI assistant app
+├── pwanimate/                 # Spark AI assistant app (module name retained for compatibility)
 │   ├── ai/                    # LLM gateway, providers, embeddings
 │   ├── context/               # Context engine, user context, types
 │   ├── ingestion/             # Document extractors and chunker
@@ -234,7 +236,7 @@ pwaninet/
 │   ├── services/              # Conversation, attachments, study sessions
 │   ├── tasks/                 # Celery tasks (ingestion, embeddings, reconciliation)
 │   ├── api/                   # REST API views and serializers
-│   ├── templates/             # Pwanimate UI templates
+│   ├── templates/             # Spark UI templates
 │   └── management/            # Management commands (backfill, etc.)
 ├── documents/                 # Academic document repository
 │   ├── academic/              # Academic hierarchy (faculty → unit)
@@ -252,7 +254,7 @@ pwaninet/
 ├── admin_dashboard/           # Admin panel and feedback
 ├── messaging/                 # Direct and group messaging (conversations, attachments, reactions, themes)
 ├── templates/                 # Global Django templates
-│   └── legal/                 # About, Privacy, Licenses, Pwanimate pages
+│   └── legal/                 # About, Privacy, Licenses, Spark pages
 ├── static/                    # Source frontend assets
 ├── android/                   # Capacitor Android project
 ├── docs/                      # Project documentation
@@ -266,7 +268,7 @@ pwaninet/
 - **Environment template**: `.env.example` is a placeholder. Put real local secrets in an ignored `.env` file.
 - **Uploads are not in Git**: User-uploaded media belongs in configured object storage/CDN for production. Local `media/` is development storage and must remain out of Git.
 - **Static assets**: Source static assets in `static/` are part of the application and are version-controlled. `staticfiles/` is generated by `collectstatic` and must remain out of Git.
-- **No open-source licence**: Do not add an open-source licence for PwaniNet without an explicit decision. Third-party assets keep their own licence terms.
+- **No open-source licence**: Do not add an open-source licence for vasto without an explicit decision. Third-party assets keep their own licence terms.
 - **Update documentation**: When changing behaviour or setup, update the relevant documentation.
 - **Migrations**: Always include Django migrations when changing models.
 - **Test before submitting**: Run the test suite and system checks before opening a change.
@@ -275,8 +277,8 @@ pwaninet/
 
 - The repository `docker-compose.yml` starts PostgreSQL and Redis only. Django, Celery workers, and Celey Beat must be started separately.
 - The production Dockerfile starts Daphne (ASGI). Gunicorn is available as a WSGI option but not currently used in the Dockerfile.
-- Pwanimate uses pgvector for semantic search. The PostgreSQL Docker image includes the pgvector extension.
-- AI features require provider API keys. Without keys, Pwanimate falls back to a mock provider for development and testing.
-- PwaniNet is an independent project. It is not an official Pwani University service or assignment unless confirmed in writing.
+- Spark uses pgvector for semantic search. The PostgreSQL Docker image includes the pgvector extension.
+- AI features require provider API keys. Without keys, Spark falls back to a mock provider for development and testing.
+- vasto is an independent project. It is not an official Pwani University service or assignment unless confirmed in writing.
 
 For detailed setup instructions, see the [developer guide](docs/developer-guide.md).

@@ -4,7 +4,7 @@
   <a href="{% url 'users:settings' %}" class="back-link" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
     <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
   </a>
-  <h1 class="page-title">{% trans "About PwaniNet" %}</h1>
+  <h1 class="page-title">{% trans "About vasto" %}</h1>
   <p class="page-subtitle">{% trans "Version information and support resources" %}</p>
 </div>
 
@@ -95,7 +95,7 @@
   <div class="settings-expandable-content" id="licenses">
     <div class="settings-expandable-body">
       <div class="update-links">
-        <a class="update-link" href="{% url 'public_about' %}" hx-get="{% url 'public_about' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">{% trans "About PwaniNet" %}</a>
+        <a class="update-link" href="{% url 'public_about' %}" hx-get="{% url 'public_about' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">{% trans "About vasto" %}</a>
         <a class="update-link" href="{% url 'public_privacy' %}" hx-get="{% url 'public_privacy' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">{% trans "Privacy Policy" %}</a>
         <a class="update-link" href="{% url 'public_licenses' %}" hx-get="{% url 'public_licenses' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">{% trans "Licences and attributions" %}</a>
       </div>

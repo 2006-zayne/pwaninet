@@ -103,7 +103,7 @@
                                                 <li>Open this page while online</li>
                                                 <li>Click "Simulate Offline"</li>
                                                 <li>Try to refresh the page</li>
-                                                <li>Should see PwaniNet offline page, not dinosaur page</li>
+                                                <li>Should see vasto offline page, not dinosaur page</li>
                                             </ol>
                                             <button class="btn btn-sm btn-primary" onclick="runScenario1()">Run Test</button>
                                         </div>
@@ -290,7 +290,7 @@ function simulateOffline() {
     
     // Show notification
     if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('PwaniNet', {
+        new Notification('vasto', {
             body: 'Now in offline mode',
             icon: '/static/images/favicon.ico'
         });
@@ -306,7 +306,7 @@ function simulateOnline() {
     
     // Show notification
     if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('PwaniNet', {
+        new Notification('vasto', {
             body: 'Now back online',
             icon: '/static/images/favicon.ico'
         });
@@ -328,7 +328,7 @@ async function runScenario1() {
     simulateOffline();
     
     log('Scenario 1: Try refreshing the page while offline');
-    log('Expected: Should see PwaniNet offline page, not browser dinosaur page');
+    log('Expected: Should see vasto offline page, not browser dinosaur page');
 }
 
 async function runScenario2() {

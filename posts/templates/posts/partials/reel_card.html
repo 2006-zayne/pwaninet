@@ -117,7 +117,7 @@
                 {% elif post.visibility == 'FOLLOWERS' %}
                     <i class="bi bi-people-fill text-muted" title="{% trans 'Followers only' %}" aria-label="{% trans 'Followers only' %}" style="font-size: 11px;"></i>
                 {% else %}
-                    <i class="bi bi-globe-americas text-muted" title="{% trans 'PwaniNet students' %}" aria-label="{% trans 'PwaniNet students' %}" style="font-size: 11px;"></i>
+                    <i class="bi bi-globe-americas text-muted" title="{% trans 'vasto students' %}" aria-label="{% trans 'vasto students' %}" style="font-size: 11px;"></i>
                 {% endif %}
             </div>
         </div>
@@ -353,7 +353,7 @@
                 class="btn btn-sm border-0 {% if user_has_reposted %}text-primary{% else %}text-muted{% endif %} d-flex align-items-center justify-content-center gap-1 text-decoration-none engagement-button flex-grow-1 repost-button"
                 style="flex: 1 1 0px; min-width: 0;"
                 data-post-id="{{ post.share_id }}"
-                onclick="const vm = window.videoManager || window.PwaniNetVideoManager; if (vm && vm.toggleReelRepost) { event.preventDefault(); event.stopPropagation(); vm.toggleReelRepost('{{ post.share_id }}'); }"
+                onclick="const vm = window.videoManager || window.vastoVideoManager; if (vm && vm.toggleReelRepost) { event.preventDefault(); event.stopPropagation(); vm.toggleReelRepost('{{ post.share_id }}'); }"
                 aria-label="{% if user_has_reposted %}{% trans 'Undo repost' %}{% else %}{% trans 'Repost' %}{% endif %}"
                 title="{% if user_has_reposted %}{% trans 'Reposted' %}{% else %}{% trans 'Repost' %}{% endif %}">
             <i class="bi bi-repeat fs-5 {% if user_has_reposted %}text-primary{% endif %}"></i>

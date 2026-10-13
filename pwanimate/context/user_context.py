@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def resolve_display_name(user: Any) -> str:
     """
-    Resolve human-readable display name adhering to PwaniNet conventions.
+    Resolve human-readable display name adhering to vasto conventions.
 
     Prefers combined first, second, and last names, falling back to
     get_full_name() or username.
@@ -270,7 +270,7 @@ class UserContext:
 class UserContextService:
     """
     Service to construct safe, compact, structured UserContext snapshots
-    for authenticated PwaniNet users.
+    for authenticated vasto users.
     """
 
     def build(self, user: Any) -> UserContext:

@@ -5,8 +5,8 @@
 (function() {
     'use strict';
 
-    const STORAGE_KEY_DISMISSED = 'pwaninet_push_sheet_dismissed_at';
-    const STORAGE_KEY_SUBSCRIBED = 'pwaninet_push_subscribed';
+    const STORAGE_KEY_DISMISSED = 'vasto_push_sheet_dismissed_at';
+    const STORAGE_KEY_SUBSCRIBED = 'vasto_push_subscribed';
     const COOLDOWN_DAYS = 3;
     const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
     const SHOW_DELAY_MS = 1000;
@@ -28,7 +28,7 @@
             document.documentElement.classList.contains('is-capacitor') ||
             document.documentElement.classList.contains('is-native-app') ||
             typeof window.AndroidBridge !== 'undefined' ||
-            typeof window.PwaninetBridge !== 'undefined'
+            typeof window.vastoBridge !== 'undefined'
         );
     }
 
@@ -50,7 +50,7 @@
             const hasPlugin = typeof window.Capacitor !== 'undefined' &&
                 window.Capacitor.Plugins &&
                 !!window.Capacitor.Plugins.PushNotifications;
-            const bridge = window.AndroidBridge || window.PwaninetBridge;
+            const bridge = window.AndroidBridge || window.vastoBridge;
             const isPushReady = bridge && typeof bridge.isPushNotificationsAvailable === 'function'
                 ? bridge.isPushNotificationsAvailable()
                 : true;

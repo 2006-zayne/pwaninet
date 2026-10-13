@@ -1,5 +1,5 @@
 """
-WebSocket routing configuration for pwaninet project.
+WebSocket routing configuration for vasto project.
 
 ARCHITECTURAL RULE:
 Each WebSocket consumer must have a single source of truth file.

@@ -1,5 +1,5 @@
 """
-Notification Rules for PwaniNet Notification Engine v2
+Notification Rules for vasto Notification Engine v2
 
 This module defines notification rules that transform platform events into user notifications.
 Following the specification, each rule has: trigger, conditions, recipients, priority, category, delivery policy, aggregation policy.

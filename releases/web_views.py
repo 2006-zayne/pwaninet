@@ -1,5 +1,5 @@
 """
-Web views for PwaniNet Release Center UI.
+Web views for vasto Release Center UI.
 
 Thin views that delegate business logic to services.
 All release management UI endpoints are here.

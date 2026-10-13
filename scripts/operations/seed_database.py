@@ -1,5 +1,5 @@
 """
-Comprehensive Database Seed Script for Pwaninet
+Comprehensive Database Seed Script for vasto
 
 This script populates the database with sample data for all models across the application.
 Run this with: python manage.py shell < seed_database.py
@@ -975,7 +975,7 @@ def seed_releases(users):
         version='1.0.0',
         build_number=1,
         release_title='Initial Release',
-        release_summary='First stable release of Pwaninet',
+        release_summary='First stable release of vasto',
         release_type='MAJOR',
         status='PUBLISHED',
         release_channel='STABLE',

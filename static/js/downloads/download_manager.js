@@ -1,5 +1,5 @@
 /**
- * PwaniNet Unified Download Manager
+ * pwaninet Unified Download Manager
  * Coordinates:
  *   - Native Capacitor direct-to-disk downloads (no JS memory overhead)
  *   - Web/PWA streaming downloads to IndexedDB
@@ -79,7 +79,7 @@ class DownloadManager {
             // Let users retry a failed gallery publish without downloading the
             // media a second time; the private offline copy is already present.
             const existingCategory = existing.category || options.mediaType || options.category;
-            const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+            const nativeBridge = window.AndroidBridge || window.pwaninetBridge;
             if (existing.isNative && existing.gallerySaved === false && existing.nativeUri &&
                 ['image', 'video'].includes(existingCategory) && nativeBridge?.saveMediaToGallery) {
                 try {
@@ -183,7 +183,7 @@ class DownloadManager {
             let gallerySaved = null;
             let galleryError = null;
             const mediaCategory = item.mediaType || item.category;
-            const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+            const nativeBridge = window.AndroidBridge || window.pwaninetBridge;
             if (['image', 'video'].includes(mediaCategory)) {
                 gallerySaved = false;
                 if (nativeBridge?.saveMediaToGallery) {
@@ -547,7 +547,7 @@ class DownloadManager {
             try {
                 await window.Capacitor.Plugins.Share.share({
                     title: metadata.filename,
-                    text: `Shared from PwaniNet: ${metadata.filename}`,
+                    text: `Shared from pwaninet: ${metadata.filename}`,
                     url: metadata.nativeUri || metadata.url,
                     dialogTitle: `Share ${metadata.filename}`
                 });
@@ -566,7 +566,7 @@ class DownloadManager {
             try {
                 await navigator.share({
                     title: metadata.filename,
-                    text: `Shared from PwaniNet: ${metadata.filename}`,
+                    text: `Shared from pwaninet: ${metadata.filename}`,
                     url: metadata.url
                 });
                 return;

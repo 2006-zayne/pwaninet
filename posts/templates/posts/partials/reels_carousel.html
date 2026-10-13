@@ -27,7 +27,7 @@
                class="text-primary text-decoration-none fw-semibold small d-inline-flex align-items-center gap-1 reels-view-all-link"
                style="font-size: 13px;"
                data-action="fullscreen"
-               onclick="(function(el){ const shelf = el.closest('.reels-carousel-shelf'); const firstCard = shelf?.querySelector('.reels-carousel-card'); const vm = window.videoManager || window.PwaniNetVideoManager; if (firstCard && vm) { vm.openFullscreenReels(firstCard.dataset.postId); } })(this);">
+               onclick="(function(el){ const shelf = el.closest('.reels-carousel-shelf'); const firstCard = shelf?.querySelector('.reels-carousel-card'); const vm = window.videoManager || window.vastoVideoManager; if (firstCard && vm) { vm.openFullscreenReels(firstCard.dataset.postId); } })(this);">
                 {% trans "View all" %} <i class="bi bi-chevron-right" style="font-size: 10px;"></i>
             </a>
         </div>
@@ -61,7 +61,7 @@
                  data-is-self="{% if reel.author == request.user %}true{% else %}false{% endif %}"
                  role="button"
                  tabindex="0"
-                 onkeydown="if(event.key==='Enter'||event.key===' '){ const vm = window.videoManager || window.PwaniNetVideoManager; if(vm) vm.openFullscreenReels('{{ reel.share_id }}'); event.preventDefault(); }">
+                 onkeydown="if(event.key==='Enter'||event.key===' '){ const vm = window.videoManager || window.vastoVideoManager; if(vm) vm.openFullscreenReels('{{ reel.share_id }}'); event.preventDefault(); }">
                 
                 <!-- Poster Thumbnail Image -->
                 {% with poster=reel.get_video_poster|default:reel.thumbnail_url %}

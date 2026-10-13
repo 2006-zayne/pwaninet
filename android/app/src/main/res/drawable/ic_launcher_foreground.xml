@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon foreground: full-bleed Vasto artwork (NOT the transparent mark).
+     drawable-v24 robot override was deleted so this applies on all API levels. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="72dp"
-        android:height="72dp"
-        android:gravity="center">
+    <item>
         <bitmap
-            android:src="@drawable/logo"
-            android:gravity="center" />
+            android:src="@drawable/logo_launcher"
+            android:gravity="fill" />
     </item>
 </layer-list>

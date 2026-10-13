@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token }}">
     <meta name="user-authenticated" content="{% if request.user.is_authenticated %}true{% else %}false{% endif %}">
-    <title>PwaniNet</title>
+    <title>vasto</title>
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.webmanifest">
@@ -78,7 +78,7 @@
                 document.documentElement.setAttribute('data-bs-theme', resolvedTheme);
             }
 
-            var bridge = window.AndroidBridge || window.PwaninetBridge;
+            var bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.setSystemBarTheme === 'function') {
                 bridge.setSystemBarTheme(resolvedTheme);
             }
@@ -921,15 +921,15 @@
 
         // Set user-specific data for audio manager and comment management
         {% if request.user.is_authenticated %}
-        window.PwaniNetUserId = {{ request.user.id }};
-        window.PwaniNetUsername = '{{ request.user.username }}';
-        window.PwaniNetUserRole = '{{ request.user.global_role|default:"" }}';
-        window.PwaniNetUserAudioPreference = '{{ request.user.audio_preference|default:"muted" }}';
+        window.vastoUserId = {{ request.user.id }};
+        window.vastoUsername = '{{ request.user.username }}';
+        window.vastoUserRole = '{{ request.user.global_role|default:"" }}';
+        window.vastoUserAudioPreference = '{{ request.user.audio_preference|default:"muted" }}';
         {% else %}
-        window.PwaniNetUserId = null;
-        window.PwaniNetUsername = '';
-        window.PwaniNetUserRole = '';
-        window.PwaniNetUserAudioPreference = null;
+        window.vastoUserId = null;
+        window.vastoUsername = '';
+        window.vastoUserRole = '';
+        window.vastoUserAudioPreference = null;
         {% endif %}
     </script>
     <script defer src="{% static 'js/whats-new-modal.js' %}"></script>
@@ -959,10 +959,10 @@
     <style>
         :root {
             --navbar-height: 56px;
-            --pwaninet-safe-area-top: env(safe-area-inset-top, 0px);
-            --pwaninet-safe-area-bottom: env(safe-area-inset-bottom, 0px);
-            --pwaninet-safe-area-left: env(safe-area-inset-left, 0px);
-            --pwaninet-safe-area-right: env(safe-area-inset-right, 0px);
+            --vasto-safe-area-top: env(safe-area-inset-top, 0px);
+            --vasto-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+            --vasto-safe-area-left: env(safe-area-inset-left, 0px);
+            --vasto-safe-area-right: env(safe-area-inset-right, 0px);
         }
         @media (min-width: 768px) {
             :root {
@@ -1039,7 +1039,7 @@
             font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
             font-style: var(--font-style, normal);
             padding-top: var(--navbar-height);
-            padding-bottom: calc(85px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+            padding-bottom: calc(85px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             font-size: 1rem;
         }
 
@@ -1047,28 +1047,28 @@
         body.is-native-app:not(.in-conversation-active):not(:has(.whatsapp-layout)),
         body.is-standalone-pwa:not(.in-conversation-active):not(:has(.whatsapp-layout)),
         .is-standalone-pwa body:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
-            padding-top: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
-            padding-bottom: calc(76px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+            padding-top: calc(var(--navbar-height) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+            padding-bottom: calc(76px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
         }
 
         body.is-native-app .navbar-top,
         body.is-standalone-pwa .navbar-top,
         .is-standalone-pwa .navbar-top {
-            padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) !important;
+            padding-top: var(--vasto-safe-area-top, env(safe-area-inset-top, 0px)) !important;
             padding-bottom: 0 !important;
-            height: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+            height: calc(var(--navbar-height) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
             box-sizing: border-box;
         }
 
         @media (display-mode: standalone) {
             body:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
-                padding-top: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
-                padding-bottom: calc(76px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+                padding-top: calc(var(--navbar-height) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                padding-bottom: calc(76px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
             .navbar-top {
-                padding-top: var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)) !important;
+                padding-top: var(--vasto-safe-area-top, env(safe-area-inset-top, 0px)) !important;
                 padding-bottom: 0 !important;
-                height: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                height: calc(var(--navbar-height) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
                 box-sizing: border-box;
             }
         }
@@ -1092,28 +1092,28 @@
 
         @media (max-width: 767px) {
             body {
-                padding-bottom: calc(85px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                padding-bottom: calc(85px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
             .is-native-app body, body.is-native-app,
             .is-standalone-pwa body, body.is-standalone-pwa {
-                padding-bottom: calc(76px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+                padding-bottom: calc(76px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
         }
 
         /* iPhone SE and very small screens (320px width) */
         @media (max-width: 360px) {
             body {
-                padding-bottom: calc(80px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                padding-bottom: calc(80px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
             .is-native-app body, body.is-native-app {
-                padding-bottom: calc(72px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+                padding-bottom: calc(72px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
 
             .mobile-bottom-nav {
                 width: 96%;
                 max-width: 380px;
                 height: 56px;
-                bottom: calc(6px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                bottom: calc(6px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
                 padding: 0 4px;
                 border-radius: 16px;
             }
@@ -1161,13 +1161,11 @@
             font-weight: 700;
             font-style: italic;
             letter-spacing: 2px;
-            color: var(--text-dark);
+            color: var(--primary);
             text-transform: uppercase;
             text-decoration: none;
             font-size: 1.4rem;
         }
-
-        .brand-net { color: var(--primary); }
 
         @media (max-width: 768px) {
             .nav-brand-tactical {
@@ -1227,7 +1225,7 @@
         /* Capacitor safe area adjustment */
         .is-capacitor #navigation-progress,
         body.is-native-app #navigation-progress {
-            top: calc(var(--navbar-height) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px)));
+            top: calc(var(--navbar-height) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px)));
         }
 
         /* Reduced motion support */
@@ -1256,7 +1254,7 @@
             border-radius: 20px;
             height: 60px;
             position: fixed;
-            bottom: calc(6px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+            bottom: calc(6px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             left: 50%;
             transform: translateX(-50%);
             width: 96%;
@@ -1415,7 +1413,7 @@
             /* Full-width top mobile navigation bar seamlessly integrated with navbar-top */
             [data-mobile-nav-position="top"] .mobile-bottom-nav {
                 z-index: 9999 !important;
-                top: calc(var(--navbar-height, 56px) + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                top: calc(var(--navbar-height, 56px) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
                 bottom: auto !important;
                 left: 0 !important;
                 right: 0 !important;
@@ -1449,15 +1447,15 @@
                - Top clearance for combined unified header (.navbar-top 56px + nav tier 48px + safe-area-top)
                - Clear bottom nav offset (retaining only safe-area-inset-bottom) */
             [data-mobile-nav-position="top"] body {
-                padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
-        padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
+                padding-top: calc(var(--navbar-height, 56px) + 48px + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+        padding-bottom: var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
             }
 
             [data-mobile-nav-position="top"] body.is-native-app,
             [data-mobile-nav-position="top"] body.is-standalone-pwa,
             [data-mobile-nav-position="top"].is-standalone-pwa body {
-                padding-top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
-        padding-bottom: var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
+                padding-top: calc(var(--navbar-height, 56px) + 48px + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+        padding-bottom: var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
             }
 
             /* Small screens (<= 360px) */
@@ -1468,21 +1466,21 @@
                     padding-right: 4px !important;
                 }
                 [data-mobile-nav-position="top"] body {
-                    padding-top: calc(var(--navbar-height, 56px) + 44px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                    padding-top: calc(var(--navbar-height, 56px) + 44px + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
                 }
                 [data-mobile-nav-position="top"] #navigation-progress {
-                    top: calc(var(--navbar-height, 56px) + 44px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                    top: calc(var(--navbar-height, 56px) + 44px + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
                 }
             }
 
             /* Back-to-top button clearance when mobile nav is at the top */
             [data-mobile-nav-position="top"] .back-to-top-btn {
-                bottom: calc(18px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+                bottom: calc(18px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
 
             /* Navigation progress bar positioned under combined unified header */
             [data-mobile-nav-position="top"] #navigation-progress {
-                top: calc(var(--navbar-height, 56px) + 48px + var(--pwaninet-safe-area-top, env(safe-area-inset-top, 0px))) !important;
+                top: calc(var(--navbar-height, 56px) + 48px + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
             }
 
             /* Keyboard open state: keep top mobile nav stable at top */
@@ -1841,36 +1839,36 @@
         /* Mobile layout: positioned cleanly above mobile bottom nav */
         @media (max-width: 767.98px) {
             .back-to-top-btn {
-                bottom: calc(84px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-                right: calc(18px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+                bottom: calc(84px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                right: calc(18px + var(--vasto-safe-area-right, env(safe-area-inset-right, 0px)));
             }
             /* When upload or download banner is visible above mobile bottom nav, push Back to Top above it */
             body:has(#upload-banner.visible) .back-to-top-btn,
             body:has(#download-banner.visible) .back-to-top-btn,
             body.has-active-upload .back-to-top-btn,
             body.has-active-download .back-to-top-btn {
-                bottom: calc(164px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                bottom: calc(164px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
             body:has(#upload-banner.visible):has(#download-banner.visible) .back-to-top-btn {
-                bottom: calc(244px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                bottom: calc(244px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
         }
 
         /* Desktop layout: floating in bottom-right corner */
         @media (min-width: 768px) {
             .back-to-top-btn {
-                bottom: calc(28px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-                right: calc(28px + var(--pwaninet-safe-area-right, env(safe-area-inset-right, 0px)));
+                bottom: calc(28px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                right: calc(28px + var(--vasto-safe-area-right, env(safe-area-inset-right, 0px)));
             }
             /* When upload or download banner is visible in bottom-right dock on desktop, push Back to Top above it */
             body:has(#upload-banner.visible) .back-to-top-btn,
             body:has(#download-banner.visible) .back-to-top-btn,
             body.has-active-upload .back-to-top-btn,
             body.has-active-download .back-to-top-btn {
-                bottom: calc(112px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                bottom: calc(112px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
             body:has(#upload-banner.visible):has(#download-banner.visible) .back-to-top-btn {
-                bottom: calc(196px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                bottom: calc(196px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
             }
         }
 
@@ -1942,7 +1940,7 @@
       data-app-environment="{{ app_environment }}">
 
     <div id="pwani-boot-splash" aria-hidden="true">
-        <img src="{% static 'images/pwaninet-app-icon.png' %}" alt="" onerror="this.style.display='none'">
+        <img src="{% static 'images/vasto-transparent.png' %}" alt="" onerror="this.style.display='none'">
     </div>
     <script>
         // Boot splash ONLY on native cold launch. Every in-app / web
@@ -1952,14 +1950,14 @@
             function isNative() {
                 try {
                     if (typeof window.Capacitor !== 'undefined') return true;
-                    if (window.AndroidBridge || window.PwaninetBridge) return true;
-                    if (/PwaniNetApp\/Android/i.test(navigator.userAgent || '')) return true;
+                    if (window.AndroidBridge || window.vastoBridge) return true;
+                    if (/vastoApp\/Android/i.test(navigator.userAgent || '')) return true;
                 } catch (_) {}
                 return false;
             }
             function notifyReady() {
                 try {
-                    var bridge = window.AndroidBridge || window.PwaninetBridge;
+                    var bridge = window.AndroidBridge || window.vastoBridge;
                     if (bridge && typeof bridge.notifyPageReady === 'function') {
                         bridge.notifyPageReady();
                     }
@@ -2026,7 +2024,7 @@
                 }
             }
             markNativeApp();
-            window.addEventListener('pwaninet:safe-area-changed', markNativeApp);
+            window.addEventListener('vasto:safe-area-changed', markNativeApp);
         })();
     </script>
 
@@ -2089,7 +2087,7 @@
             <script>
             (function() {
                 try {
-                    var dismissedAt = localStorage.getItem('pwaninet_2fa_nudge_dismissed');
+                    var dismissedAt = localStorage.getItem('vasto_2fa_nudge_dismissed');
                     var now = Date.now();
                     if (!dismissedAt || (now - parseInt(dismissedAt, 10)) > 7 * 24 * 60 * 60 * 1000) {
                         var banner = document.getElementById('twoFactorNudgeBanner');
@@ -2101,7 +2099,7 @@
             })();
             function dismiss2faNudge() {
                 try {
-                    localStorage.setItem('pwaninet_2fa_nudge_dismissed', Date.now().toString());
+                    localStorage.setItem('vasto_2fa_nudge_dismissed', Date.now().toString());
                 } catch(e) {}
                 var banner = document.getElementById('twoFactorNudgeBanner');
                 if (banner) {
@@ -2155,7 +2153,7 @@
         {% endif %}
 
         <!-- Hidden download target iframe to prevent top-level page reloads on 302 downloads -->
-        <iframe name="pwaninet-download-target" id="pwaninet-download-target" style="display:none; width:0; height:0; border:0;" aria-hidden="true"></iframe>
+        <iframe name="vasto-download-target" id="vasto-download-target" style="display:none; width:0; height:0; border:0;" aria-hidden="true"></iframe>
 
         <!-- Desktop QR Install Modal (Persistent in Base Shell) -->
         <div class="modal fade" id="qrInstallModal" tabindex="-1" aria-labelledby="qrInstallModalTitle" aria-hidden="true">
@@ -2163,7 +2161,7 @@
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
               <div class="modal-header border-0 pb-0 pt-4 px-4 align-items-center">
                 <h5 class="modal-title fw-bold" id="qrInstallModalTitle">
-                  <i class="bi bi-phone text-primary me-2"></i>{% trans "Install PwaniNet on Android" %}
+                  <i class="bi bi-phone text-primary me-2"></i>{% trans "Install vasto on Android" %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
               </div>
@@ -2172,7 +2170,7 @@
                 <div class="d-inline-flex flex-column align-items-center justify-content-center p-3 my-2 rounded-3 shadow-sm"
                      style="background: #ffffff !important; border: 1px solid #e2e8f0; width: 200px; height: 200px; margin: 0 auto;">
                   <img src="{% url 'qr_code_svg' %}{% if global_app_invite_token %}?token={{ global_app_invite_token }}{% endif %}"
-                       alt="{% trans 'PwaniNet APK QR Code' %}"
+                       alt="{% trans 'vasto APK QR Code' %}"
                        width="176"
                        height="176"
                        style="display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #ffffff;"
@@ -2289,7 +2287,7 @@
               <div class="modal-footer border-0 pt-0 pb-4 px-4 justify-content-center">
                 <span class="text-muted small">
                   {% trans "Downloading on this device?" %} 
-                  <a href="{% url 'download_android_apk' %}" target="pwaninet-download-target" data-apk-download="true" class="text-primary text-decoration-none fw-semibold" hx-boost="false">
+                  <a href="{% url 'download_android_apk' %}" target="vasto-download-target" data-apk-download="true" class="text-primary text-decoration-none fw-semibold" hx-boost="false">
                     {% trans "Download directly on your computer" %}
                   </a>
                   <span class="mx-1 text-secondary">•</span>
@@ -2393,7 +2391,7 @@
                         <!-- Top Section: In-Site Friends & Groups Horizontal Tray (TikTok Style) -->
                         <div class="share-tray-section mb-3">
                             <div class="d-flex align-items-center justify-content-between px-1 mb-2">
-                                <span class="small fw-semibold text-muted text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">{% trans "Send on PwaniNet" %}</span>
+                                <span class="small fw-semibold text-muted text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">{% trans "Send on vasto" %}</span>
                                 <span id="globalShareTargetStatus" class="small text-primary fw-medium" style="font-size: 11px;"></span>
                             </div>
                             <div class="share-tray-carousel-wrapper position-relative">
@@ -2729,7 +2727,7 @@
                     <div class="comments-modal-handle d-sm-none" aria-hidden="true"></div>
                     <div class="modal-header border-0 pb-0 pt-3 px-4 d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center gap-2">
-                            <span class="fw-bold fs-5 tracking-tight text-primary">PWANI<span class="text-dark">NET</span></span>
+                            <span class="fw-bold fs-5 tracking-tight text-primary">VASTO</span>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
                     </div>
@@ -2741,7 +2739,7 @@
                             </div>
                             <h5 class="fw-bold mb-2 text-dark" id="guestAuthModalTitle">{% trans "Sign in to explore more" %}</h5>
                             <p class="text-muted small mb-0 px-2" id="guestAuthModalSubtitle">
-                                {% trans "Join the PwaniNet campus network to like, comment, and connect with fellow students." %}
+                                {% trans "Join the vasto campus network to like, comment, and connect with fellow students." %}
                             </p>
                         </div>
 
@@ -3221,7 +3219,7 @@
                     }, 2000);
                 }).catch((err) => {
                     console.error('[Download Click] downloadManager error, falling back to direct browser download:', err);
-                    const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+                    const nativeBridge = window.AndroidBridge || window.vastoBridge;
                     if (nativeBridge?.startMediaDownload) {
                         if (typeof window.showFeedback === 'function') window.showFeedback(err.message || 'Unable to save this media.', 'error');
                         btn.innerHTML = origHtml;
@@ -3236,7 +3234,7 @@
                     }, 2000);
                 });
             } else {
-                const nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+                const nativeBridge = window.AndroidBridge || window.vastoBridge;
                 if (nativeBridge?.startMediaDownload) {
                     const mimeType = mediaType === 'video' ? 'video/mp4' : mediaType === 'image' ? 'image/jpeg' : '';
                     const nativeResult = nativeBridge.startMediaDownload(absoluteUrl, filename, mimeType, mediaType);
@@ -3295,7 +3293,7 @@
             }
 
             // Immediately notify native system bars
-            var bridge = window.AndroidBridge || window.PwaninetBridge;
+            var bridge = window.AndroidBridge || window.vastoBridge;
             if (bridge && typeof bridge.setSystemBarTheme === 'function') {
                 bridge.setSystemBarTheme(resolvedTheme);
             }
@@ -3739,7 +3737,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
     function showChatNotificationBanner(data) {
         if (!data || !data.conversation_id) return;
         const convId = String(data.conversation_id);
-        const bannerId = 'pwaninet-chat-floating-banner';
+        const bannerId = 'vasto-chat-floating-banner';
         const existing = document.getElementById(bannerId);
         if (existing) {
             existing.remove();
@@ -3763,7 +3761,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
         banner.setAttribute('role', 'alert');
         banner.style.cssText = [
             'position: fixed',
-            'top: calc(var(--pwaninet-safe-area-top, 0px) + 14px)',
+            'top: calc(var(--vasto-safe-area-top, 0px) + 14px)',
             'right: 16px',
             'z-index: 10990',
             'width: min(380px, calc(100vw - 24px))',
@@ -3953,12 +3951,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
         if ('Notification' in window && Notification.permission === 'granted') {
             new Notification(notification.title || 'New Message', {
                 body: notification.body || notification.message || notification.summary,
-                icon: notification.icon || notification.actor_avatar || '/static/images/pwaninetmonochrome.png'
+                icon: notification.icon || notification.actor_avatar || '/static/images/vastomonochrome.png'
             });
         }
 
         // Check if user has toggled off in-app toasts
-        if (localStorage.getItem('pwaninet_in_app_toasts') === 'false') {
+        if (localStorage.getItem('vasto_in_app_toasts') === 'false') {
             return;
         }
 
@@ -3987,7 +3985,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
         `;
 
         const avatarSrc = notification.actor_avatar || notification.icon || '/static/images/web-app-manifest-192x192-rounded.png';
-        const titleText = notification.title || 'PwaniNet';
+        const titleText = notification.title || 'vasto';
         const bodyText = notification.body || notification.message || notification.summary || 'You have a new notification';
         const thumbSrc = notification.thumbnail_url || notification.image || (notification.metadata && (notification.metadata.thumbnail_url || notification.metadata.image_url));
         const targetUrl = notification.url || (notification.metadata && notification.metadata.url) || '/notifications/';
@@ -4261,15 +4259,15 @@ window.addEventListener('beforeinstallprompt', (e) => {
         if (hasPwanimate) {
             document.documentElement.classList.add('pwanimate-active');
             document.body.classList.add('pwanimate-active');
-            if (typeof initPwanimate === 'function') {
-                initPwanimate();
+            if (typeof initSpark === 'function') {
+                initSpark();
             }
         } else {
             document.documentElement.classList.remove('pwanimate-active');
             document.body.classList.remove('pwanimate-active');
-            if (window._activePwanimateChat) {
-                try { window._activePwanimateChat.destroy(); } catch (_) {}
-                window._activePwanimateChat = null;
+            if (window._activeSparkChat) {
+                try { window._activeSparkChat.destroy(); } catch (_) {}
+                window._activeSparkChat = null;
             }
         }
     });
@@ -4393,9 +4391,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
                                        !p.startsWith('/messaging/unread-count') &&
                                        !p.startsWith('/messaging/v1') &&
                                        !p.startsWith('/messaging/api');
-        const isPwanimatePage = (p) => p.startsWith('/pwanimate') && !p.startsWith('/pwanimate/api');
+        const isSparkPage = (p) => p.startsWith('/pwanimate') && !p.startsWith('/pwanimate/api');
 
-        // Enforce strict full-page browser navigation across the PwaniNet ↔ Pwanimate boundary
+        // Enforce strict full-page browser navigation across the vasto ↔ Pwanimate boundary
         document.body.addEventListener('htmx:beforeRequest', function(evt) {
             const path = (evt.detail && evt.detail.requestConfig && evt.detail.requestConfig.path) ||
                          (evt.detail && evt.detail.pathInfo && evt.detail.pathInfo.requestPath) ||
@@ -4409,14 +4407,14 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 targetPath = path;
             }
 
-            const isTargetPwanimate = isPwanimatePage(targetPath);
-            const isCurrentPwanimate = isPwanimatePage(window.location.pathname);
+            const isTargetSpark = isSparkPage(targetPath);
+            const isCurrentSpark = isSparkPage(window.location.pathname);
 
             const targetEl = evt.detail && (evt.detail.target || (evt.detail.requestConfig && evt.detail.requestConfig.target));
             const isPageTarget = !targetEl || targetEl.id === 'page-content-target' || targetEl === document.body || targetEl.tagName === 'BODY' || targetEl.tagName === 'MAIN';
 
-            if (isPageTarget && (isTargetPwanimate !== isCurrentPwanimate)) {
-                // Crossing the boundary between PwaniNet and Pwanimate:
+            if (isPageTarget && (isTargetSpark !== isCurrentSpark)) {
+                // Crossing the boundary between vasto and Pwanimate:
                 evt.preventDefault();
                 if (evt.detail && evt.detail.xhr && typeof evt.detail.xhr.abort === 'function') {
                     try { evt.detail.xhr.abort(); } catch (_) {}
@@ -4516,8 +4514,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 document.documentElement.style.removeProperty('overflow-x');
 
                 const responseText = evt.detail.xhr && evt.detail.xhr.responseText ? evt.detail.xhr.responseText.trim() : '';
-                const isIncomingPwanimate = responseText.includes('pwanimate-workspace');
-                if (isIncomingPwanimate) {
+                const isIncomingSpark = responseText.includes('pwanimate-workspace');
+                if (isIncomingSpark) {
                     document.documentElement.classList.add('pwanimate-active');
                     document.body.classList.add('pwanimate-active');
                 } else {
@@ -4542,14 +4540,14 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         return;
                     }
 
-                    // Check if response crosses the PwaniNet ↔ Pwanimate boundary
+                    // Check if response crosses the vasto ↔ Pwanimate boundary
                     const incomingIsPwanimate = responseText.includes('pwanimate-workspace') || (responseUrl && responseUrl.includes('/pwanimate'));
                     const currentIsPwanimate = window.location.pathname.startsWith('/pwanimate');
                     if (incomingIsPwanimate !== currentIsPwanimate) {
                         // Crossing the boundary: MUST perform native full-page navigation, not seamless partial swap!
                         evt.detail.shouldSwap = false;
                         const dest = responseUrl || (evt.detail.requestConfig && evt.detail.requestConfig.path) || (incomingIsPwanimate ? '/pwanimate/' : '/');
-                        console.log('[Boundary Navigation] Crossing PwaniNet ↔ Pwanimate, forcing full-page navigation to:', dest);
+                        console.log('[Boundary Navigation] Crossing vasto ↔ Pwanimate, forcing full-page navigation to:', dest);
                         window.location.assign(dest);
                         return;
                     }
@@ -4662,7 +4660,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
         });
 
-        // Strict boundary navigation: any link crossing PwaniNet ↔ Pwanimate MUST be a native full-page browser navigation
+        // Strict boundary navigation: any link crossing vasto ↔ Pwanimate MUST be a native full-page browser navigation
         document.addEventListener('click', function(evt) {
             if (evt.button !== 0 || evt.ctrlKey || evt.metaKey || evt.shiftKey || evt.altKey) {
                 return;
@@ -4686,10 +4684,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
             if (targetUrl.origin !== window.location.origin) return;
 
-            const isTargetPwanimate = targetUrl.pathname.startsWith('/pwanimate');
-            const isCurrentPwanimate = window.location.pathname.startsWith('/pwanimate');
+            const isTargetSpark = targetUrl.pathname.startsWith('/pwanimate');
+            const isCurrentSpark = window.location.pathname.startsWith('/pwanimate');
 
-            if (isTargetPwanimate !== isCurrentPwanimate) {
+            if (isTargetSpark !== isCurrentSpark) {
                 // Intercept in capture phase before HTMX or any other listener can touch it
                 evt.preventDefault();
                 evt.stopPropagation();
@@ -4966,7 +4964,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
           }
         </style>
         <div style="max-width: 1200px; margin: 0 auto;">
-            <span style="font-weight: 600;">PwaniNet</span>
+            <span style="font-weight: 600;">vasto</span>
             <span style="margin: 0 0.5rem;">|</span>
             <span id="footer-app-version" class="app-current-version">Version {{ app_version }}</span>
             <span style="margin: 0 0.5rem;">|</span>
@@ -5112,7 +5110,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
         window.pwaniSavedPosts = {
             getSavedPosts: function () {
                 try {
-                    return JSON.parse(localStorage.getItem('pwaninet_saved_posts') || '[]');
+                    return JSON.parse(localStorage.getItem('vasto_saved_posts') || '[]');
                 } catch (_) {
                     return [];
                 }
@@ -5135,7 +5133,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     nowSaved = true;
                 }
                 try {
-                    localStorage.setItem('pwaninet_saved_posts', JSON.stringify(saved));
+                    localStorage.setItem('vasto_saved_posts', JSON.stringify(saved));
                 } catch (_) {}
                 return nowSaved;
             }
@@ -5158,7 +5156,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 if (val && !val.includes('{{')) return val;
             }
             return (document.querySelector('[name=csrfmiddlewaretoken]') && document.querySelector('[name=csrfmiddlewaretoken]').value) ||
-                   ((document.cookie.match(/pwaninet_local_csrftoken=([^;]+)/) || [])[1]) ||
+                   ((document.cookie.match(/vasto_local_csrftoken=([^;]+)/) || [])[1]) ||
                    ((document.cookie.match(/csrftoken=([^;]+)/) || [])[1]) || '';
         }
 
@@ -5308,7 +5306,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             });
         }
 
-        // ── 1-Tap Send on PwaniNet Handler ──
+        // ── 1-Tap Send on vasto Handler ──
         document.addEventListener('click', function (e) {
             var tray = document.getElementById('globalShareTargetsTray');
             if (!tray || !tray.contains(e.target)) return;
@@ -5480,7 +5478,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                                 window.pwaniShare(url, text);
                             } else if (navigator.share) {
                                 navigator.share({
-                                    title: 'PwaniNet',
+                                    title: 'vasto',
                                     text: text,
                                     url: url
                                 }).catch(function () {});
@@ -5564,9 +5562,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 if (shareMode === 'app_download') {
                     if (titleEl) titleEl.textContent = '{% trans "Share Mobile App" %}';
                     activePostUrl = shareUrl || defaultAppUrl;
-                    activePostContent = shareTxt || ('{% trans "📱 Download the official PwaniNet Android app for campus updates, course groups, and offline access:" %} ' + activePostUrl);
+                    activePostContent = shareTxt || ('{% trans "📱 Download the official vasto Android app for campus updates, course groups, and offline access:" %} ' + activePostUrl);
 
-                    // App download can be sent directly to friends on PwaniNet
+                    // App download can be sent directly to friends on vasto
                     if (window.isAuthenticated) {
                         if (searchWrap) searchWrap.classList.remove('d-none');
                         if (traySection) traySection.classList.remove('d-none');
@@ -5579,10 +5577,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         if (trayDivider) trayDivider.classList.add('d-none');
                     }
                 } else {
-                    // platform_invite: For friends who are NOT on PwaniNet
-                    if (titleEl) titleEl.textContent = '{% trans "Invite to PwaniNet" %}';
+                    // platform_invite: For friends who are NOT on vasto
+                    if (titleEl) titleEl.textContent = '{% trans "Invite to vasto" %}';
                     activePostUrl = shareUrl || defaultPlatformUrl;
-                    activePostContent = shareTxt || ('{% trans "🎓 Join me on PwaniNet! Connect with classmates, access course groups, and collaborate:" %} ' + activePostUrl);
+                    activePostContent = shareTxt || ('{% trans "🎓 Join me on vasto! Connect with classmates, access course groups, and collaborate:" %} ' + activePostUrl);
 
                     // Hide in-app users tray since invite is for non-members
                     if (searchWrap) searchWrap.classList.add('d-none');
@@ -5764,7 +5762,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                             updateRepostVisual(nowReposted);
                             showFeedback(nowReposted ? '{% trans "Reposted to your profile!" %}' : '{% trans "Repost removed" %}', 'success');
 
-                            var vm = window.videoManager || window.PwaniNetVideoManager;
+                            var vm = window.videoManager || window.vastoVideoManager;
                             if (vm && typeof vm.syncRepostUiAcrossSite === 'function') {
                                 vm.syncRepostUiAcrossSite(activePostId, nowReposted, data.repost_count, data);
                             } else {
@@ -5858,7 +5856,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                                     ? 'Already saved for Offline Media, but the Gallery copy failed. Tap download again to retry.'
                                     : 'Download started. The download banner will confirm when it is ready.', reelDownload?.gallerySaved === false ? 'danger' : 'info');
                             } else {
-                                var nativeBridge = window.AndroidBridge || window.PwaninetBridge;
+                                var nativeBridge = window.AndroidBridge || window.vastoBridge;
                                 if (!nativeBridge?.startMediaDownload) throw new Error('Download service is unavailable. Please reload and try again.');
                                 var nativeResult = nativeBridge.startMediaDownload(downloadUrl, 'reel_' + activePostId + '.mp4', 'video/mp4', 'video');
                                 if (!nativeResult || nativeResult === 'failed') throw new Error('Unable to start the download. Please try again.');
@@ -5902,7 +5900,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
 
             // Setup Platform Links
-            var shareText = activePostContent || (isReel ? 'Watch this reel on PwaniNet!' : 'Check this out on PwaniNet!');
+            var shareText = activePostContent || (isReel ? 'Watch this reel on vasto!' : 'Check this out on vasto!');
             var encodedText = encodeURIComponent(shareText);
             var encodedUrl = encodeURIComponent(activePostUrl);
 
@@ -5930,7 +5928,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                             window.pwaniShare(activePostUrl, shareText);
                         } else if (navigator.share) {
                             navigator.share({
-                                title: 'PwaniNet',
+                                title: 'vasto',
                                 text: shareText,
                                 url: activePostUrl
                             }).catch(function () {});
@@ -6021,7 +6019,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
         window.showGuestAuthPrompt = function(options) {
             options = options || {};
             var title = options.title || '{% trans "Sign in to explore more" %}';
-            var subtitle = options.subtitle || '{% trans "Join the PwaniNet campus community to like, comment, and connect with students." %}';
+            var subtitle = options.subtitle || '{% trans "Join the vasto campus community to like, comment, and connect with students." %}';
             var iconClass = options.icon || 'bi-stars';
             var returnUrl = options.next || (window.location.pathname + window.location.search);
 
@@ -6128,7 +6126,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 } else if (isMoreMenu) {
                     contextOptions = {
                         title: '{% trans "Sign in for more options" %}',
-                        subtitle: '{% trans "Sign in to PwaniNet to save posts, repost, customize your feed, or report content." %}',
+                        subtitle: '{% trans "Sign in to vasto to save posts, repost, customize your feed, or report content." %}',
                         icon: 'bi-sliders'
                     };
                 } else if (isProfile) {
@@ -6139,8 +6137,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
                     };
                 } else {
                     contextOptions = {
-                        title: '{% trans "Sign in to explore PwaniNet" %}',
-                        subtitle: '{% trans "Join PwaniNet to explore campus groups, discover trending posts, and access past papers." %}',
+                        title: '{% trans "Sign in to explore vasto" %}',
+                        subtitle: '{% trans "Join vasto to explore campus groups, discover trending posts, and access past papers." %}',
                         icon: 'bi-compass-fill'
                     };
                 }

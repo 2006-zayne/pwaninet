@@ -392,7 +392,7 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
                     object_id=f"site_{topic}",
                     title=f"Site Information: {topic}",
                     content=f"No specific information found for '{topic}'. Available topics: {', '.join(available)}",
-                    citation="[PwaniNet Site Info]",
+                    citation="[vasto Site Info]",
                     url="/about/",
                     metadata=data,
                 )
@@ -401,9 +401,9 @@ def tool_result_to_context_items(tool_name: str, result: ToolResult) -> List[Con
             ContextItem(
                 source="site_content",
                 object_id=f"site_{topic}",
-                title=f"PwaniNet: {topic.replace('_', ' ').title()}",
+                title=f"vasto: {topic.replace('_', ' ').title()}",
                 content=content[:5000],
-                citation="[PwaniNet Site Documentation]",
+                citation="[vasto Site Documentation]",
                 url="/about/",
                 metadata=data,
             )

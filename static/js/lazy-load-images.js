@@ -1,5 +1,5 @@
 /**
- * PwaniNet Lazy Image Loader
+ * vasto Lazy Image Loader
  * Implements lazy loading for images and media posts
  * Uses Intersection Observer API for performance
  */
@@ -196,7 +196,7 @@
     init();
 
     // Expose public API
-    window.PwaniNetLazyLoad = {
+    window.vastoLazyLoad = {
         init: initLazyLoading,
         observeNewElements,
         loadAllImages,

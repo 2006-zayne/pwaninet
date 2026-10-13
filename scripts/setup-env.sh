@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Pwaninet Environment Setup Script
+# Vasto Environment Setup Script
 # This script helps switch between local and Docker development modes
 
 set -e
 
-echo "Pwaninet Environment Setup"
-echo "=========================="
+echo "Vasto Environment Setup"
+echo "========================"
 
 # Function to copy environment file
 copy_env() {

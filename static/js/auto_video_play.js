@@ -2,7 +2,7 @@
  * Auto Video Play (Deprecated)
  * 
  * Video playback and IntersectionObserver management have been centralized into
- * static/js/video-manager.js (PwaniNetVideoManager) to eliminate memory leaks,
+ * static/js/video-manager.js (vastoVideoManager) to eliminate memory leaks,
  * duplicate observers, and conflicting playback policies.
  */
 (function() {
@@ -11,7 +11,7 @@
     if (window.AutoVideoPlayer) return;
     window.AutoVideoPlayer = class DeprecatedAutoVideoPlayer {
         constructor() {
-            console.log('[AutoVideoPlayer] Deprecated: Superceded by PwaniNetVideoManager');
+            console.log('[AutoVideoPlayer] Deprecated: Superceded by vastoVideoManager');
         }
         init() {}
         setup() {}

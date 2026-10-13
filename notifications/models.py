@@ -81,7 +81,7 @@ class PushSubscription(models.Model):
 
 class PlatformEvent(models.Model):
     """
-    A Platform Event represents a meaningful occurrence within PwaniNet.
+    A Platform Event represents a meaningful occurrence within vasto.
     
     Events are immutable historical facts that describe what happened.
     They do not decide whether notifications should be created - that is the

@@ -175,12 +175,12 @@ class AttachmentUploadEndpointTestCase(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(
             username='uploader_test',
-            email='uploader@pwaninet.local',
+            email='uploader@vasto.local',
             password='pass',
         )
         self.other_user = User.objects.create_user(
             username='other_uploader',
-            email='other_upload@pwaninet.local',
+            email='other_upload@vasto.local',
             password='pass',
         )
 
@@ -254,9 +254,9 @@ class AttachmentOwnershipTestCase(TestCase):
 
     def setUp(self):
         self.user_a = User.objects.create_user(
-            username='user_a', email='user_a@pwaninet.local', password='pass')
+            username='user_a', email='user_a@vasto.local', password='pass')
         self.user_b = User.objects.create_user(
-            username='user_b', email='user_b@pwaninet.local', password='pass')
+            username='user_b', email='user_b@vasto.local', password='pass')
         self.client = APIClient()
 
     def _upload_as(self, user, filename='photo.jpg', content=JPEG_MAGIC, ct='image/jpeg'):
@@ -332,7 +332,7 @@ class AttachmentMediaAuthTestCase(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='media_auth_test', email='media@pwaninet.local', password='pass')
+            username='media_auth_test', email='media@vasto.local', password='pass')
         self.client = APIClient()
 
     def _upload(self):
@@ -370,7 +370,7 @@ class ChatAttachmentIntegrationTestCase(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='chat_attach_test', email='chat_att@pwaninet.local', password='pass')
+            username='chat_attach_test', email='chat_att@vasto.local', password='pass')
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
@@ -490,7 +490,7 @@ class ProviderMultimodalCapabilityTestCase(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='provider_cap_test', email='prov@pwaninet.local', password='pass')
+            username='provider_cap_test', email='prov@vasto.local', password='pass')
         self.client = APIClient()
 
     def _upload_image(self):
@@ -610,7 +610,7 @@ class AttachmentServiceTestCase(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username='svc_test_user', email='svc@pwaninet.local', password='pass')
+            username='svc_test_user', email='svc@vasto.local', password='pass')
 
     def test_create_image_attachment(self):
         f = make_file('photo.jpg', JPEG_MAGIC, 'image/jpeg')

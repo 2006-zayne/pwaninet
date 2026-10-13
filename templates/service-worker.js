@@ -1,5 +1,5 @@
 /**
- * PwaniNet Service Worker
+ * Vasto Service Worker
  * Minimal PWA compliance - installability only
  */
 
@@ -43,10 +43,10 @@ self.addEventListener('push', (event) => {
     console.log('Service Worker: Push event received');
 
     let pushData = {
-        title: 'PwaniNet Notification',
+        title: 'Vasto Notification',
         body: 'You have a new notification',
         icon: '/static/images/web-app-manifest-192x192.png',
-        badge: '/static/images/pwaninetmonochrome.png',
+        badge: '/static/images/vastomonochrome.png',
         vibrate: [200, 100, 200],
         requireInteraction: false,
         actions: [

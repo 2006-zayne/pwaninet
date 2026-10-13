@@ -231,11 +231,11 @@ class NotificationMessageEngine:
                 "SUMMARY": "New post shared with you",
             },
             "APP_SHARE": {
-                "SINGLE": "{actor} shared the PwaniNet mobile app with you.",
-                "DUAL": "{actor1} and {actor2} shared the PwaniNet mobile app with you.",
-                "FEW": "{actors} shared the PwaniNet mobile app with you.",
-                "MANY": "{actors} shared the PwaniNet mobile app with you.",
-                "HISTORICAL": "{actors} shared the PwaniNet mobile app with you.",
+                "SINGLE": "{actor} shared the vasto mobile app with you.",
+                "DUAL": "{actor1} and {actor2} shared the vasto mobile app with you.",
+                "FEW": "{actors} shared the vasto mobile app with you.",
+                "MANY": "{actors} shared the vasto mobile app with you.",
+                "HISTORICAL": "{actors} shared the vasto mobile app with you.",
                 "SUMMARY": "Mobile app shared with you",
             },
             "POST_SHARED_TO_GROUP": {

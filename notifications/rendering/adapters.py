@@ -217,9 +217,9 @@ class NotificationObjectAdapter(PayloadAdapter):
         """Resolve actors from metadata or source_events as list of NotificationActor."""
         actors = []
         
-        # System notifications use PwaniNet icon instead of user avatar
+        # System notifications use vasto icon instead of user avatar
         is_system_notification = notification.notification_type in ['SYSTEM', 'MAINTENANCE', 'ACCOUNT_VERIFIED']
-        system_avatar = '/static/images/favicon.svg'  # PwaniNet system icon
+        system_avatar = '/static/images/favicon.svg'  # vasto system icon
         
         # For aggregated notifications, get all actors from source events
         if notification.event_count and notification.event_count > 1:
@@ -492,8 +492,8 @@ class NotificationObjectAdapter(PayloadAdapter):
                 type=ResourceType.SYSTEM,
                 id=target_id or 0,
                 url=tab_url,
-                title=metadata.get('post_content') or 'PwaniNet Mobile App',
-                image_url=_clean_media_url(thumbnail_url) or '/static/images/pwaninet-app-icon.png'
+                title=metadata.get('post_content') or 'vasto Mobile App',
+                image_url=_clean_media_url(thumbnail_url) or '/static/images/vasto-app-icon.png'
             )
 
         post = None

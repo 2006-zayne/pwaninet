@@ -58,7 +58,7 @@ def validate_run(environment, **kwargs):
         )
 
 
-class PwaniNetNavigationUser(HttpUser):
+class vastoNavigationUser(HttpUser):
     wait_time = between(2, 5)
 
     def on_start(self):

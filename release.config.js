@@ -1,5 +1,5 @@
 /**
- * semantic-release configuration for PwaniNet
+ * semantic-release configuration for Vasto
  *
  * Commit message convention (Conventional Commits):
  *   fix: …              → patch bump  (1.0.0 → 1.0.1)

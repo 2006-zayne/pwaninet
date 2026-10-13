@@ -32,15 +32,15 @@ class ClassifyIntentCategoryTestCase(SimpleTestCase):
         intent = self.orchestrator.classify_intent_category("Define machine learning")
         self.assertEqual(intent, IntentCategory.GENERAL_KNOWLEDGE)
 
-    def test_pwaninet_knowledge_intent(self):
-        """Campus-specific queries should be PWANINET_KNOWLEDGE."""
+    def test_vasto_knowledge_intent(self):
+        """Campus-specific queries should be vasto_KNOWLEDGE."""
         intent = self.orchestrator.classify_intent_category("What is the CS deadline?")
-        self.assertEqual(intent, IntentCategory.PWANINET_KNOWLEDGE)
+        self.assertEqual(intent, IntentCategory.vasto_KNOWLEDGE)
 
-    def test_pwaninet_knowledge_with_university_terms(self):
-        """University-specific terms should trigger PWANINET_KNOWLEDGE."""
+    def test_vasto_knowledge_with_university_terms(self):
+        """University-specific terms should trigger vasto_KNOWLEDGE."""
         intent = self.orchestrator.classify_intent_category("Tell me about Pwani University courses")
-        self.assertEqual(intent, IntentCategory.PWANINET_KNOWLEDGE)
+        self.assertEqual(intent, IntentCategory.vasto_KNOWLEDGE)
 
     def test_personalized_discovery_intent(self):
         """People discovery queries should be PERSONALIZED_DISCOVERY."""
@@ -78,9 +78,9 @@ class ClassifyIntentCategoryTestCase(SimpleTestCase):
         intent = self.orchestrator.classify_intent_category("Tell me about AI")
         self.assertEqual(intent, IntentCategory.MIXED)
 
-    def test_mixed_intent_with_pwaninet_and_general(self):
-        """Queries mixing PwaniNet and general terms should be MIXED."""
-        intent = self.orchestrator.classify_intent_category("Compare PwaniNet CS courses with industry standards")
+    def test_mixed_intent_with_vasto_and_general(self):
+        """Queries mixing vasto and general terms should be MIXED."""
+        intent = self.orchestrator.classify_intent_category("Compare vasto CS courses with industry standards")
         self.assertEqual(intent, IntentCategory.MIXED)
 
 
@@ -113,10 +113,10 @@ class DetermineGroundingModeTestCase(SimpleTestCase):
         )
         self.assertEqual(mode, GroundingMode.REQUIRED)
 
-    def test_required_for_pwaninet_knowledge(self):
-        """PWANINET_KNOWLEDGE should be REQUIRED."""
+    def test_required_for_vasto_knowledge(self):
+        """vasto_KNOWLEDGE should be REQUIRED."""
         mode = self.orchestrator.determine_grounding_mode(
-            IntentCategory.PWANINET_KNOWLEDGE
+            IntentCategory.vasto_KNOWLEDGE
         )
         self.assertEqual(mode, GroundingMode.REQUIRED)
 
@@ -167,7 +167,7 @@ class ShouldPerformRetrievalTestCase(SimpleTestCase):
         """REQUIRED mode should always perform retrieval."""
         should_retrieve = self.orchestrator.should_perform_retrieval(
             GroundingMode.REQUIRED,
-            IntentCategory.PWANINET_KNOWLEDGE
+            IntentCategory.vasto_KNOWLEDGE
         )
         self.assertTrue(should_retrieve)
 
@@ -179,11 +179,11 @@ class ShouldPerformRetrievalTestCase(SimpleTestCase):
         )
         self.assertTrue(should_retrieve)
 
-    def test_retrieval_for_optional_with_pwaninet(self):
-        """OPTIONAL mode with PWANINET_KNOWLEDGE should retrieve."""
+    def test_retrieval_for_optional_with_vasto(self):
+        """OPTIONAL mode with vasto_KNOWLEDGE should retrieve."""
         should_retrieve = self.orchestrator.should_perform_retrieval(
             GroundingMode.OPTIONAL,
-            IntentCategory.PWANINET_KNOWLEDGE
+            IntentCategory.vasto_KNOWLEDGE
         )
         self.assertTrue(should_retrieve)
 
@@ -229,14 +229,14 @@ class IntentClassificationIntegrationTestCase(SimpleTestCase):
         self.assertEqual(grounding_mode, GroundingMode.NONE)
         self.assertFalse(should_retrieve)
 
-    def test_pwaninet_knowledge_retrieval_flow(self):
-        """PwaniNet knowledge should trigger retrieval."""
+    def test_vasto_knowledge_retrieval_flow(self):
+        """vasto knowledge should trigger retrieval."""
         query = "What did the CS department post yesterday?"
         intent = self.orchestrator.classify_intent_category(query)
         grounding_mode = self.orchestrator.determine_grounding_mode(intent)
         should_retrieve = self.orchestrator.should_perform_retrieval(grounding_mode, intent)
         
-        self.assertEqual(intent, IntentCategory.PWANINET_KNOWLEDGE)
+        self.assertEqual(intent, IntentCategory.vasto_KNOWLEDGE)
         self.assertEqual(grounding_mode, GroundingMode.REQUIRED)
         self.assertTrue(should_retrieve)
 
@@ -282,18 +282,18 @@ class IntentClassificationIntegrationTestCase(SimpleTestCase):
         
         self.assertEqual(intent, IntentCategory.MIXED)
         self.assertEqual(grounding_mode, GroundingMode.OPTIONAL)
-        # For MIXED intent, OPTIONAL mode doesn't retrieve (no PwaniNet-specific intent)
+        # For MIXED intent, OPTIONAL mode doesn't retrieve (no vasto-specific intent)
         self.assertFalse(should_retrieve)
 
-    def test_mixed_with_pwaninet_terms_retrieval_flow(self):
-        """Mixed query with PwaniNet terms should retrieve."""
-        query = "Compare PwaniNet CS courses with industry standards"
+    def test_mixed_with_vasto_terms_retrieval_flow(self):
+        """Mixed query with vasto terms should retrieve."""
+        query = "Compare vasto CS courses with industry standards"
         intent = self.orchestrator.classify_intent_category(query)
         grounding_mode = self.orchestrator.determine_grounding_mode(intent)
         should_retrieve = self.orchestrator.should_perform_retrieval(grounding_mode, intent)
         
         self.assertEqual(intent, IntentCategory.MIXED)
         self.assertEqual(grounding_mode, GroundingMode.OPTIONAL)
-        # Since it has PwaniNet terms, it should still retrieve (classification refines this)
-        # Note: This is a limitation of the current implementation - mixed with PwaniNet terms
-        # should ideally be PWANINET_KNOWLEDGE, but the current logic keeps it MIXED
+        # Since it has vasto terms, it should still retrieve (classification refines this)
+        # Note: This is a limitation of the current implementation - mixed with vasto terms
+        # should ideally be vasto_KNOWLEDGE, but the current logic keeps it MIXED

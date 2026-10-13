@@ -1,7 +1,7 @@
 """
-PwaniNet Search Adapter for Pwanimate.
+pwaninet Search Adapter for Pwanimate.
 
-Thin adapter that consumes the existing PwaniNet UnifiedSearchService
+Thin adapter that consumes the existing pwaninet UnifiedSearchService
 and translates domain search results into normalized RetrievalResult objects,
 preserving all existing authorization, privacy, and ranking invariants.
 """
@@ -14,8 +14,8 @@ from pwanimate.retrieval.types import RetrievalRequest, RetrievalResult, SourceT
 logger = logging.getLogger(__name__)
 
 
-class PwaniNetSearchAdapter:
-    """Adapter wrapping PwaniNet UnifiedSearchService for Pwanimate retrieval."""
+class pwaninetSearchAdapter:
+    """Adapter wrapping pwaninet UnifiedSearchService for Pwanimate retrieval."""
 
     def __init__(self, search_service: Optional[UnifiedSearchService] = None):
         self.search_service = search_service or UnifiedSearchService()

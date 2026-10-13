@@ -1,5 +1,5 @@
 """
-Unified Search Service for Pwaninet.
+Unified Search Service for vasto.
 Orchestrates normalized search across People, Documents, Posts, and Groups
 with PostgreSQL Full-Text Search (FTS), Trigram similarity fallbacks,
 post privacy invariants, and engagement rank damping.

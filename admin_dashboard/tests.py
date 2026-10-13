@@ -7,7 +7,7 @@ User = get_user_model()
 
 
 class DjangoAdminLinkTests(TestCase):
-    """Test cases for Django Admin links inside PwaniNet UI"""
+    """Test cases for Django Admin links inside vasto UI"""
 
     def setUp(self):
         self.course = Course.objects.create(name='Computer Science')
@@ -89,12 +89,12 @@ class DjangoAdminLinkTests(TestCase):
         self.assertIn('/admin/', content)
         self.assertIn('Django Admin', content)
 
-    def test_django_admin_base_template_has_return_to_pwaninet_link(self):
-        """Django admin site should render PwaniNet branding and Return to PwaniNet link"""
+    def test_django_admin_base_template_has_return_to_vasto_link(self):
+        """Django admin site should render vasto branding and Return to vasto link"""
         response = self.staff_client.get(reverse('admin:index'))
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn('PWANI', content)
         self.assertIn('NET', content)
-        self.assertIn('Return to PwaniNet App', content)
+        self.assertIn('Return to vasto App', content)
         self.assertIn('Admin Dashboard', content)

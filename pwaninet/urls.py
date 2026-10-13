@@ -1,5 +1,5 @@
 """
-URL configuration for pwaninet project.
+URL configuration for vasto project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/6.0/topics/http/urls/
@@ -18,9 +18,9 @@ from django.contrib import admin
 from django.urls import path, include
 
 # Configure Django Admin Branding
-admin.site.site_header = "PwaniNet Administration"
-admin.site.site_title = "PwaniNet Admin Portal"
-admin.site.index_title = "Welcome to PwaniNet Admin Portal"
+admin.site.site_header = "vasto Administration"
+admin.site.site_title = "vasto Admin Portal"
+admin.site.index_title = "Welcome to vasto Admin Portal"
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
@@ -104,7 +104,7 @@ def redirect_messaging(request):
     """Redirect any messaging URLs to home page since messaging is frozen for MVP"""
     return HttpResponseRedirect('/')
 
-GITHUB_RELEASE_APK_URL = 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk'
+GITHUB_RELEASE_APK_URL = 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk'
 
 
 from django.core.signing import TimestampSigner, BadSignature
@@ -138,14 +138,14 @@ def download_android_apk(request):
         except BadSignature:
             return HttpResponseForbidden("Invalid or expired download token.")
     
-    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk')
+    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk')
     
     if getattr(settings, 'REDIRECT_APK_TO_GITHUB', True) and not getattr(settings, 'DEBUG', False):
         return HttpResponseRedirect(github_url)
     
     import os
     local_candidates = [
-        os.path.join(settings.BASE_DIR, 'media', 'downloads', 'pwaninet.apk'),
+        os.path.join(settings.BASE_DIR, 'media', 'downloads', 'vasto.apk'),
         os.path.join(settings.BASE_DIR, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk'),
     ]
     for apk_path in local_candidates:
@@ -153,7 +153,7 @@ def download_android_apk(request):
             return FileResponse(
                 open(apk_path, 'rb'),
                 as_attachment=True,
-                filename='pwaninet.apk',
+                filename='vasto.apk',
                 content_type='application/vnd.android.package-archive'
             )
             
@@ -165,7 +165,7 @@ from django.shortcuts import render
 @require_http_methods(["GET", "HEAD"])
 def downloads_page_view(request):
     """
-    Dedicated full page for PwaniNet downloads:
+    Dedicated full page for vasto downloads:
     - PWA installation option with browser prompt trigger
     - Mobile APK direct download option (via silent trigger without page redirect)
     - Detailed safety guidance:
@@ -174,7 +174,7 @@ def downloads_page_view(request):
       * Unknown sources / APK sideloading walkthrough
       * PWA install guidelines for iOS Safari & Android Chrome
     """
-    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/pwaninet.apk')
+    github_url = getattr(settings, 'APK_DOWNLOAD_URL', 'https://github.com/2006-zayne/pwaninet/releases/latest/download/vasto.apk')
     
     # Resolve encrypted referral link for sharing from this page
     app_invite_token = ''

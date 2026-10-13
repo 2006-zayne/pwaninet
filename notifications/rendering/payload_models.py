@@ -1,6 +1,6 @@
 """
 Notification Payload Models
-Conforms to PwaniNet Notification Payload Contract (Version 1.0)
+Conforms to vasto Notification Payload Contract (Version 1.0)
 The payload is declarative, self-describing, and renderer-independent.
 """
 

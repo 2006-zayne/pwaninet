@@ -80,7 +80,7 @@ def extract_document(
     Central, format-agnostic structural extraction entry point.
 
     Args:
-        file_input: Local path string/Path, OR a PwaniNet DocumentFile model instance.
+        file_input: Local path string/Path, OR a vasto DocumentFile model instance.
         filename: Optional original or display filename.
         mime_type: Optional MIME type hint.
         extension: Optional extension hint (e.g. 'pdf').
@@ -95,14 +95,14 @@ def extract_document(
         EmptyDocumentError: If the document contains zero text elements.
         ExtractionError: For generic extraction failures.
     """
-    # Check if file_input is a PwaniNet DocumentFile model instance
+    # Check if file_input is a vasto DocumentFile model instance
     if hasattr(file_input, 'file') and hasattr(file_input, 'original_filename'):
         doc_file = file_input
         eff_filename = filename or getattr(doc_file, 'original_filename', '') or os.path.basename(doc_file.file.name)
         eff_mime = mime_type or getattr(doc_file, 'mime_type', '')
         eff_ext = extension or getattr(doc_file, 'extension', '')
 
-        # Use PwaniNet's storage context manager to handle local vs remote R2 storage
+        # Use vasto's storage context manager to handle local vs remote R2 storage
         try:
             from documents.tasks.processing import get_local_filepath
         except ImportError:

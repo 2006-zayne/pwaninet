@@ -1,7 +1,7 @@
 """Django signal handlers for the document repository.
 
 These handlers respond to Django model signals and emit domain events,
-keeping the repository decoupled from other PwaniNet modules.
+keeping the repository decoupled from other vasto modules.
 """
 
 import logging

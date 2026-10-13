@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('token', models.CharField(db_index=True, max_length=128, unique=True)),
-                ('invite_type', models.CharField(choices=[('app_download', 'Mobile App Download'), ('platform_invite', 'Invite to PwaniNet')], db_index=True, default='platform_invite', max_length=32)),
+                ('invite_type', models.CharField(choices=[('app_download', 'Mobile App Download'), ('platform_invite', 'Invite to vasto')], db_index=True, default='platform_invite', max_length=32)),
                 ('clicks_count', models.PositiveIntegerField(default=0)),
                 ('conversions_count', models.PositiveIntegerField(default=0)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),

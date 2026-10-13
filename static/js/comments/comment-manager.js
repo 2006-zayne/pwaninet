@@ -589,9 +589,9 @@ const CommentManager = {
     const commentEl = document.getElementById(`comment-${commentId}`);
     if (!commentEl) return;
 
-    const currentUserId = (this.currentUser && this.currentUser.id) || window.PwaniNetUserId;
-    const currentUserRole = (this.currentUser && this.currentUser.role) || window.PwaniNetUserRole;
-    const currentUsername = (this.currentUser && this.currentUser.username) || window.PwaniNetUsername;
+    const currentUserId = (this.currentUser && this.currentUser.id) || window.vastoUserId;
+    const currentUserRole = (this.currentUser && this.currentUser.role) || window.vastoUserRole;
+    const currentUsername = (this.currentUser && this.currentUser.username) || window.vastoUsername;
 
     const authorId = commentEl.dataset.authorId;
     const authorLink = commentEl.querySelector('.comment-author-link');

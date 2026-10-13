@@ -30,7 +30,7 @@ class PwanimatePreferencesModelTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="student_alice",
-            email="alice@pwaninet.local",
+            email="alice@vasto.local",
             password="testpassword123",
             first_name="Alice",
             last_name="Student",
@@ -136,12 +136,12 @@ class PwanimatePreferenceServiceTests(TestCase):
     def setUp(self):
         self.user_a = User.objects.create_user(
             username="alice",
-            email="alice@pwaninet.local",
+            email="alice@vasto.local",
             password="testpassword123",
         )
         self.user_b = User.objects.create_user(
             username="bob",
-            email="bob@pwaninet.local",
+            email="bob@vasto.local",
             password="testpassword123",
         )
 
@@ -314,7 +314,7 @@ class PwanimatePreferencesCompatibilityTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="existing_student",
-            email="existing@pwaninet.local",
+            email="existing@vasto.local",
             password="testpassword123",
         )
 

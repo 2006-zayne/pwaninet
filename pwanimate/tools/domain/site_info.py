@@ -1,7 +1,7 @@
 """
 Site Info Domain Tool for Pwanimate.
 
-Allows Pwanimate to answer questions about PwaniNet and itself
+Allows Pwanimate to answer questions about vasto and itself
 by loading curated site content from markdown files.
 """
 
@@ -12,7 +12,7 @@ from pwanimate.services.site_content import SiteContentService
 
 class SiteInfoTool(BaseDomainTool):
     name = "site_info"
-    description = "Get information about PwaniNet or Pwanimate features and capabilities."
+    description = "Get information about vasto or Pwanimate features and capabilities."
     parameters_schema = {
         "type": "object",
         "properties": {

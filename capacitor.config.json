@@ -1,6 +1,6 @@
 {
-  "appId": "com.pwaninet.app",
-  "appName": "Pwaninet",
+  "appId": "com.vasto.app",
+  "appName": "Vasto",
   "webDir": "www",
   "server": {
     "url": "https://pwaninet.app",
@@ -20,7 +20,6 @@
       "showSpinner": false,
       "splashFullScreen": true,
       "splashImmersive": true,
-      "layoutName": "splash_screen",
       "useDialog": true
     },
     "StatusBar": {

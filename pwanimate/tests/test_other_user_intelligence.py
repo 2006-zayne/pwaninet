@@ -189,26 +189,26 @@ class OtherUserProfileSecurityAndPrivacyTestCase(TestCase):
             interests="AI, Open Source, Distributed Systems",
             collaboration_status=CollaborationStatus.OPEN_TO_PROJECTS,
             profile_privacy=PrivacyLevel.PUBLIC,
-            email="kelvin@pwaninet.local",
+            email="kelvin@vasto.local",
         )
 
         self.target_private = User.objects.create_user(
             username="target_private",
             profile_privacy=PrivacyLevel.PRIVATE,
-            email="private@pwaninet.local",
+            email="private@vasto.local",
         )
 
         self.target_followers = User.objects.create_user(
             username="target_followers",
             profile_privacy=PrivacyLevel.FOLLOWERS,
-            email="followers@pwaninet.local",
+            email="followers@vasto.local",
         )
         Follow.objects.create(follower=self.follower, followed=self.target_followers)
 
         self.target_blocked = User.objects.create_user(
             username="target_blocked",
             profile_privacy=PrivacyLevel.PUBLIC,
-            email="blocked@pwaninet.local",
+            email="blocked@vasto.local",
         )
         # Block: viewer blocked target_blocked
         Block.objects.create(blocker=self.viewer, blocked=self.target_blocked)
@@ -236,7 +236,7 @@ class OtherUserProfileSecurityAndPrivacyTestCase(TestCase):
         # 1. Viewing own profile
         res_self = self.tool.execute(user=self.target_public, username="target_public")
         self.assertIn("email", res_self.data)
-        self.assertEqual(res_self.data["email"], "kelvin@pwaninet.local")
+        self.assertEqual(res_self.data["email"], "kelvin@vasto.local")
 
         # 2. Staff viewing profile
         res_staff = self.tool.execute(user=self.staff_user, username="target_public")
@@ -310,7 +310,7 @@ class OtherUserAdapterAndOrchestrationTestCase(TestCase):
             interests="Machine Learning, Data Science, Kaggle",
             collaboration_status=CollaborationStatus.OPEN_TO_PROJECTS,
             profile_privacy=PrivacyLevel.PUBLIC,
-            email="jane@pwaninet.local",
+            email="jane@vasto.local",
         )
 
         self.tool = UserProfileTool()
@@ -333,7 +333,7 @@ class OtherUserAdapterAndOrchestrationTestCase(TestCase):
         self.assertIn("Collaboration Status: open_to_projects", item.content)
         self.assertIn("Skills: Python, TensorFlow, Pandas", item.content)
         # Email must NOT be in the body
-        self.assertNotIn("jane@pwaninet.local", item.content)
+        self.assertNotIn("jane@vasto.local", item.content)
 
     def test_orchestrator_returns_single_person_card_when_user_profile_succeeds(self):
         # Configure MockLLMProvider in AIGateway

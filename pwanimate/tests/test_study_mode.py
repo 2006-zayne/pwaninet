@@ -87,7 +87,7 @@ class StudyCommandAndEntryTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="study_entry_user",
-            email="study_entry@pwaninet.local",
+            email="study_entry@vasto.local",
             password="testpassword123",
         )
         self.client = APIClient()
@@ -205,7 +205,7 @@ class StudySessionLifecycleTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="lifecycle_user",
-            email="lifecycle@pwaninet.local",
+            email="lifecycle@vasto.local",
             password="testpassword123",
         )
         self.client = APIClient()
@@ -342,10 +342,10 @@ class StudySessionLifecycleTests(TestCase):
 class CrossUserSecurityTests(TestCase):
     def setUp(self):
         self.alice = User.objects.create_user(
-            username="alice_study", email="alice@pwaninet.local", password="password123"
+            username="alice_study", email="alice@vasto.local", password="password123"
         )
         self.bob = User.objects.create_user(
-            username="bob_study", email="bob@pwaninet.local", password="password123"
+            username="bob_study", email="bob@vasto.local", password="password123"
         )
         self.alice_session = StudySessionService.start_or_continue_session(
             user=self.alice,
@@ -419,7 +419,7 @@ class CrossUserSecurityTests(TestCase):
 class StudyCheckpointAndBoundedContextTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="ckpt_user", email="ckpt@pwaninet.local", password="password123"
+            username="ckpt_user", email="ckpt@vasto.local", password="password123"
         )
         self.session = StudySessionService.start_or_continue_session(
             user=self.user,
@@ -576,10 +576,10 @@ class StudyCheckpointAndBoundedContextTests(TestCase):
 class StudyDocumentContextAndExtractionTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="doc_study_user", email="doc_study@pwaninet.local", password="password123"
+            username="doc_study_user", email="doc_study@vasto.local", password="password123"
         )
         self.other_user = User.objects.create_user(
-            username="other_doc_user", email="other_doc@pwaninet.local", password="password123"
+            username="other_doc_user", email="other_doc@vasto.local", password="password123"
         )
         self.category = Category.objects.create(code="lecture_notes", name="Lecture Notes")
         self.public_doc = Document.objects.create(
@@ -719,16 +719,16 @@ class StudyDocumentContextAndExtractionTests(TestCase):
 class StudySummaryAndCollectionIntegrationTests(TestCase):
     def setUp(self):
         self.owner = User.objects.create_user(
-            username="col_owner", email="col_owner@pwaninet.local", password="password123"
+            username="col_owner", email="col_owner@vasto.local", password="password123"
         )
         self.editor = User.objects.create_user(
-            username="col_editor", email="col_editor@pwaninet.local", password="password123"
+            username="col_editor", email="col_editor@vasto.local", password="password123"
         )
         self.viewer = User.objects.create_user(
-            username="col_viewer", email="col_viewer@pwaninet.local", password="password123"
+            username="col_viewer", email="col_viewer@vasto.local", password="password123"
         )
         self.stranger = User.objects.create_user(
-            username="col_stranger", email="col_stranger@pwaninet.local", password="password123"
+            username="col_stranger", email="col_stranger@vasto.local", password="password123"
         )
 
         self.session = StudySessionService.start_or_continue_session(

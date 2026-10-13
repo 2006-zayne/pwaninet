@@ -24,7 +24,7 @@ class UserProfileTool(BaseDomainTool):
     """
     name = "user_profile"
     description = (
-        "Retrieve sanitized profile information for a PwaniNet user (academic details, "
+        "Retrieve sanitized profile information for a vasto user (academic details, "
         "bio, headline, skills) respecting user privacy settings."
     )
     parameters_schema = {

@@ -1,4 +1,4 @@
-package com.pwaninet.app;
+package com.vasto.app;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -38,9 +38,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Custom Firebase Messaging Service for PwaniNet.
+ * Custom Firebase Messaging Service for Pwaninet.
  * Builds rich native notifications featuring:
- * - Status bar icon: Dedicated monochrome glyph (R.drawable.ic_stat_pwaninet)
+ * - Status bar icon: Dedicated monochrome glyph (R.drawable.ic_stat_vasto)
  * - Large icon: Natively circular-masked Actor Avatar
  * - Big picture: Media thumbnail via BigPictureStyle
  * - Brand accent color: #2563eb
@@ -50,7 +50,7 @@ import java.util.concurrent.TimeUnit;
 public class PwaninetFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "PwaninetPushService";
-    private static final String DEFAULT_CHANNEL_ID = "pwaninet_notifications";
+    private static final String DEFAULT_CHANNEL_ID = "vasto_notifications";
     private static final int IMAGE_TIMEOUT_MS = 2500;
     private static final ExecutorService DOWNLOAD_EXECUTOR = Executors.newFixedThreadPool(2);
 
@@ -115,7 +115,7 @@ public class PwaninetFirebaseMessagingService extends FirebaseMessagingService {
         try {
             String title = data.get("title");
             if (title == null || title.trim().isEmpty()) {
-                title = "PwaniNet";
+                title = "Pwaninet";
             }
 
             String body = data.get("body");
@@ -139,7 +139,7 @@ public class PwaninetFirebaseMessagingService extends FirebaseMessagingService {
 
             String tag = data.get("tag");
             if (tag == null || tag.trim().isEmpty()) {
-                tag = "pwaninet_" + System.currentTimeMillis();
+                tag = "vasto_" + System.currentTimeMillis();
             }
 
             String notificationId = data.get("notification_id");
@@ -158,7 +158,7 @@ public class PwaninetFirebaseMessagingService extends FirebaseMessagingService {
             ensureNotificationChannel(channelId);
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
-                    .setSmallIcon(R.drawable.ic_stat_pwaninet)
+                    .setSmallIcon(R.drawable.ic_stat_vasto)
                     .setColor(ContextCompat.getColor(this, R.color.colorPrimary))
                     .setContentTitle(title)
                     .setContentText(body)
@@ -258,7 +258,7 @@ public class PwaninetFirebaseMessagingService extends FirebaseMessagingService {
                 if (nm != null && nm.getNotificationChannel(channelId) == null) {
                     NotificationChannel channel = new NotificationChannel(
                             channelId,
-                            "PwaniNet Notifications",
+                            "Pwaninet Notifications",
                             NotificationManager.IMPORTANCE_HIGH
                     );
                     channel.setDescription("Social updates, mentions, posts, documents, and messages");

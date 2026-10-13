@@ -17,7 +17,7 @@ from pwanimate.retrieval.types import (
     RetrievalMode,
 )
 from pwanimate.retrieval.services.document_retrieval import DocumentSemanticRetrievalService
-from pwanimate.retrieval.adapters.pwaninet_search import PwaniNetSearchAdapter
+from pwanimate.retrieval.adapters.pwaninet_search import pwaninetSearchAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +28,10 @@ class UnifiedRetrievalService:
     def __init__(
         self,
         document_service: Optional[DocumentSemanticRetrievalService] = None,
-        search_adapter: Optional[PwaniNetSearchAdapter] = None,
+        search_adapter: Optional[pwaninetSearchAdapter] = None,
     ):
         self.document_service = document_service or DocumentSemanticRetrievalService()
-        self.search_adapter = search_adapter or PwaniNetSearchAdapter()
+        self.search_adapter = search_adapter or pwaninetSearchAdapter()
 
     def retrieve(
         self,

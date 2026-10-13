@@ -1,5 +1,5 @@
 /**
- * Network Status Detection for PwaniNet Messaging
+ * Network Status Detection for vasto Messaging
  * Handles online/offline detection and status management
  */
 

@@ -1,5 +1,5 @@
 """
-Release permissions for PwaniNet Release Center.
+Release permissions for vasto Release Center.
 
 Provides dedicated permissions for release management without requiring
 Django superuser access.

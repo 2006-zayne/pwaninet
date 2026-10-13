@@ -1,5 +1,5 @@
 /**
- * Global Audio Manager for PwaniNet
+ * Global Audio Manager for vasto
  * Manages global audio preference for video playback
  * Handles mute/unmute functionality and tutorial bubble
  */
@@ -18,14 +18,14 @@
     };
 
     const STORAGE_KEYS = {
-        AUDIO_PREFERENCE: 'pwaninet_audio_preference',
-        TUTORIAL_SEEN: 'pwaninet_video_tutorial_seen'
+        AUDIO_PREFERENCE: 'vasto_audio_preference',
+        TUTORIAL_SEEN: 'vasto_video_tutorial_seen'
     };
 
     // Get user-specific storage key
     function getUserStorageKey(baseKey) {
         // Try to get username from page or use generic key for non-authenticated users
-        const username = window.PwaniNetUsername || '';
+        const username = window.vastoUsername || '';
         return username ? `${baseKey}_${username}` : baseKey;
     }
 
@@ -60,7 +60,7 @@
 
     function loadPreferences() {
         // First try to get preference from server if authenticated
-        const userAudioPref = window.PwaniNetUserAudioPreference;
+        const userAudioPref = window.vastoUserAudioPreference;
         if (userAudioPref) {
             state.audioPreference = userAudioPref;
         } else {
@@ -127,8 +127,8 @@
         try {
             if (window.videoManager && typeof window.videoManager.setGlobalMute === 'function') {
                 window.videoManager.setGlobalMute(state.audioPreference === 'muted');
-            } else if (window.PwaniNetVideoManager && typeof window.PwaniNetVideoManager.setGlobalMute === 'function') {
-                window.PwaniNetVideoManager.setGlobalMute(state.audioPreference === 'muted');
+            } else if (window.vastoVideoManager && typeof window.vastoVideoManager.setGlobalMute === 'function') {
+                window.vastoVideoManager.setGlobalMute(state.audioPreference === 'muted');
             }
         } catch (_) {}
         
@@ -428,7 +428,7 @@
     // PUBLIC API
     // ============================================================================
 
-    window.PwaniNetGlobalAudio = {
+    window.vastoGlobalAudio = {
         init,
         toggleGlobalAudio,
         getAudioPreference: () => state.audioPreference,
@@ -443,9 +443,9 @@
                     if (window.videoManager.isGlobalMuted !== (preference === 'muted')) {
                         window.videoManager.setGlobalMute(preference === 'muted');
                     }
-                } else if (window.PwaniNetVideoManager && typeof window.PwaniNetVideoManager.setGlobalMute === 'function') {
-                    if (window.PwaniNetVideoManager.isGlobalMuted !== (preference === 'muted')) {
-                        window.PwaniNetVideoManager.setGlobalMute(preference === 'muted');
+                } else if (window.vastoVideoManager && typeof window.vastoVideoManager.setGlobalMute === 'function') {
+                    if (window.vastoVideoManager.isGlobalMuted !== (preference === 'muted')) {
+                        window.vastoVideoManager.setGlobalMute(preference === 'muted');
                     }
                 }
             } catch (_) {}

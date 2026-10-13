@@ -80,13 +80,13 @@ class AudioPreference(models.TextChoices):
 
 class PrivacyLevel(models.TextChoices):
     PUBLIC = 'PUBLIC', 'Everyone'
-    AUTHENTICATED = 'AUTHENTICATED', 'PwaniNet Users'
+    AUTHENTICATED = 'AUTHENTICATED', 'vasto Users'
     FOLLOWERS = 'FOLLOWERS', 'Followers Only'
     PRIVATE = 'PRIVATE', 'Only Me'
 
 
 PRIVACY_CHOICES = [
-    (PrivacyLevel.AUTHENTICATED, 'PwaniNet Users'),
+    (PrivacyLevel.AUTHENTICATED, 'vasto Users'),
     (PrivacyLevel.FOLLOWERS, 'Followers Only'),
     (PrivacyLevel.PRIVATE, 'Only Me'),
 ]
@@ -644,7 +644,7 @@ class RecoveryCode(models.Model):
 
 class InviteType(models.TextChoices):
     APP_DOWNLOAD = 'app_download', 'Mobile App Download'
-    PLATFORM_INVITE = 'platform_invite', 'Invite to PwaniNet'
+    PLATFORM_INVITE = 'platform_invite', 'Invite to vasto'
 
 
 class PlatformInvite(models.Model):

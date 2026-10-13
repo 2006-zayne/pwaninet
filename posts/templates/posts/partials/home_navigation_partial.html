@@ -336,7 +336,7 @@
                hx-trigger="input changed delay:200ms"
                hx-sync="this:replace"
                hx-indicator="#search-indicator"
-               aria-label="{% trans 'Search PwaniNet' %}">
+               aria-label="{% trans 'Search vasto' %}">
         <button type="button"
                 class="search-clear"
                 onclick="this.previousElementSibling.value=''; const dd = document.getElementById('search-dropdown-results'); if(dd) { dd.innerHTML=''; dd.style.removeProperty('display'); } this.previousElementSibling.dispatchEvent(new Event('input'));"
@@ -593,7 +593,7 @@
     </div>
 </aside>
 
-<!-- Left Rail Out-Of-Band: restore PwaniNet left rail (in case coming from Pwanimate) -->
+<!-- Left Rail Out-Of-Band: restore vasto left rail (in case coming from Pwanimate) -->
 <aside id="left-nav-rail" class="desktop-left-rail d-none d-lg-block" aria-label="{% trans 'Global Navigation' %}" hx-swap-oob="true">
     <div class="left-rail-inner">
         {% include 'partials/desktop_left_rail.html' %}

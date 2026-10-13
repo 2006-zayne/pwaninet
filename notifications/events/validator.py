@@ -1,5 +1,5 @@
 """
-Event Validator for PwaniNet Notification Engine v2
+Event Validator for vasto Notification Engine v2
 
 This module validates platform events before they are published.
 Ensures events conform to the specification and contain required fields.

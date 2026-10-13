@@ -69,7 +69,7 @@ class ToolRouterTestCase(SimpleTestCase):
 
     def test_route_notifications_negative(self):
         negatives = [
-            "how do notifications work in pwaninet?",
+            "how do notifications work in vasto?",
             "why did notifications fail to send?",
             "create a notification for the students",
         ]

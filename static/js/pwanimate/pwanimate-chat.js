@@ -1,6 +1,6 @@
 /**
- * Pwanimate Chat Controller
- * Vanilla JS controller for Pwanimate assistant interface
+ * Spark Chat Controller
+ * Vanilla JS controller for Spark assistant interface
  * Supports Web, PWA, and Capacitor Android WebView
  */
 
@@ -27,7 +27,7 @@
                window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     }
 
-    function isPwanimateCitationLink(element) {
+    function isSparkCitationLink(element) {
         if (!element) return false;
         const citationControl = (element.matches && element.matches('a, button'))
             ? element
@@ -72,7 +72,7 @@
         return diffYr === 1 ? '1 year ago' : diffYr + ' years ago';
     }
 
-    class PwanimateChat {
+    class SparkChat {
         constructor(workspace) {
             this.workspace = workspace;
             this.conversationId = workspace.dataset.conversationId || null;
@@ -206,7 +206,7 @@
                 try {
                     initialResources = JSON.parse(jsonEl.textContent || '[]');
                 } catch (error) {
-                    console.warn('[Pwanimate] Could not read initial context resources.', error);
+                    console.warn('[Spark] Could not read initial context resources.', error);
                 }
             }
 
@@ -253,7 +253,7 @@
                         this.studyModeActive = parsed.status === 'active';
                     }
                 } catch (err) {
-                    console.warn('[Pwanimate] Could not parse active study session:', err);
+                    console.warn('[Spark] Could not parse active study session:', err);
                 }
             }
 
@@ -265,7 +265,7 @@
                         this.resumableStudySession = parsed;
                     }
                 } catch (err) {
-                    console.warn('[Pwanimate] Could not parse resumable study session:', err);
+                    console.warn('[Spark] Could not parse resumable study session:', err);
                 }
             }
 
@@ -278,7 +278,7 @@
                         this.showUnavailableSourceWarnings(parsed);
                     }
                 } catch (err) {
-                    console.warn('[Pwanimate] Could not parse unavailable resource notices:', err);
+                    console.warn('[Spark] Could not parse unavailable resource notices:', err);
                 }
             }
 
@@ -320,7 +320,7 @@
             if (this.input) {
                 this.input.placeholder = this.studyModeActive
                     ? 'Ask a study question...'
-                    : 'Ask Pwanimate anything...';
+                    : 'Ask Spark anything...';
             }
 
             const banner = document.getElementById('pwanimate-study-session-banner');
@@ -507,7 +507,7 @@
                     this.showUnavailableSourceWarnings(data.warnings);
                 }
             } catch (err) {
-                console.warn('[Pwanimate] Failed to sync study context state:', err);
+                console.warn('[Spark] Failed to sync study context state:', err);
             }
         }
 
@@ -550,7 +550,7 @@
                     return data.study_session;
                 }
             } catch (err) {
-                console.warn('[Pwanimate] Could not initialize study session:', err);
+                console.warn('[Spark] Could not initialize study session:', err);
             }
             return null;
         }
@@ -594,7 +594,7 @@
                 this.refreshConversationsList();
                 return data.study_session || null;
             } catch (err) {
-                console.error('[Pwanimate] Study session status update error:', err);
+                console.error('[Spark] Study session status update error:', err);
                 return null;
             }
         }
@@ -834,7 +834,7 @@
                     if (button) button.innerHTML = '<i class="bi bi-check2 me-1"></i>Saved';
                 }
             } catch (err) {
-                console.error('[Pwanimate] Error saving study metadata:', err);
+                console.error('[Spark] Error saving study metadata:', err);
             } finally {
                 setTimeout(() => {
                     if (button) {
@@ -885,7 +885,7 @@
                     }
                 }
             } catch (err) {
-                console.error('[Pwanimate] Checkpoint generation failed:', err);
+                console.error('[Spark] Checkpoint generation failed:', err);
             } finally {
                 if (button) {
                     button.disabled = false;
@@ -935,7 +935,7 @@
                     statusEl.classList.remove('d-none');
                 }
             } catch (err) {
-                console.error('[Pwanimate] Summary generation failed:', err);
+                console.error('[Spark] Summary generation failed:', err);
             } finally {
                 if (button) {
                     button.disabled = false;
@@ -1030,7 +1030,7 @@
                     selectEl.value = collections[0].id;
                 }
             } catch (err) {
-                console.warn('[Pwanimate] Could not load user collections:', err);
+                console.warn('[Spark] Could not load user collections:', err);
             }
         }
 
@@ -1414,7 +1414,7 @@
                             this.postProcessMarkdownDOM(el);
                             this.enhanceWebSources(el.closest('.pwanimate-message-row'));
                         } catch (e) {
-                            console.warn('[Pwanimate] Markdown parse error:', e);
+                            console.warn('[Spark] Markdown parse error:', e);
                         }
                     }
                 });
@@ -1544,7 +1544,7 @@
                 try {
                     html = window.marked.parse(processed);
                 } catch (e) {
-                    console.warn('[Pwanimate] Marked parse error:', e);
+                    console.warn('[Spark] Marked parse error:', e);
                     html = escapeHtml(content);
                     return html;
                 }
@@ -1572,7 +1572,7 @@
                         });
                         html = html.split(id).join(renderedMath);
                     } catch (err) {
-                        console.warn('[Pwanimate] KaTeX render error:', err);
+                        console.warn('[Spark] KaTeX render error:', err);
                         const fallback = displayMode ? `<pre class="katex-fallback">${escapeHtml(code)}</pre>` : `<code>${escapeHtml(code)}</code>`;
                         html = html.split(id).join(fallback);
                     }
@@ -1810,7 +1810,7 @@
                     try {
                         window.Prism.highlightElement(code);
                     } catch (e) {
-                        console.warn('[Pwanimate] Prism highlight error:', e);
+                        console.warn('[Spark] Prism highlight error:', e);
                     }
                 }
             });
@@ -1860,7 +1860,7 @@
                     showSuccess();
                     return true;
                 }).catch(err => {
-                    console.warn('[Pwanimate] Clipboard API error, falling back:', err);
+                    console.warn('[Spark] Clipboard API error, falling back:', err);
                     return this.fallbackCopyText(text, showSuccess);
                 });
             } else {
@@ -1884,7 +1884,7 @@
                 if (successful && onSuccess) onSuccess();
                 return successful;
             } catch (e) {
-                console.warn('[Pwanimate] Fallback copy failed:', e);
+                console.warn('[Spark] Fallback copy failed:', e);
                 return false;
             }
         }
@@ -2026,14 +2026,14 @@
                     }
 
                     const badge = e.target.closest('a, button');
-                    if (badge && isPwanimateCitationLink(badge)) {
+                    if (badge && isSparkCitationLink(badge)) {
                         if ((badge.dataset.sourceType || '').toLowerCase() === 'web') {
                             const webUrl = this.getSafeExternalUrl(badge.dataset.url || badge.getAttribute('href'));
                             if (!webUrl) {
                                 e.preventDefault();
                                 return;
                             }
-                            const bridge = window.AndroidBridge || window.PwaninetBridge;
+                            const bridge = window.AndroidBridge || window.pwaninetBridge;
                             if (bridge && typeof bridge.openExternalUrl === 'function') {
                                 e.preventDefault();
                                 bridge.openExternalUrl(webUrl);
@@ -2605,7 +2605,7 @@
                     // Some Android WebView builds report a MIME type as supported but
                     // still reject it when constructing MediaRecorder. Let WebView choose.
                     if (!mimeType || error.name !== 'NotSupportedError') throw error;
-                    console.warn('[Pwanimate voice] Requested recording format was rejected; retrying with the WebView default.', error);
+                    console.warn('[Spark voice] Requested recording format was rejected; retrying with the WebView default.', error);
                     this.voiceRecorder = new MediaRecorder(stream);
                 }
                 this.voiceChunks = [];
@@ -2622,7 +2622,7 @@
                 recorder.addEventListener('stop', () => this.handleVoiceRecordingStopped(recorder), { once: true });
                 recorder.addEventListener('error', event => {
                     const error = event.error || event;
-                    console.error('[Pwanimate voice] MediaRecorder failed:', error);
+                    console.error('[Spark voice] MediaRecorder failed:', error);
                     this.voiceErrorMessage = this.getVoiceStartupErrorMessage(error);
                     stream.getTracks().forEach(track => track.stop());
                     this.voiceMediaStream = null;
@@ -2637,7 +2637,7 @@
                 }, { once: true });
                 recorder.start(1000);
             } catch (error) {
-                console.error('[Pwanimate voice] Could not start recording:', error);
+                console.error('[Spark voice] Could not start recording:', error);
                 if (stream) stream.getTracks().forEach(track => track.stop());
                 this.voiceMediaStream = null;
                 if (this.voiceCancelled) return;
@@ -2671,7 +2671,7 @@
             switch (error && error.name) {
                 case 'NotAllowedError':
                 case 'SecurityError':
-                    return 'Microphone access is blocked. Allow microphone access for Pwaninet in Android settings, then try again.';
+                    return 'Microphone access is blocked. Allow microphone access for pwaninet in Android settings, then try again.';
                 case 'NotFoundError':
                 case 'DevicesNotFoundError':
                     return 'No microphone is available on this device.';
@@ -3147,7 +3147,7 @@
             } else if (meta.citation) {
                 subtitle = `${category} · ${meta.citation}`;
             } else {
-                subtitle = `${category} · PwaniNet Repository`;
+                subtitle = `${category} · pwaninet Repository`;
             }
 
             const targetSrc = previewType === 'video'
@@ -3163,8 +3163,8 @@
             const profileCardUrl = meta.profileCardUrl || meta.profile_card_url || person.profile_card_url ||
                 `${profileUrl.replace(/\/$/, '')}/pwanimate-card/`;
             const description = meta.description || meta.content || meta.snippet || meta.citation ||
-                (previewType === 'document' ? 'Official course or academic document from PwaniNet repository.' :
-                (previewType === 'post' ? 'Discussion post on PwaniNet.' :
+                (previewType === 'document' ? 'Official course or academic document from pwaninet repository.' :
+                (previewType === 'post' ? 'Discussion post on pwaninet.' :
                 (previewType === 'profile' ? [person.headline, person.academic_level, person.programme_name, person.bio].filter(Boolean).join('\n') : 'Resource referenced in this conversation.')));
 
             const attachmentId = meta.attachmentId || meta.attachment_id || '';
@@ -3214,7 +3214,7 @@
         }
 
         normalizeResource(url, title, meta = {}) {
-            return PwanimateChat.normalizeResource(url, title, meta);
+            return SparkChat.normalizeResource(url, title, meta);
         }
 
         previewResource(url, title, meta = {}) {
@@ -3836,7 +3836,7 @@
                         docViewer._resizeObs.observe(docViewer);
                     }
                 }).catch((err) => {
-                    console.warn('[Pwanimate] DocumentViewer initialization failed, falling back to doc card:', err);
+                    console.warn('[Spark] DocumentViewer initialization failed, falling back to doc card:', err);
                     docViewer.classList.remove('d-flex');
                     docViewer.classList.add('d-none');
                     this.renderDocCard(container, prefix, details);
@@ -3920,7 +3920,7 @@
             } catch (error) {
                 if (docContainer.dataset.profileCardUrl !== cardUrl) return;
                 docContainer.innerHTML = '<div class="small text-muted text-center m-auto">This profile preview is unavailable.</div>';
-                console.warn('[Pwanimate] Profile card preview could not be loaded:', error);
+                console.warn('[Spark] Profile card preview could not be loaded:', error);
             }
         }
 
@@ -4470,7 +4470,7 @@
                     this.sendBtn.disabled = true;
                     this.sendBtn.classList.remove('is-active');
                     this.sendBtn.setAttribute('aria-label', 'Wait for document processing to finish');
-                    this.sendBtn.setAttribute('title', 'Pwanimate is reading the attached document');
+                    this.sendBtn.setAttribute('title', 'Spark is reading the attached document');
                 } else if (failedDocument) {
                     this.sendBtn.disabled = true;
                     this.sendBtn.classList.remove('is-active');
@@ -4537,7 +4537,7 @@
                             }
                         } catch (err) {
                             if (err && err.message && err.message.toLowerCase().includes('cancel')) return;
-                            console.warn('[Pwanimate] Capacitor camera error, falling back to file input:', err);
+                            console.warn('[Spark] Capacitor camera error, falling back to file input:', err);
                             if (cameraInput) cameraInput.click();
                         }
                         return;
@@ -4639,7 +4639,7 @@
 
                 if (!response.ok || !data.id) {
                     const errMsg = data.error || 'Upload failed.';
-                    console.warn('[Pwanimate] Attachment upload failed:', errMsg);
+                    console.warn('[Spark] Attachment upload failed:', errMsg);
                     if (chip) {
                         chip.classList.remove('is-uploading');
                         chip.classList.add('is-error');
@@ -4740,7 +4740,7 @@
                 this.updateSendButtonState();
 
             } catch (err) {
-                console.error('[Pwanimate] Attachment upload network error:', err);
+                console.error('[Spark] Attachment upload network error:', err);
                 chip = document.getElementById(chipId);
                 if (chip) {
                     chip.classList.remove('is-uploading');
@@ -4790,7 +4790,7 @@
                     if (data.processing_status === 'failed') {
                         if (chip) {
                             chip.classList.remove('is-processing');
-                            chip.title = data.processing_error || 'Pwanimate could not read this document.';
+                            chip.title = data.processing_error || 'Spark could not read this document.';
                             this._setAttachmentStatusLabel(chip, 'Could not read', true);
                         }
                         attachment.processing_error = data.processing_error || '';
@@ -4816,7 +4816,7 @@
             try {
                 this.abortController.abort();
             } catch (e) {
-                console.error('[Pwanimate] Abort error:', e);
+                console.error('[Spark] Abort error:', e);
             }
         }
 
@@ -4861,7 +4861,7 @@
                 button.innerHTML = '<i class="bi bi-check2 me-2"></i>Saved in My Resources';
                 window.location.assign(data.download_url);
             } catch (error) {
-                console.error('[Pwanimate] Resource export failed:', error);
+                console.error('[Spark] Resource export failed:', error);
                 button.innerHTML = '<i class="bi bi-exclamation-circle me-2"></i>Could not prepare file';
                 window.setTimeout(() => { button.innerHTML = originalMarkup; }, 2600);
                 return;
@@ -5017,7 +5017,7 @@
                 }
 
                 if (!responseOk) {
-                    let errMsg = data.error || 'Failed to get answer from Pwanimate.';
+                    let errMsg = data.error || 'Failed to get answer from Spark.';
                     if (responseStatus === 429) {
                         errMsg = data.error || 'All free-tier model quotas are temporarily depleted. Please wait a moment for limits to reset.';
                     } else if (responseStatus === 504) {
@@ -5057,7 +5057,7 @@
                 }
 
                 const meta = data.metadata || {};
-                console.log('[Pwanimate Telemetry]', {
+                console.log('[Spark Telemetry]', {
                     conversation_id: data.conversation_id,
                     provider: data.provider,
                     model: data.model,
@@ -5082,11 +5082,11 @@
 
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    console.log('[Pwanimate] Chat request aborted by user.');
+                    console.log('[Spark] Chat request aborted by user.');
                     this.removeTypingIndicator();
                     this.showSystemNotice('Generation stopped');
                 } else {
-                    console.error('[Pwanimate] Chat network error:', err);
+                    console.error('[Spark] Chat network error:', err);
                     this.removeTypingIndicator();
                     this.showErrorBubble(
                         'Network connection error. Please check your internet connection.',
@@ -5167,8 +5167,8 @@
                 <div class="pwanimate-message-content">
                     <div class="pwanimate-assistant-bubble">
                         <div class="pwanimate-assistant-header">
-                            <img src="/static/images/pwanimate/pwanimate-transparent.png" class="pwanimate-assistant-avatar" alt="Pwanimate">
-                            <span>Pwanimate</span>
+                            <img src="/static/images/pwanimate/pwanimate-transparent.png" class="pwanimate-assistant-avatar" alt="Spark">
+                            <span>Spark</span>
                         </div>
                         <div class="pwanimate-thinking-loader pwanimate-typing-indicator" role="status" aria-live="polite" aria-atomic="true">
                             <div class="pwanimate-thinking-animation" aria-hidden="true">
@@ -5191,7 +5191,7 @@
                 searching_web: 'Searching the web…',
                 reading_sources: 'Reading sources…',
                 devouring_context: 'Devouring the context…',
-                searching_posts: 'Searching PwaniNet…',
+                searching_posts: 'Searching pwaninet…',
                 searching_documents: 'Searching the repository…'
             };
             const label = labels[stage];
@@ -5447,8 +5447,8 @@
                 this.contextDocViewer = null;
             }
             document.body.classList.remove('pwanimate-resizing');
-            if (window._activePwanimateChat === this) {
-                window._activePwanimateChat = null;
+            if (window._activeSparkChat === this) {
+                window._activeSparkChat = null;
             }
         }
 
@@ -5581,8 +5581,8 @@
                 <div class="pwanimate-message-content">
                     <div class="pwanimate-assistant-bubble">
                         <div class="pwanimate-assistant-header">
-                            <img src="/static/images/pwanimate/pwanimate-transparent.png" class="pwanimate-assistant-avatar" alt="Pwanimate">
-                            <span>Pwanimate</span>
+                            <img src="/static/images/pwanimate/pwanimate-transparent.png" class="pwanimate-assistant-avatar" alt="Spark">
+                            <span>Spark</span>
                         </div>
                         <div class="pwanimate-markdown-body" data-raw="${escapeHtml(answer)}">${parsedHtml}</div>
                         ${peopleHtml}
@@ -5826,7 +5826,7 @@
                     alert('Failed to delete conversation.');
                 }
             } catch (e) {
-                console.error('[Pwanimate] Delete error:', e);
+                console.error('[Spark] Delete error:', e);
                 alert('Network error while deleting conversation.');
             }
         }
@@ -5845,7 +5845,7 @@
                 const conversations = await res.json();
                 this.renderConversationsList(conversations);
             } catch (e) {
-                console.warn('[Pwanimate] Failed to refresh conversation list:', e);
+                console.warn('[Spark] Failed to refresh conversation list:', e);
             }
         }
 
@@ -5897,7 +5897,7 @@
                                     data-conversation-id="${c.id}"
                                     aria-label="Delete conversation"
                                     title="Delete conversation"
-                                    onclick="event.stopPropagation(); event.preventDefault(); window.handleDeletePwanimateConversation('${c.id}');">
+                                    onclick="event.stopPropagation(); event.preventDefault(); window.handleDeleteSparkConversation('${c.id}');">
                                 <i class="bi bi-trash3"></i>
                             </button>
                         </div>
@@ -5938,7 +5938,7 @@
                     });
                 }
             } catch (e) {
-                console.warn('[Pwanimate] Failed to fetch quota status:', e);
+                console.warn('[Spark] Failed to fetch quota status:', e);
             }
         }
 
@@ -6273,12 +6273,12 @@
         }
     }
 
-    function initPwanimate() {
+    function initSpark() {
         const workspace = document.getElementById('pwanimate-workspace');
         if (!workspace) {
-            if (window._activePwanimateChat) {
-                window._activePwanimateChat.destroy();
-                window._activePwanimateChat = null;
+            if (window._activeSparkChat) {
+                window._activeSparkChat.destroy();
+                window._activeSparkChat = null;
             }
             document.documentElement.classList.remove('pwanimate-active');
             document.body.classList.remove('pwanimate-active');
@@ -6290,52 +6290,52 @@
         // firing alongside an htmx:afterSwap). We intentionally do NOT block re-init
         // when the workspace element itself has changed (HTMX navigation between conversations),
         // which is why we compare by reference rather than a data-initialized attribute.
-        if (window._activePwanimateChat && window._activePwanimateChat.workspace === workspace) {
-            window._activePwanimateChat.initWorkspaceGeometry();
+        if (window._activeSparkChat && window._activeSparkChat.workspace === workspace) {
+            window._activeSparkChat.initWorkspaceGeometry();
             return;
         }
-        if (window._activePwanimateChat) {
-            window._activePwanimateChat.destroy();
-            window._activePwanimateChat = null;
+        if (window._activeSparkChat) {
+            window._activeSparkChat.destroy();
+            window._activeSparkChat = null;
         }
-        window._activePwanimateChat = new PwanimateChat(workspace);
+        window._activeSparkChat = new SparkChat(workspace);
     }
 
-    window.initPwanimate = initPwanimate;
+    window.initSpark = initSpark;
 
-    window.pwanimateWorkspace = {
+    window.sparkWorkspace = {
         toggleContextRail: () => {
-            if (window._activePwanimateChat) {
-                window._activePwanimateChat.toggleContextRail();
+            if (window._activeSparkChat) {
+                window._activeSparkChat.toggleContextRail();
             } else {
                 const workspace = document.getElementById('pwanimate-workspace');
                 if (workspace) workspace.classList.toggle('pwanimate-context-open');
             }
         },
         openContextRail: () => {
-            if (window._activePwanimateChat) {
-                window._activePwanimateChat.openContextRail();
+            if (window._activeSparkChat) {
+                window._activeSparkChat.openContextRail();
             } else {
                 const workspace = document.getElementById('pwanimate-workspace');
                 if (workspace) workspace.classList.add('pwanimate-context-open');
             }
         },
         closeContextRail: () => {
-            if (window._activePwanimateChat) {
-                window._activePwanimateChat.closeContextRail();
+            if (window._activeSparkChat) {
+                window._activeSparkChat.closeContextRail();
             } else {
                 const workspace = document.getElementById('pwanimate-workspace');
                 if (workspace) workspace.classList.remove('pwanimate-context-open');
             }
         },
         switchWorkspaceTab: (tab) => {
-            if (window._activePwanimateChat) {
-                window._activePwanimateChat.switchWorkspaceTab(tab);
+            if (window._activeSparkChat) {
+                window._activeSparkChat.switchWorkspaceTab(tab);
             }
         },
         toggleLeftRail: (collapse) => {
-            if (window._activePwanimateChat) {
-                window._activePwanimateChat.toggleLeftRail(collapse);
+            if (window._activeSparkChat) {
+                window._activeSparkChat.toggleLeftRail(collapse);
             } else {
                 const workspace = document.getElementById('pwanimate-workspace');
                 if (workspace) {
@@ -6346,17 +6346,17 @@
         }
     };
 
-    window.handleDeletePwanimateConversation = function (convId) {
+    window.handleDeleteSparkConversation = function (convId) {
         if (!convId) return;
-        if (window._activePwanimateChat && typeof window._activePwanimateChat.handleDeleteConversation === 'function') {
-            window._activePwanimateChat.handleDeleteConversation(convId);
+        if (window._activeSparkChat && typeof window._activeSparkChat.handleDeleteConversation === 'function') {
+            window._activeSparkChat.handleDeleteConversation(convId);
         } else {
             const activeConvId = document.getElementById('pwanimate-workspace')?.dataset?.conversationId || null;
-            PwanimateChat.prototype.handleDeleteConversation.call({ conversationId: activeConvId }, convId);
+            SparkChat.prototype.handleDeleteConversation.call({ conversationId: activeConvId }, convId);
         }
     };
 
-    window.switchPwanimateSettingsTab = function (scope, tabName) {
+    window.switchSparkSettingsTab = function (scope, tabName) {
         if (!tabName) return;
         const isModal = scope === 'modal';
         const tabsContainerId = isModal ? 'pwanimate-modal-tabs' : 'pwanimate-mobile-tabs';
@@ -6416,16 +6416,16 @@
         }
     };
 
-    window.setPwanimateModalActiveTab = function (el) {
+    window.setSparkModalActiveTab = function (el) {
         if (!el) return;
         const tab = el.getAttribute('data-tab') || (el.id ? el.id.replace('modal-tab-', '') : 'personalization');
-        window.switchPwanimateSettingsTab('modal', tab);
+        window.switchSparkSettingsTab('modal', tab);
     };
 
-    window.setPwanimateMobileActiveTab = function (el) {
+    window.setSparkMobileActiveTab = function (el) {
         if (!el) return;
         const tab = el.getAttribute('data-tab') || (el.id ? el.id.replace('mobile-tab-', '') : 'personalization');
-        window.switchPwanimateSettingsTab('mobile', tab);
+        window.switchSparkSettingsTab('mobile', tab);
     };
 
     // Global listener to sync choice card selections with radio button state
@@ -6450,11 +6450,11 @@
         if (e.target && e.target.id === 'pwanimateSettingsModal') {
             const activeModalTab = e.target.querySelector('#pwanimate-modal-tabs .nav-link.active');
             const tabName = activeModalTab ? activeModalTab.getAttribute('data-tab') : 'personalization';
-            window.switchPwanimateSettingsTab('modal', tabName || 'personalization');
+            window.switchSparkSettingsTab('modal', tabName || 'personalization');
         }
     });
 
-    function cleanupPwanimateModals() {
+    function cleanupSparkModals() {
         const modalEl = document.getElementById('pwanimateSettingsModal');
         if (modalEl && window.bootstrap && typeof window.bootstrap.Modal?.getInstance === 'function') {
             const inst = window.bootstrap.Modal.getInstance(modalEl);
@@ -6470,20 +6470,20 @@
 
     // Attach to lifecycle
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initPwanimate);
+        document.addEventListener('DOMContentLoaded', initSpark);
     } else {
-        initPwanimate();
+        initSpark();
     }
 
     if (!window._pwanimateSwapListenerAttached) {
         window._pwanimateSwapListenerAttached = true;
         document.body.addEventListener('htmx:beforeSwap', function (evt) {
             if (evt.detail && evt.detail.target && evt.detail.target.id === 'page-content-target') {
-                if (window._activePwanimateChat) {
-                    window._activePwanimateChat.destroy();
-                    window._activePwanimateChat = null;
+                if (window._activeSparkChat) {
+                    window._activeSparkChat.destroy();
+                    window._activeSparkChat = null;
                 }
-                cleanupPwanimateModals();
+                cleanupSparkModals();
                 if (!evt.detail.xhr || !evt.detail.xhr.responseText.includes('pwanimate-workspace')) {
                     document.documentElement.classList.remove('pwanimate-active');
                     document.body.classList.remove('pwanimate-active');
@@ -6493,7 +6493,7 @@
 
         document.body.addEventListener('htmx:afterSwap', function (evt) {
             if (document.getElementById('pwanimate-workspace')) {
-                initPwanimate();
+                initSpark();
             } else {
                 document.documentElement.classList.remove('pwanimate-active');
                 document.body.classList.remove('pwanimate-active');

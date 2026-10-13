@@ -3,7 +3,7 @@
  * Stores device ID in localStorage and sends it with all HTMX requests
  */
 
-const DEVICE_ID_KEY = 'pwaninet_device_id';
+const DEVICE_ID_KEY = 'vasto_device_id';
 
 /**
  * Generate a random device ID

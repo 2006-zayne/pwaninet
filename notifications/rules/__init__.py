@@ -1,5 +1,5 @@
 """
-Rules module for PwaniNet Notification Engine v2
+Rules module for vasto Notification Engine v2
 
 This module provides the Rules Engine that transforms platform events into user notifications.
 """

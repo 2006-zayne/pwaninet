@@ -29,7 +29,7 @@ class ConversationModelTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="student_model_test",
-            email="student_model@pwaninet.local",
+            email="student_model@vasto.local",
             password="pass",
         )
 
@@ -97,12 +97,12 @@ class ConversationServiceTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="student_service_test",
-            email="student_service@pwaninet.local",
+            email="student_service@vasto.local",
             password="pass",
         )
         self.other_user = User.objects.create_user(
             username="other_student",
-            email="other@pwaninet.local",
+            email="other@vasto.local",
             password="pass",
         )
 
@@ -189,12 +189,12 @@ class ConversationAPITestCase(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(
             username="student_api",
-            email="student_api@pwaninet.local",
+            email="student_api@vasto.local",
             password="pass123",
         )
         self.other_user = User.objects.create_user(
             username="other_api",
-            email="other_api@pwaninet.local",
+            email="other_api@vasto.local",
             password="pass123",
         )
 

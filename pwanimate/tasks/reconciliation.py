@@ -21,7 +21,7 @@ def reconcile_document_ingestion(self, dry_run: bool = False) -> Dict[str, Any]:
     """
     Periodic reconciliation task.
 
-    Inspects document versions across PwaniNet, detects ingestion gaps or incomplete
+    Inspects document versions across vasto, detects ingestion gaps or incomplete
     embeddings, and safely dispatches existing worker tasks with distributed locking.
     """
     logger.info("[PWANIMATE-RECONCILER] Starting periodic reconciliation task.")

@@ -7,7 +7,7 @@ COMPOSE_FILE="$APP_DIR/docker-compose.prod.yml"
 cd "$APP_DIR"
 
 echo "=================================================="
-echo " [Pwaninet] Initiating Automated Production Deploy"
+echo " [vasto] Initiating Automated Production Deploy"
 echo "=================================================="
 
 # 1. Check for dirty local working directory

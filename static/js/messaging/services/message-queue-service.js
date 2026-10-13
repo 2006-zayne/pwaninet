@@ -7,7 +7,7 @@
 
 class MessageQueueService {
     constructor() {
-        this.dbName = 'PwaninetMessageQueue';
+        this.dbName = 'vastoMessageQueue';
         this.dbVersion = 1;
         this.db = null;
         this.queue = new Map(); // In-memory cache

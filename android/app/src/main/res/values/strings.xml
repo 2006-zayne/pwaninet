@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Pwaninet</string>
-    <string name="title_activity_main">Pwaninet</string>
-    <string name="package_name">com.pwaninet.app</string>
-    <string name="custom_url_scheme">com.pwaninet.app</string>
+    <string name="app_name">Vasto</string>
+    <string name="title_activity_main">Vasto</string>
+    <string name="package_name">com.vasto.app</string>
+    <string name="custom_url_scheme">com.vasto.app</string>
 </resources>

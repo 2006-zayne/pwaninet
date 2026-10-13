@@ -1,12 +1,12 @@
 #!/bin/bash
-# PwaniNet Cloudflare Tunnel Credential Rotation Validator
+# Vasto Cloudflare Tunnel Credential Rotation Validator
 # Validates that the active token is configured and is NOT the compromised historical credential.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PWANINET_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$PWANINET_DIR"
+VASTO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$VASTO_DIR"
 
 # Compromised token SHA-256 fingerprint from commit aa1ee041ffe868d239078093bbae6aa73f813aaf
 COMPROMISED_SHA="1c7849e7b26c710c92bbbb5c15b9c5bf731fe4ffb233c10a484ca7fc20c3260d"

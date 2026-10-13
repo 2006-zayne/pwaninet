@@ -1,7 +1,7 @@
-<!-- Interactive PwaniNet Spotlight Tour -->
+<!-- Interactive vasto Spotlight Tour -->
 <style>
   /* ── Tour Overlay & Spotlight ── */
-  #pwaninet-tour-overlay {
+  #vasto-tour-overlay {
     position: fixed;
     inset: 0;
     z-index: 10050;
@@ -9,12 +9,12 @@
     opacity: 0;
     transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  #pwaninet-tour-overlay.tour-active {
+  #vasto-tour-overlay.tour-active {
     opacity: 1;
   }
 
   /* Spotlight Cutout Frame */
-  #pwaninet-tour-spotlight {
+  #vasto-tour-spotlight {
     position: fixed;
     z-index: 10051;
     pointer-events: none;
@@ -44,7 +44,7 @@
   }
 
   /* ── Interactive Tour Popover Card ── */
-  #pwaninet-tour-card {
+  #vasto-tour-card {
     position: fixed;
     z-index: 10055;
     background: #ffffff;
@@ -63,12 +63,12 @@
                 left 0.35s cubic-bezier(0.25, 1, 0.5, 1);
     pointer-events: auto;
   }
-  #pwaninet-tour-card.card-visible {
+  #vasto-tour-card.card-visible {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
 
-  [data-theme="dark"] #pwaninet-tour-card {
+  [data-theme="dark"] #vasto-tour-card {
     background: #1e293b;
     color: #f8fafc;
     box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6),
@@ -132,7 +132,7 @@
 
   /* Responsive positioning on mobile: Lifted cleanly above mobile bottom nav */
   @media (max-width: 767px) {
-    #pwaninet-tour-card {
+    #vasto-tour-card {
       width: calc(100vw - 24px) !important;
       left: 12px !important;
       right: 12px !important;
@@ -144,12 +144,12 @@
 </style>
 
 <!-- Tour Markup Container (Hidden by default) -->
-<div id="pwaninet-tour-overlay" class="d-none" aria-live="polite" role="dialog" aria-modal="true">
+<div id="vasto-tour-overlay" class="d-none" aria-live="polite" role="dialog" aria-modal="true">
   <!-- Dynamic Spotlight Frame -->
-  <div id="pwaninet-tour-spotlight"></div>
+  <div id="vasto-tour-spotlight"></div>
 
   <!-- Interactive Popover Card -->
-  <div id="pwaninet-tour-card">
+  <div id="vasto-tour-card">
     <div class="d-flex align-items-center justify-content-between mb-2">
       <div class="d-flex align-items-center gap-2">
         <span class="tour-badge-pill" id="tourStepBadge">Step 1 of 5</span>
@@ -262,7 +262,7 @@
     {
       title: "Notifications & Alerts",
       icon: "bi-bell-fill",
-      body: "Keep track of assignment replies, likes, mentions, and course announcements right here in Notifications. You're ready to make the most of PwaniNet!",
+      body: "Keep track of assignment replies, likes, mentions, and course announcements right here in Notifications. You're ready to make the most of vasto!",
       tip: "Check your notification settings in your profile to customize alert sounds and push updates.",
       targets: [
         '#notification-badge-container',
@@ -375,8 +375,8 @@
   function repositionSpotlight() {
     if (!isTourRunning || !activeTargetElement) return;
 
-    const spotlight = document.getElementById('pwaninet-tour-spotlight');
-    const card = document.getElementById('pwaninet-tour-card');
+    const spotlight = document.getElementById('vasto-tour-spotlight');
+    const card = document.getElementById('vasto-tour-card');
     if (!spotlight || !card) return;
 
     const rect = activeTargetElement.getBoundingClientRect();
@@ -407,12 +407,12 @@
       const isNearBottomAction = (rect.top > window.innerHeight * 0.48 && rect.bottom < window.innerHeight - 80);
 
       if (isNearBottomAction) {
-        card.style.top = 'calc(24px + var(--pwaninet-safe-area-top, 0px))';
+        card.style.top = 'calc(24px + var(--vasto-safe-area-top, 0px))';
         card.style.bottom = 'auto';
       } else {
         // Otherwise lift card cleanly ABOVE the mobile bottom nav bar (60px + 12px = 72px)
         card.style.top = 'auto';
-        card.style.bottom = 'calc(88px + var(--pwaninet-safe-area-bottom, env(safe-area-inset-bottom, 0px)))';
+        card.style.bottom = 'calc(88px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)))';
       }
       card.style.left = '12px';
       card.style.right = '12px';
@@ -463,7 +463,7 @@
   }
 
   window.startOnboardingTour = function() {
-    const overlay = document.getElementById('pwaninet-tour-overlay');
+    const overlay = document.getElementById('vasto-tour-overlay');
     if (!overlay) return;
 
     isTourRunning = true;
@@ -509,8 +509,8 @@
 
   function closeTour() {
     isTourRunning = false;
-    const overlay = document.getElementById('pwaninet-tour-overlay');
-    const card = document.getElementById('pwaninet-tour-card');
+    const overlay = document.getElementById('vasto-tour-overlay');
+    const card = document.getElementById('vasto-tour-card');
     const mobileNav = document.querySelector('.mobile-bottom-nav');
 
     if (mobileNav) {

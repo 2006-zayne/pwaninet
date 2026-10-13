@@ -1,5 +1,5 @@
 /**
- * Storage Manager for PwaniNet
+ * Storage Manager for vasto
  * Coordinates all storage operations including downloads, cache, and temporary data
  */
 

@@ -2,7 +2,7 @@
  * DeviceMediaStore - Unified Local Storage for Chat Media
  * Coordinates:
  *   - Native Capacitor direct-to-disk storage (@capacitor/filesystem on Android / iOS)
- *   - Web / Desktop IndexedDB binary Blob storage (pwaninet_downloads_v1)
+ *   - Web / Desktop IndexedDB binary Blob storage (vasto_downloads_v1)
  *   - Persistent storage protection via navigator.storage.persist()
  *   - Local source resolution (Capacitor.convertFileSrc vs URL.createObjectURL)
  *   - In-memory key tracking synchronized with IndexedDB
@@ -27,7 +27,7 @@ class DeviceMediaStore {
     _setupEventListeners() {
         if (typeof window === 'undefined') return;
 
-        window.addEventListener('pwaninet:download-deleted', (e) => {
+        window.addEventListener('vasto:download-deleted', (e) => {
             const rawId = e.detail?.id;
             if (rawId) {
                 const messageId = String(rawId).replace(/^chat_/, '');
@@ -35,7 +35,7 @@ class DeviceMediaStore {
             }
         });
 
-        window.addEventListener('pwaninet:media-deleted', (e) => {
+        window.addEventListener('vasto:media-deleted', (e) => {
             const rawId = e.detail?.id || e.detail?.messageId;
             if (rawId) {
                 const messageId = String(rawId).replace(/^chat_/, '');
@@ -126,7 +126,7 @@ class DeviceMediaStore {
 
         console.log('[DEVICE_MEDIA_STORE] Evicted media:', strId);
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('pwaninet:media-evicted', { detail: { messageId: strId } }));
+            window.dispatchEvent(new CustomEvent('vasto:media-evicted', { detail: { messageId: strId } }));
         }
     }
 
@@ -173,11 +173,11 @@ class DeviceMediaStore {
                 const { Filesystem } = window.Capacitor.Plugins;
                 const Directory = window.Capacitor.Plugins.Filesystem.Directory || { Data: 'DATA' };
                 const safeName = (filename || 'media').replace(/[^a-zA-Z0-9._-]/g, '_');
-                const relativePath = `pwaninet_chat_media/${strId}_${safeName}`;
+                const relativePath = `vasto_chat_media/${strId}_${safeName}`;
 
                 try {
                     await Filesystem.mkdir({
-                        path: 'pwaninet_chat_media',
+                        path: 'vasto_chat_media',
                         directory: Directory.Data,
                         recursive: true
                     });
@@ -401,11 +401,11 @@ class DeviceMediaStore {
             // Native Capacitor direct-to-disk background download
             const { Filesystem } = window.Capacitor.Plugins;
             const Directory = window.Capacitor.Plugins.Filesystem.Directory || { Data: 'DATA' };
-            const relativePath = `pwaninet_chat_media/${strId}_${safeFilename}`;
+            const relativePath = `vasto_chat_media/${strId}_${safeFilename}`;
 
             try {
                 await Filesystem.mkdir({
-                    path: 'pwaninet_chat_media',
+                    path: 'vasto_chat_media',
                     directory: Directory.Data,
                     recursive: true
                 });

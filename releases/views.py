@@ -371,7 +371,7 @@ class CreateReleaseView(APIView):
     """
     API endpoint for creating releases with automatic version increment.
     Accepts semantic version type and automatically increments version.
-    Also updates pwaninet/version.py with new version.
+    Also updates vasto/version.py with new version.
     Endpoint: POST /api/releases/create/
     """
     def post(self, request):
@@ -392,7 +392,7 @@ class CreateReleaseView(APIView):
         new_version = self.increment_version(version.__version__, release_type)
         new_build_number = version.__build_number__ + 1
 
-        # Update pwaninet/version.py
+        # Update vasto/version.py
         self.update_version_file(new_version, new_build_number)
 
         # Create release in database

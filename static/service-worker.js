@@ -1,5 +1,5 @@
 /**
- * PwaniNet Service Worker
+ * vasto Service Worker
  * Handles offline support, caching, and push notifications
  * Version: 1.2.0 - Updated offline page design and caching
  */
@@ -7,9 +7,9 @@
 'use strict';
 let CACHE_VERSION = '1.6.3';
 let CACHE_BUILD = '112';
-const SW_CACHE_REVISION = '13';
-let CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
-let OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
+const SW_CACHE_REVISION = '14';
+let CACHE_NAME = `vasto-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
+let OFFLINE_CACHE_NAME = `vasto-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 
 // Service worker version metadata
 const SW_VERSION = {
@@ -26,8 +26,8 @@ self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SET_VERSION') {
         CACHE_VERSION = event.data.version;
         CACHE_BUILD = event.data.build;
-        CACHE_NAME = `pwaninet-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
-        OFFLINE_CACHE_NAME = `pwaninet-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
+        CACHE_NAME = `vasto-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
+        OFFLINE_CACHE_NAME = `vasto-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
         SW_VERSION.version = CACHE_VERSION;
         SW_VERSION.build = CACHE_BUILD;
         SW_VERSION.cacheName = CACHE_NAME;
@@ -60,7 +60,7 @@ const CORE_ASSETS = [
     '/static/images/web-app-manifest-192x192.png',
     '/static/images/web-app-manifest-192x192-rounded.png',
     '/static/images/web-app-manifest-512x512.png',
-    '/static/images/pwaninetmonochrome.png',
+    '/static/images/vastomonochrome.png',
     '/static/images/browserconfig.xml',
     '/static/js/native-pwa-install.js',
     '/static/js/downloads/download_storage.js',
@@ -107,10 +107,10 @@ self.addEventListener('activate', (event) => {
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames.map((cacheName) => {
-                        const isPwaniNetWorkerCache =
-                            cacheName.startsWith('pwaninet-v') ||
-                            cacheName.startsWith('pwaninet-offline-v');
-                        if (isPwaniNetWorkerCache && cacheName !== CACHE_NAME && cacheName !== OFFLINE_CACHE_NAME) {
+                        const isvastoWorkerCache =
+                            cacheName.startsWith('vasto-v') ||
+                            cacheName.startsWith('vasto-offline-v');
+                        if (isvastoWorkerCache && cacheName !== CACHE_NAME && cacheName !== OFFLINE_CACHE_NAME) {
                             console.log('Service Worker: Deleting old cache:', cacheName);
                             return caches.delete(cacheName);
                         }
@@ -140,10 +140,10 @@ self.addEventListener('push', (event) => {
     console.log('Service Worker: Push event received');
 
     let pushData = {
-        title: 'PwaniNet Notification',
+        title: 'vasto Notification',
         body: 'You have a new notification',
         icon: '/static/images/web-app-manifest-192x192-rounded.png',
-        badge: '/static/images/pwaninetmonochrome.png',
+        badge: '/static/images/vastomonochrome.png',
         vibrate: [200, 100, 200],
         requireInteraction: false,
         actions: [
@@ -501,7 +501,7 @@ async function handleOfflineMediaStreamRequest(request) {
     const id = url.pathname.replace('/offline-media-stream/', '').split('?')[0];
     
     return new Promise((resolve) => {
-        const req = indexedDB.open('pwaninet_downloads_v1', 1);
+        const req = indexedDB.open('vasto_downloads_v1', 1);
         req.onerror = () => resolve(new Response('Database error', { status: 500 }));
         req.onsuccess = () => {
             const db = req.result;
@@ -670,7 +670,7 @@ async function getOfflinePage() {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>PwaniNet - Offline</title>
+            <title>vasto - Offline</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body {
@@ -851,7 +851,7 @@ self.addEventListener('message', (event) => {
 
         case 'CLOSE_CHAT_NOTIFICATIONS':
             if (self.registration && typeof self.registration.getNotifications === 'function') {
-                const targetTag = (payload && payload.tag) || (payload && payload.conversation_id ? `pwaninet-chat-${payload.conversation_id}` : null);
+                const targetTag = (payload && payload.tag) || (payload && payload.conversation_id ? `vasto-chat-${payload.conversation_id}` : null);
                 const opts = targetTag ? { tag: targetTag } : {};
                 self.registration.getNotifications(opts).then((notifications) => {
                     notifications.forEach((n) => {

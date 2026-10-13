@@ -154,7 +154,7 @@ const CommentApi = {
         let defaultToken = '';
         for (let cookie of cookies) {
           const [name, value] = cookie.trim().split('=');
-          if (name === 'pwaninet_local_csrftoken') {
+          if (name === 'vasto_local_csrftoken') {
             localToken = decodeURIComponent(value || '');
           } else if (name === 'csrftoken') {
             defaultToken = decodeURIComponent(value || '');

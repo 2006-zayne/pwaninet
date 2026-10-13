@@ -83,7 +83,7 @@ class ContextEngine:
         
         # Programme, level, school, semester, and enrolled units keep Pwanimate natively grounded in the student's academic context
         if intent in [
-            IntentCategory.PWANINET_KNOWLEDGE,
+            IntentCategory.Vasto_KNOWLEDGE,
             IntentCategory.PERSONALIZED_DISCOVERY,
             IntentCategory.MIXED,
             IntentCategory.GENERAL_KNOWLEDGE,
@@ -203,7 +203,7 @@ class ContextEngine:
         
         Args:
             explicit_resources: User-selected resources.
-            retrieved_context: Retrieved evidence from PwaniNet.
+            retrieved_context: Retrieved evidence from Vasto.
             grounding_mode: Current grounding mode.
             
         Returns:

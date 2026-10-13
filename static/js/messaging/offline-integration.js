@@ -1,5 +1,5 @@
 /**
- * Offline Integration Layer for PwaniNet Messaging
+ * Offline Integration Layer for vasto Messaging
  * Integrates offline capabilities with existing messaging system
  */
 

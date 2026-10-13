@@ -1,1 +1,1 @@
-"""Search package for pwaninet."""
+"""Search package for vasto."""

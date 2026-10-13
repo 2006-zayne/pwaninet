@@ -1,7 +1,7 @@
 """
 users/services/recovery_code_service.py
 
-Single-use recovery code service for PwaniNet.
+Single-use recovery code service for vasto.
 Handles generation of high-entropy unambiguous codes, PBKDF2 hashed storage,
 concurrency-safe atomic consumption, and regeneration.
 """

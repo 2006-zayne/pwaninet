@@ -1,5 +1,5 @@
 """
-Delivery module for PwaniNet Notification Engine v2
+Delivery module for vasto Notification Engine v2
 
 This module provides the Delivery Engine that delivers approved notifications
 through supported communication channels.

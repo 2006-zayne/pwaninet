@@ -1,5 +1,5 @@
 """
-Elite Chat Notification Service for PwaniNet (WhatsApp / Telegram / Messenger / Instagram Standard).
+Elite Chat Notification Service for vasto (WhatsApp / Telegram / Messenger / Instagram Standard).
 
 Provides a single unified pipeline for:
 1. Rich message preview generation (Text, Photo, Multi-Photo Album, Video, Voice Note with duration,
@@ -7,11 +7,11 @@ Provides a single unified pipeline for:
 2. Recipient resolution with block filtering, mute enforcement, and WhatsApp/Telegram-style
    mute override when a user is directly replied to or @mentioned in a group.
 3. Real-time WebSocket broadcasts (`conversation_update`) to `notifications_{user_id}` driving:
-   - Global `.messages-badge` across every page in PwaniNet
+   - Global `.messages-badge` across every page in vasto
    - Real-time conversation list ordering, rich snippets, and dynamic new-conversation insertion
    - In-app floating chat banner (when online outside the active conversation)
 4. Grouped, stacked OS Push Notifications (WebPush + Native Android/iOS FCM) on the
-   `pwaninet_messages` channel with per-conversation thread tags (`pwaninet-chat-{conversation_id}`).
+   `vasto_messages` channel with per-conversation thread tags (`vasto-chat-{conversation_id}`).
 """
 
 import json
@@ -43,7 +43,7 @@ DEFAULT_AVATAR_PATH = '/static/images/web-app-manifest-192x192-rounded.png'
 
 
 class ChatNotificationService:
-    """Unified notification and real-time inbox service for PwaniNet Messaging."""
+    """Unified notification and real-time inbox service for vasto Messaging."""
 
     # ------------------------------------------------------------------
     # 1. Identity & URL Helpers
@@ -53,14 +53,14 @@ class ChatNotificationService:
     def get_user_display_name(user) -> str:
         """Return user's full name if set, otherwise username."""
         if not user:
-            return 'PwaniNet User'
+            return 'vasto User'
         try:
             full_name = (user.get_full_name() or '').strip()
             if full_name and full_name.lower() != 'none none':
                 return full_name
         except Exception:
             pass
-        return getattr(user, 'username', None) or 'PwaniNet User'
+        return getattr(user, 'username', None) or 'vasto User'
 
     @staticmethod
     def get_user_avatar_url(user) -> str:
@@ -807,7 +807,7 @@ class ChatNotificationService:
                         'sender_id': actor.id if actor else message.sender_id,
                         'is_sender': is_sender,
                         'should_alert': False,
-                        'retract_tag': f"pwaninet-chat-{conversation.id}",
+                        'retract_tag': f"vasto-chat-{conversation.id}",
                         'timestamp': timezone.now().isoformat(),
                         'unread_count': 0 if is_sender else conv_unread,
                         'total_unread_count': total_unread,
@@ -923,7 +923,7 @@ class ChatNotificationService:
                     'unread_count': 0,
                     'total_unread_count': total_unread,
                     'should_alert': False,
-                    'retract_tag': f"pwaninet-chat-{conversation_id}",
+                    'retract_tag': f"vasto-chat-{conversation_id}",
                 },
             )
             try:
@@ -1144,8 +1144,8 @@ class ChatNotificationService:
                 pass
 
         target_url = f"/messaging/conversation/{conversation.id}/"
-        tag = f"pwaninet-chat-{conversation.id}"
-        channel_id = 'pwaninet_messages'
+        tag = f"vasto-chat-{conversation.id}"
+        channel_id = 'vasto_messages'
 
         for sub in subscriptions:
             if sub.token_type == PushSubscription.TokenType.VAPID:
@@ -1197,7 +1197,7 @@ class ChatNotificationService:
             'body': body,
             'icon': icon_url,
             'image': image_url,
-            'badge': cls.make_absolute_url('/static/images/pwaninetmonochrome.png'),
+            'badge': cls.make_absolute_url('/static/images/vastomonochrome.png'),
             'vibrate': [180, 80, 180],
             'requireInteraction': False,
             'tag': tag,
@@ -1268,7 +1268,7 @@ class ChatNotificationService:
                 'conversation_id': str(conversation_id),
                 'notification_type': 'CHAT_MESSAGE',
                 'category': 'MESSAGING',
-                'icon': 'ic_stat_pwaninet',
+                'icon': 'ic_stat_vasto',
                 'avatar_url': str(icon_url or ''),
                 'image': str(image_url or ''),
                 'channel_id': str(channel_id),
@@ -1286,7 +1286,7 @@ class ChatNotificationService:
             else:
                 notif_kwargs = {'title': title, 'body': body}
                 android_notif_kwargs = {
-                    'icon': 'ic_stat_pwaninet',
+                    'icon': 'ic_stat_vasto',
                     'channel_id': channel_id,
                     'tag': tag,
                     'color': '#2563eb',

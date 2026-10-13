@@ -1,7 +1,7 @@
 """Academic domain models for university structure.
 
 These models represent the hierarchical academic structure of the university
-and are designed to be reusable across PwaniNet modules.
+and are designed to be reusable across vasto modules.
 
 Hierarchy:
 Faculty → School → Department → Programme → Academic Unit → Semester → Academic Year

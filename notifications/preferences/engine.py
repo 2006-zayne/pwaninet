@@ -1,5 +1,5 @@
 """
-Preference Engine for PwaniNet Notification Engine v2
+Preference Engine for vasto Notification Engine v2
 
 This module implements the Preference Engine that evaluates user-specific notification
 preferences before delivery. Following Chapter 8 of the specification.

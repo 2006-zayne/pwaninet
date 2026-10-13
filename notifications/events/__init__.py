@@ -1,8 +1,8 @@
 """
-Events module for PwaniNet Notification Engine v2
+Events module for vasto Notification Engine v2
 
 This module provides the event infrastructure for the platform.
-Events are immutable facts representing completed actions within PwaniNet.
+Events are immutable facts representing completed actions within vasto.
 """
 
 from notifications.models import PlatformEvent, EventArchive

@@ -87,11 +87,11 @@ class BuildStudentContextTestCase(SimpleTestCase):
         self.assertEqual(len(student_ctx.relevant_interests), 0)
         self.assertEqual(len(student_ctx.relevant_skills), 0)
 
-    def test_student_context_for_pwaninet_knowledge(self):
-        """PwaniNet knowledge should include programme/level."""
+    def test_student_context_for_vasto_knowledge(self):
+        """vasto knowledge should include programme/level."""
         student_ctx = self.engine.build_student_context(
             self.mock_user_context,
-            IntentCategory.PWANINET_KNOWLEDGE,
+            IntentCategory.vasto_KNOWLEDGE,
             "What are the CS prerequisites?"
         )
         

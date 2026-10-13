@@ -12,7 +12,7 @@ Tests coverage:
 4. Personalization Form Submissions (POST):
    - Valid updates persist to PwanimatePreferences
    - Success alert rendered
-   - Decoupled from PwaniNet User model (username, email unchanged)
+   - Decoupled from Vasto User model (username, email unchanged)
 5. Validation Errors:
    - Invalid tone choice
    - Invalid response style choice
@@ -48,7 +48,7 @@ class PwanimateSettingsAuthTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             username="student_mwangi",
-            email="mwangi@pwaninet.local",
+            email="mwangi@Vasto.local",
             password="testpassword123",
             first_name="Mwangi",
             last_name="Kamau",
@@ -87,7 +87,7 @@ class PwanimateSettingsHTMXNegotiationTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             username="student_mwangi",
-            email="mwangi@pwaninet.local",
+            email="mwangi@Vasto.local",
             password="testpassword123",
             first_name="Mwangi",
         )
@@ -183,7 +183,7 @@ class PwanimatePersonalizationFormTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             username="student_mwangi",
-            email="mwangi@pwaninet.local",
+            email="mwangi@Vasto.local",
             password="testpassword123",
             first_name="Mwangi",
             last_name="Kamau",
@@ -424,7 +424,7 @@ class PwanimateSettingsProductBoundaryTests(TestCase):
 
 
 class PwanimateSettingsNavigationAndHeaderTests(TestCase):
-    """Verify simplified navigation (single Settings item, no PwaniNet Settings) and clean headers."""
+    """Verify simplified navigation (single Settings item, no Vasto Settings) and clean headers."""
 
     def setUp(self):
         self.client = Client()
@@ -436,8 +436,8 @@ class PwanimateSettingsNavigationAndHeaderTests(TestCase):
         )
         self.client.force_login(self.user)
 
-    def test_left_rail_contains_single_settings_link_and_no_pwaninet_settings(self):
-        """Desktop rail contains single Settings item with gear icon and no PwaniNet Settings."""
+    def test_left_rail_contains_single_settings_link_and_no_Vasto_settings(self):
+        """Desktop rail contains single Settings item with gear icon and no Vasto Settings."""
         resp = self.client.get(reverse("pwanimate:index"))
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode("utf-8")
@@ -446,15 +446,15 @@ class PwanimateSettingsNavigationAndHeaderTests(TestCase):
         self.assertIn("bi-gear", content)
         self.assertIn("Settings", content)
 
-        # Must NOT have separate PwaniNet Settings
-        self.assertNotIn("PwaniNet Settings", content)
+        # Must NOT have separate Vasto Settings
+        self.assertNotIn("Vasto Settings", content)
 
-    def test_mobile_menu_contains_single_settings_link_and_no_pwaninet_settings(self):
-        """Mobile offcanvas menu contains single Settings item and no PwaniNet Settings."""
+    def test_mobile_menu_contains_single_settings_link_and_no_Vasto_settings(self):
+        """Mobile offcanvas menu contains single Settings item and no Vasto Settings."""
         resp = self.client.get(reverse("pwanimate:index"))
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode("utf-8")
-        self.assertNotIn("PwaniNet Settings", content)
+        self.assertNotIn("Vasto Settings", content)
 
     def test_modal_header_is_clean_settings(self):
         """Desktop modal header renders 'Settings' with close filter."""
@@ -554,7 +554,7 @@ class PwanimateVersionAndSettingsRenderingTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             username="student_mwangi",
-            email="mwangi@pwaninet.local",
+            email="mwangi@Vasto.local",
             password="testpassword123",
             first_name="Mwangi",
             last_name="Kamau",

@@ -10,7 +10,7 @@
     <div class="mb-4">
         <h4 class="fw-bold mb-1">{% trans "Personalization" %}</h4>
         <p class="text-muted small mb-0">
-            {% trans "Configure how Pwanimate interacts with you across conversations and academic inquiries." %}
+            {% trans "Configure how Spark interacts with you across conversations and academic inquiries." %}
         </p>
     </div>
 
@@ -18,7 +18,7 @@
     <div class="alert alert-success d-flex align-items-center py-2 px-3 mb-4 rounded-3 shadow-sm border-0" role="alert">
         <i class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
         <div>
-            <strong>{% trans "Saved!" %}</strong> {% trans "Your Pwanimate preferences have been updated." %}
+            <strong>{% trans "Saved!" %}</strong> {% trans "Your Spark preferences have been updated." %}
         </div>
     </div>
     {% endif %}
@@ -42,10 +42,10 @@
     <!-- 1. Nickname -->
     <div class="mb-4 pwanimate-settings-section">
         <label for="pwanimate-nickname-input" class="form-label fw-bold mb-1">
-            {% trans "What should Pwanimate call you?" %}
+            {% trans "What should Spark call you?" %}
         </label>
         <p class="text-muted small mb-2">
-            {% trans "Optional. This only changes how Pwanimate addresses you in chat, and does not alter your PwaniNet account or display name." %}
+            {% trans "Optional. This only changes how Spark addresses you in chat, and does not alter your vasto account or display name." %}
         </p>
         <input type="text"
                class="form-control pwanimate-settings-input {% if errors.nickname %}is-invalid{% endif %}"
@@ -66,7 +66,7 @@
     <div class="mb-4 pwanimate-settings-section">
         <label class="form-label fw-bold mb-1">{% trans "Conversational Tone" %}</label>
         <p class="text-muted small mb-2">
-            {% trans "Select the general manner in which Pwanimate frames its responses." %}
+            {% trans "Select the general manner in which Spark frames its responses." %}
         </p>
         <div class="d-flex flex-column gap-2 pwanimate-options-grid">
             <label class="pwanimate-choice-card d-flex align-items-start gap-3 p-3 rounded-3 border {% if preferences.tone == 'neutral' or not preferences.tone %}selected{% endif %}">
@@ -137,7 +137,7 @@
             {% trans "Personal Instructions" %}
         </label>
         <p class="text-muted small mb-2">
-            {% trans "Tell Pwanimate how you would like it to work with you. These instructions guide conversational style, but do not override university policies, safety rules, or privacy boundaries." %}
+            {% trans "Tell Spark how you would like it to work with you. These instructions guide conversational style, but do not override university policies, safety rules, or privacy boundaries." %}
         </p>
         <textarea class="form-control pwanimate-settings-textarea {% if errors.personal_instructions %}is-invalid{% endif %}"
                   id="pwanimate-instructions-textarea"

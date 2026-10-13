@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='group',
             name='post_visibility',
-            field=models.CharField(choices=[('everyone', 'Everyone in Pwaninet'), ('members_only', 'Only Members')], default='members_only', help_text='Who can view group posts in the main feed', max_length=20),
+            field=models.CharField(choices=[('everyone', 'Everyone in vasto'), ('members_only', 'Only Members')], default='members_only', help_text='Who can view group posts in the main feed', max_length=20),
         ),
     ]

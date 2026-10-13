@@ -306,7 +306,7 @@ class Command(BaseCommand):
         except User.DoesNotExist:
             admin_user = User.objects.create_user(
                 username='admin',
-                email='admin@pwaninet.com',
+                email='admin@vasto.com',
                 password='Admin@123',
                 first_name='Admin',
                 last_name='User',
@@ -320,14 +320,14 @@ class Command(BaseCommand):
         test_users_data = [
             {
                 'username': 'testuser1',
-                'email': 'testuser1@pwaninet.com',
+                'email': 'testuser1@vasto.com',
                 'first_name': 'Test',
                 'last_name': 'User One',
                 'password': 'Test@123'
             },
             {
                 'username': 'testuser2',
-                'email': 'testuser2@pwaninet.com',
+                'email': 'testuser2@vasto.com',
                 'first_name': 'Test',
                 'last_name': 'User Two',
                 'password': 'Test@123'
@@ -775,7 +775,7 @@ class Command(BaseCommand):
             
             # Create messages
             message_contents = [
-                "Welcome to PwaniNet! Let me know if you need any help.",
+                "Welcome to vasto! Let me know if you need any help.",
                 "Thanks for joining! How are you finding the platform?",
                 "Feel free to reach out if you have any questions.",
                 "Great to have you here! Don't hesitate to ask for assistance.",

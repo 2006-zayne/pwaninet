@@ -1,5 +1,5 @@
 """
-Views for Unified Search in Pwaninet.
+Views for Unified Search in vasto.
 Handles live typing suggestions dropdown and multi-tab dedicated search page.
 """
 

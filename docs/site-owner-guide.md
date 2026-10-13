@@ -1,10 +1,10 @@
-# Understanding PwaniNet and Pwanimate
+# Understanding Vasto and Pwanimate
 
 This is a reading guide for understanding the whole product, even when you usually work on one feature at a time. It explains the current code in this repository. The code and settings are the final source of truth when behavior changes.
 
 ## 1. The short version
 
-PwaniNet is one Django application for student profiles, social activity, groups, academic resources, notifications, and related site features. Pwanimate is the AI assistant inside that application. It is a Django app that uses PwaniNet's accounts, academic records, groups, posts, documents, and notifications as sources of context through explicit tools and retrieval services.
+Vasto is one Django application for student profiles, social activity, groups, academic resources, notifications, and related site features. Pwanimate is the AI assistant inside that application. It is a Django app that uses Vasto's accounts, academic records, groups, posts, documents, and notifications as sources of context through explicit tools and retrieval services.
 
 The main request path is:
 
@@ -19,13 +19,13 @@ Django site (templates, views, APIs, app services)
         └── External services when configured: object storage, push, AI providers
 ```
 
-The Android application is a Capacitor wrapper around the web experience. It does not have a separate copy of the core PwaniNet business logic.
+The Android application is a Capacitor wrapper around the web experience. It does not have a separate copy of the core Vasto business logic.
 
 ## 2. Find the main pieces
 
 | Folder or file | What it is for |
 | --- | --- |
-| `pwaninet/` | Django project configuration: settings, root URLs, ASGI/WSGI entry points, and Celery setup. |
+| `Vasto/` | Django project configuration: settings, root URLs, ASGI/WSGI entry points, and Celery setup. |
 | `users/`, `posts/`, `groups/`, `documents/`, `notifications/` | Main student-facing product areas. Each owns its models, views, URLs, and services. |
 | `pwanimate/` | Assistant UI/API, conversation records, context assembly, tool calls, retrieval, AI provider adapters, and document ingestion. |
 | `realtime/` | Shared Channels routing and WebSocket consumers. |
@@ -37,13 +37,13 @@ The Android application is a Capacitor wrapper around the web experience. It doe
 
 `messaging/` contains a large direct-message feature but its current URL flows are frozen behind a gate. Its code being present does not mean it is enabled for users. `messaging.frozen/` is a historical code snapshot.
 
-## 3. How PwaniNet works
+## 3. How Vasto works
 
 ### A normal page request
 
-The browser requests a URL. The root URL configuration (`pwaninet/urls.py`) sends the request to an app such as `posts`, `users`, `groups`, or `documents`. A view checks the logged-in user and relevant visibility rules, loads or changes database records through Django's ORM, and returns a template or JSON response. Most pages are rendered by Django templates. HTMX is used in many screens to fetch and replace part of a page without a full reload; JavaScript handles interactions that need richer client-side behavior.
+The browser requests a URL. The root URL configuration (`Vasto/urls.py`) sends the request to an app such as `posts`, `users`, `groups`, or `documents`. A view checks the logged-in user and relevant visibility rules, loads or changes database records through Django's ORM, and returns a template or JSON response. Most pages are rendered by Django templates. HTMX is used in many screens to fetch and replace part of a page without a full reload; JavaScript handles interactions that need richer client-side behavior.
 
-The app folder is usually the best starting point: read its `urls.py`, then follow the view, service/query module, and models it calls. Shared concerns such as authentication, project middleware, settings, and URL mounts live in `pwaninet/`.
+The app folder is usually the best starting point: read its `urls.py`, then follow the view, service/query module, and models it calls. Shared concerns such as authentication, project middleware, settings, and URL mounts live in `Vasto/`.
 
 ### The major product areas
 
@@ -70,7 +70,7 @@ Pwanimate is not a separate server in the current application. Its pages are mou
 
 1. The Pwanimate UI posts a message to the chat API. The API validates the request and associates the conversation with the authenticated user.
 2. `PwanimateOrchestrator` coordinates the response. Context services build a bounded package of relevant user/profile context and request intent.
-3. The retrieval service can search ingested academic-resource chunks by vector similarity. The tool router may select domain tools for an explicit site lookup, such as academic data, a document, a group announcement, people, or notification context. The tool calls are app code that query PwaniNet data; they are not arbitrary shell or browser actions.
+3. The retrieval service can search ingested academic-resource chunks by vector similarity. The tool router may select domain tools for an explicit site lookup, such as academic data, a document, a group announcement, people, or notification context. The tool calls are app code that query Vasto data; they are not arbitrary shell or browser actions.
 4. The AI gateway turns the prompt, context, and tool results into a provider request. Provider adapters normalize authentication, HTTP requests, errors, and responses. The configured provider chain/quota tracker can move to an eligible fallback on provider errors or rate limits.
 5. The response and usage information are returned to the UI, and conversation/message records are persisted. The UI renders Markdown, math, and code with local browser libraries and sanitizes generated HTML before display.
 
@@ -78,7 +78,7 @@ The exact context, tool set, model, and providers vary with code paths and envir
 
 ### How reference documents become searchable
 
-The ingestion tasks read source files from PwaniNet's document storage. Format-specific extractors read PDF, Word, PowerPoint, and text-like files. The structure-aware chunker breaks extracted content into useful smaller pieces and keeps location/source metadata. The embedding factory sends chunk text to the configured embedding provider. PostgreSQL stores the vectors with `pgvector`; retrieval compares a query vector with stored vectors and applies source/availability filters. Celery runs long ingestion and embedding work asynchronously.
+The ingestion tasks read source files from Vasto's document storage. Format-specific extractors read PDF, Word, PowerPoint, and text-like files. The structure-aware chunker breaks extracted content into useful smaller pieces and keeps location/source metadata. The embedding factory sends chunk text to the configured embedding provider. PostgreSQL stores the vectors with `pgvector`; retrieval compares a query vector with stored vectors and applies source/availability filters. Celery runs long ingestion and embedding work asynchronously.
 
 This is the basis of retrieval-augmented generation (RAG): search for source passages relevant to a question, then give those passages to the language model as evidence. It is separate from normal site-wide keyword search, and it does not mean that every site record or upload is automatically included in the assistant's knowledge base.
 
@@ -167,7 +167,7 @@ Pwanimate's current AI flow is custom Python code under `pwanimate/ai/`, `pwanim
 2. Read [the developer guide](developer-guide.md) to run the application locally.
 3. Pick the feature guide from [the app index](apps/README.md), then trace that app's URL to its view/service/model.
 4. For assistant changes, read [the Pwanimate app guide](apps/pwanimate.md), then start at `pwanimate/api/views.py` for API entry points and `pwanimate/orchestrator/service.py` for response coordination.
-5. Check `pwaninet/settings/base.py` for the active configuration and the environment example for setting names. Secrets and live production values are not documented in this guide.
+5. Check `Vasto/settings/base.py` for the active configuration and the environment example for setting names. Secrets and live production values are not documented in this guide.
 
 ## 7. A few concepts to keep straight
 
