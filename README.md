@@ -149,7 +149,7 @@ Vasto was formerly known as Pwaninet. The service domain (pwaninet.app), app ide
 
    Edit `.env` with your local values. Key variables:
    - `DB_NAME`, `DB_USER`, `DB_PASSWORD` — PostgreSQL credentials
-   - `DB_HOST=127.0.0.1`, `DB_PORT=5432` — local database connection
+   - `DB_HOST=127.0.0.1`, `DB_PORT=5433` — local database connection
    - `REDIS_URL=redis://127.0.0.1:6379/1` — cache
    - `CELERY_BROKER_URL=redis://127.0.0.1:6379/0` — Celery broker
    - `SECRET_KEY` — generate a fresh Django secret key
@@ -183,13 +183,13 @@ Vasto was formerly known as Pwaninet. The service domain (pwaninet.app), app ide
 
    ```bash
    export DJANGO_SETTINGS_MODULE=pwaninet.settings.local
-   celery -A vasto worker -l info
+   celery -A pwaninet worker -l info
    ```
 
 10. **Start Celery Beat (optional, for scheduled tasks)**
 
     ```bash
-    celery -A vasto beat -l info
+    celery -A pwaninet beat -l info
     ```
 
 The site is now running at `http://127.0.0.1:8000/`. The admin panel is at `/admin/`. API documentation is at `/api/docs/`.

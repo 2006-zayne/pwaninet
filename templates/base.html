@@ -735,6 +735,310 @@
         [data-theme="dark"] .group-explore-name {
             color: var(--text-main, #e4e6eb) !important;
         }
+        /* ==========================================================================
+   iOS LIQUID-GLASS BOTTOM NAV
+   • Mobile-only  (hidden at ≥ 768px)
+   • No background element — floats over your real page
+   • Scoped to .mobile-bottom-nav only
+   ========================================================================== */
+
+.mobile-bottom-nav,
+.mobile-bottom-nav *,
+.mobile-bottom-nav *::before,
+.mobile-bottom-nav *::after { box-sizing: border-box; }
+
+/* --------------------------------------------------------------------------
+   HIDE BY DEFAULT  ·  SHOW ON MOBILE ONLY
+   The !important overrides Bootstrap's d-md-none (which also hides ≥768px).
+   -------------------------------------------------------------------------- */
+.mobile-bottom-nav {
+  display: none;   /* hidden unless the media query below matches */
+  
+}
+
+@media (max-width: 767.98px) {
+  .mobile-bottom-nav {
+    display: flex !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   THE BAR
+   -------------------------------------------------------------------------- */
+.mobile-bottom-nav {
+  /* ---- tuning knobs ---------------------------------------------------- */
+  --ios-blur: 26px;
+  --ios-sat: 180%;
+  --ios-tint: rgba(28, 28, 38, 0.55);   /* darker so it reads on light pages */
+  --ios-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+
+  /* ---- layout ---------------------------------------------------------- */
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 1030;
+
+  width: min(460px, calc(100% - 16px));
+  height: 68px;
+  padding: 8px 6px;
+
+  align-items: stretch;
+  gap: 1px;
+
+  border-radius: 34px;
+  isolation: isolate;
+  overflow: hidden;
+
+  /* ---- the glass ------------------------------------------------------- */
+  background: var(--ios-tint);
+  -webkit-backdrop-filter: blur(var(--ios-blur)) saturate(var(--ios-sat)) brightness(1.10);
+          backdrop-filter: blur(var(--ios-blur)) saturate(var(--ios-sat)) brightness(1.10);
+  box-shadow:
+    0 12px 34px rgba(0, 0, 0, 0.42),
+    0 2px 6px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Specular sheen — pointer-driven via --mx / --my */
+.mobile-bottom-nav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      150px 100px at var(--mx, 50%) var(--my, 0%),
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0.00) 68%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.04) 42%,
+      rgba(255, 255, 255, 0.00) 70%
+    );
+}
+
+/* 1px gradient rim — the "edge of glass" */
+.mobile-bottom-nav::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 5;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(255, 255, 255, 0.16) 24%,
+    rgba(255, 255, 255, 0.04) 58%,
+    rgba(255, 255, 255, 0.28) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+}
+
+/* Fallback when backdrop-filter isn't supported */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .mobile-bottom-nav { background: rgba(28, 28, 38, 0.90); }
+}
+
+/* --------------------------------------------------------------------------
+   THE LIQUID PILL  (injected by JS)
+   -------------------------------------------------------------------------- */
+.mobile-bottom-nav .nav-chip-pill {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  height: 52px;
+  width: 60px;
+  border-radius: 26px;
+  z-index: 1;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  will-change: transform, width;
+
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.30) 0%,
+    rgba(255, 255, 255, 0.12) 55%,
+    rgba(255, 255, 255, 0.18) 100%
+  );
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.70),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   CHIPS
+   -------------------------------------------------------------------------- */
+.mobile-bottom-nav .nav-chip {
+  position: relative;
+  z-index: 3;
+  flex: 1 1 0;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  padding: 0;
+  border-radius: 26px;
+  text-decoration: none;
+
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+
+  transition: color 260ms ease, transform 200ms var(--ios-spring);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-bottom-nav .nav-chip:hover  { color: rgba(255, 255, 255, 0.82); }
+.mobile-bottom-nav .nav-chip:active { transform: scale(0.90); }
+.mobile-bottom-nav .nav-chip.active { color: #ffffff; }
+
+.mobile-bottom-nav .nav-chip:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: -3px;
+}
+
+.mobile-bottom-nav .nav-chip i {
+  display: block;
+  font-size: 19px;
+  line-height: 1;
+  transition: transform 320ms var(--ios-spring), filter 260ms ease;
+}
+.mobile-bottom-nav .nav-chip.active i {
+  transform: translateY(-1px) scale(1.06);
+  filter: drop-shadow(0 1px 7px rgba(255, 255, 255, 0.45));
+}
+
+/* Label = last span of each chip */
+.mobile-bottom-nav .nav-chip > span:last-child {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+/* Avatar */
+.mobile-bottom-nav .nav-profile-avatar {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.38);
+  transition: box-shadow 260ms ease, transform 320ms var(--ios-spring);
+}
+.mobile-bottom-nav .nav-chip.active .nav-profile-avatar {
+  box-shadow: 0 0 0 2px #ffffff, 0 2px 10px rgba(0, 0, 0, 0.40);
+}
+
+/* --------------------------------------------------------------------------
+   MINIMAL BOOTSTRAP HELPERS (scoped)
+   Delete if your Bootstrap bundle already covers these.
+   -------------------------------------------------------------------------- */
+.mobile-bottom-nav .position-relative  { position: relative  !important; }
+.mobile-bottom-nav .position-absolute  { position: absolute  !important; }
+.mobile-bottom-nav .d-inline-block     { display: inline-block !important; }
+.mobile-bottom-nav .rounded-pill       { border-radius: 50rem !important; }
+
+.mobile-bottom-nav .visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   BADGES + ACTIVITY DOT
+   (inline style="display:none" still wins — your app JS reveals them)
+   -------------------------------------------------------------------------- */
+.mobile-bottom-nav .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background-color: #ff3b30 !important;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  box-shadow: 0 0 0 2px rgba(20, 20, 28, 0.55);
+}
+
+.mobile-bottom-nav .messages-badge {
+  top: -3px !important;
+  right: -7px !important;
+  font-size: 10px !important;
+}
+
+.mobile-bottom-nav .notification-badge {
+  top: -3px;
+  right: -7px;
+}
+
+.mobile-bottom-nav .nav-groups-dot {
+  display: inline-block;
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff375f;
+  box-shadow: 0 0 0 2px rgba(20, 20, 28, 0.55);
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   SMALL PHONES
+   -------------------------------------------------------------------------- */
+@media (max-width: 400px) {
+  .mobile-bottom-nav .nav-chip     { font-size: 8.5px; }
+  .mobile-bottom-nav .nav-chip i   { font-size: 18px; }
+}
+
+/* --------------------------------------------------------------------------
+   A11Y
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-bottom-nav,
+  .mobile-bottom-nav *,
+  .mobile-bottom-nav *::before,
+  .mobile-bottom-nav *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
     </style>
 
     <script>
@@ -756,6 +1060,192 @@
                     }
                 });
             }, 1000);
+            /* ==========================================================================
+   LIQUID GLASS NAV — behaviour layer
+   Spring pill · Pointer sheen · Arrow-key nav · URL sync · Resize handling
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  var nav = document.querySelector('.mobile-bottom-nav');
+  if (!nav) return;
+
+  var chips = Array.prototype.slice.call(nav.querySelectorAll('.nav-chip'));
+  if (!chips.length) return;
+
+  /* --- 1. Inject the pill (additive only) -------------------------------- */
+  var pill = document.createElement('span');
+  pill.className = 'nav-chip-pill';
+  pill.setAttribute('aria-hidden', 'true');
+  nav.insertBefore(pill, nav.firstChild);
+
+  /* --- 2. Spring state --------------------------------------------------- */
+  var STIFFNESS = 0.16;
+  var DAMPING   = 0.76;
+  var STRETCH   = 0.22;
+  var SQUASH    = 0.10;
+
+  var posX = 0, velX = 0, targetX = 0;
+  var curW = 0, targetW = 0;
+  var running = false, rafId = 0;
+
+  function activeChip() {
+    return nav.querySelector('.nav-chip.active') || chips[0];
+  }
+
+  function measure() {
+    var navRect  = nav.getBoundingClientRect();
+    var chipRect = activeChip().getBoundingClientRect();
+    targetX = chipRect.left - navRect.left;
+    targetW = chipRect.width;
+  }
+
+  function paint(sx, sy) {
+    pill.style.width = curW.toFixed(2) + 'px';
+    pill.style.transform =
+      'translate3d(' + posX.toFixed(2) + 'px,0,0) scale(' + sx + ',' + sy + ')';
+  }
+
+  function loop() {
+    velX = (velX + (targetX - posX) * STIFFNESS) * DAMPING;
+    posX += velX;
+    curW += (targetW - curW) * 0.22;
+
+    var s = Math.min(Math.abs(velX) / 60, 1);
+    paint(1 + s * STRETCH, 1 - s * SQUASH);
+
+    var settled =
+      Math.abs(targetX - posX) < 0.1 &&
+      Math.abs(velX)    < 0.1 &&
+      Math.abs(targetW - curW) < 0.1;
+
+    if (settled) {
+      posX = targetX; velX = 0; curW = targetW;
+      paint(1, 1);
+      running = false;
+      return;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function snap() {
+    if (nav.offsetParent === null) return;   // hidden — nothing to measure
+    measure();
+    posX = targetX; velX = 0;
+    curW = targetW;
+    paint(1, 1);
+    if (running) { cancelAnimationFrame(rafId); running = false; }
+  }
+
+  /* --- 3. Selection ------------------------------------------------------ */
+  function setActive(chip, animate) {
+    if (!chip) return;
+    chips.forEach(function (c) { c.classList.toggle('active', c === chip); });
+    measure();
+    if (animate === false) snap(); else start();
+  }
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      // htmx swaps #page-content-target; the nav stays mounted.
+      setActive(chip, true);
+    });
+  });
+
+  /* --- 4. Back / forward sync ------------------------------------------- */
+  function syncFromPath() {
+    var path = location.pathname;
+    var best = null, bestLen = -1;
+
+    chips.forEach(function (c) {
+      var href = c.getAttribute('href');
+      if (!href) return;
+      var p;
+      try { p = new URL(href, location.origin).pathname; } catch (e) { return; }
+
+      if (p === '/') {
+        if (path === '/' && 0 > bestLen) { best = c; bestLen = 0; }
+        return;
+      }
+      if (path === p) {
+        if (p.length > bestLen) { best = c; bestLen = p.length; }
+      } else if (path.indexOf(p) === 0 && p.length > bestLen) {
+        best = c; bestLen = p.length;
+      }
+    });
+
+    if (best) setActive(best, true);
+  }
+
+  window.addEventListener('popstate', syncFromPath);
+  document.body.addEventListener('htmx:historyRestore', syncFromPath);
+
+  /* --- 5. Pointer sheen -------------------------------------------------- */
+  function setSheen(x, y) {
+    nav.style.setProperty('--mx', x.toFixed(2) + '%');
+    nav.style.setProperty('--my', y.toFixed(2) + '%');
+  }
+
+  nav.addEventListener('pointermove', function (e) {
+    var r = nav.getBoundingClientRect();
+    setSheen(((e.clientX - r.left) / r.width) * 100,
+             ((e.clientY - r.top) / r.height) * 100);
+  });
+
+  nav.addEventListener('pointerleave', function () { setSheen(50, 0); });
+
+  nav.addEventListener('pointerdown', function (e) {
+    if (e.pointerType !== 'touch') return;
+    var r = nav.getBoundingClientRect();
+    setSheen(((e.clientX - r.left) / r.width) * 100,
+             ((e.clientY - r.top) / r.height) * 100);
+    setTimeout(function () { setSheen(50, 0); }, 420);
+  });
+
+  /* --- 6. Keyboard ← / → ------------------------------------------------- */
+  nav.addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    var i = chips.indexOf(document.activeElement);
+    if (i === -1) i = chips.indexOf(activeChip());
+    var next = (i + (e.key === 'ArrowRight' ? 1 : -1) + chips.length) % chips.length;
+    chips[next].focus();
+    setActive(chips[next], true);
+  });
+
+  /* --- 7. Re-measure on resize / rotate / font load ---------------------- */
+  var rt;
+  window.addEventListener('resize', function () {
+    clearTimeout(rt);
+    rt = setTimeout(snap, 120);
+  });
+  window.addEventListener('orientationchange', function () {
+    setTimeout(snap, 260);
+  });
+
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(function () {
+      if (nav.offsetParent === null) return;
+      measure();
+      if (Math.abs(targetX - posX) > 0.5 || Math.abs(targetW - curW) > 0.5) snap();
+    });
+    ro.observe(nav);
+    ro.observe(activeChip());
+  }
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(snap);
+  }
+
+  /* --- 8. Go ------------------------------------------------------------- */
+  requestAnimationFrame(function () { snap(); });
+})();
         })();
     </script>
 

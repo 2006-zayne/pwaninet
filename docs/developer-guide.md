@@ -140,7 +140,7 @@ DB_NAME=vasto
 DB_USER=vasto
 DB_PASSWORD=local_password
 DB_HOST=127.0.0.1
-DB_PORT=5432
+DB_PORT=5433
 
 # Redis
 REDIS_URL=redis://127.0.0.1:6379/1
@@ -205,8 +205,10 @@ docker compose up -d db redis
 ```
 
 This starts:
-- **PostgreSQL** with pgvector extension on port 5432
+- **PostgreSQL** with pgvector extension on host port 5433 (container port 5432)
 - **Redis** on port 6379
+
+The PostgreSQL host port defaults to 5433 to avoid conflicts with a system PostgreSQL server. If you change `DB_PORT` in `.env`, Compose and Django both use that port.
 
 ### Verify services are running
 
@@ -303,13 +305,13 @@ In a separate terminal (with virtual environment activated):
 **Linux/macOS:**
 ```bash
 export DJANGO_SETTINGS_MODULE=pwaninet.settings.local
-celery -A vasto worker -l info
+celery -A pwaninet worker -l info
 ```
 
 **Windows PowerShell:**
 ```powershell
 $env:DJANGO_SETTINGS_MODULE = "pwaninet.settings.local"
-celery -A vasto worker -l info
+celery -A pwaninet worker -l info
 ```
 
 ### Start Celery Beat (scheduled tasks)
@@ -317,14 +319,14 @@ celery -A vasto worker -l info
 In another terminal:
 
 ```bash
-celery -A vasto beat -l info
+celery -A pwaninet beat -l info
 ```
 
 Celery Beat runs scheduled jobs such as document ingestion reconciliation (every 10 minutes).
 
 ### Task queues
 
-Tasks are routed to named queues configured in `vasto/settings/base.py`. If a task appears not to run, check the queue configuration and ensure a worker is consuming from that queue.
+Tasks are routed to named queues configured in `pwaninet/settings/base.py`. If a task appears not to run, check the queue configuration and ensure a worker is consuming from that queue.
 
 ---
 
@@ -520,16 +522,16 @@ python manage.py test --settings=pwaninet.settings.local
 
 ```bash
 # Start worker
-celery -A vasto worker -l info
+celery -A pwaninet worker -l info
 
 # Start beat (scheduled tasks)
-celery -A vasto beat -l info
+celery -A pwaninet beat -l info
 
 # Start worker + beat together (development)
-celery -A vasto worker -B -l info
+celery -A pwaninet worker -B -l info
 
 # Monitor (requires Flower)
-celery -A vasto flower --port=5555
+celery -A pwaninet flower --port=5555
 ```
 
 ### Docker
@@ -576,7 +578,7 @@ docker compose up -d --build
 
 ### Key patterns
 
-- **Settings modules**: `vasto/settings/base.py` contains shared config; `local.py`, `production.py`, and `test.py` override per environment.
+- **Settings modules**: `pwaninet/settings/base.py` contains shared config; `local.py`, `production.py`, and `test.py` override per environment.
 - **App structure**: Each Django app follows the standard layout with `models.py`, `views.py`, `urls.py`, `serializers.py` (for API apps), `services/`, `tasks/`, and `templates/`.
 - **Authorization**: Privacy and visibility checks are enforced at the queryset level in services, not just in views.
 - **Search**: PostgreSQL full-text search with `SearchVectorField` and trigram similarity fallback. Search vectors are updated via Django signals.
@@ -622,9 +624,9 @@ docker compose up -d --build
 
 ### Celery tasks not running
 
-- Ensure Celery worker is started: `celery -A vasto worker -l info`
+- Ensure Celery worker is started: `celery -A pwaninet worker -l info`
 - Ensure Redis is running (broker)
-- Check task routing configuration in `vasto/settings/base.py`
+- Check task routing configuration in `pwaninet/settings/base.py`
 - Verify `DJANGO_SETTINGS_MODULE=pwaninet.settings.local` is set
 
 ---
