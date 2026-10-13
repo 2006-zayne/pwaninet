@@ -1593,6 +1593,7 @@ def settings_two_factor_disable_view(request):
     from users.services.two_factor_service import (
         is_two_factor_enabled, verify_totp, disable_two_factor
     )
+    from users.services.recovery_code_service import consume_recovery_code
 
     if not is_two_factor_enabled(request.user):
         messages.info(request, _("Two-factor authentication is not enabled."))
@@ -1600,11 +1601,24 @@ def settings_two_factor_disable_view(request):
 
     code = request.POST.get('code', '').strip()
     if not code:
-        messages.error(request, _("Please provide your 6-digit authenticator code to disable 2FA."))
+        messages.error(request, _("Please provide your 6-digit authenticator code or a recovery code to disable 2FA."))
         return redirect('users:settings_two_factor')
 
+    used_recovery_code = False
     if verify_totp(request.user, code):
+        verified = True
+    elif consume_recovery_code(request.user, code):
+        verified = True
+        used_recovery_code = True
+    else:
+        verified = False
+
+    if verified:
         disable_two_factor(request.user)
+        logger.info(
+            f"[SECURITY-2FA] DISABLED BY USER: 2FA disabled by '{request.user.username}' via "
+            f"{'recovery code' if used_recovery_code else 'TOTP'} from IP={get_client_ip(request)}"
+        )
         messages.success(request, _("Two-factor authentication has been successfully disabled."))
         return redirect('users:settings_two_factor')
     else:
@@ -1625,7 +1639,7 @@ def settings_two_factor_regenerate_codes_view(request):
     from users.services.two_factor_service import (
         is_two_factor_enabled, verify_totp
     )
-    from users.services.recovery_code_service import regenerate_recovery_codes
+    from users.services.recovery_code_service import regenerate_recovery_codes, consume_recovery_code
 
     if not is_two_factor_enabled(request.user):
         messages.info(request, _("Two-factor authentication is not enabled."))
@@ -1633,10 +1647,10 @@ def settings_two_factor_regenerate_codes_view(request):
 
     code = request.POST.get('code', '').strip()
     if not code:
-        messages.error(request, _("Please provide your 6-digit authenticator code to regenerate recovery codes."))
+        messages.error(request, _("Please provide your 6-digit authenticator code or a recovery code to regenerate recovery codes."))
         return redirect('users:settings_two_factor')
 
-    if verify_totp(request.user, code):
+    if verify_totp(request.user, code) or consume_recovery_code(request.user, code):
         new_codes = regenerate_recovery_codes(request.user)
         context = {
             'state': 'recovery_codes_display',

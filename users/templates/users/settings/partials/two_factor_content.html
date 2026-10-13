@@ -223,7 +223,7 @@
         <div class="card card-body border-0 shadow-sm p-4 rounded-3" style="background: var(--page-bg); border: 1px solid var(--border) !important;">
           <h6 class="fw-bold text-dark mb-1" data-theme-text>{% trans "Regenerate Recovery Codes" %}</h6>
           <p class="text-secondary small mb-3">
-            {% trans "Regenerating will permanently invalidate all existing recovery codes. Enter your current 6-digit authenticator code to confirm." %}
+            {% trans "Regenerating will permanently invalidate all existing recovery codes. Enter your current 6-digit authenticator code or a recovery code to confirm." %}
           </p>
           <form method="POST" action="{% url 'users:settings_two_factor_regenerate_codes' %}" hx-post="{% url 'users:settings_two_factor_regenerate_codes' %}" hx-target="#page-content-target" hx-swap="innerHTML">
             {% csrf_token %}
@@ -262,7 +262,7 @@
         <div class="collapse mt-3" id="disableCollapse">
           <div class="card card-body border-0 shadow-sm p-3 rounded-3" style="background: var(--page-bg); border: 1px solid rgba(220, 53, 69, 0.3) !important;">
             <p class="small text-danger fw-semibold mb-2">
-              <i class="bi bi-shield-exclamation me-1"></i>{% trans "Enter your 6-digit authenticator code to confirm disabling 2FA:" %}
+              <i class="bi bi-shield-exclamation me-1"></i>{% trans "Enter your 6-digit authenticator code or a recovery code to confirm disabling 2FA:" %}
             </p>
             <form method="POST" action="{% url 'users:settings_two_factor_disable' %}" hx-post="{% url 'users:settings_two_factor_disable' %}" hx-target="#page-content-target" hx-swap="innerHTML">
               {% csrf_token %}
