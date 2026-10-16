@@ -1202,6 +1202,31 @@ def post_detail_view(request, share_id):
             return render(request, 'posts/partials/comments_chunk.html', context)
         return render(request, 'posts/partials/comments_section.html', context)
 
+    # Open Graph preview: thumbnail straight from the DB row (post images,
+    # video poster, gradient/text thumbnail). Media URLs are public CDN links
+    # so preview fetchers need no login; the page itself stays gated.
+    og_image = ''
+    try:
+        if context.get('post_images'):
+            og_image = context['post_images'][0].image.url or ''
+        if not og_image:
+            poster = post.get_video_poster or ''
+            # A bare video URL (with '#poster' marker, no poster file) is not
+            # a loadable image — skip it so crawlers don't choke.
+            if poster and not poster.endswith('#poster'):
+                og_image = poster
+        if not og_image and getattr(post, 'thumbnail', None):
+            og_image = post.thumbnail.url or ''
+    except Exception:
+        og_image = ''
+    if og_image:
+        og_image = request.build_absolute_uri(og_image)
+    author_name = getattr(post.author, 'username', 'vasto')
+    post_text = (post.content or '').strip()
+    context['og_title'] = f"Post by @{author_name} on Vasto"
+    context['og_description'] = (post_text[:200] + '…') if len(post_text) > 200 else (post_text or 'See this post on Vasto.')
+    context['og_image'] = og_image
+
     # For HTMX page navigation requests, return navigation partial
     if request.headers.get('HX-Request'):
         return render(request, 'posts/partials/post_detail_navigation_partial.html', context)

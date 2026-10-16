@@ -8,7 +8,18 @@
     <meta name="csrf-token" content="{{ csrf_token }}">
     <meta name="resumable-uploads" content="{{ USE_RESUMABLE_UPLOADS|yesno:'1,0' }}">
     <meta name="user-authenticated" content="{% if request.user.is_authenticated %}true{% else %}false{% endif %}">
-    <title>vasto</title>
+    <title>{% block title %}vasto{% endblock %}</title>
+
+    <!-- Open Graph / link previews (overridable per page) -->
+    {% block og_tags %}
+    <meta property="og:site_name" content="Vasto">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}Vasto — Your campus, connected{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Connect with classmates, join course groups, and access academic materials on Vasto.{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/vasto-app-icon.png' %}{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}{{ request.build_absolute_uri }}{% endblock %}">
+    <meta name="twitter:card" content="summary_large_image">
+    {% endblock %}
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.webmanifest">

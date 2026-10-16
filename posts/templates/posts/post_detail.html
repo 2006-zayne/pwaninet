@@ -1,5 +1,10 @@
 {% extends 'base.html' %}
 
+{% block title %}Post by @{{ post.author.username }} | Vasto{% endblock %}
+{% block og_title %}{{ og_title }}{% endblock %}
+{% block og_description %}{{ og_description }}{% endblock %}
+{% block og_image %}{% if og_image %}{{ og_image }}{% else %}{{ block.super }}{% endif %}{% endblock %}
+
 {% block content %}
 {% include 'posts/partials/post_detail_content.html' %}
 {% endblock %}
