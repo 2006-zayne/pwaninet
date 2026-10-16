@@ -52,10 +52,13 @@ class UploadBanner {
             <div class="upload-donut-container">
                 <svg class="upload-donut" viewBox="0 0 32 32">
                     <circle class="upload-donut-bg" cx="16" cy="16" r="14" fill="none" />
-                    <circle class="upload-donut-progress" id="upload-donut-progress" cx="16" cy="16" r="14" fill="none" 
-                            stroke-dasharray="0, 88" stroke-dashoffset="0" />
+                    <circle class="upload-donut-progress" id="upload-donut-progress" cx="16" cy="16" r="14" fill="none"
+                            stroke-dasharray="88, 88" stroke-dashoffset="88" />
                 </svg>
                 <div class="upload-count" id="upload-count">0</div>
+            </div>
+            <div class="upload-meta">
+                <div class="upload-status" id="upload-status">Preparing…</div>
             </div>
             <button class="upload-cancel-btn" id="upload-banner-cancel" title="Cancel">
                 <i class="bi bi-x-lg"></i>
@@ -79,9 +82,17 @@ class UploadBanner {
             });
         }
 
-        // Click on banner to navigate to uploads page
+        // Click on banner to navigate to uploads page (HTMX: keep R2 PUT alive)
         this.banner.addEventListener('click', (e) => {
             if (e.target.closest('.upload-cancel-btn')) return; // Don't navigate if clicking cancel
+            if (window.htmx) {
+                window.htmx.ajax('GET', '/uploads/', {
+                    target: '#page-content-target',
+                    swap: 'innerHTML',
+                });
+                try { window.history.pushState({}, '', '/uploads/'); } catch (_) {}
+                return;
+            }
             window.location.href = '/uploads/';
         });
 
@@ -114,6 +125,31 @@ class UploadBanner {
         window.addEventListener('resumable-upload-progress', (e) => {
             this.handleResumableProgress(e.detail);
         });
+
+        // Tracker bus: upload bytes + server processing/publication.
+        // Without these the donut freezes at 100% on publish and the
+        // transcoding phase shows no progress (the reported bug).
+        uploadEvents.on(UploadEventNames.UPLOAD_PROGRESS, (data) => {
+            if (data && (data.uploadId === this.currentUploadId || !this.currentUploadId)) {
+                this.currentUploadId = data.uploadId || this.currentUploadId;
+                const percent = Math.round(data.percent || 0);
+                this.updateDonutProgress(percent, `Uploading ${percent}%`);
+            }
+        });
+
+        uploadEvents.on(UploadEventNames.PROGRESS_UPDATED, (data) => {
+            if (!data || (this.currentUploadId && data.uploadId !== this.currentUploadId)) return;
+            const percent = Math.round(data.percent || 0);
+            if (data.stage === 'serverProcessing') {
+                this.updateDonutProgress(percent, data.status || `Processing ${percent}%`);
+            } else if (data.stage === 'publication') {
+                this.updateDonutProgress(percent, 'Publishing…');
+            }
+        });
+
+        uploadEvents.on(UploadEventNames.UPLOAD_FAILED, () => {
+            this.setStatus('Upload failed — tap ✕ or retry from Uploads');
+        });
     }
 
     /**
@@ -131,6 +167,7 @@ class UploadBanner {
      */
     handleUploadStarted(data) {
         this.currentUploadId = data.uploadId;
+        this.updateDonutProgress(0, 'Uploading 0%');
         this.show();
     }
 
@@ -138,10 +175,9 @@ class UploadBanner {
      * Handle resumable upload progress
      */
     handleResumableProgress(detail) {
-        console.log('[UploadUI] Resumable progress:', detail);
         if (detail && detail.total) {
             const percent = Math.round((100 * detail.loaded) / detail.total);
-            this.updateDonutProgress(percent);
+            this.updateDonutProgress(percent, `Uploading ${percent}%`);
         }
     }
 
@@ -150,9 +186,8 @@ class UploadBanner {
      */
     handleUploadPublished(data) {
         this.hasVideo = Boolean(data.hasVideo);
-        this.updateDonutProgress(100);
-
         if (!this.hasVideo) {
+            this.updateDonutProgress(100, 'Published!');
             // Non-video: hide after short delay
             setTimeout(() => {
                 this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
@@ -161,7 +196,11 @@ class UploadBanner {
                     this.hide();
                 }
             }, 2000);
+            return;
         }
+        // Video: upload bytes are done, transcoding starts. Do NOT freeze
+        // at 100% with no label — hand over to serverProcessing events.
+        this.updateDonutProgress(100, 'Upload complete — processing video…');
         // Video: stay visible during processing
     }
 
@@ -169,6 +208,8 @@ class UploadBanner {
      * Handle upload completed
      */
     handleUploadCompleted(data) {
+        this.setStatus('Ready!');
+        this.updateDonutProgress(100);
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
         if (this.activeUploadCount === 0) {
@@ -201,15 +242,22 @@ class UploadBanner {
     /**
      * Update donut progress
      */
-    updateDonutProgress(percent) {
+    updateDonutProgress(percent, label) {
         const progressEl = document.getElementById('upload-donut-progress');
         if (progressEl) {
             // circumference ≈ 88 for radius 14
             // offset = 88 - (percent/100 * 88)
             const circumference = 88;
             const offset = circumference - (percent / 100 * circumference);
+            progressEl.setAttribute('stroke-dasharray', `${circumference}, ${circumference}`);
             progressEl.setAttribute('stroke-dashoffset', offset);
         }
+        if (typeof label === 'string') this.setStatus(label);
+    }
+
+    setStatus(text) {
+        const el = document.getElementById('upload-status');
+        if (el && typeof text === 'string' && text) el.textContent = text;
     }
 
     /**
@@ -393,6 +441,26 @@ class UploadUI {
                 font-weight: 700;
                 color: var(--text-dark, #e4e6eb);
                 font-variant-numeric: tabular-nums;
+            }
+
+            /* Phase label: tells the user why a video sits on processing */
+            .upload-meta {
+                max-width: 220px;
+            }
+            .upload-status {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-dark, #e4e6eb);
+                background: var(--card-bg, rgba(0,0,0,0.65));
+                border: 1px solid var(--border, rgba(255,255,255,0.14));
+                border-radius: 999px;
+                padding: 6px 10px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            [data-theme="light"] .upload-status {
+                color: var(--text-dark, #0f172a);
             }
 
             [data-theme="light"] .upload-count {

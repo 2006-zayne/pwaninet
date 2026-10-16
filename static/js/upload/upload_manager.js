@@ -212,32 +212,48 @@ class UploadManager {
             this.transitionState(uploadId, UploadState.UPLOADING);
             uploadEvents.emit(UploadEventNames.UPLOAD_STARTED, { uploadId, session });
 
-            // Always use resumable direct-to-R2 engine for all post uploads
-            console.log('[UploadManager] Checking resumable engine...');
-            if (!window.resumableUpload || typeof window.resumableUpload.start !== 'function') {
-                console.error('[UploadManager] Resumable engine not available:', {
-                    hasWindowResumable: !!window.resumableUpload,
-                    hasStartFunction: typeof window.resumableUpload?.start === 'function',
-                });
-                throw new Error('Upload engine not loaded. Please refresh the page and try again.');
-            }
-            console.log('[UploadManager] Resumable engine available, starting upload...');
+            const hasFiles = Array.isArray(session.files) && session.files.length > 0;
+            let response = null;
 
-            const response = await this._performResumableUpload(uploadId, session, tracker);
+            if (!hasFiles) {
+                // Text/link/gradient posts carry no bytes: bypass R2 and
+                // create directly via the posts API (link preview +
+                // thumbnail jobs run server-side there).
+                console.log('[UploadManager] Text-only post, using posts API...');
+                response = await uploadAPI.upload(session, (p) => {
+                    tracker.updateUploadProgress(p.loaded, p.total);
+                });
+            } else {
+                // File uploads use the resumable direct-to-R2 engine
+                console.log('[UploadManager] Checking resumable engine...');
+                if (!window.resumableUpload || typeof window.resumableUpload.start !== 'function') {
+                    console.error('[UploadManager] Resumable engine not available:', {
+                        hasWindowResumable: !!window.resumableUpload,
+                        hasStartFunction: typeof window.resumableUpload?.start === 'function',
+                    });
+                    throw new Error('Upload engine not loaded. Please refresh the page and try again.');
+                }
+                console.log('[UploadManager] Resumable engine available, starting upload...');
+
+                response = await this._performResumableUpload(uploadId, session, tracker);
+            }
             tracker.completeUpload();
 
             // Determine whether this post has a video file so we know
             // whether to wait for live HLS transcoding progress.
-            const postId   = response?.post_id ?? response?.id ?? null;
+            const postId   = response?.post_id ?? response?.id ?? response?.share_id ?? null;
             const hasVideo = session.files?.some(
                 (f) => f.type?.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi)$/i.test(f.name ?? '')
             ) ?? false;
+
+            // SERVER_PROCESSING must precede PUBLISHED (state machine
+            // forbids UPLOADING -> PUBLISHED directly).
+            this.transitionState(uploadId, UploadState.SERVER_PROCESSING, { hasVideo, postId });
 
             // Immediately notify UI and feed that post has been created
             uploadEvents.emit(UploadEventNames.UPLOAD_PUBLISHED, { uploadId, session, postId, hasVideo });
 
             if (hasVideo && postId) {
-                this.transitionState(uploadId, UploadState.SERVER_PROCESSING, { hasVideo: true, postId });
                 await this.waitForServerProcessing(uploadId, postId, hasVideo, response);
                 tracker.completeServerProcessing();
             } else {
@@ -280,6 +296,9 @@ class UploadManager {
             unit: session.metadata?.unit || null,
             gradient_class: session.metadata?.gradient_class || 'none',
             allow_downloads: session.metadata?.allow_downloads !== false,
+            video_width: session.metadata?.video_width || null,
+            video_height: session.metadata?.video_height || null,
+            video_duration: session.metadata?.video_duration || null,
         };
 
         let finalResponse = null;

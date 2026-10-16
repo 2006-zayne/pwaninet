@@ -353,6 +353,12 @@ class UploadCompleteView(APIView):
             "visibility": post_data.get("visibility", "AUTHENTICATED"),
             "allow_downloads": post_data.get("allow_downloads", True),
         }
+        # Provisional reel dims from client preview metadata; ffprobe in
+        # process_large_video overwrites with measured truth on ready.
+        for field in ("video_width", "video_height", "video_duration"):
+            value = post_data.get(field)
+            if isinstance(value, int) and value > 0:
+                kwargs[field] = value
         if group is not None:
             kwargs["group"] = group
         unit_id = post_data.get("unit")
@@ -369,11 +375,13 @@ class UploadCompleteView(APIView):
 
     @staticmethod
     def _done_payload(record):
+        post = record.post
         return {
             "id": str(record.id),
             "status": record.status,
             "post_id": record.post_id,
-            "post_share_id": str(record.post.share_id) if record.post else None,
+            "post_share_id": str(post.share_id) if post else None,
+            "is_reel": bool(post.is_reel) if post else False,
         }
 
 
@@ -443,6 +451,13 @@ class UploadDeleteView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def delete(self, request, id):
+        return self._soft_delete(request, id)
+
+    def post(self, request, id):
+        # Alias for clients (e.g. cached manager_page.js) that send POST.
+        return self._soft_delete(request, id)
+
+    def _soft_delete(self, request, id):
         with transaction.atomic():
             record = UploadRecord.objects.select_for_update().get(
                 id=id, user=request.user,
@@ -455,7 +470,7 @@ class UploadDeleteView(APIView):
                 except Exception:
                     pass
             record.deleted_at = timezone.now()
-            record.save(update_fields=["deleted_at", "updated_at"])
+            record.save(update_fields=["status", "completed_at", "deleted_at", "updated_at"])
             UploadEvent.objects.create(
                 record=record, event_type=UploadEvent.EventType.DELETED)
         session = record.session

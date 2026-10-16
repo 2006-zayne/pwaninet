@@ -3624,10 +3624,10 @@
     <script src="{% static 'js/upload/native_upload.js' %}"></script>
 
     <script type="module">
-        import { uploadManager } from '{% static "js/upload/upload_manager.js" %}';
-        import { uploadUI } from '{% static "js/upload/upload_ui.js" %}';
-        import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}';
-        import { uploadEvents } from '{% static "js/upload/upload_events.js" %}';
+        import { uploadManager } from '{% static "js/upload/upload_manager.js" %}?v=20261016-02';
+        import { uploadUI } from '{% static "js/upload/upload_ui.js" %}?v=20261016-02';
+        import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}?v=20261016-02';
+        import { uploadEvents } from '{% static "js/upload/upload_events.js" %}?v=20261016-02';
 
         import { downloadManager } from '{% static "js/downloads/download_manager.js" %}';
         import { downloadUI } from '{% static "js/downloads/download_ui.js" %}';
@@ -3654,6 +3654,22 @@
 
             downloadManager.initialize();
             downloadUI.initialize();
+
+            // Global resume: survive full loads / tab close. Manager page
+            // must not be the only caller, or navigations abort the R2 PUT
+            // with nothing to re-drive it. Native worker owns resume there.
+            try {
+                const native = window.NativeUploads && typeof window.NativeUploads.isAvailable === 'function'
+                    ? window.NativeUploads.isAvailable()
+                    : false;
+                if (!native && window.resumableUpload && typeof window.resumableUpload.resumeAll === 'function') {
+                    window.resumableUpload.resumeAll().catch((e) => {
+                        console.warn('[Uploads] global resumeAll failed:', e);
+                    });
+                }
+            } catch (e) {
+                console.warn('[Uploads] global resume check failed:', e);
+            }
         };
 
         if (document.readyState === 'loading') {

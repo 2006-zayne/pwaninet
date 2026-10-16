@@ -56,6 +56,11 @@ class CompletePostSerializer(serializers.Serializer):
     unit = serializers.IntegerField(required=False, allow_null=True, default=None)
     gradient_class = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
     allow_downloads = serializers.BooleanField(required=False, default=True)
+    # Provisional client-measured video dims (ffprobe truth overwrites on ready).
+    # Lets post_card is_reel + carousel classify at publish, not just post-transcode.
+    video_width = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=0)
+    video_height = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=0)
+    video_duration = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=0)
 
 
 class CompleteSerializer(serializers.Serializer):

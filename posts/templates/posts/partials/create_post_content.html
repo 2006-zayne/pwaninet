@@ -1168,8 +1168,9 @@
 
 
 <script type="module">
-import { uploadManager } from '{% static "js/upload/upload_manager.js" %}';
-import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}';
+import { uploadManager } from '{% static "js/upload/upload_manager.js" %}?v=20261016-02';
+import { uploadEvents, UploadEventNames } from '{% static "js/upload/upload_events.js" %}?v=20261016-02';
+import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}?v=20261016-02';
 
 function initCreatePostComposer() {
     const postForm = document.getElementById('postForm');
@@ -1978,42 +1979,42 @@ function initCreatePostComposer() {
       // Clean up composer state immediately
       resetComposerState();
 
-      // Wait for upload to start before navigating (ensures resumable engine has time to persist)
-      const uploadStartedListener = (e) => {
-        if (e.detail.uploadId === createdUploadId) {
-          window.removeEventListener('upload:started', uploadStartedListener);
-          // Dismiss composer and navigate to feed via HTMX without interrupting background upload
-          const discardLink = document.querySelector('.btn-cancel');
-          if (discardLink && window.htmx) {
-            discardLink.click();
-          } else if (window.htmx) {
-            window.history.pushState({}, '', '/');
-            window.htmx.ajax('GET', '/', {
-              target: '#page-content-target',
-              swap: 'innerHTML',
-            });
-          } else {
-            window.location.href = '/';
-          }
-        }
-      };
-      window.addEventListener('upload:started', uploadStartedListener);
-
-      // Fallback: navigate after 3 seconds if upload doesn't start
-      setTimeout(() => {
-        window.removeEventListener('upload:started', uploadStartedListener);
+      // HTMX-only navigation: a full document load aborts the in-flight
+      // R2 PUT. Same-document HTMX swaps let it continue; cross-document
+      // loads are covered by global resumeAll() in base.html.
+      const navigateToFeedHTMX = () => {
         const discardLink = document.querySelector('.btn-cancel');
         if (discardLink && window.htmx) {
           discardLink.click();
-        } else if (window.htmx) {
+          return;
+        }
+        if (window.htmx) {
           window.history.pushState({}, '', '/');
           window.htmx.ajax('GET', '/', {
             target: '#page-content-target',
             swap: 'innerHTML',
           });
-        } else {
-          window.location.href = '/';
+          return;
         }
+        // No full-reload fallback: retry HTMX nav on next tick so the
+        // resumable engine is never killed by location.href.
+        setTimeout(navigateToFeedHTMX, 500);
+      };
+
+      // Wait for upload to start before navigating (ensures resumable engine has time to persist).
+      // NOTE: uploadManager emits on the uploadEvents bus, not window.
+      const offStarted = uploadEvents.once(UploadEventNames.UPLOAD_STARTED, (data) => {
+        if (data && data.uploadId === createdUploadId) {
+          navigateToFeedHTMX();
+        }
+      });
+
+      // Fallback: navigate after 3 seconds if upload doesn't start.
+      // Engine persists sessions in IndexedDB first, so global resume
+      // completes it even if this fires early.
+      setTimeout(() => {
+        try { if (typeof offStarted === 'function') offStarted(); } catch (_) {}
+        navigateToFeedHTMX();
       }, 3000);
     });
 

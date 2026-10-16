@@ -120,9 +120,11 @@
         const btn = e.target.closest('[data-action]');
         if (!btn) return;
         const id = btn.closest('.card').dataset.id;
+        const action = btn.dataset.action;
+        const method = action === 'delete' ? 'DELETE' : 'POST';
         btn.disabled = true;
         try {
-            await api(`${id}/${btn.dataset.action}/`, 'POST', {});
+            await api(`${id}/${action}/`, method, method === 'DELETE' ? undefined : {});
             await load();
         } catch (err) {
             btn.disabled = false;

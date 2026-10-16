@@ -105,7 +105,7 @@ class UploadSession(models.Model):
     )
     r2_key = models.CharField(max_length=1024)
     r2_upload_id = models.CharField(
-        max_length=255, blank=True, default="",
+        max_length=1024, blank=True, default="",
         help_text="S3 multipart upload ID; empty for single-put.",
     )
     part_size = models.PositiveIntegerField(default=states.PART_SIZE_BYTES)

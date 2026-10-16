@@ -1,0 +1,33 @@
+{% extends "admin/change_list.html" %}
+
+{% block result_list %}
+<div style="margin: 0 0 16px; padding: 12px 16px; background: var(--darkened-bg, #f8f8f8); border: 1px solid var(--border-color, #ccc); border-radius: 4px;">
+  <h2 style="margin: 0 0 8px;">Route cheat-sheet (PWA has no URL bar)</h2>
+  <p style="margin: 0 0 8px;">Tick <strong>Is active</strong> on a row to lock that section; edit <strong>Eta</strong> / <strong>Message</strong> on its change page. Staff accounts always bypass locks. <strong>Home feed “/” matches every page</strong> — that row is the whole-site switch.</p>
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr><th style="text-align:left; padding:4px 8px;">Page</th><th style="text-align:left; padding:4px 8px;">URL / prefix</th></tr>
+    </thead>
+    <tbody>
+      <tr><td style="padding:4px 8px;">Home feed (whole site)</td><td style="padding:4px 8px;"><code>/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Posts</td><td style="padding:4px 8px;"><code>/post/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Posts API</td><td style="padding:4px 8px;"><code>/api/posts/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Uploads page</td><td style="padding:4px 8px;"><code>/uploads/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Uploads API</td><td style="padding:4px 8px;"><code>/api/uploads/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Messaging</td><td style="padding:4px 8px;"><code>/messaging/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Groups</td><td style="padding:4px 8px;"><code>/groups/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Notifications</td><td style="padding:4px 8px;"><code>/notifications/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Courses</td><td style="padding:4px 8px;"><code>/courses/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Documents</td><td style="padding:4px 8px;"><code>/documents/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Search</td><td style="padding:4px 8px;"><code>/search/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Users / profiles</td><td style="padding:4px 8px;"><code>/users/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Pwanimate</td><td style="padding:4px 8px;"><code>/pwanimate/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Pwanimate API</td><td style="padding:4px 8px;"><code>/api/pwanimate/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Dashboard</td><td style="padding:4px 8px;"><code>/dashboard/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Releases</td><td style="padding:4px 8px;"><code>/system/releases/</code></td></tr>
+      <tr><td style="padding:4px 8px;">Downloads / APK</td><td style="padding:4px 8px;"><code>/download/</code></td></tr>
+    </tbody>
+  </table>
+</div>
+{{ block.super }}
+{% endblock %}

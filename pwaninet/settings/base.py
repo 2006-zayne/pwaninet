@@ -593,10 +593,13 @@ if USE_S3:
         },
     }
 
-    # Rewrite Django's MEDIA_URL to the CDN edge
-    MEDIA_URL  = f'https://{CDN_DOMAIN}/media/'
+    # Rewrite Django's MEDIA_URL to the CDN edge (only when set;
+    # empty CDN_DOMAIN would build the broken 'https:///media/').
+    if CDN_DOMAIN:
+        MEDIA_URL  = f'https://{CDN_DOMAIN}/media/'
     if USE_S3_STATIC:
-        STATIC_URL = f'https://{CDN_DOMAIN}/static/'
+        if CDN_DOMAIN:
+            STATIC_URL = f'https://{CDN_DOMAIN}/static/'
 
 # Logging configuration
 LOGGING = {
