@@ -7,6 +7,12 @@
         <hr class="flex-grow-1">
     </div>
     <div id="google-signin-button" class="d-flex justify-content-center"></div>
+    <div id="google-native-button" class="d-grid gap-2" hidden>
+        <button type="button" class="btn btn-light btn-lg border shadow-sm d-flex align-items-center justify-content-center gap-2" id="googleNativeBtn">
+            <i class="bi bi-google" aria-hidden="true"></i>
+            <span>Continue with Google</span>
+        </button>
+    </div>
     <div class="google-signin-error text-danger small text-center mt-2" role="alert" hidden></div>
     <div class="google-link-form mt-3" hidden>
         <div class="alert alert-warning small" role="alert">
@@ -37,18 +43,24 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 (function() {
-    // Never render web Google OAuth inside the Capacitor native shell.
-    // The Android app uses a native sign-in path instead (embedded WebViews
-    // are not a supported OAuth environment).
+    var CLIENT_ID = "{{ google_web_client_id|escapejs }}";
+    var COMPLETE_URL = "{% url 'users:google_complete' %}";
+    var LINK_URL = "{% url 'users:google_link' %}";
+    var LOGIN_URI = "{{ google_login_uri|escapejs }}";
+
+    // Inside the Capacitor native shell, web Google OAuth is unsupported
+    // (Google blocks OAuth in embedded WebViews). Use the native
+    // Credential Manager plugin instead, then complete sign-in against the
+    // same backend endpoint with the returned ID token.
     if (window.Capacitor !== undefined) {
-        var wrap = document.querySelector('[data-google-signin]');
-        if (wrap) { wrap.hidden = true; }
+        var gisButton = document.getElementById('google-signin-button');
+        if (gisButton) { gisButton.hidden = true; }
+        var nativeWrap = document.getElementById('google-native-button');
+        if (nativeWrap) { nativeWrap.hidden = false; }
+        initNativeGoogleButton();
+        initLinkForm();
         return;
     }
-
-    var CLIENT_ID = "{{ google_web_client_id|escapejs }}";
-    var LOGIN_URI = "{{ google_login_uri|escapejs }}";
-    var LINK_URL = "{% url 'users:google_link' %}";
 
     function getCsrfToken() {
         var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
@@ -117,6 +129,47 @@
         }
     }
 
+    function initNativeGoogleButton() {
+        var plugins = (window.Capacitor && window.Capacitor.Plugins) || {};
+        var SocialLogin = plugins.SocialLogin;
+        var btn = document.getElementById('googleNativeBtn');
+        if (!SocialLogin || !btn) {
+            showError('Google sign-in is unavailable in this app version. Please update the app.');
+            return;
+        }
+        SocialLogin.initialize({
+            google: { webClientId: CLIENT_ID, mode: 'online' }
+        }).catch(function() {
+            showError('Google sign-in is unavailable right now.');
+        });
+        btn.addEventListener('click', function() {
+            btn.disabled = true;
+            SocialLogin.login({
+                provider: 'google',
+                options: { scopes: ['openid', 'email', 'profile'] }
+            }).then(function(response) {
+                var idToken = response && response.result && response.result.idToken;
+                if (!idToken) {
+                    showError('Google sign-in failed. Please try again.');
+                    btn.disabled = false;
+                    return;
+                }
+                // Same backend contract as web (ok / link_required / error);
+                // the ID token aud is the web client ID, verified server-side.
+                postJson(COMPLETE_URL, { credential: idToken })
+                    .then(handleComplete)
+                    .catch(function() {
+                        showError('Google sign-in failed. Please check your connection and try again.');
+                        btn.disabled = false;
+                    });
+            }).catch(function() {
+                // Includes user cancellation of the native account sheet.
+                btn.disabled = false;
+            });
+        });
+    }
+
+    function initLinkForm() {
     var linkForm = document.querySelector('.google-link-actual-form');
     if (linkForm) {
         linkForm.addEventListener('submit', function(event) {
@@ -143,11 +196,13 @@
             });
         });
     }
+    }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', renderButton);
+        document.addEventListener('DOMContentLoaded', function() { renderButton(); initLinkForm(); });
     } else {
         renderButton();
+        initLinkForm();
     }
 })();
 </script>
