@@ -7,7 +7,7 @@
         <hr class="flex-grow-1">
     </div>
     <div id="google-signin-button" class="d-flex justify-content-center"></div>
-    <div id="google-native-button" class="d-grid gap-2" hidden>
+    <div id="google-native-button" class="d-grid gap-2 d-none">
         <button type="button" class="btn btn-light btn-lg border shadow-sm d-flex align-items-center justify-content-center gap-2" id="googleNativeBtn">
             <i class="bi bi-google" aria-hidden="true"></i>
             <span>Continue with Google</span>
@@ -52,11 +52,16 @@
     // (Google blocks OAuth in embedded WebViews). Use the native
     // Credential Manager plugin instead, then complete sign-in against the
     // same backend endpoint with the returned ID token.
-    if (window.Capacitor !== undefined) {
+    // NOTE: window.Capacitor may exist as a stub on web builds; only treat
+    // as native when it reports a native platform.
+    var isNative = window.Capacitor !== undefined
+        && typeof window.Capacitor.isNativePlatform === 'function'
+        && window.Capacitor.isNativePlatform();
+    if (isNative) {
         var gisButton = document.getElementById('google-signin-button');
-        if (gisButton) { gisButton.hidden = true; }
+        if (gisButton) { gisButton.style.display = 'none'; }
         var nativeWrap = document.getElementById('google-native-button');
-        if (nativeWrap) { nativeWrap.hidden = false; }
+        if (nativeWrap) { nativeWrap.classList.remove('d-none'); }
         initNativeGoogleButton();
         initLinkForm();
         return;
@@ -113,6 +118,10 @@
             setTimeout(renderButton, 300);
             return;
         }
+        // HTMX swaps re-execute this partial: never render twice into the
+        // same container (that stacks two "Sign in with Google" buttons).
+        var container = document.getElementById('google-signin-button');
+        if (!container || container.dataset.gsiRendered === 'true') return;
         try {
             window.google.accounts.id.initialize({
                 client_id: CLIENT_ID,
@@ -122,8 +131,10 @@
             });
             window.google.accounts.id.renderButton(
                 document.getElementById('google-signin-button'),
-                { theme: 'outline', size: 'large', width: 320 }
+                // Match the form inputs: full container width (GSI caps at 400).
+                { theme: 'outline', size: 'large', width: Math.min(Math.max(container.offsetWidth || 320, 240), 400) }
             );
+            container.dataset.gsiRendered = 'true';
         } catch (error) {
             showError('Google sign-in is unavailable right now.');
         }
@@ -137,6 +148,8 @@
             showError('Google sign-in is unavailable in this app version. Please update the app.');
             return;
         }
+        if (btn.dataset.nativeBound === 'true') return;
+        btn.dataset.nativeBound = 'true';
         SocialLogin.initialize({
             google: { webClientId: CLIENT_ID, mode: 'online' }
         }).catch(function() {
