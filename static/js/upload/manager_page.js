@@ -17,6 +17,7 @@
     let activeFilter = '';
     let searchTerm = '';
     let refreshTimer = null;
+    let lastItems = [];
 
     function getCSRFToken() {
         const meta = document.querySelector('meta[name="csrf-token"]');
@@ -64,7 +65,9 @@
             ? Math.round((100 * (item.progress_bytes || 0)) / item.total_bytes)
             : 0;
         const canRetry = item.status === 'failed' || item.status === 'paused';
-        const canCancel = ['queued', 'preparing', 'uploading', 'verifying', 'paused', 'failed'].includes(item.status);
+        // Cancel is offered during processing/publishing too so a user can
+        // kill a transcode on purpose — always behind a confirm dialogue.
+        const canCancel = ['queued', 'preparing', 'uploading', 'verifying', 'processing', 'publishing', 'paused', 'failed'].includes(item.status);
         const canDelete = item.status !== 'uploading' && item.status !== 'verifying' && item.status !== 'processing';
         const queueInfo = item.queue_position ? `<span class="badge bg-info ms-2">#${item.queue_position}</span>` : '';
         return `
@@ -101,6 +104,7 @@
         if (searchTerm) {
             items = items.filter((i) => (i.filename || '').toLowerCase().includes(searchTerm));
         }
+        lastItems = items;
         listEl.innerHTML = items.map(card).join('');
         emptyEl.hidden = items.length > 0;
     }
@@ -121,7 +125,26 @@
         if (!btn) return;
         const id = btn.closest('.card').dataset.id;
         const action = btn.dataset.action;
+        const item = lastItems.find((i) => String(i.id) === String(id));
         const method = action === 'delete' ? 'DELETE' : 'POST';
+        // Destructive actions always confirm first — cancelling mid-transcode
+        // or deleting nukes the post + media + HLS, never just the donut.
+        if (action === 'cancel' && item && ['uploading', 'verifying', 'processing', 'publishing'].includes(item.status)) {
+            const ok = window.confirm(
+                `Stop "${item.filename || 'this upload'}"?\n\n` +
+                'The transfer/transcoding will be aborted and the post with its media removed. This cannot be undone.'
+            );
+            if (!ok) return;
+        }
+        if (action === 'delete') {
+            const isReady = item && item.status === 'completed';
+            const ok = window.confirm(
+                isReady
+                    ? `Remove "${item.filename || 'this upload'}" from history?\n\nSafe: the finished post and its media stay in your feed. Only this history card is cleared.`
+                    : `Delete "${(item && item.filename) || 'this upload'}" and its unfinished post with all media?\n\nThis permanently removes the history entry, the post, and its files. This cannot be undone.`
+            );
+            if (!ok) return;
+        }
         btn.disabled = true;
         try {
             await api(`${id}/${action}/`, method, method === 'DELETE' ? undefined : {});

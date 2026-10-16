@@ -35,7 +35,9 @@ const STATE_TRANSITIONS = {
     [UploadState.READY]: [UploadState.QUEUED, UploadState.CANCELLED],
     [UploadState.QUEUED]: [UploadState.UPLOADING, UploadState.CANCELLED],
     [UploadState.UPLOADING]: [UploadState.SERVER_PROCESSING, UploadState.FAILED, UploadState.CANCELLED],
-    [UploadState.SERVER_PROCESSING]: [UploadState.PUBLISHED, UploadState.FAILED],
+    // CANCELLED must stay reachable while transcoding: otherwise the banner
+    // ✕ does nothing mid-transcode and the donut sticks with no way out.
+    [UploadState.SERVER_PROCESSING]: [UploadState.PUBLISHED, UploadState.FAILED, UploadState.CANCELLED],
     [UploadState.PUBLISHED]: [], // Terminal state
     [UploadState.FAILED]: [UploadState.QUEUED], // Can retry from failed
     [UploadState.CANCELLED]: [], // Terminal state
