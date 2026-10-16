@@ -1116,6 +1116,31 @@ function triggerNativeApkDownload(apkUrl) {
     }
 }
 
+/**
+ * In-place APK update (Capacitor only): downloads via the native
+ * AppUpdater plugin and fires the system installer. Same signing key +
+ * higher versionCode installs OVER the app — login and data preserved,
+ * no uninstall. Returns a promise resolving true when the native path
+ * handled it, false when the caller should fall back (downloads page).
+ */
+function vastoInPlaceUpdate(apkUrl) {
+    var plugins = (window.Capacitor && window.Capacitor.Plugins) || {};
+    if (!plugins.AppUpdater || typeof plugins.AppUpdater.downloadAndInstall !== 'function') {
+        return Promise.resolve(false);
+    }
+    var url = apkUrl || '/download/app/latest/';
+    if (!url.startsWith('http')) {
+        url = window.location.origin + (url.startsWith('/') ? '' : '/') + url;
+    }
+    return plugins.AppUpdater.downloadAndInstall({ url: url }).then(function(res) {
+        return res && res.status === 'install_started';
+    }).catch(function(err) {
+        console.warn('[vasto-NATIVE] In-place update failed, falling back:', err && err.message);
+        return false;
+    });
+}
+window.vastoInPlaceUpdate = vastoInPlaceUpdate;
+
 function openNativeUpdateDownloadPage() {
     // Keep update navigation inside the app and let the downloads page manage the APK state.
     window.location.href = '/downloads/?native_update=1#downloads-actions';
@@ -1255,7 +1280,15 @@ async function checkNativeAppUpdates(manual) {
                 if (updateBtn) {
                     updateBtn.classList.remove('d-none');
                     updateBtn.classList.add('d-inline-flex');
-                    updateBtn.href = '/downloads/?native_update=1#downloads-actions';
+                    updateBtn.removeAttribute('href');
+                    updateBtn.onclick = function(e) {
+                        e.preventDefault();
+                        vastoInPlaceUpdate('/download/app/latest/').then(function(handled) {
+                            if (!handled) {
+                                window.location.href = '/downloads/?native_update=1#downloads-actions';
+                            }
+                        });
+                    };
                 }
                 if (checkBtn) {
                     checkBtn.classList.add('btn-outline-secondary');
@@ -1290,7 +1323,11 @@ async function checkNativeAppUpdates(manual) {
             if (manual) {
                 showNativeUpdateBanner(data);
                 if (confirm('A new native version (v' + targetApkVer + ') is available! Would you like to download the APK update now?')) {
-                    openNativeUpdateDownloadPage();
+                    vastoInPlaceUpdate('/download/app/latest/').then(function(handled) {
+                        if (!handled) {
+                            openNativeUpdateDownloadPage();
+                        }
+                    });
                 }
                 return;
             }
@@ -1353,8 +1390,13 @@ function showNativeUpdateBanner(data) {
     var dlBtn = document.getElementById('vasto-native-update-download-btn');
     if (dlBtn) {
         dlBtn.addEventListener('click', function() {
-            openNativeUpdateDownloadPage();
-            banner.remove();
+            dlBtn.disabled = true;
+            vastoInPlaceUpdate('/download/app/latest/').then(function(handled) {
+                if (!handled) {
+                    openNativeUpdateDownloadPage();
+                }
+                banner.remove();
+            });
         });
     }
 
@@ -1392,7 +1434,14 @@ function showMandatoryUpdateModal(data) {
     var btn = document.getElementById('vasto-mandatory-download-btn');
     if (btn) {
         btn.addEventListener('click', function() {
-            openNativeUpdateDownloadPage();
+            btn.disabled = true;
+            vastoInPlaceUpdate('/download/app/latest/').then(function(handled) {
+                if (!handled) {
+                    openNativeUpdateDownloadPage();
+                } else {
+                    btn.disabled = false;
+                }
+            });
         });
     }
 }

@@ -723,6 +723,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NavigationBarPlugin.class);
         registerPlugin(HapticsPlugin.class);
         registerPlugin(UploadManagerPlugin.class);
+        registerPlugin(AppUpdaterPlugin.class);
 
         // Configure edge-to-edge once at Activity creation
         EdgeToEdge.enable(this,
