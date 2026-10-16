@@ -7,11 +7,11 @@
   window.__pwaniStartConvGlobalBound = true;
 
   function getCSRF() {
-    var m = document.querySelector('meta[name="csrf-token"]');
+    const m = document.querySelector('meta[name="csrf-token"]');
     if (m && m.content) return m.content;
-    var i = document.querySelector('[name=csrfmiddlewaretoken]');
+    const i = document.querySelector('[name=csrfmiddlewaretoken]');
     if (i && i.value) return i.value;
-    var c = (document.cookie || '').split('; ').find(function (r) { return r.indexOf('csrftoken=') === 0; });
+    const c = (document.cookie || '').split('; ').find(function (r) { return r.indexOf('csrftoken=') === 0; });
     return c ? c.split('=')[1] : '';
   }
 
@@ -20,7 +20,7 @@
   }
 
   document.addEventListener('click', function (e) {
-    var btn = e.target && e.target.closest
+    const btn = e.target && e.target.closest
       ? e.target.closest('.start-conversation, .start-conversation-btn, .profile-message-btn')
       : null;
     if (!btn) return;
@@ -33,7 +33,7 @@
       try { e.stopImmediatePropagation(); } catch (_) {}
     }
 
-    var userId = btn.dataset ? btn.dataset.userId : null;
+    const userId = btn.dataset ? btn.dataset.userId : null;
     if (!userId) return;
     if (btn.dataset.conversationId) {
       navigate(btn.dataset.conversationId);
@@ -42,7 +42,7 @@
     if (btn.dataset.busy === '1') return;
     btn.dataset.busy = '1';
     btn.disabled = true;
-    var orig = btn.innerHTML;
+    const orig = btn.innerHTML;
     btn.innerHTML = 'Opening...';
 
     fetch('/messaging/v1/conversations/', {
@@ -55,7 +55,7 @@
         return r.json();
       })
       .then(function (data) {
-        var convId = data && (data.id || data.conversation_id);
+        const convId = data && (data.id || data.conversation_id);
         if (convId) { navigate(convId); return; }
         if (data && data.redirect_url) { window.location.href = data.redirect_url; return; }
         throw new Error('No conversation ID in response');

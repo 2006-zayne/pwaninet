@@ -8,7 +8,7 @@
     console.log('[vasto-NATIVE] Script load time:', window._vasto_native_load_time.toFixed(2) + 'ms');
 
     function initEarly() {
-        var isNative = typeof window.Capacitor !== 'undefined' ||
+        const isNative = typeof window.Capacitor !== 'undefined' ||
                        window.hasOwnProperty('Capacitor') ||
                        document.documentElement.classList.contains('is-capacitor') ||
                        document.documentElement.classList.contains('is-native-app');
@@ -17,7 +17,7 @@
         document.documentElement.classList.add('is-capacitor', 'is-native-app');
         if (document.body) document.body.classList.add('is-capacitor', 'is-native-app');
 
-        var earlyInitStart = performance.now();
+        const earlyInitStart = performance.now();
         console.log('[vasto-NATIVE] Early UI initialization started at:', earlyInitStart.toFixed(2) + 'ms');
 
         // 1. Configure Status Bar immediately for edge-to-edge
@@ -27,11 +27,11 @@
         initSafeAreaEarly();
 
         // 3. Configure Navigation Bar immediately for current theme
-        var initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
         updateNavigationBarForTheme(initialTheme);
 
         window._vasto_native_ui_initialized = true;
-        var earlyInitEnd = performance.now();
+        const earlyInitEnd = performance.now();
         console.log('[vasto-NATIVE] Early UI initialization complete in:', (earlyInitEnd - earlyInitStart).toFixed(2) + 'ms');
     }
 
@@ -40,8 +40,8 @@
         initEarly();
     } else {
         // Fallback: wait a few frames if we're in a native environment but bridge is lagging
-        var attempts = 0;
-        var checkBridge = setInterval(function() {
+        let attempts = 0;
+        const checkBridge = setInterval(function() {
             attempts++;
             if ((window.Capacitor && window.Capacitor.Plugins) || window.AndroidBridge || window.vastoBridge || attempts > 20) {
                 clearInterval(checkBridge);
@@ -55,13 +55,13 @@
  * Initialize Status Bar as early as possible
  */
 async function initStatusBarEarly() {
-    var startTime = performance.now();
+    const startTime = performance.now();
     try {
         const theme = document.documentElement.getAttribute('data-theme') || 'light';
         const isLight = theme === 'light';
 
         // Notify AndroidBridge directly for instantaneous update
-        var bridge = window.AndroidBridge || window.vastoBridge;
+        const bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.setSystemBarTheme === 'function') {
             bridge.setSystemBarTheme(isLight ? 'light' : 'dark');
         }
@@ -77,7 +77,7 @@ async function initStatusBarEarly() {
         // Initial theme style
         await StatusBar.setStyle({ style: isLight ? 'LIGHT' : 'DARK' });
 
-        var endTime = performance.now();
+        const endTime = performance.now();
         console.log('[vasto-NATIVE] StatusBar early init complete in:', (endTime - startTime).toFixed(2) + 'ms');
     } catch (e) {
         console.error('[vasto-NATIVE] Early StatusBar init failed', e);
@@ -89,7 +89,7 @@ async function initStatusBarEarly() {
  * Handles both native bridge events and plugin-based inset information
  */
 async function initSafeAreaEarly() {
-    var startTime = performance.now();
+    const startTime = performance.now();
     try {
         // Function to update CSS variables from insets
         const updateInsets = (insets) => {
@@ -155,7 +155,7 @@ async function initSafeAreaEarly() {
             }
         }
 
-        var endTime = performance.now();
+        const endTime = performance.now();
         console.log('[vasto-NATIVE] SafeArea early init complete in:', (endTime - startTime).toFixed(2) + 'ms');
     } catch (e) {
         console.error('[vasto-NATIVE] Early SafeArea init failed', e);
@@ -354,7 +354,7 @@ async function updateStatusBarForTheme(theme) {
         }
 
         // Instant synchronous native update
-        var bridge = window.AndroidBridge || window.vastoBridge;
+        const bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.setSystemBarTheme === 'function') {
             bridge.setSystemBarTheme(isLight ? 'light' : 'dark');
         }
@@ -392,7 +392,7 @@ async function updateNavigationBarForTheme(theme) {
         const themeStr = isLight ? 'light' : 'dark';
 
         // 1. Try AndroidBridge / vastoBridge JavascriptInterface (instantaneous call)
-        var bridge = window.AndroidBridge || window.vastoBridge;
+        const bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.setNavigationBarTheme === 'function') {
             bridge.setNavigationBarTheme(themeStr);
             console.log('[NativeApp] Navigation bar theme updated via AndroidBridge to: ' + themeStr);
@@ -576,7 +576,7 @@ async function initBackNavigation() {
                 _lastBackPressTime = now;
                 if (window.Haptics) window.Haptics.impactLight();
 
-                var bridge = window.AndroidBridge || window.vastoBridge;
+                const bridge = window.AndroidBridge || window.vastoBridge;
                 if (bridge && typeof bridge.showToast === 'function') {
                     bridge.showToast('Press back again to exit');
                 } else {
@@ -1044,10 +1044,10 @@ function injectNativeUpdateStyles() {
 
 async function getInstalledAppVersion() {
     // 1. Try AndroidBridge / vastoBridge getAppVersionInfo
-    var bridge = window.AndroidBridge || window.vastoBridge;
+    const bridge = window.AndroidBridge || window.vastoBridge;
     if (bridge && typeof bridge.getAppVersionInfo === 'function') {
         try {
-            var info = JSON.parse(bridge.getAppVersionInfo());
+            const info = JSON.parse(bridge.getAppVersionInfo());
             if (info && (info.versionName || info.versionCode)) {
                 return {
                     version: String(info.versionName || '1.0.0').replace(/^v/, '').trim(),
@@ -1062,10 +1062,10 @@ async function getInstalledAppVersion() {
     // 2. Try Capacitor App plugin via registerPlugin, Plugins.App, or nativePromise
     if (window.Capacitor) {
         try {
-            var App = (window.Capacitor.Plugins && window.Capacitor.Plugins.App) ||
+            const App = (window.Capacitor.Plugins && window.Capacitor.Plugins.App) ||
                       (typeof window.Capacitor.registerPlugin === 'function' && window.Capacitor.registerPlugin('App'));
             if (App && typeof App.getInfo === 'function') {
-                var appInfo = await App.getInfo();
+                const appInfo = await App.getInfo();
                 if (appInfo && (appInfo.version || appInfo.build)) {
                     return {
                         version: String(appInfo.version || '1.0.0').replace(/^v/, '').trim(),
@@ -1073,7 +1073,7 @@ async function getInstalledAppVersion() {
                     };
                 }
             } else if (typeof window.Capacitor.nativePromise === 'function') {
-                var rawInfo = await window.Capacitor.nativePromise('App', 'getInfo');
+                const rawInfo = await window.Capacitor.nativePromise('App', 'getInfo');
                 if (rawInfo && (rawInfo.version || rawInfo.build)) {
                     return {
                         version: String(rawInfo.version || '1.0.0').replace(/^v/, '').trim(),
@@ -1088,9 +1088,9 @@ async function getInstalledAppVersion() {
 
     // 3. Try User-Agent parsing
     if (typeof navigator !== 'undefined' && navigator.userAgent) {
-        var uaMatch = navigator.userAgent.match(/vastoApp\/Android\/([0-9\.]+)/);
+        const uaMatch = navigator.userAgent.match(/vastoApp\/Android\/([0-9\.]+)/);
         if (uaMatch && uaMatch[1]) {
-            var uaBuildMatch = navigator.userAgent.match(/Build\/([0-9]+)/);
+            const uaBuildMatch = navigator.userAgent.match(/Build\/([0-9]+)/);
             return {
                 version: uaMatch[1].trim(),
                 build: uaBuildMatch ? parseInt(uaBuildMatch[1], 10) : 1
@@ -1098,17 +1098,17 @@ async function getInstalledAppVersion() {
         }
     }
 
-    var cachedVer = localStorage.getItem('vasto_installed_apk_version') || '1.0.0';
-    var cachedBuild = parseInt(localStorage.getItem('vasto_installed_apk_build') || '1', 10);
+    const cachedVer = localStorage.getItem('vasto_installed_apk_version') || '1.0.0';
+    const cachedBuild = parseInt(localStorage.getItem('vasto_installed_apk_build') || '1', 10);
     return { version: cachedVer.replace(/^v/, '').trim(), build: cachedBuild };
 }
 
 function triggerNativeApkDownload(apkUrl) {
-    var url = apkUrl || '/download/app/latest/';
+    let url = apkUrl || '/download/app/latest/';
     if (!url.startsWith('http')) {
         url = window.location.origin + (url.startsWith('/') ? '' : '/') + url;
     }
-    var bridge = window.AndroidBridge || window.vastoBridge;
+    const bridge = window.AndroidBridge || window.vastoBridge;
     if (bridge && typeof bridge.openExternalUrl === 'function') {
         bridge.openExternalUrl(url);
     } else {
@@ -1123,11 +1123,11 @@ function openNativeUpdateDownloadPage() {
 
 function semverCompare(v1, v2) {
     if (!v1 || !v2) return 0;
-    var p1 = v1.replace(/^v/, '').split('.').map(Number);
-    var p2 = v2.replace(/^v/, '').split('.').map(Number);
-    for (var i = 0; i < Math.max(p1.length, p2.length); i++) {
-        var num1 = p1[i] || 0;
-        var num2 = p2[i] || 0;
+    const p1 = v1.replace(/^v/, '').split('.').map(Number);
+    const p2 = v2.replace(/^v/, '').split('.').map(Number);
+    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+        const num1 = p1[i] || 0;
+        const num2 = p2[i] || 0;
         if (num1 > num2) return 1;
         if (num1 < num2) return -1;
     }
@@ -1154,15 +1154,15 @@ async function checkNativeAppUpdates(manual) {
             return;
         }
 
-        var installed = await getInstalledAppVersion();
+        const installed = await getInstalledAppVersion();
         if (installed && installed.version) {
             localStorage.setItem('vasto_installed_apk_version', installed.version);
             localStorage.setItem('vasto_installed_apk_build', String(installed.build));
             document.cookie = 'vasto_native_version=' + encodeURIComponent(installed.version) + '; path=/; max-age=31536000; SameSite=Lax';
         }
 
-        var res = await fetch('/api/releases/version_check/?installed_build=' + installed.build + '&installed_version=' + encodeURIComponent(installed.version));
-        var data = res.ok ? await res.json() : {
+        const res = await fetch('/api/releases/version_check/?installed_build=' + installed.build + '&installed_version=' + encodeURIComponent(installed.version));
+        const data = res.ok ? await res.json() : {
             update_available: false,
             latest_version: installed.version,
             latest_apk_version: installed.version,
@@ -1171,11 +1171,11 @@ async function checkNativeAppUpdates(manual) {
 
         // Real-time GitHub Releases API check fallback
         try {
-            var ghRes = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
+            const ghRes = await fetch('https://api.github.com/repos/2006-zayne/pwaninet/releases/latest');
             if (ghRes.ok) {
-                var ghData = await ghRes.json();
-                var ghTag = (ghData.tag_name || '').replace(/^v/, '').trim();
-                var hasApk = ghData.assets && ghData.assets.some(function(a) {
+                const ghData = await ghRes.json();
+                const ghTag = (ghData.tag_name || '').replace(/^v/, '').trim();
+                const hasApk = ghData.assets && ghData.assets.some(function(a) {
                     return (a.name || '').endsWith('.apk');
                 });
 
@@ -1202,7 +1202,7 @@ async function checkNativeAppUpdates(manual) {
             data.latest_version = installed.version;
         }
 
-        var targetApkVer = data.latest_apk_version || data.latest_version;
+        const targetApkVer = data.latest_apk_version || data.latest_version;
 
         // Strict invariant: update is ONLY available if targetApkVer is strictly higher than installed.version
         if (semverCompare(targetApkVer, installed.version) > 0) {
@@ -1212,15 +1212,15 @@ async function checkNativeAppUpdates(manual) {
             data.update_available = false;
             // Running version is the installed version or latest web version if higher
             data.running_version = semverCompare(installed.version, data.latest_version) >= 0 ? installed.version : data.latest_version;
-            var existingBanner = document.getElementById('vasto-native-update-banner');
+            const existingBanner = document.getElementById('vasto-native-update-banner');
             if (existingBanner) existingBanner.remove();
-            var existingModal = document.getElementById('vasto-mandatory-modal-backdrop');
+            const existingModal = document.getElementById('vasto-mandatory-modal-backdrop');
             if (existingModal) existingModal.remove();
         }
 
         // Hydrate running version in DOM (footer, about page, updates page)
-        var effectiveVer = data.running_version || installed.version;
-        var curVerElements = document.querySelectorAll('.app-current-version, #current-version');
+        const effectiveVer = data.running_version || installed.version;
+        const curVerElements = document.querySelectorAll('.app-current-version, #current-version');
         curVerElements.forEach(function(el) {
             if (el.id === 'footer-app-version') {
                 el.textContent = 'Version ' + effectiveVer;
@@ -1230,18 +1230,18 @@ async function checkNativeAppUpdates(manual) {
         });
 
         // Check if Settings page native update card is present in DOM
-        var card = document.getElementById('settings-native-update-card');
+        const card = document.getElementById('settings-native-update-card');
         if (card) {
-            var installedVerSpan = document.getElementById('native-installed-version');
+            const installedVerSpan = document.getElementById('native-installed-version');
             if (installedVerSpan) installedVerSpan.textContent = 'v' + installed.version;
 
-            var latestVerSpan = document.getElementById('native-latest-version-meta');
+            const latestVerSpan = document.getElementById('native-latest-version-meta');
             if (latestVerSpan) latestVerSpan.textContent = 'Latest v' + targetApkVer;
 
-            var badge = document.getElementById('native-app-status-badge');
-            var desc = document.getElementById('native-app-update-desc');
-            var updateBtn = document.getElementById('native-app-download-update-btn');
-            var checkBtn = document.getElementById('native-app-check-update-btn');
+            const badge = document.getElementById('native-app-status-badge');
+            const desc = document.getElementById('native-app-update-desc');
+            const updateBtn = document.getElementById('native-app-download-update-btn');
+            const checkBtn = document.getElementById('native-app-check-update-btn');
 
             if (data.update_available) {
                 if (badge) {
@@ -1302,7 +1302,7 @@ async function checkNativeAppUpdates(manual) {
             }
 
             // Check snooze for standard optional prompt
-            var snoozedUntil = parseInt(localStorage.getItem('vasto_native_update_snooze') || '0', 10);
+            const snoozedUntil = parseInt(localStorage.getItem('vasto_native_update_snooze') || '0', 10);
             if (!manual && snoozedUntil && Date.now() < snoozedUntil) {
                 return;
             }
@@ -1321,8 +1321,8 @@ function showNativeUpdateBanner(data) {
     if (document.getElementById('vasto-native-update-banner')) return;
     injectNativeUpdateStyles();
 
-    var targetVer = data.latest_apk_version || data.latest_version;
-    var banner = document.createElement('div');
+    const targetVer = data.latest_apk_version || data.latest_version;
+    const banner = document.createElement('div');
     banner.id = 'vasto-native-update-banner';
     banner.innerHTML = `
         <div class="vasto-native-update-inner">
@@ -1350,7 +1350,7 @@ function showNativeUpdateBanner(data) {
     `;
     document.body.appendChild(banner);
 
-    var dlBtn = document.getElementById('vasto-native-update-download-btn');
+    const dlBtn = document.getElementById('vasto-native-update-download-btn');
     if (dlBtn) {
         dlBtn.addEventListener('click', function() {
             openNativeUpdateDownloadPage();
@@ -1358,7 +1358,7 @@ function showNativeUpdateBanner(data) {
         });
     }
 
-    var laterBtn = document.getElementById('vasto-native-update-later-btn');
+    const laterBtn = document.getElementById('vasto-native-update-later-btn');
     if (laterBtn) {
         laterBtn.addEventListener('click', function() {
             banner.remove();
@@ -1372,8 +1372,8 @@ function showMandatoryUpdateModal(data) {
     if (document.getElementById('vasto-mandatory-modal-backdrop')) return;
     injectNativeUpdateStyles();
 
-    var targetVer = data.latest_apk_version || data.latest_version;
-    var backdrop = document.createElement('div');
+    const targetVer = data.latest_apk_version || data.latest_version;
+    const backdrop = document.createElement('div');
     backdrop.id = 'vasto-mandatory-modal-backdrop';
     backdrop.innerHTML = `
         <div class="vasto-mandatory-modal">
@@ -1389,7 +1389,7 @@ function showMandatoryUpdateModal(data) {
     `;
     document.body.appendChild(backdrop);
 
-    var btn = document.getElementById('vasto-mandatory-download-btn');
+    const btn = document.getElementById('vasto-mandatory-download-btn');
     if (btn) {
         btn.addEventListener('click', function() {
             openNativeUpdateDownloadPage();
@@ -1803,13 +1803,13 @@ window.showNativePushBanner = showNativePushBanner;
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-        var domReadyTime = performance.now();
+        const domReadyTime = performance.now();
         console.log('[vasto-NATIVE] DOMContentLoaded at:', domReadyTime.toFixed(2) + 'ms');
         console.log('[vasto-NATIVE] Time from script load to DOMReady:', (domReadyTime - window._vasto_native_load_time).toFixed(2) + 'ms');
         initNativeAppEnhancements();
     });
 } else {
-    var domReadyTime = performance.now();
+    const domReadyTime = performance.now();
     console.log('[vasto-NATIVE] DOM already ready at:', domReadyTime.toFixed(2) + 'ms');
     initNativeAppEnhancements();
 }

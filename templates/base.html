@@ -1322,6 +1322,7 @@
     <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}?v=4">
     <link rel="stylesheet" href="{% static 'css/downloads/offline_media_viewer.css' %}">
     <link rel="stylesheet" id="pwanimate-css" href="{% static 'css/pwanimate/pwanimate.css' %}?v={{ pwanimate_version|default:'2.0.0' }}-20260929-3">
+    <link rel="stylesheet" href="{% static 'css/liquid-glass.css' %}">
     {% block extra_css %}{% endblock %}
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script>
@@ -1388,6 +1389,7 @@
 
     <!-- Video Manager - replaces auto_video_play.js -->
     <script defer src="{% static 'js/video-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
+    <script defer src="{% static 'js/liquid-glass.js' %}"></script>
 
     <!-- Global Audio Manager -->
     <script defer src="{% static 'js/global-audio-manager.js' %}"></script>

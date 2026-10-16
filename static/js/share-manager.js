@@ -13,6 +13,8 @@
 (function () {
     'use strict';
 
+    const platformShareButtonsBound = new WeakSet();
+
     /* ── Helpers ───────────────────────────────────────────────────────── */
 
     function isCapacitor() {
@@ -34,8 +36,8 @@
     }
 
     function buildPlatformLinks(url, text) {
-        var encodedUrl  = encodeURIComponent(url);
-        var encodedText = encodeURIComponent(text || 'Check this out on vasto!');
+        const encodedUrl  = encodeURIComponent(url);
+        const encodedText = encodeURIComponent(text || 'Check this out on vasto!');
         return {
             whatsapp: 'https://wa.me/?text=' + encodedText + '%20' + encodedUrl,
             telegram: 'https://t.me/share/url?url=' + encodedUrl + '&text=' + encodedText,
@@ -51,9 +53,9 @@
      * @param {string} [text]   - Optional description/preview text
      */
     async function pwaniShare(path, text) {
-        var url   = buildAbsoluteUrl(path);
-        var title = 'vasto';
-        var body  = text || 'Check this out on vasto!';
+        const url   = buildAbsoluteUrl(path);
+        const title = 'vasto';
+        const body  = text || 'Check this out on vasto!';
 
         // 1. Capacitor native share sheet (highest fidelity on Android/iOS)
         if (hasCapacitorShare()) {
@@ -82,9 +84,9 @@
         }
 
         // 3. Fallback: open WhatsApp web (works everywhere, especially desktop)
-        var links = buildPlatformLinks(url, body);
+        const links = buildPlatformLinks(url, body);
         // Try AndroidBridge for Capacitor without Share plugin (opens external browser)
-        var bridge = window.AndroidBridge || window.vastoBridge;
+        const bridge = window.AndroidBridge || window.vastoBridge;
         if (bridge && typeof bridge.openExternalUrl === 'function') {
             bridge.openExternalUrl(links.whatsapp);
         } else {
@@ -99,7 +101,7 @@
      * Called once on load (and on htmx:afterSettle for dynamically injected cards).
      */
     function initShareButtons() {
-        var canNativeShare = hasCapacitorShare() || hasWebShare();
+        const canNativeShare = hasCapacitorShare() || hasWebShare();
 
         // Native share buttons: show if share API is available
         document.querySelectorAll('[id^="native-share-btn-"]').forEach(function (btn) {
@@ -117,21 +119,28 @@
 
         // Wire up platform link hrefs
         document.querySelectorAll('.platform-share-btn').forEach(function (btn) {
-            var shareUrl = btn.dataset.shareUrl;
+            const shareUrl = btn.dataset.shareUrl;
             if (!shareUrl) return;
-            var platform = btn.dataset.platform;
-            var links = buildPlatformLinks(shareUrl, 'Check this out on vasto!');
+            const platform = btn.dataset.platform;
+            const links = buildPlatformLinks(shareUrl, 'Check this out on vasto!');
             if (links[platform]) {
                 btn.href = links[platform];
                 // In Capacitor: intercept click and use openExternalUrl bridge
-                if (isCapacitor()) {
+                // FIX: Avoid stacking click handlers when HTMX re-runs this initializer.
+                if (isCapacitor() && !platformShareButtonsBound.has(btn)) {
+                    platformShareButtonsBound.add(btn);
                     btn.addEventListener('click', function (e) {
+                        const currentShareUrl = btn.dataset.shareUrl;
+                        const currentPlatform = btn.dataset.platform;
+                        if (!currentShareUrl || !currentPlatform) return;
+                        const currentLinks = buildPlatformLinks(currentShareUrl, 'Check this out on vasto!');
+                        if (!currentLinks[currentPlatform]) return;
                         e.preventDefault();
-                        var bridge = window.AndroidBridge || window.vastoBridge;
+                        const bridge = window.AndroidBridge || window.vastoBridge;
                         if (bridge && typeof bridge.openExternalUrl === 'function') {
-                            bridge.openExternalUrl(links[platform]);
+                            bridge.openExternalUrl(currentLinks[currentPlatform]);
                         } else {
-                            window.open(links[platform], '_blank', 'noopener,noreferrer');
+                            window.open(currentLinks[currentPlatform], '_blank', 'noopener,noreferrer');
                         }
                     });
                 }

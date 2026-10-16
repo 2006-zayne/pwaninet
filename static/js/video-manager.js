@@ -2067,9 +2067,9 @@
                         <button type="button"
                                 class="reel-caption-toggle"
                                 onclick="event.stopPropagation(); (function(btn){
-                                    var c = btn.parentElement.querySelector('.reel-caption-text');
+                                    const c = btn.parentElement.querySelector('.reel-caption-text');
                                     if (!c) return;
-                                    var exp = c.classList.toggle('is-expanded');
+                                    const exp = c.classList.toggle('is-expanded');
                                     btn.textContent = exp ? 'less' : '... more';
                                 })(this);">
                             ... more
