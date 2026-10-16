@@ -1076,6 +1076,10 @@
                   <i class="bi bi-paperclip"></i>
                   <span class="toolbar-btn-label">Attach</span>
                 </button>
+                <a href="{% url 'uploads_page:upload-manager' %}" class="toolbar-btn" title="My Uploads" data-bypass-htmx="true" hx-boost="false">
+                  <i class="bi bi-cloud-arrow-up-fill"></i>
+                  <span class="toolbar-btn-label">Uploads</span>
+                </a>
                 <div class="form-check ms-3 mb-0 d-flex align-items-center d-none" id="signatureToggleContainer">
                   <input class="form-check-input mt-0 me-2" type="checkbox" id="signatureCheckbox">
                   <label class="form-check-label text-muted small" for="signatureCheckbox" style="cursor: pointer; white-space: nowrap;">
@@ -1163,7 +1167,11 @@
 </div>
 
 
-<script>
+<script type="module">
+import { uploadManager } from '{% static "js/upload/upload_manager.js" %}?v=20261016-02';
+import { uploadEvents, UploadEventNames } from '{% static "js/upload/upload_events.js" %}?v=20261016-02';
+import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}?v=20261016-02';
+
 function initCreatePostComposer() {
     const postForm = document.getElementById('postForm');
     if (!postForm || postForm.dataset.composerInitialized === 'true') {
@@ -1539,17 +1547,17 @@ function initCreatePostComposer() {
       const files = mediaFiles.map(item => item.file);
 
       if (files.length === 0) {
-        if (window.uploadManager?.clearDraftPreviews) {
-          window.uploadManager.clearDraftPreviews(draftPreviewId);
+        if (uploadManager?.clearDraftPreviews) {
+          uploadManager.clearDraftPreviews(draftPreviewId);
         }
         updateMediaPreview();
         updatePreview();
         return;
       }
 
-      if (window.uploadManager?.createDraftPreviews) {
+      if (uploadManager?.createDraftPreviews) {
         try {
-          const previews = await window.uploadManager.createDraftPreviews(draftPreviewId, files);
+          const previews = await uploadManager.createDraftPreviews(draftPreviewId, files);
           mediaFiles = previews.map((preview) => ({
             type: preview.type === 'document' ? 'docs' : preview.type,
             file: preview.file,
@@ -1675,7 +1683,7 @@ function initCreatePostComposer() {
     let saveDraftTimeout = null;
 
     function autoSaveDraft() {
-        if (!window.draftManager) return;
+        if (!draftManager) return;
         
         if (saveDraftTimeout) clearTimeout(saveDraftTimeout);
         
@@ -1685,7 +1693,7 @@ function initCreatePostComposer() {
             
             if (caption || files.length > 0) {
                 try {
-                    await window.draftManager.saveDraft({
+                    await draftManager.saveDraft({
                         id: DRAFT_ID,
                         caption: caption,
                         mediaFiles: files,
@@ -1696,7 +1704,7 @@ function initCreatePostComposer() {
                 }
             } else {
                 try {
-                    await window.draftManager.deleteDraft(DRAFT_ID);
+                    await draftManager.deleteDraft(DRAFT_ID);
                 } catch (e) {}
             }
         }, 1000);
@@ -1866,11 +1874,11 @@ function initCreatePostComposer() {
       if (noneSwatch) {
         noneSwatch.classList.add('selected');
       }
-      if (window.uploadManager?.clearDraftPreviews) {
-        window.uploadManager.clearDraftPreviews(draftPreviewId);
+      if (uploadManager?.clearDraftPreviews) {
+        uploadManager.clearDraftPreviews(draftPreviewId);
       }
-      if (window.draftManager) {
-        window.draftManager.deleteDraft(DRAFT_ID).catch(() => {});
+      if (draftManager) {
+        draftManager.deleteDraft(DRAFT_ID).catch(() => {});
       }
       updateMediaPreview();
       updatePreview();
@@ -1896,8 +1904,8 @@ function initCreatePostComposer() {
       let videoHeight = null;
       let videoDuration = null;
       let videoPosterBlob = null;
-      if (window.uploadManager && draftPreviewId) {
-        const draftPreviews = window.uploadManager.previewManager?.getPreviews(draftPreviewId) || [];
+      if (uploadManager && draftPreviewId) {
+        const draftPreviews = uploadManager.previewManager?.getPreviews(draftPreviewId) || [];
         const videoPreview = draftPreviews.find(p => p.type === 'video');
         if (videoPreview?.metadata) {
           videoWidth = videoPreview.metadata.width || null;
@@ -1908,41 +1916,57 @@ function initCreatePostComposer() {
       }
 
       let createdUploadId = null;
-      if (window.uploadManager) {
-        createdUploadId = window.uploadManager.createUpload({
-          files,
-          caption,
-          visibility: 'public',
-          metadata: {
-            unit: unitSelect?.value || null,
-            group: document.getElementById('id_group')?.value || null,
-            gradient_class: gradInput.value || 'none',
-            custom_gradient_text: document.getElementById('customGradientText')?.value?.trim() || null,
-            custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
-            custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
-            custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
-            allow_downloads: document.querySelector('[data-download-permission-toggle]')?.checked !== false,
-            video_width: videoWidth,
-            video_height: videoHeight,
-            video_duration: videoDuration,
-            video_poster_blob: videoPosterBlob,
-          },
-        });
-
-        const metadataLog = {
-            gradient_class: gradInput.value || 'none',
-            custom_gradient_text: document.getElementById('customGradientText')?.value?.trim() || null,
-            custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
-            custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
-            custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
-            allow_downloads: document.querySelector('[data-download-permission-toggle]')?.checked !== false,
-          };
-        console.log('[createPost] Metadata being sent:', metadataLog);
-        console.log('[createPost] Upload manager createUpload called with:', {
+      try {
+        console.log('[createPost] Starting upload, files:', files.length);
+        if (uploadManager) {
+          console.log('[createPost] uploadManager available, calling createUpload');
+          createdUploadId = uploadManager.createUpload({
             files,
-          caption,
-          metadata: metadataLog
-        });
+            caption,
+            visibility: 'PUBLIC',
+            metadata: {
+              unit: unitSelect?.value || null,
+              group: document.getElementById('id_group')?.value || null,
+              gradient_class: gradInput.value || 'none',
+              custom_gradient_text: document.getElementById('customGradientText')?.value?.trim() || null,
+              custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
+              custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
+              custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
+              allow_downloads: document.querySelector('[data-download-permission-toggle]')?.checked !== false,
+              video_width: videoWidth,
+              video_height: videoHeight,
+              video_duration: videoDuration,
+              video_poster_blob: videoPosterBlob,
+            },
+          });
+
+          const metadataLog = {
+              gradient_class: gradInput.value || 'none',
+              custom_gradient_text: document.getElementById('customGradientText')?.value?.trim() || null,
+              custom_gradient_color1: document.getElementById('customGradientColor1')?.value || null,
+              custom_gradient_color2: document.getElementById('customGradientColor2')?.value || null,
+              custom_gradient_text_color: document.getElementById('customGradientTextColor')?.value || null,
+              allow_downloads: document.querySelector('[data-download-permission-toggle]')?.checked !== false,
+            };
+          console.log('[createPost] Metadata being sent:', metadataLog);
+          console.log('[createPost] Upload manager createUpload called with:', {
+              files,
+            caption,
+            metadata: metadataLog
+          });
+        } else {
+          console.error('[createPost] uploadManager not available');
+          alert('Upload manager not loaded. Please refresh the page.');
+          deployBtn.disabled = false;
+          deployBtn.innerHTML = originalBtnHtml;
+          return;
+        }
+      } catch (err) {
+        console.error('[createPost] Error creating upload:', err);
+        alert('Failed to initialize upload: ' + (err.message || 'Unknown error'));
+        deployBtn.disabled = false;
+        deployBtn.innerHTML = originalBtnHtml;
+        return;
       }
 
       if (!createdUploadId) {
@@ -1955,26 +1979,50 @@ function initCreatePostComposer() {
       // Clean up composer state immediately
       resetComposerState();
 
-      // Dismiss composer and navigate to feed via HTMX without interrupting background upload
-      const discardLink = document.querySelector('.btn-cancel');
-      if (discardLink && window.htmx) {
-        discardLink.click();
-      } else if (window.htmx) {
-        window.history.pushState({}, '', '/');
-        window.htmx.ajax('GET', '/', {
-          target: '#page-content-target',
-          swap: 'innerHTML',
-        });
-      } else {
-        window.location.href = '/';
-      }
+      // HTMX-only navigation: a full document load aborts the in-flight
+      // R2 PUT. Same-document HTMX swaps let it continue; cross-document
+      // loads are covered by global resumeAll() in base.html.
+      const navigateToFeedHTMX = () => {
+        const discardLink = document.querySelector('.btn-cancel');
+        if (discardLink && window.htmx) {
+          discardLink.click();
+          return;
+        }
+        if (window.htmx) {
+          window.history.pushState({}, '', '/');
+          window.htmx.ajax('GET', '/', {
+            target: '#page-content-target',
+            swap: 'innerHTML',
+          });
+          return;
+        }
+        // No full-reload fallback: retry HTMX nav on next tick so the
+        // resumable engine is never killed by location.href.
+        setTimeout(navigateToFeedHTMX, 500);
+      };
+
+      // Wait for upload to start before navigating (ensures resumable engine has time to persist).
+      // NOTE: uploadManager emits on the uploadEvents bus, not window.
+      const offStarted = uploadEvents.once(UploadEventNames.UPLOAD_STARTED, (data) => {
+        if (data && data.uploadId === createdUploadId) {
+          navigateToFeedHTMX();
+        }
+      });
+
+      // Fallback: navigate after 3 seconds if upload doesn't start.
+      // Engine persists sessions in IndexedDB first, so global resume
+      // completes it even if this fires early.
+      setTimeout(() => {
+        try { if (typeof offStarted === 'function') offStarted(); } catch (_) {}
+        navigateToFeedHTMX();
+      }, 3000);
     });
 
     // Initialize composer state on page load
     async function initComposer() {
-      if (window.draftManager) {
+      if (draftManager) {
         try {
-          const draft = await window.draftManager.getDraft(DRAFT_ID);
+          const draft = await draftManager.getDraft(DRAFT_ID);
           if (draft) {
             textarea.value = draft.caption || '';
             gradInput.value = draft.gradientClass || 'none';
@@ -1988,8 +2036,8 @@ function initCreatePostComposer() {
               document.querySelector('.style-swatch.swatch-none')?.classList.add('selected');
             }
 
-            if (draft.mediaFiles && draft.mediaFiles.length > 0 && window.uploadManager) {
-              const previews = await window.uploadManager.createDraftPreviews(draftPreviewId, draft.mediaFiles);
+            if (draft.mediaFiles && draft.mediaFiles.length > 0 && uploadManager) {
+              const previews = await uploadManager.createDraftPreviews(draftPreviewId, draft.mediaFiles);
               mediaFiles = previews.map(preview => ({
                 type: preview.type === 'document' ? 'docs' : preview.type,
                 file: preview.file,

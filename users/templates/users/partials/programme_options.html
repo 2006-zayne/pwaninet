@@ -1,0 +1,4 @@
+<option value="">Select your programme (optional)</option>
+{% for prog in programmes %}
+<option value="{{ prog.id }}">{{ prog.name }}{% if prog.code %} ({{ prog.code }}){% endif %}</option>
+{% endfor %}

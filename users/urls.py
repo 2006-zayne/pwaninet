@@ -15,6 +15,12 @@ urlpatterns = [
     
     # Registration
     path('register/', views.register_view, name='register'),
+
+    # Google sign-in (website GIS ID-token flow)
+    path('google/complete/', views.google_complete_view, name='google_complete'),
+    path('google/link/', views.google_link_view, name='google_link'),
+    # GIS redirect mode: Google POSTs credential+g_csrf_token cross-site.
+    path('google/redirect/', views.google_redirect_view, name='google_redirect'),
     
     # Invites & Mobile App Referral Landing Endpoints
     path('i/<str:token>/', views.encrypted_invite_landing, name='encrypted_invite_landing'),
@@ -32,6 +38,8 @@ urlpatterns = [
     path('academic/load-levels/', views.load_academic_levels, name='load_academic_levels'),
     path('academic/load-years/', views.load_academic_years, name='load_academic_years'),
     path('academic/load-semesters/', views.load_semesters, name='load_semesters'),
+    path('academic/load-programmes/', views.load_programmes_by_institution, name='load_programmes_by_institution'),
+    path('onboarding/institution-setup/', views.save_institution_setup, name='onboarding_institution_setup'),
     
     # Email verification
     path('verify-email/<uidb64>/<token>/', views.verify_email_view, name='verify_email'),

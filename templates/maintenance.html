@@ -1,0 +1,327 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vasto - Scheduled Maintenance</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+
+    <script>
+        // Set theme immediately to prevent flash - matching base.html logic
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+
+            let resolvedTheme = 'light';
+            if (savedTheme === 'dark') {
+                resolvedTheme = 'dark';
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else if (savedTheme === 'light') {
+                resolvedTheme = 'light';
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                // System preference
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                resolvedTheme = prefersDark ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', resolvedTheme);
+            }
+            if (window.AndroidBridge && typeof window.AndroidBridge.setSystemBarTheme === 'function') {
+                window.AndroidBridge.setSystemBarTheme(resolvedTheme);
+            }
+        })();
+    </script>
+
+    <style>
+        /* Theme variables matching base.html exactly */
+        :root, [data-theme="light"] {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-light: #dbeafe;
+            --text-dark: #0f172a;
+            --text-secondary: #64748b;
+            --text-muted: #64748b;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+        }
+
+        /* Dark theme variables matching base.html exactly */
+        [data-theme="dark"] {
+            --primary: #6366f1;
+            --primary-hover: #818cf8;
+            --primary-light: #312e81;
+            --text-dark: #e4e6eb;
+            --background: #18191f;
+            --card-bg: #242526;
+            --border: #3a3b3c;
+            --text-secondary: #e4e6eb;
+            --text-muted: #e4e6eb;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background);
+            color: var(--text-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .maintenance-container {
+            max-width: 400px;
+            width: 100%;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .maintenance-logo {
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 20px;
+        }
+
+        .maintenance-logo img {
+            width: 96px;
+            height: 96px;
+            border-radius: 22px;
+            display: block;
+        }
+
+        .maintenance-kicker {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .maintenance-title {
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            color: var(--text-dark);
+        }
+
+        .maintenance-message {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+
+        .status-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .status-card small {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .status-card strong {
+            font-size: 16px;
+            display: block;
+            margin-top: 2px;
+            color: var(--text-dark);
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .action-button {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 2px solid var(--border);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            width: 100%;
+            max-width: 280px;
+            justify-content: center;
+        }
+
+        .action-button:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .action-button.primary {
+            background: #2563eb;
+            color: white;
+            border: 2px solid #2563eb;
+        }
+
+        [data-theme="dark"] .action-button.primary {
+            background: #6366f1;
+            border-color: #6366f1;
+        }
+
+        .action-button.primary:hover {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+            color: white;
+        }
+
+        [data-theme="dark"] .action-button.primary:hover {
+            background: #818cf8;
+            border-color: #818cf8;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .maintenance-container {
+                padding: 0 16px;
+            }
+
+            .maintenance-title {
+                font-size: 24px;
+            }
+
+            .maintenance-message {
+                font-size: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .maintenance-title {
+                font-size: 20px;
+            }
+
+            .maintenance-logo,
+            .maintenance-logo img {
+                width: 80px;
+                height: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="maintenance-container">
+        <div class="maintenance-logo">
+            <img src="{% static 'images/vasto-app-icon.png' %}" alt="Vasto">
+        </div>
+
+        <div class="maintenance-kicker">Scheduled Maintenance</div>
+
+        <h1 class="maintenance-title">{{ headline|default:"This section is temporarily unavailable" }}</h1>
+
+        <p class="maintenance-message">{{ message|default:"We are performing scheduled maintenance on this part of Vasto. No data has been affected. Thank you for your patience." }}</p>
+
+        {% if show_eta|default:True and eta_display %}
+        <div class="status-card">
+            <small>Estimated return</small>
+            <strong>{{ eta_display }}</strong>
+            {% if area %}<small>Affected area: {{ area }}</small>{% endif %}
+        </div>
+        {% elif area %}
+        <div class="status-card">
+            <small>Affected area: {{ area }}</small>
+        </div>
+        {% endif %}
+
+        <div class="action-buttons">
+            <a href="/" class="action-button primary" data-bypass-htmx="true">
+                <span>Back to Home</span>
+            </a>
+            <a href="/offline-media/" class="action-button" data-bypass-htmx="true">
+                <span>View downloaded media</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Auto-retry: poll the current URL; the middleware answers 503 while
+        // locked and the real page once the lock is lifted.
+        let retryInterval = setInterval(() => {
+            fetch(window.location.pathname, { method: 'HEAD', cache: 'no-store' })
+                .then((response) => {
+                    if (response.status !== 503) {
+                        clearInterval(retryInterval);
+                        retryInterval = null;
+                        window.location.reload();
+                    }
+                })
+                .catch(() => {});
+        }, 30000);
+
+        // Listen for theme changes
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'theme') {
+                applyTheme(e.newValue || 'system');
+            }
+        });
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+            if (savedTheme === 'system') {
+                applyTheme('system');
+            }
+        });
+
+        function applyTheme(theme) {
+            let resolvedTheme = 'light';
+            if (theme === 'dark') {
+                resolvedTheme = 'dark';
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else if (theme === 'light') {
+                resolvedTheme = 'light';
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                // System preference
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                resolvedTheme = prefersDark ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', resolvedTheme);
+            }
+            if (window.AndroidBridge && typeof window.AndroidBridge.setSystemBarTheme === 'function') {
+                window.AndroidBridge.setSystemBarTheme(resolvedTheme);
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (retryInterval) {
+                clearInterval(retryInterval);
+            }
+        });
+    </script>
+</body>
+</html>

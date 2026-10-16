@@ -41,7 +41,7 @@ const VALIDATION_CONFIG = {
         minDimensions: { width: 1, height: 1 },
     },
     video: {
-        maxSize: 100 * 1024 * 1024, // 100MB — must match server FileUploadValidator
+        maxSize: 150 * 1024 * 1024, // 150MB — must match server posts/validators.py
         allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/3gpp', 'video/x-matroska', 'video/x-m4v', 'video/3gpp2'],
         maxDuration: 3600, // 1 hour in seconds
     },
@@ -50,7 +50,7 @@ const VALIDATION_CONFIG = {
         allowedTypes: ['application/pdf', 'text/plain', 'text/csv', 'text/markdown', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip', 'application/json'],
     },
     audio: {
-        maxSize: 25 * 1024 * 1024, // 25MB — must match server
+        maxSize: 20 * 1024 * 1024, // 20MB — must match server posts/validators.py
         allowedTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/3gpp', 'audio/flac', 'application/ogg'],
     },
     caption: {

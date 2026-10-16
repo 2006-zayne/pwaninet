@@ -1,0 +1,484 @@
+"""Phase 1 upload-session API: create/recover, status, history, events.
+
+Transfer authorization (presigned R2 URLs) and idempotent completion land in
+Phase 2; every shape here already matches the approved spec so clients can
+build against it.
+"""
+
+import logging
+
+from django.db import IntegrityError, transaction
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from . import r2
+from .models import UploadEvent, UploadPostGroup, UploadRecord, UploadSession
+from .tasks import finalize_upload_media
+from .serializers import (
+    AuthorizeSerializer,
+    CompleteSerializer,
+    UploadCreateSerializer,
+    UploadEventSerializer,
+    UploadRecordSerializer,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _r2_key(user, client_upload_id, filename):
+    from django.conf import settings
+    dev_prefix = getattr(settings, "R2_DEV_PREFIX", "")
+    safe_name = (filename or "upload").replace("/", "_")[-180:]
+    base_key = f"media/uploads/staging/{user.id}/{client_upload_id}/{safe_name}"
+    return f"{dev_prefix}/{base_key}" if dev_prefix else base_key
+
+
+class UploadCollectionView(APIView):
+    """GET lists history (?status=, ?page=, ?page_size=); POST creates/recovers."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = UploadRecord.objects.filter(
+            user=request.user, deleted_at__isnull=True,
+        ).select_related("session", "post")
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        try:
+            page_size = min(max(int(request.query_params.get("page_size", 20)), 1), 100)
+            page = max(int(request.query_params.get("page", 1)), 1)
+        except ValueError:
+            page_size, page = 20, 1
+        total = qs.count()
+        records = qs[(page - 1) * page_size:page * page_size]
+        return Response({
+            "count": total,
+            "page": page,
+            "page_size": page_size,
+            "results": UploadRecordSerializer(records, many=True).data,
+        })
+
+    def post(self, request):
+        serializer = UploadCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            with transaction.atomic():
+                record, created = UploadRecord.objects.get_or_create(
+                    user=request.user,
+                    client_upload_id=data["client_upload_id"],
+                    defaults={
+                        "filename": data["filename"],
+                        "mime_type": data.get("mime_type", ""),
+                        "file_size": data["file_size"],
+                        "sha256": data.get("sha256", ""),
+                        "total_bytes": data["file_size"],
+                        "post_group": data.get("post_group"),
+                    },
+                )
+                if created:
+                    protocol, total_parts = UploadSession.plan_protocol(data["file_size"])
+                    UploadSession.objects.create(
+                        record=record,
+                        protocol=protocol,
+                        r2_key=_r2_key(request.user, data["client_upload_id"], data["filename"]),
+                        total_parts=total_parts,
+                    )
+                    UploadEvent.objects.create(record=record, event_type=UploadEvent.EventType.CREATED)
+                    http_status = status.HTTP_201_CREATED
+                else:
+                    UploadEvent.objects.create(
+                        record=record,
+                        event_type=UploadEvent.EventType.RECOVERED,
+                        detail={"status": record.status},
+                    )
+                    http_status = status.HTTP_200_OK
+            if record.deleted_at is not None:
+                # Tombstone: history was deleted; a fresh client UUID is required.
+                return Response(
+                    {"error_code": "UPLOAD_DELETED",
+                     "detail": "This upload history was deleted. Start a new upload."},
+                    status=status.HTTP_410_GONE,
+                )
+        except IntegrityError:
+            # Lost a get_or_create race: fetch the winner and treat as recovery.
+            record = UploadRecord.objects.get(
+                user=request.user, client_upload_id=data["client_upload_id"]
+            )
+            UploadEvent.objects.create(
+                record=record,
+                event_type=UploadEvent.EventType.RECOVERED,
+                detail={"status": record.status, "raced": True},
+            )
+            http_status = status.HTTP_200_OK
+        return Response(
+            UploadRecordSerializer(record).data, status=http_status,
+        )
+
+
+class UploadDetailView(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UploadRecordSerializer
+
+    def get_object(self):
+        return get_object_or_404(
+            UploadRecord.objects.select_related("session", "post"),
+            id=self.kwargs["id"], user=self.request.user,
+        )
+
+
+class UploadEventsView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UploadEventSerializer
+
+    def get_queryset(self):
+        record = get_object_or_404(
+            UploadRecord, id=self.kwargs["id"], user=self.request.user,
+        )
+        return record.events.all()
+
+
+def _r2_503():
+    return Response(
+        {"error_code": "R2_NOT_CONFIGURED", "detail": "Direct upload is unavailable."},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+class UploadAuthorizeView(APIView):
+    """Mint short-lived presigned URLs. Re-call on expiry; never restarts."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        import traceback
+        try:
+            record = get_object_or_404(
+                UploadRecord.objects.select_related("session"),
+                id=id, user=request.user, deleted_at__isnull=True,
+            )
+            serializer = AuthorizeSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            try:
+                client = r2.get_r2_client()
+            except r2.R2Unavailable as e:
+                logger.error(f"[UploadAuthorizeView] R2 unavailable: {e}")
+                return _r2_503()
+            bucket = r2.get_bucket()
+            session = record.session
+
+            with transaction.atomic():
+                record = UploadRecord.objects.select_for_update().get(id=record.id)
+                if record.status == "queued":
+                    record.transition_to("preparing")
+                if record.status in ("preparing", "paused", "failed"):
+                    record.transition_to("uploading")
+                if record.status != "uploading":
+                    return Response(
+                        {"error_code": "NOT_UPLOADING",
+                         "detail": f"Cannot authorize in status {record.status}."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                record.save()
+                if session.protocol == UploadSession.PROTOCOL_S3_MULTIPART:
+                    if not session.r2_upload_id:
+                        session.r2_upload_id = r2.ensure_multipart(
+                            client, bucket, session.r2_key)
+                session.expires_at = r2.credential_expiry()
+                session.save(update_fields=["r2_upload_id", "expires_at", "updated_at"])
+                UploadEvent.objects.create(
+                    record=record, event_type=UploadEvent.EventType.AUTHORIZED,
+                    detail={"protocol": session.protocol},
+                )
+
+            if session.protocol == UploadSession.PROTOCOL_SINGLE_PUT:
+                urls = [{
+                    "part_number": 1,
+                    "url": str(r2.presign_single_put(
+                        client, bucket, session.r2_key, record.mime_type)),
+                }]
+            else:
+                wanted = serializer.validated_data.get("parts") or list(
+                    range(1, session.total_parts + 1))
+                urls = [{
+                    "part_number": n,
+                    "url": str(r2.presign_part(
+                        client, bucket, session.r2_key, session.r2_upload_id, n)),
+                } for n in wanted]
+            return Response({
+                "upload_id": session.r2_upload_id,
+                "protocol": session.protocol,
+                "part_size": session.part_size,
+                "total_parts": session.total_parts,
+                "parts": urls,
+                "expires_at": session.expires_at,
+            })
+        except Exception as e:
+            logger.error(f"[UploadAuthorizeView] Unexpected error: {e}\n{traceback.format_exc()}")
+            raise
+
+
+class UploadCompleteView(APIView):
+    """Verify against R2, finalize, create/link the post. Fully idempotent."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        serializer = CompleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            client = r2.get_r2_client()
+        except r2.R2Unavailable:
+            return _r2_503()
+        bucket = r2.get_bucket()
+
+        with transaction.atomic():
+            record = UploadRecord.objects.select_for_update().get(
+                id=id, user=request.user,
+            )
+            if record.deleted_at is not None:
+                return Response(
+                    {"error_code": "DELETED", "detail": "Upload was deleted."},
+                    status=status.HTTP_410_GONE,
+                )
+            if record.post_id is not None:
+                # Already finalized: second call returns the same post, always.
+                return Response(self._done_payload(record), status=status.HTTP_200_OK)
+            if record.status not in ("uploading", "paused", "failed", "verifying"):
+                return Response(
+                    {"error_code": "BAD_STATE",
+                     "detail": f"Cannot complete from status {record.status}."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if record.status != "verifying":
+                record.transition_to("verifying")
+                record.save()
+            session = record.session
+
+            if session.protocol == UploadSession.PROTOCOL_S3_MULTIPART:
+                claimed = {
+                    p["part_number"]: p["etag"].strip('"')
+                    for p in serializer.validated_data.get("parts", [])
+                }
+                verified = r2.list_verified_parts(
+                    client, bucket, session.r2_key, session.r2_upload_id)
+                missing = [
+                    n for n in range(1, session.total_parts + 1)
+                    if verified.get(n) != claimed.get(n)
+                ]
+                if missing:
+                    record.transition_to("uploading")
+                    record.save()
+                    UploadEvent.objects.create(
+                        record=record,
+                        event_type=UploadEvent.EventType.RETRY_SCHEDULED,
+                        detail={"reason": "parts_mismatch", "missing": missing},
+                    )
+                    return Response(
+                        {"error_code": "PARTS_MISMATCH",
+                         "detail": "Some parts failed server verification.",
+                         "verified_parts": sorted(verified),
+                         "missing_parts": missing},
+                        status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    )
+                r2.complete_multipart(
+                    client, bucket, session.r2_key, session.r2_upload_id,
+                    [{"PartNumber": n, "ETag": f'"{verified[n]}"'}
+                     for n in range(1, session.total_parts + 1)],
+                )
+            else:
+                if not r2.head_object_ok(client, bucket, session.r2_key):
+                    return Response(
+                        {"error_code": "OBJECT_MISSING",
+                         "detail": "Uploaded object not found on R2."},
+                        status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    )
+            session.finalized = True
+            session.save(update_fields=["finalized", "updated_at"])
+            post = self._publish(record, serializer.validated_data.get("post", {}))
+            record.transition_to("processing")
+            record.progress_bytes = record.total_bytes
+            record.save()
+            UploadEvent.objects.create(
+                record=record, event_type=UploadEvent.EventType.FINALIZED,
+                detail={"r2_key": session.r2_key},
+            )
+            record_id = str(record.id)
+            transaction.on_commit(
+                lambda: finalize_upload_media.delay(record_id))
+            return Response(self._done_payload(record), status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _publish(record, post_data):
+        from posts.models import Post
+        post_data = post_data or {}
+        group = None
+        group_id = post_data.get("group")
+        if group_id:
+            from groups.models import Group, Membership
+            try:
+                group = Group.objects.get(id=group_id)
+            except Group.DoesNotExist:
+                from rest_framework.exceptions import ValidationError as DRFValidationError
+                raise DRFValidationError({"post": {"group": "Unknown group."}})
+            approved = Membership.objects.filter(
+                group=group, user=record.user, status="APPROVED",
+            ).exists()
+            if not approved:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You are not a member of this group.")
+        if record.post_group:
+            group_row = UploadPostGroup.objects.select_for_update().get_or_create(
+                user=record.user,
+                group_id=record.post_group,
+            )[0]
+            if group_row.post_id is None:
+                group_row.post = UploadCompleteView._build_post(record, post_data, group)
+                group_row.save(update_fields=["post"])
+            record.post = group_row.post
+            return record.post
+        record.post = UploadCompleteView._build_post(record, post_data, group)
+        return record.post
+
+    @staticmethod
+    def _build_post(record, post_data, group):
+        from posts.models import Post
+        kwargs = {
+            "author": record.user,
+            "content": post_data.get("content", ""),
+            "visibility": post_data.get("visibility", "AUTHENTICATED"),
+            "allow_downloads": post_data.get("allow_downloads", True),
+        }
+        # Provisional reel dims from client preview metadata; ffprobe in
+        # process_large_video overwrites with measured truth on ready.
+        for field in ("video_width", "video_height", "video_duration"):
+            value = post_data.get(field)
+            if isinstance(value, int) and value > 0:
+                kwargs[field] = value
+        if group is not None:
+            kwargs["group"] = group
+        unit_id = post_data.get("unit")
+        if unit_id:
+            from courses.models import Unit
+            kwargs["unit"] = Unit.objects.filter(id=unit_id).first()
+            if kwargs["unit"] is None:
+                from rest_framework.exceptions import ValidationError as DRFValidationError
+                raise DRFValidationError({"post": {"unit": "Unknown unit."}})
+        gradient = post_data.get("gradient_class") or ""
+        if gradient:
+            kwargs["gradient_class"] = gradient
+        return Post.objects.create(**{k: v for k, v in kwargs.items() if v is not None})
+
+    @staticmethod
+    def _done_payload(record):
+        post = record.post
+        return {
+            "id": str(record.id),
+            "status": record.status,
+            "post_id": record.post_id,
+            "post_share_id": str(post.share_id) if post else None,
+            "is_reel": bool(post.is_reel) if post else False,
+        }
+
+
+class UploadRetryView(APIView):
+    """Resume at the correct step based on verified server state. Never dupes."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        with transaction.atomic():
+            record = UploadRecord.objects.select_for_update().get(
+                id=id, user=request.user,
+            )
+            if record.status not in ("paused", "failed"):
+                return Response(
+                    UploadRecordSerializer(record).data, status=status.HTTP_200_OK)
+            target = ("processing" if record.session.finalized
+                      else "uploading")
+            record.transition_to(target)
+            record.retry_count += 1
+            record.error_code = ""
+            record.error_message = ""
+            record.save()
+            UploadEvent.objects.create(
+                record=record, event_type=UploadEvent.EventType.RETRY_SCHEDULED,
+                detail={"target": target, "attempt": record.retry_count},
+            )
+            UploadEvent.objects.create(
+                record=record, event_type=UploadEvent.EventType.RESUMED,
+                detail={"target": target},
+            )
+            return Response(
+                UploadRecordSerializer(record).data, status=status.HTTP_200_OK)
+
+
+class UploadCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        with transaction.atomic():
+            record = UploadRecord.objects.select_for_update().get(
+                id=id, user=request.user,
+            )
+            if record.status in ("completed", "cancelled"):
+                return Response(
+                    UploadRecordSerializer(record).data, status=status.HTTP_200_OK)
+            record.transition_to("cancelled")
+            record.save()
+            UploadEvent.objects.create(
+                record=record, event_type=UploadEvent.EventType.CANCELLED)
+        session = record.session
+        if session.protocol == UploadSession.PROTOCOL_S3_MULTIPART and session.r2_upload_id:
+            try:
+                r2.abort_multipart(
+                    r2.get_r2_client(), r2.get_bucket(),
+                    session.r2_key, session.r2_upload_id)
+            except r2.R2Unavailable:
+                pass
+        return Response(
+            UploadRecordSerializer(record).data, status=status.HTTP_200_OK)
+
+
+class UploadDeleteView(APIView):
+    """Soft-delete history. The tombstone blocks UUID reuse; R2 staging is
+    aborted best-effort and finished copies are swept by the reconciler."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, id):
+        return self._soft_delete(request, id)
+
+    def post(self, request, id):
+        # Alias for clients (e.g. cached manager_page.js) that send POST.
+        return self._soft_delete(request, id)
+
+    def _soft_delete(self, request, id):
+        with transaction.atomic():
+            record = UploadRecord.objects.select_for_update().get(
+                id=id, user=request.user,
+            )
+            if record.deleted_at is not None:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            if record.status not in ("completed", "cancelled", "failed"):
+                try:
+                    record.transition_to("cancelled")
+                except Exception:
+                    pass
+            record.deleted_at = timezone.now()
+            record.save(update_fields=["status", "completed_at", "deleted_at", "updated_at"])
+            UploadEvent.objects.create(
+                record=record, event_type=UploadEvent.EventType.DELETED)
+        session = record.session
+        if session.protocol == UploadSession.PROTOCOL_S3_MULTIPART and session.r2_upload_id:
+            try:
+                r2.abort_multipart(
+                    r2.get_r2_client(), r2.get_bucket(),
+                    session.r2_key, session.r2_upload_id)
+            except r2.R2Unavailable:
+                pass
+        return Response(status=status.HTTP_204_NO_CONTENT)

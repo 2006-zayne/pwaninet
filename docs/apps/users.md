@@ -13,7 +13,7 @@
 
 ## Main journeys
 
-Users register through `PwaniSignupForm`, sign in through the project login view, manage their profile and settings, and can use security flows such as two-factor authentication and recovery codes. Profile and post privacy settings feed into discovery and visibility checks. Registration includes username, password, programme, academic level, academic year, and semester; name fields are optional. The privacy notice should disclose these fields accurately.
+Users register through `PwaniSignupForm`, sign in through the project login view, manage their profile and settings, and can use security flows such as two-factor authentication and recovery codes. Profile and post privacy settings feed into discovery and visibility checks. Registration collects only username (or email in the same field), password, and optional names; institution, programme, and academic level are chosen later in the optional onboarding setup step (`InstitutionSetupForm`), never at signup. Academic year/semester default to the current records when available. The privacy notice should disclose these fields accurately.
 
 ## Routes and entry points
 

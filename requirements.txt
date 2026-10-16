@@ -140,4 +140,3 @@ boto3
 pgvector
 faster-whisper
 qrcode
-EOF

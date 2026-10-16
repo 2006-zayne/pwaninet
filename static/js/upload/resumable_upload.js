@@ -1,0 +1,292 @@
+/**
+ * ResumableUpload — Phase 3 persistent client engine for direct-to-R2 uploads.
+ *
+ * One engine for the composer and the Upload Manager page. Sessions and file
+ * blobs persist in IndexedDB so uploads survive refresh and resume from the
+ * first unverified chunk. Django is authoritative: verified parts always come
+ * from GET /api/uploads/{id}/, never from local state alone.
+ */
+(function () {
+    'use strict';
+
+    const DB_NAME = 'vasto_uploads';
+    const DB_VERSION = 1;
+    const API_BASE = '/api/uploads/';
+    const BACKOFF_MS = [5000, 30000, 120000, 600000];
+    const ACTIVE_STATES = ['queued', 'preparing', 'uploading', 'verifying', 'paused', 'failed'];
+
+    function uuid() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+        });
+    }
+
+    function getCSRFToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.content) return meta.content;
+        const match = document.cookie.match(/(?:^|;\s*)(csrftoken|vasto_local_csrftoken)=([^;]*)/);
+        return match ? decodeURIComponent(match[2]) : '';
+    }
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('sessions')) {
+                    db.createObjectStore('sessions', { keyPath: 'client_upload_id' });
+                }
+                if (!db.objectStoreNames.contains('blobs')) {
+                    db.createObjectStore('blobs', { keyPath: 'client_upload_id' });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    function storePut(store, value) {
+        return openDB().then((db) => new Promise((resolve, reject) => {
+            const tx = db.transaction(store, 'readwrite');
+            tx.objectStore(store).put(value);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        }));
+    }
+
+    function storeGet(store, key) {
+        return openDB().then((db) => new Promise((resolve, reject) => {
+            const req = db.transaction(store, 'readonly').objectStore(store).get(key);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        }));
+    }
+
+    function storeGetAll(store) {
+        return openDB().then((db) => new Promise((resolve, reject) => {
+            const req = db.transaction(store, 'readonly').objectStore(store).getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        }));
+    }
+
+    function storeDelete(store, key) {
+        return openDB().then((db) => new Promise((resolve, reject) => {
+            const tx = db.transaction(store, 'readwrite');
+            tx.objectStore(store).delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        }));
+    }
+
+    async function api(path, method, body) {
+        const headers = { 'X-CSRFToken': getCSRFToken(), 'X-Requested-With': 'XMLHttpRequest' };
+        const opts = { method, headers, credentials: 'same-origin' };
+        if (body !== undefined) {
+            headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+        }
+        const res = await fetch(API_BASE + path, opts);
+        let data = null;
+        try {
+            data = await res.json();
+        } catch (_) {
+            data = null;
+        }
+        if (!res.ok) {
+            const err = new Error((data && data.detail) || JSON.stringify(data) || `Upload API ${res.status}`);
+            err.status = res.status;
+            err.data = data;
+            console.error('[ResumableUpload] API error:', { status: res.status, path, body, data });
+            throw err;
+        }
+        return data;
+    }
+
+    function emitProgress(clientUploadId, loaded, total, serverId) {
+        console.log('[ResumableUpload] emitProgress:', { clientUploadId, loaded, total, serverId });
+        window.dispatchEvent(new CustomEvent('resumable-upload-progress', {
+            detail: { clientUploadId, loaded, total, serverId },
+        }));
+    }
+
+    function putPart(url, blob, mimeType, onProgress) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', url, true);
+            if (mimeType) xhr.setRequestHeader('Content-Type', mimeType);
+            if (onProgress) {
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) onProgress(e.loaded, e.total);
+                });
+            }
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(xhr.getResponseHeader('ETag') || '');
+                } else {
+                    const err = new Error(`Part PUT failed: ${xhr.status}`);
+                    err.status = xhr.status;
+                    reject(err);
+                }
+            };
+            xhr.onerror = () => reject(new Error('Network error during part upload'));
+            xhr.onabort = () => reject(new Error('Part upload cancelled'));
+            xhr.send(blob);
+            putPart._active = putPart._active || new Map();
+        });
+    }
+
+    class ResumableUpload {
+        constructor() {
+            this.transfers = new Map();
+        }
+
+        async start(file, options) {
+            const opts = options || {};
+            const clientUploadId = uuid();
+            await storePut('blobs', { client_upload_id: clientUploadId, blob: file });
+            const createBody = {
+                client_upload_id: clientUploadId,
+                filename: file.name || 'upload',
+                mime_type: file.type || '',
+                file_size: file.size,
+            };
+            if (opts.postGroup) createBody.post_group = opts.postGroup;
+            const record = await api('', 'POST', createBody);
+            await storePut('sessions', {
+                client_upload_id: clientUploadId,
+                server_id: record.id,
+                filename: record.filename,
+                post: opts.post || {
+                    content: opts.content || '',
+                    visibility: opts.visibility || 'AUTHENTICATED',
+                },
+            });
+            return this.resume(clientUploadId);
+        }
+
+        async resume(clientUploadId) {
+            const saved = await storeGet('sessions', clientUploadId);
+            const stored = await storeGet('blobs', clientUploadId);
+            if (!saved) throw new Error('Unknown upload session');
+            if (!stored || !stored.blob) {
+                const err = new Error('Original file unavailable — please re-select it');
+                err.code = 'FILE_MISSING';
+                err.clientUploadId = clientUploadId;
+                throw err;
+            }
+            return this._run(clientUploadId, saved.server_id, stored.blob, saved.post || {});
+        }
+
+        /** Re-attach a re-selected file to an existing session (no re-upload of verified bytes). */
+        async reattach(clientUploadId, file) {
+            await storePut('blobs', { client_upload_id: clientUploadId, blob: file });
+            return this.resume(clientUploadId);
+        }
+
+        /** Get all active sessions for banner restoration */
+        async getAllSessions() {
+            const sessions = await storeGetAll('sessions');
+            return sessions;
+        }
+
+        async _run(clientUploadId, serverId, blob, post) {
+            const status = await api(`${serverId}/`, 'GET');
+            const partSize = status.session_part_size || 8388608;
+            const auth = await api(`${serverId}/authorize/`, 'POST', {});
+            const total = status.total_bytes || blob.size;
+            const etags = {};
+            let done = 0;
+
+            if (auth.protocol === 'single-put') {
+                const target = auth.parts[0];
+                const etag = await this._putWithRetry(target.url, blob, blob.type, (l) => {
+                    emitProgress(clientUploadId, l, total, serverId);
+                });
+                etags[1] = etag;
+                done = total;
+            } else {
+                const verified = new Set(status.verified_parts || []);
+                for (const target of auth.parts) {
+                    if (verified.has(target.part_number)) {
+                        done += Math.min(partSize, total - done);
+                        emitProgress(clientUploadId, done, total, serverId);
+                        continue;
+                    }
+                    const start = (target.part_number - 1) * partSize;
+                    const chunk = blob.slice(start, Math.min(start + partSize, total));
+                    const base = done;
+                    const etag = await this._putWithRetry(target.url, chunk, blob.type, (l) => {
+                        emitProgress(clientUploadId, base + l, total, serverId);
+                    });
+                    etags[target.part_number] = etag;
+                    done = base + chunk.size;
+                    emitProgress(clientUploadId, done, total, serverId);
+                }
+            }
+
+            const parts = Object.keys(etags).map((n) => ({
+                part_number: Number(n),
+                etag: String(etags[n]).replace(/"/g, ''),
+            }));
+            const finalized = await api(`${serverId}/complete/`, 'POST', { parts, post });
+            await storeDelete('blobs', clientUploadId);
+            await storePut('sessions', {
+                client_upload_id: clientUploadId,
+                server_id: serverId,
+                filename: status.filename,
+                post,
+                done: true,
+            });
+            return finalized;
+        }
+
+        async _putWithRetry(url, blob, mimeType, onProgress) {
+            let attempt = 0;
+            for (;;) {
+                // Offline: park until connectivity returns instead of burning retries.
+                if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                    await new Promise((r) => {
+                        const onUp = () => {
+                            window.removeEventListener('online', onUp);
+                            r();
+                        };
+                        window.addEventListener('online', onUp);
+                    });
+                }
+                try {
+                    return await putPart(url, blob, mimeType, onProgress);
+                } catch (err) {
+                    if (err.status && err.status >= 400 && err.status < 500 && err.status !== 403) {
+                        throw err;
+                    }
+                    if (attempt >= BACKOFF_MS.length) throw err;
+                    await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
+                    attempt += 1;
+                }
+            }
+        }
+
+        /** Resume every locally persisted active upload (call on page load). */
+        async resumeAll() {
+            const sessions = await storeGetAll('sessions');
+            const results = [];
+            for (const s of sessions) {
+                if (s.done) continue;
+                try {
+                    const status = await api(`${s.server_id}/`, 'GET');
+                    if (ACTIVE_STATES.indexOf(status.status) === -1) continue;
+                    results.push(await this.resume(s.client_upload_id));
+                } catch (err) {
+                    results.push({ error: String((err && err.message) || err), session: s });
+                }
+            }
+            return results;
+        }
+    }
+
+    window.ResumableUpload = ResumableUpload;
+    window.resumableUpload = new ResumableUpload();
+})();

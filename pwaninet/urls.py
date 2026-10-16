@@ -61,6 +61,47 @@ def serve_manifest(request):
     except FileNotFoundError:
         return HttpResponse('Manifest not found', status=404)
 
+# SEO: sitemap + robots (public pages only — feeds/profiles require login
+# and must never be advertised to crawlers).
+@require_http_methods(["GET", "HEAD"])
+def serve_sitemap(request):
+    from django.urls import reverse, NoReverseMatch
+
+    paths = []
+    for name in ('public_about', 'public_privacy', 'public_licenses', 'downloads',
+                 'login', 'login_direct'):
+        try:
+            paths.append(reverse(name))
+        except NoReverseMatch:
+            continue
+    try:
+        paths.append(reverse('users:register'))
+    except NoReverseMatch:
+        pass
+    seen = set()
+    urls = []
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        urls.append(request.build_absolute_uri(path))
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for url in urls:
+        xml.append(f"<url><loc>{url}</loc><changefreq>weekly</changefreq></url>")
+    xml.append('</urlset>')
+    return HttpResponse('\n'.join(xml), content_type='application/xml')
+
+
+@require_http_methods(["GET", "HEAD"])
+def serve_robots(request):
+    sitemap_url = request.build_absolute_uri('/sitemap.xml')
+    return HttpResponse(
+        f"User-agent: *\nAllow: /\nSitemap: {sitemap_url}\n",
+        content_type='text/plain',
+    )
+
+
 # Service Worker - served dynamically with active version to bust cache on release
 @require_http_methods(["GET", "HEAD"])
 @csrf_exempt
@@ -296,10 +337,13 @@ urlpatterns = [
     path('test/offline/', TemplateView.as_view(template_name='offline.html'), name='offline_test'),
     # PWA Manifest and Service Worker - served without auth middleware
     path('manifest.webmanifest', serve_manifest, name='manifest'),
+    path('sitemap.xml', serve_sitemap, name='sitemap'),
+    path('robots.txt', serve_robots, name='robots'),
     path('service-worker.js', serve_service_worker, name='service_worker'),
     # Dedicated Downloads Page
     path('downloads/', downloads_page_view, name='downloads'),
     path('download/', downloads_page_view, name='download_alias'),
+    path('uploads/', include(('uploads.page_urls', 'uploads_page'), namespace='uploads_page')),
     # Direct Android APK download routes (permanent endpoints for social sharing & settings)
     path('i/<str:token>/', encrypted_invite_landing, name='encrypted_invite_landing'),
     path('app/<str:token>/', app_invite_landing, name='app_invite_landing'),
@@ -313,6 +357,7 @@ urlpatterns = [
     path('test/native-pwa/', TemplateView.as_view(template_name='native_pwa_test.html'), name='native_pwa_test'),
     path('clear-cache/', TemplateView.as_view(template_name='clear_cache.html'), name='clear_cache'),
     path('api/health/', TemplateView.as_view(template_name='health_check.html'), name='health_check'),
+    path('api/uploads/', include(('uploads.urls', 'uploads'), namespace='uploads')),
     # Messaging Test Pages - FROZEN FOR MVP
     # path('test/messaging/', TemplateView.as_view(template_name='test_messaging_architecture.html'), name='test_messaging_architecture'),
     # path('test/messaging-debug/', TemplateView.as_view(template_name='debug_messaging.html'), name='debug_messaging'),

@@ -1,4 +1,5 @@
 import datetime
+from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
@@ -11,6 +12,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
@@ -129,21 +131,13 @@ def register_view(request):
     else:
         form = PwaniSignupForm()
 
-    programmes = []
-    academic_levels = []
-    try:
-        from documents.academic.models import Programme, AcademicLevel
-        programmes = Programme.objects.filter(is_active=True).select_related('department__school').order_by('name')
-        academic_levels = AcademicLevel.objects.filter(is_active=True).order_by('level')
-    except Exception as e:
-        logger.warning(f"[register_view] Could not prefetch programmes or academic levels: {e}")
-
     return render(request, 'users/register.html', {
         'form': form,
-        'programmes': programmes,
-        'academic_levels': academic_levels,
         'inviter_username': inviter_username,
         'invite_token': ref_token,
+        'google_login_enabled': bool(settings.GOOGLE_LOGIN_ENABLED and settings.GOOGLE_WEB_CLIENT_ID),
+        'google_web_client_id': settings.GOOGLE_WEB_CLIENT_ID,
+        'google_login_uri': request.build_absolute_uri(reverse('users:google_redirect')),
     })
 
 
@@ -169,6 +163,15 @@ class PwaniLoginView(LoginView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['hero_set'] = HeroShowcaseSet.objects.filter(is_active=True).order_by('?').first()
+        from django.conf import settings as _settings
+
+        context['google_login_enabled'] = bool(
+            _settings.GOOGLE_LOGIN_ENABLED and _settings.GOOGLE_WEB_CLIENT_ID
+        )
+        context['google_web_client_id'] = _settings.GOOGLE_WEB_CLIENT_ID
+        context['google_login_uri'] = self.request.build_absolute_uri(
+            reverse('users:google_redirect')
+        )
         return context
 
     def dispatch(self, request, *args, **kwargs):
@@ -196,6 +199,8 @@ class PwaniLoginView(LoginView):
         # Phase 3: if user has 2FA enabled, do NOT log them in yet.
         # Stash their pk in the session and redirect to the 2FA challenge page.
         if two_factor_service.is_two_factor_enabled(user):
+            self.request.session.pop('_google_pending_link', None)
+            self.request.session.pop('_google_pending_link_sub', None)
             self.request.session['_2fa_pending_user_id'] = user.pk
             self.request.session['_2fa_pending_ts'] = int(_time.time())
             self.request.session['_2fa_backend'] = getattr(user, 'backend', 'users.backends.CaseInsensitiveAuthBackend')
@@ -211,6 +216,8 @@ class PwaniLoginView(LoginView):
 
         # No 2FA enrolled — log in immediately.
         self.request.session.pop('registered_username', None)
+        self.request.session.pop('_google_pending_link', None)
+        self.request.session.pop('_google_pending_link_sub', None)
         # Signal the base template to show a one-time 2FA enrollment nudge.
         self.request.session['_show_2fa_nudge'] = True
         return super().form_valid(form)
@@ -288,6 +295,8 @@ def login_2fa_challenge_view(request):
     # Rate-limit
     if attempts >= _2FA_MAX_ATTEMPTS:
         _clear_2fa_pending(request)
+        request.session.pop('_google_pending_link', None)
+        request.session.pop('_google_pending_link_sub', None)
         msg = (
             f"[SECURITY-2FA] LOCKOUT: 2FA challenge exceeded {_2FA_MAX_ATTEMPTS} attempts "
             f"for user '{pending_user.username}' from IP={ip}"
@@ -331,6 +340,30 @@ def login_2fa_challenge_view(request):
 
     from django.contrib.auth import login as auth_login
     auth_login(request, pending_user, backend=backend)
+
+    # Complete a deferred Google-account link (stored before the 2FA challenge).
+    pending_link = request.session.pop('_google_pending_link', None)
+    request.session.pop('_google_pending_link_sub', None)
+    if pending_link and pending_link.get('sub'):
+        try:
+            from users.models import GoogleAccount
+
+            GoogleAccount.objects.get_or_create(
+                sub=pending_link['sub'],
+                defaults={
+                    'user': pending_user,
+                    'email': pending_link.get('email', ''),
+                    'email_verified': bool(pending_link.get('email_verified', False)),
+                    'hosted_domain': pending_link.get('hosted_domain', ''),
+                    'link_method': pending_link.get('link_method', 'explicit_link'),
+                },
+            )
+            logger.info(
+                f"[AUTH-GOOGLE] LINKED: Google sub={pending_link['sub'][:8]}... to user "
+                f"'{pending_user.username}' after 2FA"
+            )
+        except Exception as exc:
+            logger.error(f"[AUTH-GOOGLE] Deferred link failed for '{pending_user.username}': {exc}")
 
     logger.info(
         f"[AUTH-LOGIN] SUCCESS: User '{pending_user.username}' (id={pending_user.pk}) "
@@ -626,6 +659,126 @@ def load_semesters(request):
     return render(request, 'users/partials/semester_options.html', {'semesters': semesters})
 
 
+@login_required
+def load_programmes_by_institution(request):
+    """HTMX endpoint returning programme <option>s scoped to an institution.
+
+    Institution scope is derived via
+    Programme → Department → School → Faculty → Institution.
+    Unknown or inactive institutions yield an empty list (never an error page
+    for HTMX swaps, never unscoped data).
+    """
+    from documents.academic.models import Institution, Programme
+
+    institution_id = request.GET.get('institution_id') or request.GET.get('institution')
+    institution = None
+    programmes = Programme.objects.none()
+    if institution_id:
+        try:
+            institution = Institution.objects.filter(
+                pk=institution_id, is_active=True).first()
+        except (ValueError, TypeError):
+            institution = None
+        if institution is not None:
+            programmes = Programme.objects.filter(
+                is_active=True,
+                department__school__faculty__institution=institution,
+            ).order_by('name')
+    return render(request, 'users/partials/programme_options.html', {
+        'programmes': programmes,
+        'institution': institution,
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def save_institution_setup(request):
+    """Persist the optional institution setup step of onboarding.
+
+    All identifiers are re-validated server-side via InstitutionSetupForm
+    (institution scope derived through the hierarchy, forged/inactive IDs
+    rejected). Changing the institution clears an incompatible programme;
+    clearing/changing the programme deactivates stale auto-synced unit
+    enrollments while preserving custom electives/retakes. Everything may
+    be left unset (skip).
+    """
+    from users.forms import InstitutionSetupForm
+
+    form = InstitutionSetupForm(request.POST)
+    from documents.academic.models import Institution as _Institution
+
+    def _setup_extra_context():
+        try:
+            institutions = _Institution.objects.filter(is_active=True).order_by('name')
+        except Exception:
+            institutions = []
+        return {'institutions': institutions, 'setup_programmes': []}
+
+    if not form.is_valid():
+        status = 400
+        if request.headers.get('HX-Request'):
+            ctx = {'setup_form': form, 'setup_saved': False}
+            ctx.update(_setup_extra_context())
+            return render(request, 'users/onboarding/partials/step_institution.html', ctx, status=status)
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, f"{field}: {error}" if field != '__all__' else str(error))
+        return redirect('users:onboarding')
+
+    user = request.user
+    institution = form.cleaned_data.get('institution')
+    programme = form.cleaned_data.get('programme')
+    academic_level = form.cleaned_data.get('academic_level')
+
+    institution_changed = user.institution_id != (institution.pk if institution else None)
+    programme_changed = user.programme_id != (programme.pk if programme else None)
+
+    user.institution = institution
+    user.programme = programme
+    user.academic_level = academic_level
+    from django.core.exceptions import ValidationError
+    try:
+        user.full_clean(exclude=['password'])
+    except ValidationError as exc:
+        if request.headers.get('HX-Request'):
+            ctx = {
+                'setup_form': form,
+                'setup_saved': False,
+                'setup_errors': exc.message_dict,
+            }
+            ctx.update(_setup_extra_context())
+            return render(request, 'users/onboarding/partials/step_institution.html', ctx, status=400)
+        messages.error(request, "Selected academic combination is invalid. Please review and try again.")
+        return redirect('users:onboarding')
+    user.save(update_fields=['institution', 'programme', 'academic_level'])
+
+    if programme_changed or (institution_changed and not programme):
+        try:
+            from documents.academic.models import StudentUnitEnrollment
+            from documents.academic.services import StudentAcademicEnrollmentService
+            StudentUnitEnrollment.objects.filter(
+                user=user, source='auto_programme', is_active=True).update(is_active=False)
+            if programme:
+                StudentAcademicEnrollmentService.sync_student_units(user, force_resync=True)
+        except Exception:
+            pass
+
+    if request.headers.get('HX-Request'):
+        from users.forms import InstitutionSetupForm as _SetupForm
+        ctx = {
+            'setup_form': _SetupForm(initial={
+                'institution': institution,
+                'programme': programme,
+                'academic_level': academic_level,
+            }),
+            'setup_saved': True,
+        }
+        ctx.update(_setup_extra_context())
+        return render(request, 'users/onboarding/partials/step_institution.html', ctx)
+    messages.success(request, "Academic setup saved. You can continue with onboarding.")
+    return redirect('users:onboarding')
+
+
 def verify_email_view(request, uidb64, token):
     """
     Verify email address using token.
@@ -643,6 +796,543 @@ def verify_email_view(request, uidb64, token):
     else:
         messages.error(request, 'The verification link is invalid or has expired. Please request a new verification email.')
         return redirect('login')
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Google sign-in (website, Google Identity Services ID-token flow)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_GOOGLE_AUTH_BACKEND = 'users.backends.CaseInsensitiveAuthBackend'
+
+
+def _google_safe_next(request, data=None):
+    """Return a validated `next` URL or '' — open redirects are rejected."""
+    from django.utils.http import url_has_allowed_host_and_scheme
+
+    candidate = ''
+    if data and data.get('next'):
+        candidate = data.get('next')
+    if not candidate:
+        candidate = request.POST.get('next', '') or request.GET.get('next', '')
+    if candidate and url_has_allowed_host_and_scheme(candidate, allowed_hosts={request.get_host()}):
+        return candidate
+    return ''
+
+
+def _google_request_data(request):
+    """Return POST data merged with a JSON body (GIS widget posts JSON)."""
+    import json as _json
+
+    data = {key: request.POST.get(key) for key in request.POST}
+    if request.body:
+        try:
+            body = _json.loads(request.body)
+            if isinstance(body, dict):
+                for key, value in body.items():
+                    if key not in data or not data[key]:
+                        data[key] = value
+        except Exception:
+            pass
+    return data
+
+
+def _login_existing_google_link(request, link):
+    """Complete login for an already-linked Google identity (verified `sub`)."""
+    from django.utils import timezone as _timezone
+
+    linked_user = link.user
+    if not linked_user.is_active:
+        return JsonResponse({'status': 'error', 'message': 'This account is disabled.'}, status=403)
+    link.last_login_at = _timezone.now()
+    link.save(update_fields=['last_login_at'])
+    logger.info(f"[AUTH-GOOGLE] SUCCESS: User '{linked_user.username}' signed in with Google")
+    return _google_complete_login(request, linked_user)
+
+
+def _google_link_required_response(request, owner_username, claims):
+    """Controlled conflict: email matches but ownership is unproven — never merge."""
+    from users.services import google_auth_service
+
+    google_auth_service.stash_pending_google(request, claims)
+    logger.info(
+        f"[AUTH-GOOGLE] LINK-REQUIRED: Google sub={claims.get('sub', '')[:8]}... "
+        f"matches email of '{owner_username}'"
+    )
+    return JsonResponse({
+        'status': 'link_required',
+        'username': owner_username,
+        'message': (
+            f"An account ({owner_username}) already uses this email address. "
+            "Sign in with your password to link Google sign-in."
+        ),
+    }, status=409)
+
+
+_CREATE_MAX_ATTEMPTS = 3
+
+
+def _create_google_user_account(claims, sub, google_email):
+    """Create a User + GoogleAccount for a verified Google identity, race-safely.
+
+    Returns (outcome, user) where outcome is one of:
+      'created'              – new account, caller proceeds to login.
+      'sub_exists'           – another request linked this `sub` first; `user`
+                               is the linked account, safe to authenticate
+                               because our own token verification matched it.
+      'email_collision'      – an account with this email now exists; `user`
+                               is None, caller must require explicit linking.
+      'username_unavailable' – repeated username conflicts; `user` is None,
+                               caller must return a controlled error.
+
+    Only django.db.IntegrityError is caught, plus the narrow case of a
+    username-uniqueness ValidationError raised by User.save()'s full_clean()
+    (the database constraint and the model validation cover the same
+    username uniqueness rule). Every other exception propagates so real
+    programming or database failures stay visible.
+    """
+    from django.core.exceptions import ValidationError
+    from django.db import IntegrityError, transaction
+    from django.utils import timezone as _timezone
+    from users.models import GoogleAccount, GoogleAccountLinkMethod, User
+    from users.services import google_auth_service
+
+    for _ in range(_CREATE_MAX_ATTEMPTS):
+        username = google_auth_service.derive_username_from_email(google_email) if google_email else None
+        if not username:
+            username = google_auth_service.derive_username_from_email(f"user_{sub[:12]}@google.local")
+        try:
+            with transaction.atomic():
+                new_user = User(
+                    username=username,
+                    email=google_email,
+                    first_name=(claims.get('given_name') or '')[:200],
+                    last_name=(claims.get('family_name') or '')[:200],
+                    email_verified=bool(claims.get('email_verified', False)),
+                    has_completed_onboarding=False,
+                )
+                new_user.set_unusable_password()
+                new_user.save()
+                GoogleAccount.objects.create(
+                    user=new_user,
+                    sub=sub,
+                    email=google_email,
+                    email_verified=bool(claims.get('email_verified', False)),
+                    hosted_domain=claims.get('hd', '') or '',
+                    link_method=GoogleAccountLinkMethod.NEW_SIGNUP,
+                    last_login_at=_timezone.now(),
+                )
+            return ('created', new_user)
+        except IntegrityError:
+            pass
+        except ValidationError as exc:
+            # User.save() validates uniqueness in Python before the database
+            # constraint fires. Only a username-uniqueness failure is a
+            # retryable race; anything else (e.g. an invalid field) is a
+            # real problem and must propagate.
+            if 'username' not in getattr(exc, 'message_dict', {}):
+                raise
+
+        # A uniqueness conflict occurred: re-query ground truth before deciding.
+        link = GoogleAccount.objects.select_related('user').filter(sub=sub).first()
+        if link is not None:
+            return ('sub_exists', link.user)
+        if google_email and User.objects.filter(email__iexact=google_email).exists():
+            return ('email_collision', None)
+        # Otherwise the conflict was the derived username: loop and derive
+        # a fresh candidate against current database state.
+        logger.info(f"[AUTH-GOOGLE] RETRY: username conflict for sub={sub[:8]}..., re-deriving")
+
+    logger.warning(f"[AUTH-GOOGLE] FAILED: could not allocate username for sub={sub[:8]}...")
+    return ('username_unavailable', None)
+
+
+def _google_complete_login(request, target_user, link_record=None):
+    """Log in via the standard Django session, honouring 2FA and onboarding.
+
+    `link_record` is an unsaved GoogleAccount attached after auth_login so a
+    2FA-enrolled user is only linked once the second factor verifies.
+    """
+    import time as _time
+
+    from django.contrib.auth import login as auth_login
+    from users.services import two_factor_service
+
+    data = _google_request_data(request)
+    device_id = data.get('device_id') or request.POST.get('device_id')
+    if device_id:
+        request.device_id = device_id
+
+    if two_factor_service.is_two_factor_enabled(target_user):
+        request.session['_2fa_pending_user_id'] = target_user.pk
+        request.session['_2fa_pending_ts'] = int(_time.time())
+        request.session['_2fa_backend'] = _GOOGLE_AUTH_BACKEND
+        request.session['_2fa_next'] = _google_safe_next(request, data) or reverse('posts:home')
+        if device_id:
+            request.session['_2fa_device_id'] = device_id
+        if link_record is not None:
+            request.session['_google_pending_link_sub'] = link_record['sub']
+            request.session['_google_pending_link'] = link_record
+        logger.info(
+            f"[SECURITY-2FA] CHALLENGE: Redirecting Google user '{target_user.username}' to 2FA challenge"
+        )
+        return JsonResponse({'status': 'ok', 'redirect': reverse('login_2fa_challenge')})
+
+    auth_login(request, target_user, backend=_GOOGLE_AUTH_BACKEND)
+    if link_record is not None:
+        from users.models import GoogleAccount
+
+        GoogleAccount.objects.get_or_create(
+            sub=link_record['sub'],
+            defaults={
+                'user': target_user,
+                'email': link_record['email'],
+                'email_verified': link_record['email_verified'],
+                'hosted_domain': link_record.get('hosted_domain', ''),
+                'link_method': link_record['link_method'],
+            },
+        )
+    redirect_to = _google_safe_next(request, data) or reverse('posts:home')
+    return JsonResponse({'status': 'ok', 'redirect': redirect_to})
+
+
+@require_http_methods(["POST"])
+def google_complete_view(request):
+    """Verify a Google ID token and log the user in with a normal Django session.
+
+    Same-origin, CSRF-protected (no CSRF exemption). Expects `credential`
+    (the GIS ID token) as a form field or JSON body.
+    """
+    from django.conf import settings as _settings
+    from users.models import GoogleAccount, User
+    from users.services import google_auth_service
+
+    if request.user.is_authenticated:
+        return JsonResponse({'status': 'ok', 'redirect': reverse('posts:home')})
+    if not _settings.GOOGLE_LOGIN_ENABLED:
+        return JsonResponse({'status': 'error', 'message': 'Google sign-in is currently unavailable.'}, status=403)
+
+    if not google_auth_service.google_complete_allowed(request):
+        logger.warning(
+            "[SECURITY-RATELIMIT] BLOCKED: Google complete rate limit exceeded for "
+            f"IP={google_auth_service.get_rate_limit_ip(request)}"
+        )
+        return JsonResponse({
+            'status': 'error',
+            'code': 'rate_limited',
+            'message': 'Too many sign-in attempts. Please wait a few minutes and try again.',
+        }, status=429)
+
+    data = _google_request_data(request)
+    credential = (data.get('credential') or '').strip()
+    if not credential:
+        return JsonResponse({'status': 'error', 'message': 'No Google credential was provided.'}, status=400)
+
+    try:
+        claims = google_auth_service.verify_google_id_token(credential)
+    except google_auth_service.GoogleVerificationError as exc:
+        logger.warning(f"[SECURITY-GOOGLE] Token verification failed ({exc.code}) from IP={get_client_ip(request)}")
+        return JsonResponse({'status': 'error', 'message': str(exc), 'code': exc.code}, status=401)
+
+    sub = claims.get('sub', '')
+    google_email = (claims.get('email') or '').lower()
+
+    existing_link = GoogleAccount.objects.select_related('user').filter(sub=sub).first()
+    if existing_link is not None:
+        return _login_existing_google_link(request, existing_link)
+
+    if google_email:
+        email_owner = User.objects.filter(email__iexact=google_email).first()
+        if email_owner is not None:
+            # Never silently merge on email: require proof of ownership.
+            return _google_link_required_response(request, email_owner.username, claims)
+
+    outcome, google_user = _create_google_user_account(claims, sub, google_email)
+    if outcome == 'sub_exists':
+        # A concurrent request linked this identity first; our verified
+        # claims match it, so authenticate as the linked account.
+        link = GoogleAccount.objects.select_related('user').filter(sub=sub).first()
+        return _login_existing_google_link(request, link)
+    if outcome == 'email_collision':
+        owner = User.objects.filter(email__iexact=google_email).first()
+        return _google_link_required_response(request, owner.username, claims)
+    if outcome != 'created':
+        return JsonResponse({
+            'status': 'error',
+            'code': 'username_unavailable',
+            'message': 'Could not create your account right now. Please try again.',
+        }, status=409)
+
+    new_user = google_user
+
+    ref_token = request.session.get('invite_token')
+    if ref_token:
+        try:
+            from users.services.invite_service import process_invite_conversion
+
+            process_invite_conversion(ref_token, new_user)
+            for key in ('invite_token', 'inviter_username', 'inviter_id'):
+                request.session.pop(key, None)
+        except Exception as exc:
+            logger.warning(f"[AUTH-GOOGLE] Invite conversion failed: {exc}")
+
+    logger.info(f"[AUTH-GOOGLE] SUCCESS: Created user '{new_user.username}' (id={new_user.id}) via Google")
+    return _google_complete_login(request, new_user)
+
+
+@require_http_methods(["POST"])
+def google_link_view(request):
+    """Link a verified Google identity to an existing account after ownership proof.
+
+    Requires a fresh pending Google verification (from `google_complete_view`)
+    plus the existing account's username + password, and its 2FA code where
+    2FA is enrolled. On success the Google identity is linked and (when no
+    2FA challenge is pending) the user is logged in immediately.
+    """
+    from django.conf import settings as _settings
+    from django.contrib.auth import authenticate
+    from django.utils import timezone as _timezone
+    from users.models import GoogleAccount, GoogleAccountLinkMethod, User
+    from users.services import google_auth_service, recovery_code_service, two_factor_service
+
+    if request.user.is_authenticated:
+        google_auth_service.clear_pending_google(request)
+        return JsonResponse({'status': 'ok', 'redirect': reverse('posts:home')})
+    if not _settings.GOOGLE_LOGIN_ENABLED:
+        return JsonResponse({'status': 'error', 'message': 'Google sign-in is currently unavailable.'}, status=403)
+
+    pending = google_auth_service.pop_pending_google(request)
+    if pending is None:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Your Google verification expired. Please try Google sign-in again.',
+        }, status=410)
+
+    data = _google_request_data(request)
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    code = (data.get('code') or '').strip()
+    if not username or not password:
+        google_auth_service.stash_pending_google(request, {
+            'sub': pending['sub'], 'email': pending['email'],
+            'email_verified': pending['email_verified'], 'given_name': pending.get('given_name', ''),
+            'family_name': pending.get('family_name', ''), 'hd': pending.get('hosted_domain', ''),
+        })
+        return JsonResponse({'status': 'error', 'message': 'Enter your username and password.'}, status=400)
+
+    owner = authenticate(request, username=username, password=password)
+    if owner is None:
+        google_auth_service.stash_pending_google(request, {
+            'sub': pending['sub'], 'email': pending['email'],
+            'email_verified': pending['email_verified'], 'given_name': pending.get('given_name', ''),
+            'family_name': pending.get('family_name', ''), 'hd': pending.get('hosted_domain', ''),
+        })
+        logger.warning(f"[SECURITY-GOOGLE] LINK-FAILED: bad password for '{username}'")
+        return JsonResponse({'status': 'error', 'message': 'Invalid username or password.'}, status=401)
+
+    if GoogleAccount.objects.filter(sub=pending['sub']).exists():
+        google_auth_service.clear_pending_google(request)
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This Google account is already linked. Please sign in with Google.',
+        }, status=409)
+    if hasattr(owner, 'google_account'):
+        google_auth_service.clear_pending_google(request)
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This account already has Google sign-in linked.',
+        }, status=409)
+
+    if two_factor_service.is_two_factor_enabled(owner):
+        verified = two_factor_service.verify_totp(owner, code) or recovery_code_service.consume_recovery_code(owner, code)
+        if not code or not verified:
+            google_auth_service.stash_pending_google(request, {
+                'sub': pending['sub'], 'email': pending['email'],
+                'email_verified': pending['email_verified'], 'given_name': pending.get('given_name', ''),
+                'family_name': pending.get('family_name', ''), 'hd': pending.get('hosted_domain', ''),
+            })
+            return JsonResponse({
+                'status': 'two_factor_required',
+                'message': 'Enter the 2FA code from your authenticator app to finish linking.',
+            }, status=401)
+
+    link_record = {
+        'sub': pending['sub'],
+        'email': pending['email'],
+        'email_verified': pending['email_verified'],
+        'hosted_domain': pending.get('hosted_domain', ''),
+        'link_method': GoogleAccountLinkMethod.EXPLICIT_LINK,
+    }
+    google_auth_service.clear_pending_google(request)
+    logger.info(f"[AUTH-GOOGLE] LINKED: Google sub={pending['sub'][:8]}... to user '{owner.username}'")
+    response = _google_complete_login(request, owner, link_record=link_record)
+    if isinstance(response, JsonResponse) and owner.email_verified is False and pending['email_verified']:
+        User.objects.filter(pk=owner.pk).update(email_verified=True)
+    return response
+
+
+def _stash_google_2fa_challenge(request, target_user, next_url, device_id=None, link_record=None):
+    """Shared 2FA-challenge stash for Google logins (JSON and redirect flows)."""
+    import time as _time
+
+    request.session['_2fa_pending_user_id'] = target_user.pk
+    request.session['_2fa_pending_ts'] = int(_time.time())
+    request.session['_2fa_backend'] = _GOOGLE_AUTH_BACKEND
+    request.session['_2fa_next'] = next_url or reverse('posts:home')
+    if device_id:
+        request.session['_2fa_device_id'] = device_id
+    if link_record is not None:
+        request.session['_google_pending_link_sub'] = link_record['sub']
+        request.session['_google_pending_link'] = link_record
+    logger.info(
+        f"[SECURITY-2FA] CHALLENGE: Redirecting Google user '{target_user.username}' to 2FA challenge"
+    )
+
+
+def _google_complete_login_redirect(request, target_user, link_record=None):
+    """Redirect-flow twin of _google_complete_login: same session/2FA/onboarding
+    semantics, but full-page redirects instead of JSON (Google posts back
+    cross-site, so there is no AJAX context to answer)."""
+    from django.contrib.auth import login as auth_login
+    from users.services import two_factor_service
+
+    if two_factor_service.is_two_factor_enabled(target_user):
+        _stash_google_2fa_challenge(request, target_user, reverse('posts:home'),
+                                    link_record=link_record)
+        return redirect('login_2fa_challenge')
+
+    auth_login(request, target_user, backend=_GOOGLE_AUTH_BACKEND)
+    if link_record is not None:
+        from users.models import GoogleAccount
+
+        GoogleAccount.objects.get_or_create(
+            sub=link_record['sub'],
+            defaults={
+                'user': target_user,
+                'email': link_record['email'],
+                'email_verified': link_record['email_verified'],
+                'hosted_domain': link_record.get('hosted_domain', ''),
+                'link_method': link_record['link_method'],
+            },
+        )
+    return redirect('posts:home')
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def google_redirect_view(request):
+    """GIS redirect-mode login endpoint (`login_uri`).
+
+    Google POSTs form-encoded `credential` + `g_csrf_token` here cross-site,
+    so Django CSRF cannot apply; instead the Google double-submit cookie
+    (`g_csrf_token` cookie vs form value) is verified per Google's documented
+    pattern. All identity handling reuses the verified-token service and the
+    race-safe creation helper; outcomes are full-page redirects.
+    """
+    import hmac as _hmac
+
+    from django.conf import settings as _settings
+    from users.models import GoogleAccount, User
+    from users.services import google_auth_service
+
+    login_url = reverse('login')
+    if request.user.is_authenticated:
+        return redirect('posts:home')
+    if not _settings.GOOGLE_LOGIN_ENABLED:
+        messages.error(request, 'Google sign-in is currently unavailable.')
+        return redirect(login_url)
+    if not google_auth_service.google_complete_allowed(request):
+        logger.warning(
+            "[SECURITY-RATELIMIT] BLOCKED: Google redirect rate limit exceeded for "
+            f"IP={google_auth_service.get_rate_limit_ip(request)}"
+        )
+        messages.error(request, 'Too many sign-in attempts. Please wait a few minutes and try again.')
+        return redirect(login_url)
+
+    cookie_token = request.COOKIES.get('g_csrf_token', '')
+    body_token = request.POST.get('g_csrf_token', '')
+    if not cookie_token or not body_token or not _hmac.compare_digest(cookie_token, body_token):
+        logger.warning("[SECURITY-GOOGLE] Redirect login rejected: g_csrf_token mismatch")
+        messages.error(request, 'Google sign-in could not be verified. Please try again.')
+        return redirect(login_url)
+
+    credential = (request.POST.get('credential') or '').strip()
+    if not credential:
+        messages.error(request, 'No Google credential was received. Please try again.')
+        return redirect(login_url)
+
+    try:
+        claims = google_auth_service.verify_google_id_token(credential)
+    except google_auth_service.GoogleVerificationError as exc:
+        logger.warning(f"[SECURITY-GOOGLE] Redirect token verification failed ({exc.code})")
+        messages.error(request, 'This Google sign-in is invalid or has expired. Please try again.')
+        return redirect(login_url)
+
+    sub = claims.get('sub', '')
+    google_email = (claims.get('email') or '').lower()
+
+    existing_link = GoogleAccount.objects.select_related('user').filter(sub=sub).first()
+    if existing_link is not None:
+        linked_user = existing_link.user
+        if not linked_user.is_active:
+            messages.error(request, 'This account is disabled.')
+            return redirect(login_url)
+        from django.utils import timezone as _timezone
+
+        existing_link.last_login_at = _timezone.now()
+        existing_link.save(update_fields=['last_login_at'])
+        logger.info(f"[AUTH-GOOGLE] SUCCESS: User '{linked_user.username}' signed in with Google (redirect)")
+        return _google_complete_login_redirect(request, linked_user)
+
+    if google_email:
+        email_owner = User.objects.filter(email__iexact=google_email).first()
+        if email_owner is not None:
+            # Never silently merge: stash proof-required claims, bounce to
+            # the login page with the link form revealed.
+            google_auth_service.stash_pending_google(request, claims)
+            logger.info(
+                f"[AUTH-GOOGLE] LINK-REQUIRED: Google sub={sub[:8]}... "
+                f"matches email of '{email_owner.username}' (redirect)"
+            )
+            messages.warning(
+                request,
+                f"An account ({email_owner.username}) already uses this email address. "
+                "Sign in with your password below to link Google sign-in.",
+            )
+            return redirect(f"{login_url}?google_link=1")
+
+    outcome, google_user = _create_google_user_account(claims, sub, google_email)
+    if outcome == 'sub_exists':
+        link = GoogleAccount.objects.select_related('user').filter(sub=sub).first()
+        return _google_complete_login_redirect(request, link.user)
+    if outcome == 'email_collision':
+        owner = User.objects.filter(email__iexact=google_email).first()
+        google_auth_service.stash_pending_google(request, claims)
+        messages.warning(
+            request,
+            f"An account ({owner.username}) already uses this email address. "
+            "Sign in with your password below to link Google sign-in.",
+        )
+        return redirect(f"{login_url}?google_link=1")
+    if outcome != 'created':
+        messages.error(request, 'Could not create your account right now. Please try again.')
+        return redirect(login_url)
+
+    new_user = google_user
+    ref_token = request.session.get('invite_token')
+    if ref_token:
+        try:
+            from users.services.invite_service import process_invite_conversion
+
+            process_invite_conversion(ref_token, new_user)
+            for key in ('invite_token', 'inviter_username', 'inviter_id'):
+                request.session.pop(key, None)
+        except Exception as exc:
+            logger.warning(f"[AUTH-GOOGLE] Invite conversion failed: {exc}")
+
+    logger.info(f"[AUTH-GOOGLE] SUCCESS: Created user '{new_user.username}' (id={new_user.id}) via Google (redirect)")
+    if new_user.email_verified is False and bool(claims.get('email_verified', False)):
+        User.objects.filter(pk=new_user.pk).update(email_verified=True)
+    return _google_complete_login_redirect(request, new_user)
 
 
 @login_required
@@ -2177,6 +2867,24 @@ def onboarding_wizard_view(request):
         'following_ids': following_ids,
         'joined_group_ids': joined_group_ids,
     }
+    try:
+        from documents.academic.models import Institution, Programme
+        from users.forms import InstitutionSetupForm
+        context['setup_form'] = InstitutionSetupForm(initial={
+            'institution': request.user.institution,
+            'programme': request.user.programme,
+            'academic_level': request.user.academic_level,
+        })
+        context['institutions'] = Institution.objects.filter(is_active=True).order_by('name')
+        if request.user.programme_id:
+            context['setup_programmes'] = Programme.objects.filter(
+                is_active=True,
+                department__school__faculty__institution=request.user.institution,
+            ).order_by('name') if request.user.institution_id else Programme.objects.none()
+        else:
+            context['setup_programmes'] = Programme.objects.none()
+    except Exception:
+        pass
     return render(request, 'users/onboarding/wizard.html', context)
 
 

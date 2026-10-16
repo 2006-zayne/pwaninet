@@ -131,6 +131,14 @@ class User(AbstractUser):
     course = models.ForeignKey('courses.Course', on_delete=models.CASCADE, null=True, blank=True)
     
     # New academic profile fields
+    institution = models.ForeignKey(
+        'documents.Institution',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+        help_text="Current institution (optional until setup is completed)"
+    )
     programme = models.ForeignKey(
         'documents.Programme',
         on_delete=models.SET_NULL,
@@ -306,8 +314,30 @@ class User(AbstractUser):
             )
         )
 
+    def get_programme_institution(self):
+        """Derive the institution owning the selected programme (None if unset/unmapped)."""
+        programme = getattr(self, 'programme', None)
+        getter = getattr(programme, 'get_institution', None)
+        try:
+            return getter() if callable(getter) else None
+        except Exception:
+            return None
+
     def clean(self):
         super().clean()
+        # Backstop: institution/programme mismatch is rejected wherever full_clean runs
+        # (forms, admin, setup service). Nulls and legacy-unmapped chains never raise.
+        institution_id = getattr(self, 'institution_id', None)
+        programme_id = getattr(self, 'programme_id', None)
+        if institution_id and programme_id:
+            try:
+                derived = self.get_programme_institution()
+            except Exception:
+                derived = None
+            if derived is not None and getattr(derived, 'pk', None) != institution_id:
+                raise ValidationError({
+                    'programme': 'Selected programme does not belong to the selected institution.'
+                })
         # Ensure only one president exists (only check when role is being set to PRESIDENT)
         if self.global_role == GlobalRole.PRESIDENT:
             # Check if this is a new instance or role is being changed to PRESIDENT
@@ -645,6 +675,59 @@ class RecoveryCode(models.Model):
 class InviteType(models.TextChoices):
     APP_DOWNLOAD = 'app_download', 'Mobile App Download'
     PLATFORM_INVITE = 'platform_invite', 'Invite to vasto'
+
+
+class GoogleAccountLinkMethod(models.TextChoices):
+    NEW_SIGNUP = 'new_signup', 'New account via Google'
+    EXPLICIT_LINK = 'explicit_link', 'Linked to existing account'
+
+
+class GoogleAccount(models.Model):
+    """
+    Links a stable Google identity (`sub`) to a local user.
+
+    Lookup is always by `sub`, never by email alone, so a Google account
+    can never silently merge into an existing local account that happens
+    to share the same email address.
+    """
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='google_account',
+        db_index=True,
+    )
+    sub = models.CharField(
+        max_length=255,
+        unique=True,
+        db_index=True,
+        help_text="Stable Google subject identifier from the verified ID token",
+    )
+    email = models.EmailField(help_text="Email snapshot from the Google ID token at link time")
+    email_verified = models.BooleanField(
+        default=False,
+        help_text="Whether Google reported the email as verified at link time",
+    )
+    hosted_domain = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Google Workspace hosted domain (hd claim), if present",
+    )
+    link_method = models.CharField(
+        max_length=20,
+        choices=GoogleAccountLinkMethod.choices,
+        default=GoogleAccountLinkMethod.NEW_SIGNUP,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Google Account"
+        verbose_name_plural = "Google Accounts"
+
+    def __str__(self):
+        return f"GoogleAccount(sub={self.sub}, user={self.user.username})"
 
 
 class PlatformInvite(models.Model):

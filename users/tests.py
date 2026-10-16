@@ -1620,3 +1620,184 @@ class Phase4SecurityTest(TestCase):
 
 
 
+
+
+class MinimalRegistrationTest(TestCase):
+    """Phase 1: registration works without any academic information."""
+
+    def test_signup_form_has_no_academic_fields(self):
+        form = PwaniSignupForm()
+        self.assertNotIn('programme', form.fields)
+        self.assertNotIn('academic_level', form.fields)
+        self.assertNotIn('course', form.fields)
+        self.assertNotIn('year', form.fields)
+
+    def test_register_minimal_credentials_only(self):
+        form = PwaniSignupForm(data={
+            'username': 'minimaluser',
+            'password1': 'SecurePass123!',
+            'password2': 'SecurePass123!',
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+        self.assertIsNone(user.programme)
+        self.assertIsNone(user.academic_level)
+        self.assertFalse(user.has_completed_onboarding)
+
+    def test_register_view_post_minimal_redirects_to_login(self):
+        response = self.client.post(reverse('users:register'), {
+            'username': 'viewminimal',
+            'password1': 'SecurePass123!',
+            'password2': 'SecurePass123!',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('login'))
+        user = User.objects.get(username='viewminimal')
+        self.assertIsNone(user.programme)
+        self.assertIsNone(user.academic_level)
+
+    def test_register_template_has_no_academic_pickups(self):
+        from django.template.loader import render_to_string
+        html = render_to_string('users/register.html', {'form': PwaniSignupForm()})
+        self.assertNotIn('id_programme', html)
+        self.assertNotIn('id_academic_level', html)
+        self.assertNotIn('programmePickerModal', html)
+
+
+class InstitutionSetupTest(TestCase):
+    """Phase 3: optional institution setup during onboarding."""
+
+    def setUp(self):
+        from documents.academic.models import (
+            Institution, Faculty, School, Department, Programme, AcademicLevel,
+        )
+        self.client = Client()
+        self.inst_a = Institution.objects.create(name='Test University A', short_name='TUA')
+        self.inst_b = Institution.objects.create(name='Test University B', short_name='TUB')
+        fac_a = Faculty.objects.create(code='SCA', name='Faculty of Science A', institution=self.inst_a)
+        fac_b = Faculty.objects.create(code='SCB', name='Faculty of Science B', institution=self.inst_b)
+        sch_a = School.objects.create(code='CPA', name='School of Computing A', faculty=fac_a)
+        sch_b = School.objects.create(code='CPB', name='School of Computing B', faculty=fac_b)
+        dept_a = Department.objects.create(code='CSA', name='Dept of CS A', school=sch_a)
+        dept_b = Department.objects.create(code='CSB', name='Dept of CS B', school=sch_b)
+        self.prog_a = Programme.objects.create(
+            code='BSCAA', name='BSc Computing A', department=dept_a,
+            degree_type='Bachelor', duration_years=4)
+        self.prog_b = Programme.objects.create(
+            code='BSCBB', name='BSc Computing B', department=dept_b,
+            degree_type='Bachelor', duration_years=4)
+        self.level1 = AcademicLevel.objects.create(level=1, name='Year 1')
+        self.level2 = AcademicLevel.objects.create(level=2, name='Year 2')
+        self.user = User.objects.create_user(
+            username='setupstudent', password='SecurePass123!',
+            has_completed_onboarding=False)
+
+    def _login(self):
+        self.client.force_login(self.user)
+
+    def test_programmes_filtered_by_institution(self):
+        self._login()
+        resp = self.client.get(reverse('users:load_programmes_by_institution'),
+                               {'institution_id': self.inst_a.id})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, self.prog_a.name)
+        self.assertNotContains(resp, self.prog_b.name)
+
+    def test_programmes_unknown_institution_returns_empty(self):
+        self._login()
+        resp = self.client.get(reverse('users:load_programmes_by_institution'),
+                               {'institution_id': 999999})
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, self.prog_a.name)
+        self.assertNotContains(resp, self.prog_b.name)
+
+    def test_programmes_endpoint_requires_login(self):
+        resp = self.client.get(reverse('users:load_programmes_by_institution'),
+                               {'institution_id': self.inst_a.id})
+        self.assertEqual(resp.status_code, 302)
+
+    def test_save_valid_setup(self):
+        self._login()
+        resp = self.client.post(reverse('users:onboarding_institution_setup'), {
+            'institution': str(self.inst_a.id),
+            'programme': str(self.prog_a.id),
+            'academic_level': str(self.level1.id),
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.institution, self.inst_a)
+        self.assertEqual(self.user.programme, self.prog_a)
+        self.assertEqual(self.user.academic_level, self.level1)
+
+    def test_save_mismatched_programme_rejected(self):
+        self._login()
+        resp = self.client.post(reverse('users:onboarding_institution_setup'), {
+            'institution': str(self.inst_a.id),
+            'programme': str(self.prog_b.id),
+            'academic_level': str(self.level1.id),
+        })
+        self.assertEqual(resp.status_code, 302)  # non-HTMX redirect with error message
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.programme)
+
+    def test_save_mismatched_programme_rejected_htmx(self):
+        self._login()
+        resp = self.client.post(reverse('users:onboarding_institution_setup'), {
+            'institution': str(self.inst_a.id),
+            'programme': str(self.prog_b.id),
+        }, HTTP_HX_REQUEST='true')
+        self.assertEqual(resp.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.programme)
+
+    def test_save_forged_programme_id_rejected(self):
+        self._login()
+        resp = self.client.post(reverse('users:onboarding_institution_setup'), {
+            'institution': str(self.inst_a.id),
+            'programme': '999999',
+        }, HTTP_HX_REQUEST='true')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_skip_setup_leaves_fields_unset(self):
+        self._login()
+        resp = self.client.post(reverse('users:onboarding_institution_setup'), {
+            'institution': '', 'programme': '', 'academic_level': '',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.institution)
+        self.assertIsNone(self.user.programme)
+        # Skip path: onboarding can still complete and feed is reachable
+        resp = self.client.get(reverse('users:onboarding_complete'))
+        self.assertEqual(resp.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.has_completed_onboarding)
+        resp = self.client.get(reverse('posts:home'))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_setup_endpoint_requires_login(self):
+        resp = self.client.post(reverse('users:onboarding_institution_setup'), {})
+        self.assertEqual(resp.status_code, 302)
+
+    def test_wizard_renders_empty_catalogue_state(self):
+        from documents.academic.models import Institution
+        Institution.objects.all().delete()
+        self._login()
+        resp = self.client.get(reverse('users:onboarding'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'No institutions available yet')
+
+    def test_existing_user_without_institution_keeps_access(self):
+        from documents.academic.models import Faculty, School, Department, Programme
+        fac = Faculty.objects.create(code='LGC', name='Legacy Faculty')
+        sch = School.objects.create(code='LGS', name='Legacy School', faculty=fac)
+        dept = Department.objects.create(code='LGD', name='Legacy Dept', school=sch)
+        prog = Programme.objects.create(
+            code='LGPRG', name='Legacy Programme', department=dept,
+            degree_type='Bachelor', duration_years=4)
+        legacy_user = User.objects.create_user(
+            username='legacyprog', password='SecurePass123!',
+            programme=prog, has_completed_onboarding=True)
+        self.client.force_login(legacy_user)
+        resp = self.client.get(reverse('posts:home'))
+        self.assertEqual(resp.status_code, 200)

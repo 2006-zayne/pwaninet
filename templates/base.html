@@ -6,8 +6,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="resumable-uploads" content="{{ USE_RESUMABLE_UPLOADS|yesno:'1,0' }}">
     <meta name="user-authenticated" content="{% if request.user.is_authenticated %}true{% else %}false{% endif %}">
-    <title>vasto</title>
+    <title>{% block title %}vasto{% endblock %}</title>
+
+    <!-- Open Graph / link previews (overridable per page) -->
+    {% block og_tags %}
+    <meta property="og:site_name" content="Vasto">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}Vasto — Your campus, connected{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Connect with classmates, join course groups, and access academic materials on Vasto.{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'images/vasto-app-icon.png' %}{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}{{ request.build_absolute_uri }}{% endblock %}">
+    <meta name="twitter:card" content="summary_large_image">
+    {% endblock %}
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.webmanifest">
@@ -3609,12 +3621,15 @@
 
     {% block page_scripts %}{% endblock %}
 
+    <!-- Resumable direct-to-R2 engine (plain scripts; expose window globals). -->
+    <script src="{% static 'js/upload/resumable_upload.js' %}"></script>
+    <script src="{% static 'js/upload/native_upload.js' %}"></script>
 
     <script type="module">
-        import { uploadManager } from '{% static "js/upload/upload_manager.js" %}';
-        import { uploadUI } from '{% static "js/upload/upload_ui.js" %}';
-        import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}';
-        import { uploadEvents } from '{% static "js/upload/upload_events.js" %}';
+        import { uploadManager } from '{% static "js/upload/upload_manager.js" %}?v=20261016-02';
+        import { uploadUI } from '{% static "js/upload/upload_ui.js" %}?v=20261016-02';
+        import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}?v=20261016-02';
+        import { uploadEvents } from '{% static "js/upload/upload_events.js" %}?v=20261016-02';
 
         import { downloadManager } from '{% static "js/downloads/download_manager.js" %}';
         import { downloadUI } from '{% static "js/downloads/download_ui.js" %}';
@@ -3641,6 +3656,22 @@
 
             downloadManager.initialize();
             downloadUI.initialize();
+
+            // Global resume: survive full loads / tab close. Manager page
+            // must not be the only caller, or navigations abort the R2 PUT
+            // with nothing to re-drive it. Native worker owns resume there.
+            try {
+                const native = window.NativeUploads && typeof window.NativeUploads.isAvailable === 'function'
+                    ? window.NativeUploads.isAvailable()
+                    : false;
+                if (!native && window.resumableUpload && typeof window.resumableUpload.resumeAll === 'function') {
+                    window.resumableUpload.resumeAll().catch((e) => {
+                        console.warn('[Uploads] global resumeAll failed:', e);
+                    });
+                }
+            } catch (e) {
+                console.warn('[Uploads] global resume check failed:', e);
+            }
         };
 
         if (document.readyState === 'loading') {
