@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'recommendations',
     'pwanimate',
     'admin_dashboard',
+    'uploads',
 ]
 
 MIDDLEWARE = [
@@ -82,6 +83,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'pwaninet.middleware.maintenance.MaintenanceModeMiddleware',
     'pwaninet.middleware.user_activity.UserActivityMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -107,6 +109,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'notifications.context_processors.notification_count',
+                'uploads.context_processors.upload_flags',
                 'pwaninet.context_processors.release_metadata',
                 'groups.context_processors.groups_nav_context',
                 'messaging.context_processors.messaging_nav_context',
@@ -208,6 +211,19 @@ TOTP_INTERVAL = int(os.environ.get('TOTP_INTERVAL', 30))
 TOTP_ALLOWED_DRIFT = int(os.environ.get('TOTP_ALLOWED_DRIFT', 1))
 TOTP_ISSUER = os.environ.get('TOTP_ISSUER', 'pwaninet')
 RECOVERY_CODE_COUNT = int(os.environ.get('RECOVERY_CODE_COUNT', 8))
+
+# Google sign-in (Google Identity Services ID-token flow)
+# Sign-in stays disabled until a Web Client ID is configured.
+GOOGLE_WEB_CLIENT_ID = os.environ.get('GOOGLE_WEB_CLIENT_ID', '')
+GOOGLE_ALLOWED_HD = os.environ.get('GOOGLE_ALLOWED_HD', '')
+GOOGLE_JWKS_CACHE_TIMEOUT = int(os.environ.get('GOOGLE_JWKS_CACHE_TIMEOUT', 3600))
+GOOGLE_LOGIN_ENABLED = os.environ.get('GOOGLE_LOGIN_ENABLED', 'True') == 'True'
+GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
+# Fixed-window rate limit for POST /users/google/complete/ (per client IP).
+# Effective only where a real cache backend is configured (production Redis);
+# local/dev DummyCache performs no counting.
+GOOGLE_COMPLETE_RATELIMIT_ATTEMPTS = int(os.environ.get('GOOGLE_COMPLETE_RATELIMIT_ATTEMPTS', 20))
+GOOGLE_COMPLETE_RATELIMIT_WINDOW = int(os.environ.get('GOOGLE_COMPLETE_RATELIMIT_WINDOW', 300))
 
 # Caching configuration
 CACHES = {
@@ -363,12 +379,20 @@ CELERY_TASK_ROUTES = {
     'search.tasks.*': {'queue': 'search_queue'},
     'documents.tasks.search_indexing.*': {'queue': 'search_queue'},
     
+    # Upload Manager: finalize copies verified staging objects to public keys
+    'uploads.tasks.finalize_upload_media': {'queue': 'media_queue'},
+    'uploads.tasks.reconcile_stale_uploads': {'queue': 'default'},
+
     # Pwanimate ingestion & chunking tasks
     'pwanimate.tasks.*': {'queue': 'docs_queue'},
-    
+
     # Fallback to default
     '*': {'queue': 'default'},
 }
+
+# Upload Manager: resumable direct-to-R2 engine for the post composer.
+# Always enabled by default - all post uploads use the new engine.
+USE_RESUMABLE_UPLOADS = os.environ.get('USE_RESUMABLE_UPLOADS', '1') == '1'
 
 # Celery Beat periodic task schedules
 CELERY_BEAT_SCHEDULE = {
@@ -376,6 +400,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'pwanimate.tasks.reconciliation.reconcile_document_ingestion',
         'schedule': float(os.environ.get('PWANIMATE_RECONCILE_INTERVAL_SECONDS', 600.0)),  # every 10 minutes
         'options': {'queue': 'docs_queue'},
+    },
+    'uploads-reconcile-stale-uploads': {
+        'task': 'uploads.tasks.reconcile_stale_uploads',
+        'schedule': 1800.0,  # every 30 minutes
+        'options': {'queue': 'default'},
     },
 }
 
@@ -476,17 +505,21 @@ if USE_S3:
     AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
 
     # Cloudflare R2 endpoint:  https://<accountid>.r2.cloudflarestorage.com
+    # MinIO endpoint:          http://localhost:9000
     AWS_S3_ENDPOINT_URL     = os.environ.get('AWS_S3_ENDPOINT_URL', '')
     AWS_S3_REGION_NAME      = os.environ.get('AWS_S3_REGION_NAME', 'auto')
     AWS_S3_ADDRESSING_STYLE = 'path'
     AWS_S3_SIGNATURE_VERSION = 's3v4'
 
-    # --- R2-specific: ACLs are NOT supported ---------------------------------
+    # Development prefix to separate dev uploads from production
+    R2_DEV_PREFIX = os.environ.get('R2_DEV_PREFIX', '')
+
+    # --- R2/MinIO-specific: ACLs are NOT supported -------------------------
     # Empty string from .env must become None so boto3 never sends an ACL header
     _acl_raw        = os.environ.get('AWS_DEFAULT_ACL', '')
     AWS_DEFAULT_ACL = _acl_raw if _acl_raw else None
 
-    # Boto3 client config for Cloudflare R2 compatibility:
+    # Boto3 client config for Cloudflare R2 and MinIO compatibility:
     AWS_S3_CLIENT_CONFIG = Config(
         signature_version='s3v4',
         s3={'addressing_style': 'path'},
@@ -514,6 +547,9 @@ if USE_S3:
     USE_S3_STATIC = os.environ.get('USE_S3_STATIC', '0') == '1'
 
     # --- Storage backend routing (django-storages) ---------------------------
+    # Add dev prefix to location to separate dev from production
+    media_location = f'{R2_DEV_PREFIX}/media' if R2_DEV_PREFIX else 'media'
+
     STORAGES = {
         'default': {
             # All media uploads (video, images, HLS segments, docs, audio)
@@ -524,8 +560,8 @@ if USE_S3:
                 'region_name':       AWS_S3_REGION_NAME,
                 'access_key':        AWS_ACCESS_KEY_ID,
                 'secret_key':        AWS_SECRET_ACCESS_KEY,
-                'location':          'media',
-                'default_acl':       None,          # R2: no ACLs
+                'location':          media_location,
+                'default_acl':       None,          # R2/MinIO: no ACLs
                 'file_overwrite':    False,
                 'custom_domain':     CDN_DOMAIN or None,
                 'object_parameters': {'CacheControl': 'max-age=604800, public'},  # 7 days
@@ -548,7 +584,7 @@ if USE_S3:
                     'default_acl':       None,
                     'file_overwrite':    True,
                     'custom_domain':     CDN_DOMAIN or None,
-                    'object_parameters': {'CacheControl': 'max-age=31536000, public'},
+                    'object_parameters': {'CacheControl': 'max-age-31536000, public'},
                     'signature_version': 's3v4',
                     'addressing_style':  'path',
                     'client_config':     AWS_S3_CLIENT_CONFIG,

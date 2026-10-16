@@ -1,0 +1,154 @@
+{# Google sign-in button (website only). Rendered only when the Web Client ID is configured. #}
+{% if google_login_enabled %}
+<div class="google-signin-wrap" data-google-signin>
+    <div class="d-flex align-items-center my-3" aria-hidden="true">
+        <hr class="flex-grow-1">
+        <span class="px-2 text-muted small">or</span>
+        <hr class="flex-grow-1">
+    </div>
+    <div id="google-signin-button" class="d-flex justify-content-center"></div>
+    <div class="google-signin-error text-danger small text-center mt-2" role="alert" hidden></div>
+    <div class="google-link-form mt-3" hidden>
+        <div class="alert alert-warning small" role="alert">
+            <span class="google-link-message"></span>
+        </div>
+        <form class="google-link-actual-form" novalidate>
+            <div class="mb-2">
+                <label class="form-label fw-semibold small" for="google-link-username">Username or email</label>
+                <input type="text" class="form-control tactical-form-input" id="google-link-username"
+                       name="username" autocomplete="username" autocapitalize="none" spellcheck="false">
+            </div>
+            <div class="mb-2">
+                <label class="form-label fw-semibold small" for="google-link-password">Password</label>
+                <input type="password" class="form-control tactical-form-input" id="google-link-password"
+                       name="password" autocomplete="current-password">
+            </div>
+            <div class="mb-2 google-link-code-row" hidden>
+                <label class="form-label fw-semibold small" for="google-link-code">2FA code</label>
+                <input type="text" class="form-control tactical-form-input" id="google-link-code"
+                       name="code" autocomplete="one-time-code" inputmode="numeric">
+            </div>
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-outline-primary">Link Google to my account</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+(function() {
+    // Never render web Google OAuth inside the Capacitor native shell.
+    // The Android app uses a native sign-in path instead (embedded WebViews
+    // are not a supported OAuth environment).
+    if (window.Capacitor !== undefined) {
+        var wrap = document.querySelector('[data-google-signin]');
+        if (wrap) { wrap.hidden = true; }
+        return;
+    }
+
+    var CLIENT_ID = "{{ google_web_client_id|escapejs }}";
+    var LOGIN_URI = "{{ google_login_uri|escapejs }}";
+    var LINK_URL = "{% url 'users:google_link' %}";
+
+    function getCsrfToken() {
+        var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    function showError(message) {
+        var el = document.querySelector('.google-signin-error');
+        if (el) {
+            el.textContent = message;
+            el.hidden = false;
+        }
+    }
+
+    function showLinkForm(message) {
+        var form = document.querySelector('.google-link-form');
+        var msg = document.querySelector('.google-link-message');
+        if (msg && message) { msg.textContent = message; }
+        if (form) { form.hidden = false; }
+    }
+
+    function postJson(url, payload) {
+        return fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(payload)
+        }).then(function(response) {
+            return response.json().then(function(data) {
+                data._httpStatus = response.status;
+                return data;
+            });
+        });
+    }
+
+    // Redirect mode: Google navigates the whole page to LOGIN_URI with the
+    // credential (no popup, no postMessage). Reveal the link form when the
+    // backend bounced an email collision back to the login page.
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('google_link') === '1') {
+        showLinkForm('');
+    }
+
+    function renderButton() {
+        if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+            setTimeout(renderButton, 300);
+            return;
+        }
+        try {
+            window.google.accounts.id.initialize({
+                client_id: CLIENT_ID,
+                login_uri: LOGIN_URI,
+                ux_mode: 'redirect',
+                auto_select: false
+            });
+            window.google.accounts.id.renderButton(
+                document.getElementById('google-signin-button'),
+                { theme: 'outline', size: 'large', width: 320 }
+            );
+        } catch (error) {
+            showError('Google sign-in is unavailable right now.');
+        }
+    }
+
+    var linkForm = document.querySelector('.google-link-actual-form');
+    if (linkForm) {
+        linkForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            var payload = {
+                username: document.getElementById('google-link-username').value,
+                password: document.getElementById('google-link-password').value,
+                code: document.getElementById('google-link-code').value
+            };
+            postJson(LINK_URL, payload).then(function(data) {
+                if (data.status === 'ok' && data.redirect) {
+                    window.location.href = data.redirect;
+                    return;
+                }
+                if (data.status === 'two_factor_required') {
+                    var row = document.querySelector('.google-link-code-row');
+                    if (row) { row.hidden = false; }
+                    showError(data.message);
+                    return;
+                }
+                showError(data.message || 'Linking failed. Please try again.');
+            }).catch(function() {
+                showError('Linking failed. Please check your connection and try again.');
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', renderButton);
+    } else {
+        renderButton();
+    }
+})();
+</script>
+{% endif %}

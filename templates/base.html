@@ -6,6 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="resumable-uploads" content="{{ USE_RESUMABLE_UPLOADS|yesno:'1,0' }}">
     <meta name="user-authenticated" content="{% if request.user.is_authenticated %}true{% else %}false{% endif %}">
     <title>vasto</title>
 
@@ -3607,6 +3608,9 @@
 
     {% block page_scripts %}{% endblock %}
 
+    <!-- Resumable direct-to-R2 engine (plain scripts; expose window globals). -->
+    <script src="{% static 'js/upload/resumable_upload.js' %}"></script>
+    <script src="{% static 'js/upload/native_upload.js' %}"></script>
 
     <script type="module">
         import { uploadManager } from '{% static "js/upload/upload_manager.js" %}';

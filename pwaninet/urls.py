@@ -300,6 +300,7 @@ urlpatterns = [
     # Dedicated Downloads Page
     path('downloads/', downloads_page_view, name='downloads'),
     path('download/', downloads_page_view, name='download_alias'),
+    path('uploads/', include(('uploads.page_urls', 'uploads_page'), namespace='uploads_page')),
     # Direct Android APK download routes (permanent endpoints for social sharing & settings)
     path('i/<str:token>/', encrypted_invite_landing, name='encrypted_invite_landing'),
     path('app/<str:token>/', app_invite_landing, name='app_invite_landing'),
@@ -313,6 +314,7 @@ urlpatterns = [
     path('test/native-pwa/', TemplateView.as_view(template_name='native_pwa_test.html'), name='native_pwa_test'),
     path('clear-cache/', TemplateView.as_view(template_name='clear_cache.html'), name='clear_cache'),
     path('api/health/', TemplateView.as_view(template_name='health_check.html'), name='health_check'),
+    path('api/uploads/', include(('uploads.urls', 'uploads'), namespace='uploads')),
     # Messaging Test Pages - FROZEN FOR MVP
     # path('test/messaging/', TemplateView.as_view(template_name='test_messaging_architecture.html'), name='test_messaging_architecture'),
     # path('test/messaging-debug/', TemplateView.as_view(template_name='debug_messaging.html'), name='debug_messaging'),

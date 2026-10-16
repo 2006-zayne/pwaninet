@@ -150,6 +150,22 @@ def process_video_attachment_task(self, attachment_id, trim_start=0.0, trim_end=
             logger.warning(f"[VIDEO_TASK] video_ready broadcast failed: {e}")
         logger.info(f"[VIDEO_TASK] Successfully processed video attachment {attachment_id}")
 
+    except FileNotFoundError as e:
+        logger.error(
+            "[VIDEO_TASK] Source file missing for attachment %s: %s",
+            attachment_id,
+            e,
+        )
+        try:
+            attachment.processing_status = 'failed'
+            attachment.processing_error = 'SOURCE_FILE_MISSING'
+            attachment.save(update_fields=['processing_status', 'processing_error'])
+        except Exception:
+            logger.exception(
+                "[VIDEO_TASK] Could not persist missing-source status for %s",
+                attachment_id,
+            )
+        return
     except Exception as e:
         logger.error(f"[VIDEO_TASK] Exception during video processing: {e}", exc_info=True)
         try:

@@ -82,3 +82,64 @@ class UserDailyActivity(models.Model):
 
     def __str__(self):
         return f"{self.user_id} active on {self.activity_date}"
+
+
+class PageMaintenance(models.Model):
+    """Per-page maintenance lock, managed from the Django admin.
+
+    When ``is_active`` is True, ``MaintenanceModeMiddleware`` short-circuits
+    any request whose path starts with ``path_prefix`` and renders
+    ``maintenance.html`` (HTTP 503), so a single page/section can be locked
+    while the rest of the site keeps working.
+    """
+
+    DEFAULT_HEADLINE = "This section is temporarily unavailable"
+    DEFAULT_MESSAGE = (
+        "We are performing scheduled maintenance on this part of Vasto. "
+        "No data has been affected. Thank you for your patience."
+    )
+
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Admin label, e.g. Messaging. Shown as the affected area.",
+    )
+    path_prefix = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="Requests starting with this path show the maintenance page, e.g. /messaging/",
+    )
+    is_active = models.BooleanField(default=False, db_index=True)
+    headline = models.CharField(max_length=255, default=DEFAULT_HEADLINE)
+    message = models.TextField(default=DEFAULT_MESSAGE)
+    eta = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Optional estimated return time shown to users.",
+    )
+    show_eta = models.BooleanField(
+        default=True,
+        help_text="Display the ETA on the maintenance page (hidden when no ETA is set).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        state = "ACTIVE" if self.is_active else "off"
+        return f"{self.name} ({self.path_prefix}) [{state}]"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self._bust_lock_cache()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        self._bust_lock_cache()
+
+    @staticmethod
+    def _bust_lock_cache():
+        from django.core.cache import cache
+        cache.delete("maintenance:active_locks")

@@ -2,28 +2,15 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, UsernameField
 from users.models import User, CollaborationStatus
 from courses.models import Year
-from documents.academic.models import Programme, AcademicLevel, AcademicYear, Semester
+from documents.academic.models import AcademicYear, Semester
 
 
 class PwaniSignupForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = User
         fields = UserCreationForm.Meta.fields + (
-            'first_name', 'second_name', 'last_name', 
-            'programme', 'academic_level'
+            'first_name', 'second_name', 'last_name',
         )
-
-        widgets = {
-            'programme': forms.Select(attrs={
-                'class': 'form-control',
-                'id': 'id_programme',
-                'data-searchable': 'true'
-            }),
-            'academic_level': forms.Select(attrs={
-                'class': 'form-control',
-                'id': 'id_academic_level'
-            }),
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -45,11 +32,13 @@ class PwaniSignupForm(UserCreationForm):
         self.fields['first_name'].required = False
         self.fields['second_name'].required = False
         self.fields['last_name'].required = False
-        self.fields['programme'].required = False
-        self.fields['academic_level'].required = False
 
-        self.fields['academic_level'].queryset = AcademicLevel.objects.filter(is_active=True).order_by('level')
-        self.fields['programme'].queryset = Programme.objects.filter(is_active=True).order_by('name')
+        # Match the login form: Bootstrap base + tactical theme on every
+        # widget. (JS also adds tactical-form-input, but server-rendered
+        # classes keep fields styled with JS disabled.)
+        for _field in self.fields.values():
+            _existing = _field.widget.attrs.get('class', '')
+            _field.widget.attrs['class'] = f"{_existing} form-control tactical-form-input".strip()
 
     def clean_username(self):
         """
@@ -204,6 +193,98 @@ class PwaniAuthenticationForm(AuthenticationForm):
             'autocomplete': 'current-password',
         })
     )
+
+
+class InstitutionSetupForm(forms.Form):
+    """Optional institution setup: institution → programme → academic level.
+
+    All fields are optional so setup can be skipped with everything unset.
+    Programme choices are scoped to the selected institution server-side;
+    institution scope is derived through the
+    Programme → Department → School → Faculty → Institution hierarchy
+    (no denormalised copies).
+    """
+
+    institution = forms.ModelChoiceField(
+        queryset=None,
+        required=False,
+        empty_label="Select your institution (optional)",
+    )
+    programme = forms.ModelChoiceField(
+        queryset=None,
+        required=False,
+        empty_label="Select your programme (optional)",
+    )
+    academic_level = forms.ModelChoiceField(
+        queryset=None,
+        required=False,
+        empty_label="Select your year of study (optional)",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from documents.academic.models import AcademicLevel, Institution, Programme
+
+        institution_id = None
+        if self.data:
+            institution_id = self.data.get('institution') or None
+        elif self.initial:
+            inst = self.initial.get('institution')
+            institution_id = getattr(inst, 'pk', inst)
+
+        self.fields['institution'].queryset = Institution.objects.filter(
+            is_active=True).order_by('name')
+        programme_id = self.data.get('programme') if self.data else None
+        if institution_id:
+            try:
+                self.fields['programme'].queryset = Programme.objects.filter(
+                    is_active=True,
+                    department__school__faculty__institution_id=institution_id,
+                ).order_by('name')
+            except (ValueError, TypeError):
+                self.fields['programme'].queryset = Programme.objects.none()
+        elif programme_id:
+            # Programme submitted without an institution: validate against all
+            # active programmes; clean() then adopts the programme's own scope.
+            self.fields['programme'].queryset = Programme.objects.filter(
+                is_active=True).order_by('name')
+        else:
+            self.fields['programme'].queryset = Programme.objects.none()
+        self.fields['academic_level'].queryset = AcademicLevel.objects.filter(
+            is_active=True).order_by('level')
+
+    def clean(self):
+        cleaned = super().clean()
+        institution = cleaned.get('institution')
+        programme = cleaned.get('programme')
+        academic_level = cleaned.get('academic_level')
+
+        if programme is not None:
+            if not programme.is_active:
+                self.add_error('programme', 'Selected programme is not currently available.')
+            elif institution is not None:
+                derived = programme.get_institution()
+                if derived is None or derived.pk != institution.pk:
+                    self.add_error(
+                        'programme',
+                        'Selected programme does not belong to the selected institution.')
+            else:
+                # Programme without an institution: adopt the programme's own
+                # institution scope so the profile stays consistent.
+                derived = programme.get_institution()
+                if derived is not None:
+                    cleaned['institution'] = derived
+
+        if programme is not None and academic_level is not None:
+            level_number = getattr(academic_level, 'level', None)
+            duration = getattr(programme, 'duration_years', None)
+            if (level_number is not None and duration
+                    and level_number <= 6 and level_number > duration):
+                self.add_error(
+                    'academic_level',
+                    f'Selected year is beyond this programme\'s duration ({duration} years).')
+
+        return cleaned
 
 
 class ProfileUpdateForm(forms.ModelForm):

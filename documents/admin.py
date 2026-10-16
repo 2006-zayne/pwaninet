@@ -6,6 +6,7 @@ from .models import (
     AcademicYear,
     Semester,
     AcademicLevel,
+    Institution,
     Faculty,
     School,
     Department,
@@ -129,6 +130,14 @@ class CollectionAdmin(admin.ModelAdmin):
 
 
 # Academic Structure Admin Registrations
+@admin.register(Institution)
+class InstitutionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'short_name', 'institution_type', 'is_active')
+    list_filter = ('institution_type', 'is_active')
+    search_fields = ('name', 'short_name', 'slug')
+    prepopulated_fields = {'slug': ('name',)}
+
+
 @admin.register(AcademicYear)
 class AcademicYearAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'is_current', 'start_date', 'end_date')
@@ -149,7 +158,8 @@ class AcademicLevelAdmin(admin.ModelAdmin):
 
 @admin.register(Faculty)
 class FacultyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code')
+    list_display = ('name', 'code', 'institution')
+    list_filter = ('institution',)
     search_fields = ('name', 'code')
 
 

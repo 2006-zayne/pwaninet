@@ -35,7 +35,10 @@
 
     <!-- Wizard Cards Container -->
     <div class="card border-0 shadow-sm shadow-md-lg rounded-4 rounded-md-5 overflow-hidden p-3 p-sm-4 p-md-5 bg-white position-relative wizard-card-container">
-      
+
+      <!-- Optional institution setup (skippable; academic fields may stay unset) -->
+      {% include 'users/onboarding/partials/step_institution.html' %}
+
       <!-- Step 1 Pane -->
       <div id="step-pane-1" class="wizard-pane">
         {% include 'users/onboarding/partials/step_classmates.html' %}

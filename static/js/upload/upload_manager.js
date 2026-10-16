@@ -206,20 +206,29 @@ class UploadManager {
         if (!session) return;
 
         const tracker = progressManager.getTracker(uploadId);
+        console.log('[UploadManager] performUpload called for uploadId:', uploadId, 'files:', session.files.length);
 
         try {
             this.transitionState(uploadId, UploadState.UPLOADING);
             uploadEvents.emit(UploadEventNames.UPLOAD_STARTED, { uploadId, session });
 
-            const response = await uploadAPI.upload(session, (progress) => {
-                tracker.updateUploadProgress(progress.loaded, progress.total);
-            });
+            // Always use resumable direct-to-R2 engine for all post uploads
+            console.log('[UploadManager] Checking resumable engine...');
+            if (!window.resumableUpload || typeof window.resumableUpload.start !== 'function') {
+                console.error('[UploadManager] Resumable engine not available:', {
+                    hasWindowResumable: !!window.resumableUpload,
+                    hasStartFunction: typeof window.resumableUpload?.start === 'function',
+                });
+                throw new Error('Upload engine not loaded. Please refresh the page and try again.');
+            }
+            console.log('[UploadManager] Resumable engine available, starting upload...');
 
+            const response = await this._performResumableUpload(uploadId, session, tracker);
             tracker.completeUpload();
 
             // Determine whether this post has a video file so we know
             // whether to wait for live HLS transcoding progress.
-            const postId   = response?.id ?? null;
+            const postId   = response?.post_id ?? response?.id ?? null;
             const hasVideo = session.files?.some(
                 (f) => f.type?.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi)$/i.test(f.name ?? '')
             ) ?? false;
@@ -245,8 +254,63 @@ class UploadManager {
 
             this.cleanupUpload(uploadId);
         } catch (error) {
+            console.error('[UploadManager] Upload failed:', error);
             this.failUpload(uploadId, error);
         }
+    }
+
+    /**
+     * Perform upload using the resumable direct-to-R2 engine
+     * @private
+     */
+    async _performResumableUpload(uploadId, session, tracker) {
+        // Generate a proper UUID for post_group
+        const postGroup = (window.crypto && window.crypto.randomUUID)
+            ? window.crypto.randomUUID()
+            : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+
+        const postPayload = {
+            content: session.caption,
+            visibility: (session.visibility || 'public').toUpperCase(),
+            group: session.metadata?.group || null,
+            unit: session.metadata?.unit || null,
+            gradient_class: session.metadata?.gradient_class || 'none',
+            allow_downloads: session.metadata?.allow_downloads !== false,
+        };
+
+        let finalResponse = null;
+        let done = 0;
+
+        // Setup progress listener for resumable upload
+        const progressListener = (e) => {
+            if (e.detail && e.detail.total) {
+                const totalProgress = Math.round((100 * e.detail.loaded) / e.detail.total);
+                tracker.updateUploadProgress(e.detail.loaded, e.detail.total);
+            }
+        };
+        window.addEventListener('resumable-upload-progress', progressListener);
+
+        try {
+            // Upload each file sequentially
+            for (const file of session.files) {
+                console.log('[UploadManager] Starting resumable upload for file:', file.name, 'size:', file.size);
+                const response = await window.resumableUpload.start(file, {
+                    post: postPayload,
+                    postGroup,
+                });
+                console.log('[UploadManager] Resumable upload completed for file:', file.name, 'response:', response);
+                finalResponse = response;
+                done += 1;
+            }
+        } finally {
+            window.removeEventListener('resumable-upload-progress', progressListener);
+        }
+
+        return finalResponse;
     }
 
     failUpload(uploadId, error) {

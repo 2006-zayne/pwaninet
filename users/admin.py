@@ -1,11 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
-from .models import HeroShowcaseSet, RecoveryCode, User, UserTwoFactor
+from .models import GoogleAccount, HeroShowcaseSet, RecoveryCode, User, UserTwoFactor
 
 class TheUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ('Profile', {'fields': ('course', 'year', 'global_role', 'profile_pic', 'cover_photo', 'bio')}),
+        ('Academic setup', {'fields': ('institution', 'programme', 'academic_level', 'academic_year', 'semester')}),
     )
 
     add_fieldsets = UserAdmin.add_fieldsets + (
@@ -13,7 +14,7 @@ class TheUserAdmin(UserAdmin):
     )
 
     list_display = ['first_name', 'second_name', 'last_name', 'username', 'email', 'global_role', 'is_staff']
-    list_filter = ['global_role', 'course', 'year', 'is_staff']
+    list_filter = ['global_role', 'institution', 'course', 'year', 'is_staff']
 
 admin.site.register(User, TheUserAdmin)
 
@@ -145,3 +146,18 @@ class HeroShowcaseSetAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return self._superuser(request)
+
+
+@admin.register(GoogleAccount)
+class GoogleAccountAdmin(admin.ModelAdmin):
+    list_display = ('username', 'email', 'email_verified', 'link_method', 'created_at', 'last_login_at')
+    list_filter = ('email_verified', 'link_method')
+    search_fields = ('user__username', 'user__email', 'email', 'sub')
+    readonly_fields = ('user', 'sub', 'email', 'email_verified', 'hosted_domain', 'link_method', 'created_at', 'last_login_at')
+
+    def username(self, obj):
+        return obj.user.username
+    username.short_description = 'User'
+
+    def has_add_permission(self, request):
+        return False

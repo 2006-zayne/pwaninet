@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-3" id="upload-manager" style="max-width: 800px;">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h1 class="h4 mb-0">Uploads</h1>
+        <button class="btn btn-sm btn-outline-secondary" id="um-refresh" type="button">Refresh</button>
+    </div>
+
+    <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Upload filters" id="um-filters">
+        <button type="button" class="btn btn-primary" data-filter="">All</button>
+        <button type="button" class="btn btn-outline-primary" data-filter="uploading">Active</button>
+        <button type="button" class="btn btn-outline-primary" data-filter="queued">Queued</button>
+        <button type="button" class="btn btn-outline-primary" data-filter="failed">Failed</button>
+        <button type="button" class="btn btn-outline-primary" data-filter="completed">Completed</button>
+    </div>
+
+    <input type="search" class="form-control mb-3" id="um-search" placeholder="Search uploads…" autocomplete="off">
+
+    <div id="um-list" class="d-flex flex-column gap-2"></div>
+    <p id="um-empty" class="text-muted text-center py-4" hidden>No uploads yet.</p>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="{% static 'js/upload/manager_page.js' %}"></script>
+{% endblock %}

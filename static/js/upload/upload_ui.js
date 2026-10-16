@@ -37,7 +37,7 @@ class UploadBanner {
     }
 
     /**
-     * Create the banner DOM element
+     * Create the banner DOM element - subtle donut spinner with count
      */
     createBanner() {
         if (document.getElementById('upload-banner')) {
@@ -49,64 +49,17 @@ class UploadBanner {
         banner.id = 'upload-banner';
         banner.className = 'upload-banner';
         banner.innerHTML = `
-            <!-- Header Bar -->
-            <div class="upload-banner-header" id="upload-banner-header">
-                <div class="upload-banner-badge-wrapper">
-                    <span class="upload-header-dot" id="upload-header-dot"></span>
-                    <span class="upload-header-title" id="upload-header-title">POSTING MEDIA</span>
-                </div>
-                <div class="upload-header-actions">
-                    <button class="upload-action-btn upload-minimize-btn" id="upload-banner-minimize" title="Minimize / Expand">
-                        <i class="bi bi-dash-lg" id="upload-minimize-icon"></i>
-                    </button>
-                    <button class="upload-action-btn upload-cancel-btn" id="upload-banner-cancel" title="Cancel">
-                        <i class="bi bi-x-lg" id="upload-cancel-icon"></i>
-                    </button>
-                </div>
+            <div class="upload-donut-container">
+                <svg class="upload-donut" viewBox="0 0 32 32">
+                    <circle class="upload-donut-bg" cx="16" cy="16" r="14" fill="none" />
+                    <circle class="upload-donut-progress" id="upload-donut-progress" cx="16" cy="16" r="14" fill="none" 
+                            stroke-dasharray="0, 88" stroke-dashoffset="0" />
+                </svg>
+                <div class="upload-count" id="upload-count">0</div>
             </div>
-
-            <!-- Expanded Body -->
-            <div class="upload-banner-body" id="upload-banner-body">
-                <div class="upload-banner-thumb-box" id="upload-banner-thumb-box">
-                    <div class="upload-banner-thumb" id="upload-banner-thumb">
-                        <i class="bi bi-cloud-arrow-up" id="upload-thumb-fallback"></i>
-                    </div>
-                    <span class="upload-thumb-duration" id="upload-thumb-duration" style="display: none;"></span>
-                </div>
-                <div class="upload-banner-info-col">
-                    <div class="upload-banner-title-row">
-                        <span class="upload-primary-title" id="upload-banner-title">Uploading post…</span>
-                        <span class="upload-progress-number" id="upload-banner-progress">0%</span>
-                    </div>
-                    <div class="upload-banner-sub-row" id="upload-banner-sub">
-                        Preparing media…
-                    </div>
-                    <div class="upload-quality-pills" id="upload-quality-pills" style="display: none;">
-                        <span class="quality-pill" id="pill-240p">240p</span>
-                        <span class="quality-pill" id="pill-360p">360p</span>
-                        <span class="quality-pill" id="pill-480p">480p</span>
-                        <span class="quality-pill" id="pill-720p">720p HD</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Progress Track -->
-            <div class="upload-banner-progress-track" id="upload-banner-progress-track">
-                <div class="upload-banner-progress-fill phase-upload" id="upload-banner-progress-fill"></div>
-            </div>
-
-            <!-- Minimized View (Visible when .is-minimized is set) -->
-            <div class="upload-mini-content" id="upload-mini-content" style="display: none;">
-                <div class="upload-mini-left">
-                    <span class="upload-mini-icon" id="upload-mini-icon">
-                        <i class="bi bi-arrow-repeat spin-icon"></i>
-                    </span>
-                    <span class="upload-mini-text" id="upload-mini-text">Uploading (0%)</span>
-                </div>
-                <button class="upload-action-btn upload-mini-expand-btn" id="upload-mini-expand" title="Expand">
-                    <i class="bi bi-chevron-up"></i>
-                </button>
-            </div>
+            <button class="upload-cancel-btn" id="upload-banner-cancel" title="Cancel">
+                <i class="bi bi-x-lg"></i>
+            </button>
         `;
 
         document.body.appendChild(banner);
@@ -117,357 +70,155 @@ class UploadBanner {
      * Setup event listeners
      */
     setupEventListeners() {
-        // Cancel / Retry button
+        // Cancel button
         const cancelBtn = document.getElementById('upload-banner-cancel');
         if (cancelBtn) {
             cancelBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (this.bannerMode === 'retry') {
-                    this.retryCurrentUpload();
-                } else {
-                    this.cancelCurrentUpload();
-                }
+                this.cancelCurrentUpload();
             });
         }
 
-        // Minimize / Expand button
-        const minimizeBtn = document.getElementById('upload-banner-minimize');
-        if (minimizeBtn) {
-            minimizeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.toggleMinimize();
-            });
-        }
-
-        // Minimized bar click to expand
-        const miniContent = document.getElementById('upload-mini-content');
-        if (miniContent) {
-            miniContent.addEventListener('click', () => {
-                if (this.isMinimized) {
-                    this.toggleMinimize(false);
-                }
-            });
-        }
-
-        const miniExpandBtn = document.getElementById('upload-mini-expand');
-        if (miniExpandBtn) {
-            miniExpandBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.toggleMinimize(false);
-            });
-        }
+        // Click on banner to navigate to uploads page
+        this.banner.addEventListener('click', (e) => {
+            if (e.target.closest('.upload-cancel-btn')) return; // Don't navigate if clicking cancel
+            window.location.href = '/uploads/';
+        });
 
         // Upload state machine events
-        uploadEvents.on(UploadEventNames.STATE_CHANGED, (data) => {
-            this.handleStateChange(data);
+        uploadEvents.on(UploadEventNames.UPLOAD_CREATED, (data) => {
+            this.handleUploadCreated(data);
         });
 
-        uploadEvents.on(UploadEventNames.PROGRESS_UPDATED, (data) => {
-            this.handleProgressUpdate(data);
-        });
-
-        uploadEvents.on(UploadEventNames.COMPRESSION_PROGRESS, (data) => {
-            this.handleCompressionProgress(data);
-        });
-
-        uploadEvents.on(UploadEventNames.UPLOAD_PROGRESS, (data) => {
-            this.handleUploadProgress(data);
-        });
-
-        uploadEvents.on(UploadEventNames.UPLOAD_COMPLETED, (data) => {
-            this.handleUploadCompleted(data);
+        uploadEvents.on(UploadEventNames.UPLOAD_STARTED, (data) => {
+            this.handleUploadStarted(data);
         });
 
         uploadEvents.on(UploadEventNames.UPLOAD_PUBLISHED, (data) => {
             this.handleUploadPublished(data);
         });
 
+        uploadEvents.on(UploadEventNames.UPLOAD_COMPLETED, (data) => {
+            this.handleUploadCompleted(data);
+        });
+
         uploadEvents.on(UploadEventNames.UPLOAD_FAILED, (data) => {
             this.handleUploadFailed(data);
         });
 
-        uploadEvents.on(UploadEventNames.QUEUE_CLEARED, () => {
-            this.hide();
+        uploadEvents.on(UploadEventNames.UPLOAD_CANCELLED, (data) => {
+            this.handleUploadCancelled(data);
+        });
+
+        // Listen to resumable upload progress events
+        window.addEventListener('resumable-upload-progress', (e) => {
+            this.handleResumableProgress(e.detail);
         });
     }
 
     /**
-     * Setup thumbnail preview client-side immediately
+     * Handle upload created
      */
-    setThumbnail(files) {
-        if (!files || !files.length) return;
-
-        const thumbContainer = document.getElementById('upload-banner-thumb');
-        const durationBadge = document.getElementById('upload-thumb-duration');
-        if (!thumbContainer) return;
-
-        this.cleanupThumbnails();
-
-        const videoFile = files.find((f) =>
-            f.type?.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi)$/i.test(f.name ?? '')
-        );
-        const imageFile = files.find((f) => f.type?.startsWith('image/'));
-
-        if (videoFile) {
-            this.hasVideo = true;
-            try {
-                const objectUrl = URL.createObjectURL(videoFile);
-                this.activeThumbnailUrls.push(objectUrl);
-
-                thumbContainer.innerHTML = `
-                    <video src="${objectUrl}#t=0.1" preload="metadata" muted playsinline class="upload-thumb-media"></video>
-                    <div class="upload-thumb-play-icon"><i class="bi bi-play-fill"></i></div>
-                `;
-
-                // Read duration metadata
-                const tempVideo = document.createElement('video');
-                tempVideo.preload = 'metadata';
-                tempVideo.src = objectUrl;
-                tempVideo.onloadedmetadata = () => {
-                    if (tempVideo.duration && durationBadge) {
-                        durationBadge.textContent = this.formatDuration(tempVideo.duration);
-                        durationBadge.style.display = 'block';
-                    }
-                };
-            } catch (err) {
-                thumbContainer.innerHTML = '<i class="bi bi-camera-video-fill upload-thumb-icon"></i>';
-            }
-        } else if (imageFile) {
-            this.hasVideo = false;
-            try {
-                const objectUrl = URL.createObjectURL(imageFile);
-                this.activeThumbnailUrls.push(objectUrl);
-                thumbContainer.innerHTML = `<img src="${objectUrl}" class="upload-thumb-media" alt="Upload Preview" />`;
-            } catch (err) {
-                thumbContainer.innerHTML = '<i class="bi bi-image-fill upload-thumb-icon"></i>';
-            }
-            if (durationBadge) durationBadge.style.display = 'none';
-        } else {
-            this.hasVideo = false;
-            thumbContainer.innerHTML = '<i class="bi bi-file-earmark-text-fill upload-thumb-icon"></i>';
-            if (durationBadge) durationBadge.style.display = 'none';
-        }
-    }
-
-    cleanupThumbnails() {
-        this.activeThumbnailUrls.forEach((url) => {
-            try {
-                URL.revokeObjectURL(url);
-            } catch (e) {}
-        });
-        this.activeThumbnailUrls = [];
+    handleUploadCreated(data) {
+        console.log('[UploadUI] Upload created:', data);
+        this.activeUploadCount = (this.activeUploadCount || 0) + 1;
+        this.updateCount();
+        this.show();
     }
 
     /**
-     * Toggle minimized floating chip mode
+     * Handle upload started
      */
-    toggleMinimize(forceState = null) {
-        this.isMinimized = forceState !== null ? forceState : !this.isMinimized;
-        if (!this.banner) return;
+    handleUploadStarted(data) {
+        this.currentUploadId = data.uploadId;
+        this.show();
+    }
 
-        const body = document.getElementById('upload-banner-body');
-        const header = document.getElementById('upload-banner-header');
-        const miniContent = document.getElementById('upload-mini-content');
-        const minimizeIcon = document.getElementById('upload-minimize-icon');
-
-        if (this.isMinimized) {
-            this.banner.classList.add('is-minimized');
-            if (body) body.style.display = 'none';
-            if (header) header.style.display = 'none';
-            if (miniContent) miniContent.style.display = 'flex';
-            if (minimizeIcon) minimizeIcon.className = 'bi bi-chevron-up';
-        } else {
-            this.banner.classList.remove('is-minimized');
-            if (body) body.style.display = 'flex';
-            if (header) header.style.display = 'flex';
-            if (miniContent) miniContent.style.display = 'none';
-            if (minimizeIcon) minimizeIcon.className = 'bi bi-dash-lg';
+    /**
+     * Handle resumable upload progress
+     */
+    handleResumableProgress(detail) {
+        console.log('[UploadUI] Resumable progress:', detail);
+        if (detail && detail.total) {
+            const percent = Math.round((100 * detail.loaded) / detail.total);
+            this.updateDonutProgress(percent);
         }
     }
 
     /**
-     * Handle state machine state changes
-     */
-    handleStateChange(data) {
-        const { uploadId, newState, metadata } = data;
-        this.currentUploadId = uploadId;
-        this.clearAutoHideTimer();
-
-        if (newState === UploadState.UPLOADING) {
-            this.setHeaderTitle('POSTING MEDIA', 'phase-upload');
-            this.setTitle('Uploading post…');
-            this.setProgressFillClass('phase-upload');
-            this.setCancelMode();
-        } else if (newState === UploadState.SERVER_PROCESSING) {
-            if (this.hasVideo) {
-                this.setHeaderTitle('OPTIMIZING VIDEO', 'phase-transcoding');
-                this.setTitle('Processing HD video…');
-                this.setProgressFillClass('phase-transcoding');
-                this.showQualityPills(true);
-            } else {
-                this.setHeaderTitle('SAVING', 'phase-upload');
-                this.setTitle('Saving to feed…');
-            }
-        } else if (newState === UploadState.PUBLISHED) {
-            this.showCompletion();
-        } else if (newState === UploadState.FAILED) {
-            this.showError(metadata?.error || 'Upload failed', true);
-        } else if (newState === UploadState.CANCELLED) {
-            this.hide();
-        }
-    }
-
-    /**
-     * Handle upload byte transfer progress
-     */
-    handleUploadProgress(data) {
-        const { loaded, total, percent, speed, estimatedTimeRemaining } = data;
-        this.updateProgress(percent);
-
-        let speedText = '';
-        if (speed > 0) {
-            speedText = ` • ${this.formatSpeed(speed)}`;
-        }
-
-        let timeText = '';
-        if (estimatedTimeRemaining > 0) {
-            timeText = ` • ~${this.formatTime(Math.round(estimatedTimeRemaining))} left`;
-        }
-
-        const loadedFormatted = this.formatBytes(loaded);
-        const totalFormatted = this.formatBytes(total);
-        const detailString = `${Math.round(percent)}% • ${loadedFormatted} of ${totalFormatted}${speedText}${timeText}`;
-
-        this.setSubtitle(detailString);
-        this.updateMiniText(`Uploading (${Math.round(percent)}%)`);
-    }
-
-    /**
-     * Handle generic progress update (e.g. transcoding percentage via WS)
-     */
-    handleProgressUpdate(data) {
-        const { stage, percent, status } = data;
-        this.updateProgress(percent);
-
-        if (stage === 'serverProcessing') {
-            this.setSubtitle(status || 'Optimizing video qualities…');
-            this.updateMiniText(`HD Processing (${Math.round(percent)}%)`);
-            this.updateQualityPills(percent);
-        } else if (status) {
-            this.setSubtitle(status);
-        }
-    }
-
-    /**
-     * Handle image compression progress
-     */
-    handleCompressionProgress(data) {
-        const { current, total, percent } = data;
-        this.setHeaderTitle('OPTIMIZING IMAGES', 'phase-upload');
-        this.setTitle(`Compressing ${current}/${total}`);
-        this.updateProgress(percent);
-        this.setSubtitle(`${Math.round(percent)}% complete`);
-    }
-
-    /**
-     * Handle single upload completed in queue
-     */
-    handleUploadCompleted() {
-        // Queue progress indicator
-    }
-
-    /**
-     * Handle post published confirmation (HTTP 201 received)
+     * Handle post published
      */
     handleUploadPublished(data) {
-        const { hasVideo } = data;
-        this.hasVideo = Boolean(hasVideo);
-
-        // Immediate confirmation
-        this.setHeaderTitle('POST PUBLISHED', 'phase-published');
-        this.setTitle('Post published!');
-        this.setSubtitle('Your post is live in your feed');
-        this.updateProgress(100);
-        this.setProgressFillClass('phase-published');
-        this.updateMiniText('Post published! ✓');
-
-        // Trigger HTMX feed refresh if feed container exists
-        const feedRefreshTarget = document.querySelector('[data-upload-feed-refresh]');
-        if (feedRefreshTarget && window.htmx) {
-            const refreshUrl = feedRefreshTarget.getAttribute('data-upload-feed-refresh-url') || window.location.pathname;
-            window.htmx.ajax('GET', refreshUrl, {
-                target: '#main-content-area',
-                swap: 'innerHTML',
-            });
-        }
+        this.hasVideo = Boolean(data.hasVideo);
+        this.updateDonutProgress(100);
 
         if (!this.hasVideo) {
-            // Non-video post: celebrate and auto-hide
-            this.clearAutoHideTimer();
-            this.autoHideTimer = setTimeout(() => {
-                this.hide();
-            }, 2600);
-        } else {
-            // Video post: show Published badge for 1.2s then transition to HD transcoding telemetry
-            if (this.phaseTransitionTimer) clearTimeout(this.phaseTransitionTimer);
-            this.phaseTransitionTimer = setTimeout(() => {
-                this.setHeaderTitle('OPTIMIZING VIDEO', 'phase-transcoding');
-                this.setTitle('Processing HD video…');
-                if (this.currentProgress <= 10) {
-                    this.setSubtitle('Preparing multi-bitrate HLS streams…');
-                    this.updateProgress(10);
+            // Non-video: hide after short delay
+            setTimeout(() => {
+                this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
+                this.updateCount();
+                if (this.activeUploadCount === 0) {
+                    this.hide();
                 }
-                this.setProgressFillClass('phase-transcoding');
-                this.showQualityPills(true);
-            }, 1200);
+            }, 2000);
+        }
+        // Video: stay visible during processing
+    }
+
+    /**
+     * Handle upload completed
+     */
+    handleUploadCompleted(data) {
+        this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
+        this.updateCount();
+        if (this.activeUploadCount === 0) {
+            setTimeout(() => this.hide(), 1500);
         }
     }
 
     /**
-     * Handle upload failure
+     * Handle upload failed
      */
     handleUploadFailed(data) {
-        this.currentUploadId = data.uploadId || this.currentUploadId;
-        this.clearAutoHideTimer();
-        this.showError(data.error || 'Upload interrupted', data.canRetry === true);
+        this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
+        this.updateCount();
+        if (this.activeUploadCount === 0) {
+            setTimeout(() => this.hide(), 3000);
+        }
     }
 
     /**
-     * Show completion state (transcoding done)
+     * Handle upload cancelled
      */
-    showCompletion() {
-        this.setHeaderTitle('ALL SET', 'phase-published');
-        this.setTitle(this.hasVideo ? 'Video ready in HD!' : 'Post published!');
-        this.setSubtitle('All video qualities are active');
-        this.updateProgress(100);
-        this.setProgressFillClass('phase-published');
-        this.updateMiniText('Ready in HD! ✓');
-        this.updateQualityPills(100);
-
-        this.clearAutoHideTimer();
-        this.autoHideTimer = setTimeout(() => {
+    handleUploadCancelled(data) {
+        this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
+        this.updateCount();
+        if (this.activeUploadCount === 0) {
             this.hide();
-        }, 3600);
+        }
     }
 
     /**
-     * Show error state
+     * Update donut progress
      */
-    showError(message, canRetry = false) {
-        this.setHeaderTitle('UPLOAD FAILED', 'phase-error');
-        this.setTitle('Upload interrupted');
-        this.setSubtitle(message || 'Network disconnected • Tap to retry');
-        this.setProgressFillClass('phase-error');
-        this.updateMiniText('Upload failed ✕');
+    updateDonutProgress(percent) {
+        const progressEl = document.getElementById('upload-donut-progress');
+        if (progressEl) {
+            // circumference ≈ 88 for radius 14
+            // offset = 88 - (percent/100 * 88)
+            const circumference = 88;
+            const offset = circumference - (percent / 100 * circumference);
+            progressEl.setAttribute('stroke-dashoffset', offset);
+        }
+    }
 
-        if (canRetry) {
-            this.setRetryMode();
-        } else {
-            this.setCancelMode();
-            this.clearAutoHideTimer();
-            this.autoHideTimer = setTimeout(() => {
-                this.hide();
-            }, 5000);
+    /**
+     * Update upload count
+     */
+    updateCount() {
+        const countEl = document.getElementById('upload-count');
+        if (countEl) {
+            countEl.textContent = this.activeUploadCount || 0;
         }
     }
 
@@ -476,7 +227,6 @@ class UploadBanner {
      */
     show() {
         if (!this.banner) return;
-        this.setCancelMode();
         this.banner.classList.add('visible');
         this.isVisible = true;
     }
@@ -486,145 +236,16 @@ class UploadBanner {
      */
     hide() {
         if (!this.banner) return;
-        this.clearAutoHideTimer();
-        if (this.phaseTransitionTimer) clearTimeout(this.phaseTransitionTimer);
-
         this.banner.classList.remove('visible');
         this.isVisible = false;
-
-        setTimeout(() => {
-            this.reset();
-        }, 350);
+        this.activeUploadCount = 0;
+        this.updateCount();
+        this.updateDonutProgress(0);
     }
 
     /**
-     * Reset banner state
+     * Cancel current upload
      */
-    reset() {
-        this.cleanupThumbnails();
-        this.toggleMinimize(false);
-        this.hasVideo = false;
-        this.currentProgress = 0;
-        this.setCancelMode();
-
-        this.setHeaderTitle('POSTING MEDIA', 'phase-upload');
-        this.setTitle('Uploading post…');
-        this.setSubtitle('Preparing media…');
-        this.updateProgress(0);
-        this.showQualityPills(false);
-        this.setProgressFillClass('phase-upload');
-
-        const thumb = document.getElementById('upload-banner-thumb');
-        if (thumb) thumb.innerHTML = '<i class="bi bi-cloud-arrow-up" id="upload-thumb-fallback"></i>';
-
-        const duration = document.getElementById('upload-thumb-duration');
-        if (duration) duration.style.display = 'none';
-    }
-
-    // --- UI Helper setters ----------------------------------------------------
-
-    setHeaderTitle(text, phaseClass = '') {
-        const titleEl = document.getElementById('upload-header-title');
-        const dotEl = document.getElementById('upload-header-dot');
-        if (titleEl) titleEl.textContent = text;
-        if (dotEl) {
-            dotEl.className = 'upload-header-dot';
-            if (phaseClass) dotEl.classList.add(phaseClass);
-        }
-    }
-
-    setTitle(text) {
-        const titleEl = document.getElementById('upload-banner-title');
-        if (titleEl) titleEl.textContent = text;
-    }
-
-    setSubtitle(text) {
-        const subEl = document.getElementById('upload-banner-sub');
-        if (subEl) subEl.textContent = text;
-    }
-
-    updateProgress(percent) {
-        const numEl = document.getElementById('upload-banner-progress');
-        const fillEl = document.getElementById('upload-banner-progress-fill');
-        const clamped = Math.min(100, Math.max(0, Math.round(percent)));
-
-        if (numEl) numEl.textContent = `${clamped}%`;
-        if (fillEl) fillEl.style.width = `${clamped}%`;
-        this.currentProgress = clamped;
-    }
-
-    setProgressFillClass(className) {
-        const fillEl = document.getElementById('upload-banner-progress-fill');
-        if (fillEl) {
-            fillEl.className = `upload-banner-progress-fill ${className}`;
-        }
-    }
-
-    updateMiniText(text) {
-        const miniTextEl = document.getElementById('upload-mini-text');
-        if (miniTextEl) miniTextEl.textContent = text;
-    }
-
-    showQualityPills(show) {
-        const pillsEl = document.getElementById('upload-quality-pills');
-        if (pillsEl) pillsEl.style.display = show ? 'flex' : 'none';
-    }
-
-    updateQualityPills(percent) {
-        const p240 = document.getElementById('pill-240p');
-        const p360 = document.getElementById('pill-360p');
-        const p480 = document.getElementById('pill-480p');
-        const p720 = document.getElementById('pill-720p');
-
-        if (p240) {
-            p240.className = percent >= 22 ? 'quality-pill ready' : 'quality-pill encoding';
-        }
-        if (p360) {
-            p360.className = percent >= 45 ? 'quality-pill ready' : percent >= 22 ? 'quality-pill encoding' : 'quality-pill';
-        }
-        if (p480) {
-            p480.className = percent >= 67 ? 'quality-pill ready' : percent >= 45 ? 'quality-pill encoding' : 'quality-pill';
-        }
-        if (p720) {
-            p720.className = percent >= 90 ? 'quality-pill ready' : percent >= 67 ? 'quality-pill encoding' : 'quality-pill';
-        }
-    }
-
-    clearAutoHideTimer() {
-        if (this.autoHideTimer) {
-            clearTimeout(this.autoHideTimer);
-            this.autoHideTimer = null;
-        }
-    }
-
-    setCancelMode() {
-        this.bannerMode = 'cancel';
-        const cancelBtn = document.getElementById('upload-banner-cancel');
-        if (cancelBtn) {
-            cancelBtn.innerHTML = '<i class="bi bi-x-lg" id="upload-cancel-icon"></i>';
-            cancelBtn.title = 'Cancel';
-        }
-    }
-
-    setRetryMode() {
-        this.bannerMode = 'retry';
-        const cancelBtn = document.getElementById('upload-banner-cancel');
-        if (cancelBtn) {
-            cancelBtn.innerHTML = '<i class="bi bi-arrow-clockwise" id="upload-cancel-icon"></i>';
-            cancelBtn.title = 'Retry upload';
-        }
-    }
-
-    retryCurrentUpload() {
-        if (this.currentUploadId) {
-            uploadManager.retryUpload(this.currentUploadId);
-            this.setCancelMode();
-            this.setHeaderTitle('POSTING MEDIA', 'phase-upload');
-            this.setTitle('Retrying upload…');
-            this.updateProgress(0);
-        }
-    }
-
     cancelCurrentUpload() {
         const currentUpload = uploadManager.getActiveUpload();
         if (currentUpload) {
@@ -632,37 +253,6 @@ class UploadBanner {
         } else if (this.currentUploadId) {
             uploadManager.cancelUpload(this.currentUploadId);
         }
-    }
-
-    // --- Formatters -----------------------------------------------------------
-
-    formatBytes(bytes) {
-        if (!bytes || bytes === 0) return '0 MB';
-        const mb = bytes / (1024 * 1024);
-        return `${mb.toFixed(1)} MB`;
-    }
-
-    formatSpeed(bytesPerSec) {
-        if (!bytesPerSec || bytesPerSec <= 0) return '';
-        const mbPerSec = bytesPerSec / (1024 * 1024);
-        if (mbPerSec >= 1) {
-            return `${mbPerSec.toFixed(1)} MB/s`;
-        }
-        const kbPerSec = bytesPerSec / 1024;
-        return `${Math.round(kbPerSec)} KB/s`;
-    }
-
-    formatDuration(seconds) {
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
-    }
-
-    formatTime(seconds) {
-        if (seconds < 60) return `${Math.round(seconds)}s`;
-        const m = Math.floor(seconds / 60);
-        const s = Math.round(seconds % 60);
-        return `${m}m ${s}s`;
     }
 
     isBannerVisible() {
@@ -685,11 +275,32 @@ class UploadUI {
         this.banner.initialize();
         this.injectStyles();
         this.setupGlobalListeners();
+        this.restoreBannerOnLoad();
         this.isInitialized = true;
     }
 
     /**
-     * Inject CSS styles for the upload banner
+     * Check for ongoing uploads on page load and restore banner
+     */
+    async restoreBannerOnLoad() {
+        try {
+            // Check if resumable engine has any active sessions
+            if (window.resumableUpload && typeof window.resumableUpload.getAllSessions === 'function') {
+                const sessions = await window.resumableUpload.getAllSessions();
+                const activeSessions = sessions.filter(s => !s.done);
+                if (activeSessions.length > 0) {
+                    this.banner.activeUploadCount = activeSessions.length;
+                    this.banner.updateCount();
+                    this.banner.show();
+                }
+            }
+        } catch (e) {
+            console.error('[UploadUI] Failed to restore banner:', e);
+        }
+    }
+
+    /**
+     * Inject CSS styles for the upload banner - subtle donut spinner
      */
     injectStyles() {
         if (document.getElementById('upload-banner-styles')) return;
@@ -698,454 +309,123 @@ class UploadUI {
         style.id = 'upload-banner-styles';
         style.textContent = `
             /* ================================================================
-               vasto Professional Upload Banner & Floating Dock
+               Subtle Donut Upload Spinner
                ================================================================ */
 
             .upload-banner {
                 position: fixed;
                 z-index: 9995;
-                background: var(--mobile-nav-bg, #242526);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
-                border: 1px solid var(--border, #3a3b3c);
-                border-radius: 20px;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.15);
-                overflow: hidden;
+                display: flex;
+                align-items: center;
+                gap: 8px;
                 opacity: 0;
                 pointer-events: none;
-                transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1),
-                            transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
-                            width 0.25s ease;
-                font-family: inherit;
-                color: var(--text-dark, #e4e6eb);
+                transition: opacity 0.3s ease;
             }
 
-            /* Light theme support */
-            [data-theme="light"] .upload-banner {
-                background: var(--mobile-nav-bg, #ffffff);
-                border-color: var(--border, #e2e8f0);
-                color: var(--text-dark, #0f172a);
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+            .upload-banner.visible {
+                opacity: 1;
+                pointer-events: auto;
             }
 
-            [data-theme="dark"] .upload-banner {
-                background: var(--mobile-nav-bg, #242526);
-                border-color: var(--border, #3a3b3c);
-                color: var(--text-dark, #e4e6eb);
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.2);
-            }
-
-            /* Mobile positioning: centered floating pill right above bottom navigation bar */
+            /* Mobile: left side, slightly on top of bottom nav bar */
             @media (max-width: 767.98px) {
                 .upload-banner {
-                    bottom: calc(80px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-                    left: 50%;
-                    transform: translateX(-50%) translateY(24px) scale(0.96);
-                    width: 95%;
-                    max-width: 420px;
-                    border-radius: 20px;
-                }
-                .upload-banner.visible {
-                    opacity: 1;
-                    pointer-events: auto;
-                    transform: translateX(-50%) translateY(0) scale(1);
-                }
-                .upload-banner-thumb {
-                    width: 42px !important;
-                    height: 42px !important;
-                }
-                .upload-quality-pills {
-                    display: none !important;
+                    bottom: calc(72px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+                    left: 12px;
                 }
             }
 
-            /* Desktop positioning: bottom-right floating dock */
+            /* Make donut clickable for navigation */
+            .upload-donut-container {
+                cursor: pointer;
+            }
+
+            /* Desktop: floats where current banner was (bottom-right) */
             @media (min-width: 768px) {
                 .upload-banner {
                     bottom: 24px;
                     right: 28px;
-                    left: auto;
-                    transform: translateY(24px) scale(0.96);
-                    width: 380px;
-                    max-width: 380px;
-                    border-radius: 20px;
-                }
-                .upload-banner.visible {
-                    opacity: 1;
-                    pointer-events: auto;
-                    transform: translateY(0) scale(1);
-                }
-                .upload-banner.visible.is-minimized {
-                    width: 290px;
-                }
-                .upload-banner-thumb {
-                    width: 60px;
-                    height: 38px;
                 }
             }
 
-            /* Header */
-            .upload-banner-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 10px 14px 6px 14px;
-            }
-
-            .upload-banner-badge-wrapper {
-                display: flex;
-                align-items: center;
-                gap: 7px;
-            }
-
-            .upload-header-dot {
-                width: 7px;
-                height: 7px;
-                border-radius: 50%;
-                background: #3b82f6;
-                box-shadow: 0 0 8px #3b82f6;
-                transition: background 0.3s, box-shadow 0.3s;
-            }
-
-            .upload-header-dot.phase-upload {
-                background: #3b82f6;
-                box-shadow: 0 0 8px #3b82f6;
-                animation: dot-pulse 1.6s ease-in-out infinite;
-            }
-
-            .upload-header-dot.phase-published {
-                background: #10b981;
-                box-shadow: 0 0 8px #10b981;
-                animation: none;
-            }
-
-            .upload-header-dot.phase-transcoding {
-                background: #8b5cf6;
-                box-shadow: 0 0 8px #8b5cf6;
-                animation: dot-pulse 1.4s ease-in-out infinite;
-            }
-
-            .upload-header-dot.phase-error {
-                background: #ef4444;
-                box-shadow: 0 0 8px #ef4444;
-                animation: none;
-            }
-
-            @keyframes dot-pulse {
-                0%, 100% { opacity: 1; transform: scale(1); }
-                50% { opacity: 0.4; transform: scale(0.85); }
-            }
-
-            .upload-header-title {
-                font-size: 10.5px;
-                font-weight: 700;
-                letter-spacing: 0.08em;
-                text-transform: uppercase;
-                color: var(--text-muted, #b0b3b8);
-            }
-
-            [data-theme="light"] .upload-header-title {
-                color: var(--text-muted, #64748b);
-            }
-
-            .upload-header-actions {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-
-            .upload-action-btn {
-                background: transparent;
-                border: none;
-                color: var(--text-muted, #b0b3b8);
-                width: 26px;
-                height: 26px;
-                border-radius: 8px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                font-size: 13px;
-                transition: background 0.15s, color 0.15s;
-            }
-
-            .upload-action-btn:hover {
-                background: var(--border, #3a3b3c);
-                color: var(--text-dark, #e4e6eb);
-            }
-
-            [data-theme="light"] .upload-action-btn {
-                color: var(--text-muted, #64748b);
-            }
-            [data-theme="light"] .upload-action-btn:hover {
-                background: var(--border, #e2e8f0);
-                color: var(--text-dark, #0f172a);
-            }
-
-            /* Body */
-            .upload-banner-body {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 4px 14px 12px 14px;
-            }
-
-            /* Thumbnail */
-            .upload-banner-thumb-box {
+            /* Donut Container */
+            .upload-donut-container {
                 position: relative;
-                flex-shrink: 0;
+                width: 32px;
+                height: 32px;
             }
 
-            .upload-banner-thumb {
-                border-radius: 10px;
-                background: var(--background, #18191a);
-                border: 1px solid var(--border, #3a3b3c);
-                overflow: hidden;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                position: relative;
-            }
-
-            [data-theme="light"] .upload-banner-thumb {
-                background: var(--background, #f1f5f9);
-                border-color: var(--border, #e2e8f0);
-            }
-
-            .upload-thumb-media {
+            /* SVG Donut */
+            .upload-donut {
                 width: 100%;
                 height: 100%;
-                object-fit: cover;
-                display: block;
+                transform: rotate(-90deg);
             }
 
-            .upload-thumb-icon {
-                font-size: 18px;
-                color: var(--text-muted, #b0b3b8);
+            .upload-donut-bg {
+                fill: none;
+                stroke: var(--border, #3a3b3c);
+                stroke-width: 2.5;
             }
 
-            [data-theme="light"] .upload-thumb-icon {
-                color: var(--text-muted, #64748b);
+            [data-theme="light"] .upload-donut-bg {
+                stroke: var(--border, #e2e8f0);
             }
 
-            .upload-thumb-play-icon {
+            .upload-donut-progress {
+                fill: none;
+                stroke: #3b82f6;
+                stroke-width: 2.5;
+                stroke-linecap: round;
+                stroke-dasharray: 88, 88; /* 2 * PI * 14 ≈ 88 */
+                stroke-dashoffset: 88;
+                transition: stroke-dashoffset 0.3s ease;
+            }
+
+            /* Count in center */
+            .upload-count {
                 position: absolute;
-                inset: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: rgba(0, 0, 0, 0.28);
-                color: white;
-                font-size: 13px;
-                pointer-events: none;
-            }
-
-            .upload-thumb-duration {
-                position: absolute;
-                bottom: 2px;
-                right: 3px;
-                background: rgba(0, 0, 0, 0.75);
-                color: white;
-                font-size: 9px;
-                font-weight: 600;
-                padding: 1px 3px;
-                border-radius: 3px;
-                line-height: 1.1;
-                pointer-events: none;
-            }
-
-            /* Info Column */
-            .upload-banner-info-col {
-                flex: 1;
-                min-width: 0;
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
-            }
-
-            .upload-banner-title-row {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 8px;
-            }
-
-            .upload-primary-title {
-                font-size: 13.5px;
-                font-weight: 600;
-                color: var(--text-dark, #e4e6eb);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-
-            [data-theme="light"] .upload-primary-title {
-                color: var(--text-dark, #0f172a);
-            }
-
-            .upload-progress-number {
-                font-size: 12px;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 11px;
                 font-weight: 700;
                 color: var(--text-dark, #e4e6eb);
                 font-variant-numeric: tabular-nums;
             }
 
-            [data-theme="light"] .upload-progress-number {
+            [data-theme="light"] .upload-count {
                 color: var(--text-dark, #0f172a);
             }
 
-            .upload-banner-sub-row {
-                font-size: 11.5px;
+            /* Cancel Button */
+            .upload-cancel-btn {
+                background: transparent;
+                border: none;
                 color: var(--text-muted, #b0b3b8);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-
-            [data-theme="light"] .upload-banner-sub-row {
-                color: var(--text-muted, #64748b);
-            }
-
-            /* Quality Pills */
-            .upload-quality-pills {
-                display: flex;
+                width: 24px;
+                height: 24px;
+                border-radius: 6px;
+                display: inline-flex;
                 align-items: center;
-                gap: 5px;
-                margin-top: 3px;
-            }
-
-            .quality-pill {
-                font-size: 9.5px;
-                font-weight: 600;
-                padding: 1px 6px;
-                border-radius: 4px;
-                background: var(--background, #18191a);
-                color: var(--text-muted, #b0b3b8);
-                border: 1px solid var(--border, #3a3b3c);
-                transition: background 0.2s, color 0.2s;
-            }
-
-            [data-theme="light"] .quality-pill {
-                background: var(--background, #f1f5f9);
-                color: var(--text-muted, #64748b);
-                border-color: var(--border, #e2e8f0);
-            }
-
-            .quality-pill.encoding {
-                background: rgba(139, 92, 246, 0.18);
-                color: #c4b5fd;
-                border-color: rgba(139, 92, 246, 0.3);
-                animation: pill-pulse 1.2s ease-in-out infinite;
-            }
-
-            .quality-pill.ready {
-                background: rgba(16, 185, 129, 0.18);
-                color: #6ee7b7;
-                border-color: rgba(16, 185, 129, 0.3);
-                animation: none;
-            }
-
-            @keyframes pill-pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.55; }
-            }
-
-            /* Progress Bar */
-            .upload-banner-progress-track {
-                height: 3px;
-                background: var(--border, #3a3b3c);
-                position: relative;
-                width: 100%;
-            }
-
-            [data-theme="light"] .upload-banner-progress-track {
-                background: var(--border, #e2e8f0);
-            }
-
-            .upload-banner-progress-fill {
-                height: 100%;
-                width: 0%;
-                transition: width 0.22s ease-out;
-            }
-
-            .upload-banner-progress-fill.phase-upload {
-                background: linear-gradient(90deg, #2563eb, #38bdf8);
-            }
-
-            .upload-banner-progress-fill.phase-published {
-                background: linear-gradient(90deg, #10b981, #34d399);
-            }
-
-            .upload-banner-progress-fill.phase-transcoding {
-                background: linear-gradient(90deg, #7c3aed, #a855f7);
-                background-size: 24px 24px;
-                background-image: linear-gradient(
-                    45deg,
-                    rgba(255, 255, 255, 0.15) 25%,
-                    transparent 25%,
-                    transparent 50%,
-                    rgba(255, 255, 255, 0.15) 50%,
-                    rgba(255, 255, 255, 0.15) 75%,
-                    transparent 75%,
-                    transparent
-                );
-                animation: progress-shimmer 1.2s linear infinite;
-            }
-
-            .upload-banner-progress-fill.phase-error {
-                background: #ef4444;
-            }
-
-            @keyframes progress-shimmer {
-                from { background-position: 24px 0; }
-                to { background-position: 0 0; }
-            }
-
-            /* Minimized View */
-            .upload-mini-content {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 8px 14px;
+                justify-content: center;
                 cursor: pointer;
+                font-size: 12px;
+                transition: background 0.15s, color 0.15s;
             }
 
-            .upload-mini-left {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .upload-mini-icon {
-                color: #38bdf8;
-                font-size: 13px;
-                display: flex;
-                align-items: center;
-            }
-
-            .upload-mini-icon .spin-icon {
-                animation: spin 1s linear infinite;
-            }
-
-            .upload-mini-text {
-                font-size: 12.5px;
-                font-weight: 600;
+            .upload-cancel-btn:hover {
+                background: var(--border, #3a3b3c);
                 color: var(--text-dark, #e4e6eb);
             }
 
-            [data-theme="light"] .upload-mini-text {
+            [data-theme="light"] .upload-cancel-btn {
+                color: var(--text-muted, #64748b);
+            }
+            [data-theme="light"] .upload-cancel-btn:hover {
+                background: var(--border, #e2e8f0);
                 color: var(--text-dark, #0f172a);
-            }
-
-            .upload-mini-expand-btn {
-                width: 22px;
-                height: 22px;
-                font-size: 12px;
-            }
-
-            @keyframes spin {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
             }
         `;
 
@@ -1161,7 +441,6 @@ class UploadUI {
                 : Array.isArray(data.session?.files)
                 ? data.session.files
                 : [];
-            this.banner.setThumbnail(files);
             this.banner.show();
         });
 
@@ -1170,14 +449,7 @@ class UploadUI {
             this.banner.hide();
         });
 
-        // Warn if user attempts to leave during active byte upload
-        window.addEventListener('beforeunload', (e) => {
-            if (window.uploadManager && window.uploadManager.getActiveUpload()) {
-                e.preventDefault();
-                e.returnValue = 'You have an upload in progress. Leaving will cancel the upload.';
-                return e.returnValue;
-            }
-        });
+        // No beforeunload warning needed - resumable engine survives refresh
     }
 
     /**

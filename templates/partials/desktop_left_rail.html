@@ -153,6 +153,14 @@
             <span class="left-rail-label">{% trans "Download App" %}</span>
         </a>
 
+        <a href="{% url 'uploads_page:upload-manager' %}"
+           class="left-rail-link nav-chip {% if request.resolver_match.namespace == 'uploads_page' %}active{% endif %}"
+           data-bypass-htmx="true"
+           hx-boost="false">
+            <i class="bi bi-cloud-arrow-up-fill left-rail-icon"></i>
+            <span class="left-rail-label">{% trans "Uploads" %}</span>
+        </a>
+
         {% if request.user.is_staff %}
         <a href="{% url 'admin_dashboard:dashboard_home' %}"
            class="left-rail-link nav-chip {% if request.resolver_match.app_name == 'admin_dashboard' %}active{% endif %}"

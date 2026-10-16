@@ -1,16 +1,80 @@
 """Academic domain models for university structure.
 
-These models represent the hierarchical academic structure of the university
+These models represent the hierarchical academic structure of institutions
 and are designed to be reusable across vasto modules.
 
 Hierarchy:
-Faculty → School → Department → Programme → Academic Unit → Semester → Academic Year
+Institution → Faculty → School → Department → Programme → Academic Unit
+(Calendar: Academic Year → Semester; Progression: Academic Level)
+Institution scope is derived through the hierarchy (no denormalised copies).
 """
 
 from django.conf import settings
 from django.db import models
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
+
+
+class InstitutionType(models.TextChoices):
+    UNIVERSITY = 'university', 'University'
+    COLLEGE = 'college', 'College'
+    POLYTECHNIC = 'polytechnic', 'Polytechnic'
+    OTHER = 'other', 'Other'
+
+
+class Institution(models.Model):
+    """A university or other educational institution owning an academic catalogue."""
+
+    name = models.CharField(
+        max_length=200,
+        unique=True,
+        help_text="Official name of the institution (e.g., 'Pwani University')"
+    )
+    short_name = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Short code or abbreviation (e.g., 'PU')"
+    )
+    slug = models.SlugField(
+        max_length=250,
+        unique=True,
+        help_text="URL-friendly slug"
+    )
+    institution_type = models.CharField(
+        max_length=20,
+        choices=InstitutionType.choices,
+        default=InstitutionType.UNIVERSITY,
+        db_index=True,
+        help_text="Type of institution"
+    )
+    country = models.CharField(max_length=100, blank=True)
+    county_or_region = models.CharField(max_length=100, blank=True)
+    website = models.URLField(blank=True)
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Whether this institution is available for student setup"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Institution"
+        verbose_name_plural = "Institutions"
+        indexes = [
+            models.Index(fields=['slug']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['name']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
 
 class AcademicYear(models.Model):
@@ -154,8 +218,17 @@ class Semester(models.Model):
 
 
 class Faculty(models.Model):
-    """Represents a faculty (e.g., Faculty of Science)."""
-    
+    """Represents a faculty within an institution (e.g., Faculty of Science)."""
+
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name='faculties',
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="The institution this faculty belongs to (null = legacy/unmapped catalogue)"
+    )
     code = models.CharField(
         max_length=20,
         unique=True,
@@ -185,11 +258,16 @@ class Faculty(models.Model):
         indexes = [
             models.Index(fields=['code']),
             models.Index(fields=['slug']),
+            models.Index(fields=['institution']),
         ]
-    
+
     def __str__(self):
         return f"{self.code} - {self.name}"
-    
+
+    def get_institution(self):
+        """Return the owning institution (or None for legacy unmapped rows)."""
+        return self.institution
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
@@ -239,7 +317,13 @@ class School(models.Model):
     
     def __str__(self):
         return f"{self.code} - {self.name}"
-    
+
+    def get_institution(self):
+        """Derive the owning institution via school → faculty (None if unmapped)."""
+        school = getattr(self, 'school', None)
+        faculty = getattr(school, 'faculty', None) if school else None
+        return getattr(faculty, 'institution', None)
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
@@ -289,7 +373,13 @@ class Department(models.Model):
     
     def __str__(self):
         return f"{self.code} - {self.name}"
-    
+
+    def get_institution(self):
+        """Derive the owning institution via school → faculty (None if unmapped)."""
+        school = getattr(self, 'school', None)
+        faculty = getattr(school, 'faculty', None) if school else None
+        return getattr(faculty, 'institution', None)
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
@@ -351,7 +441,14 @@ class Programme(models.Model):
     
     def __str__(self):
         return f"{self.code} - {self.name}"
-    
+
+    def get_institution(self):
+        """Derive the owning institution via department → school → faculty (None if unmapped)."""
+        department = getattr(self, 'department', None)
+        school = getattr(department, 'school', None) if department else None
+        faculty = getattr(school, 'faculty', None) if school else None
+        return getattr(faculty, 'institution', None)
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
