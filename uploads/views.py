@@ -124,11 +124,25 @@ class UploadDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = UploadRecordSerializer
 
-    def get_object(self):
-        return get_object_or_404(
-            UploadRecord.objects.select_related("session", "post"),
-            id=self.kwargs["id"], user=self.request.user,
-        )
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            record = UploadRecord.objects.select_related("session", "post").get(
+                id=self.kwargs["id"], user=request.user,
+            )
+        except UploadRecord.DoesNotExist:
+            return Response(
+                {"error_code": "NOT_FOUND",
+                 "detail": "No UploadRecord matches the given query."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if record.deleted_at is not None:
+            return Response(
+                {"error_code": "UPLOAD_DELETED",
+                 "detail": "This upload was deleted. Start a new upload."},
+                status=status.HTTP_410_GONE,
+            )
+        serializer = self.get_serializer(record)
+        return Response(serializer.data)
 
 
 class UploadEventsView(generics.ListAPIView):
@@ -159,8 +173,14 @@ class UploadAuthorizeView(APIView):
         try:
             record = get_object_or_404(
                 UploadRecord.objects.select_related("session"),
-                id=id, user=request.user, deleted_at__isnull=True,
+                id=id, user=request.user,
             )
+            if record.deleted_at is not None:
+                return Response(
+                    {"error_code": "UPLOAD_DELETED",
+                     "detail": "This upload was deleted. Start a new upload."},
+                    status=status.HTTP_410_GONE,
+                )
             serializer = AuthorizeSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             try:
