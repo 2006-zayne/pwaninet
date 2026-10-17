@@ -82,7 +82,7 @@
                 {% else %}
                 <p class="small mb-0 text-secondary italic">
                     <i class="bi bi-shield-lock me-1"></i>
-                    "{{ profile_user.bio|default:_('Pwani University Student.') }}"
+                    "{{ profile_user.get_display_bio }}"
                 </p>
                 {% endif %}
             </div>
@@ -224,6 +224,12 @@
             </div>
             {% else %}
             <div class="d-flex flex-column gap-2 small text-secondary" style="font-size: 0.84rem;">
+                {% if profile_user.institution %}
+                <div class="d-flex justify-content-between py-1 border-bottom align-items-center">
+                    <span class="text-muted">{% trans "Institution" %}</span>
+                    <span class="badge bg-primary bg-opacity-10 text-primary fw-bold text-end text-wrap" style="max-width: 65%;">{{ profile_user.institution.name }}</span>
+                </div>
+                {% endif %}
                 {% if profile_user.programme %}
                 <div class="d-flex justify-content-between py-1 border-bottom">
                     <span class="text-muted">{% trans "Programme" %}</span>
@@ -268,6 +274,19 @@
                     <span class="text-muted">{% trans "Joined" %}</span>
                     <span class="text-dark fw-semibold">{{ profile_user.date_joined|date:"M Y" }}</span>
                 </div>
+
+                {% if request.user == profile_user %}
+                <div class="pt-2 border-top text-end">
+                    <a href="{% url 'users:settings_academic' %}"
+                       hx-get="{% url 'users:settings_academic' %}"
+                       hx-target="#page-content-target"
+                       hx-swap="innerHTML"
+                       hx-push-url="true"
+                       class="btn btn-sm btn-outline-primary rounded-pill py-1 px-3 small">
+                        <i class="bi bi-pencil-square me-1"></i>{% trans "Edit Academic Info" %}
+                    </a>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
         </div>

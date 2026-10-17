@@ -664,14 +664,15 @@ def load_semesters(request):
 def load_programmes_by_institution(request):
     """HTMX endpoint returning programme <option>s scoped to an institution.
 
-    Institution scope is derived via
-    Programme → Department → School → Faculty → Institution.
+    Institution scope is derived via Programme → Department → School (→ Faculty) → Institution.
     Unknown or inactive institutions yield an empty list (never an error page
     for HTMX swaps, never unscoped data).
     """
     from documents.academic.models import Institution, Programme
+    from django.db.models import Q
 
     institution_id = request.GET.get('institution_id') or request.GET.get('institution')
+    selected_programme_id = request.GET.get('selected_programme_id') or request.GET.get('programme')
     institution = None
     programmes = Programme.objects.none()
     if institution_id:
@@ -682,12 +683,15 @@ def load_programmes_by_institution(request):
             institution = None
         if institution is not None:
             programmes = Programme.objects.filter(
-                is_active=True,
-                department__school__faculty__institution=institution,
-            ).order_by('name')
+                is_active=True
+            ).filter(
+                Q(department__school__institution=institution) |
+                Q(department__school__faculty__institution=institution)
+            ).distinct().order_by('name')
     return render(request, 'users/partials/programme_options.html', {
         'programmes': programmes,
         'institution': institution,
+        'selected_programme_id': selected_programme_id,
     })
 
 
@@ -751,7 +755,31 @@ def save_institution_setup(request):
             return render(request, 'users/onboarding/partials/step_institution.html', ctx, status=400)
         messages.error(request, "Selected academic combination is invalid. Please review and try again.")
         return redirect('users:onboarding')
-    user.save(update_fields=['institution', 'programme', 'academic_level'])
+    fields_to_update = ['institution', 'programme', 'academic_level']
+    if not user.bio:
+        user.bio = user.generate_smart_bio()
+        fields_to_update.append('bio')
+    
+    if programme:
+        try:
+            from courses.models import Course, Year
+            matching_course = Course.objects.filter(name__iexact=programme.name).first()
+            if matching_course:
+                user.course = matching_course
+                fields_to_update.append('course')
+                if academic_level:
+                    matching_year = Year.objects.filter(course=matching_course, level=academic_level.level).first()
+                    if matching_year:
+                        user.year = matching_year
+                        fields_to_update.append('year')
+        except Exception:
+            pass
+    elif institution_changed and not programme:
+        user.course = None
+        user.year = None
+        fields_to_update.extend(['course', 'year'])
+
+    user.save(update_fields=list(set(fields_to_update)))
 
     if programme_changed or (institution_changed and not programme):
         try:
@@ -2029,6 +2057,121 @@ def settings_profile_view(request):
             'form': form,
         })
     return render(request, 'users/settings/profile.html', {'form': form})
+
+
+@login_required
+def settings_academic_view(request):
+    """Academic institution & programme settings page (full-page & HTMX supported)."""
+    from users.forms import AcademicProfileUpdateForm
+    from documents.academic.models import Institution, Programme
+
+    is_htmx = bool(request.headers.get('HX-Request'))
+
+    if request.method == 'POST':
+        form = AcademicProfileUpdateForm(request.POST, user=request.user)
+        if form.is_valid():
+            try:
+                form.save()
+                messages.success(request, 'Academic details updated successfully.')
+                if is_htmx:
+                    from pwaninet.utils.htmx import htmx_location_response
+                    from django.urls import reverse
+                    return htmx_location_response(reverse('users:settings_academic'))
+                return redirect('users:settings_academic')
+            except Exception as e:
+                messages.error(request, f'Error saving academic details: {str(e)}')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}' if field != '__all__' else str(error))
+    else:
+        form = AcademicProfileUpdateForm(user=request.user)
+
+    institutions = Institution.objects.filter(is_active=True).order_by('name')
+    setup_programmes = Programme.objects.none()
+    if request.user.institution_id:
+        from django.db.models import Q
+        setup_programmes = Programme.objects.filter(
+            is_active=True
+        ).filter(
+            Q(department__school__institution_id=request.user.institution_id) |
+            Q(department__school__faculty__institution_id=request.user.institution_id)
+        ).distinct().order_by('name')
+
+    context = {
+        'form': form,
+        'institutions': institutions,
+        'setup_programmes': setup_programmes,
+    }
+
+    if is_htmx:
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/academic_content.html',
+            **context,
+        })
+    return render(request, 'users/settings/academic.html', context)
+
+
+@login_required
+@require_http_methods(["GET", "PATCH", "POST"])
+def api_user_academic_view(request):
+    """REST API endpoint to retrieve or update the authenticated user's academic profile."""
+    from users.forms import AcademicProfileUpdateForm
+    from documents.academic.models import Institution, Programme
+    import json
+
+    user = request.user
+
+    if request.method == "GET":
+        return JsonResponse({
+            'status': 'success',
+            'academic_profile': {
+                'institution': {
+                    'id': user.institution.id,
+                    'name': user.institution.name,
+                    'short_name': user.institution.short_name,
+                    'slug': user.institution.slug,
+                } if user.institution else None,
+                'programme': {
+                    'id': user.programme.id,
+                    'name': user.programme.name,
+                    'code': user.programme.code,
+                } if user.programme else None,
+                'academic_level': {
+                    'id': user.academic_level.id,
+                    'level': user.academic_level.level,
+                    'name': user.academic_level.name,
+                } if user.academic_level else None,
+                'bio': user.bio,
+                'display_bio': user.get_display_bio(),
+            }
+        })
+
+    data = request.POST
+    if not data and request.body:
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+        except Exception:
+            data = {}
+
+    form = AcademicProfileUpdateForm(data, user=user)
+    if form.is_valid():
+        updated_user = form.save()
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Academic profile updated successfully.',
+            'academic_profile': {
+                'institution_id': updated_user.institution_id,
+                'programme_id': updated_user.programme_id,
+                'academic_level_id': updated_user.academic_level_id,
+                'bio': updated_user.bio,
+                'display_bio': updated_user.get_display_bio(),
+            }
+        })
+    return JsonResponse({
+        'status': 'error',
+        'errors': form.errors.get_json_data()
+    }, status=400)
 
 
 @login_required

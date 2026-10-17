@@ -16,6 +16,8 @@
   
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_profile' icon_class='bi-person' title='Profile Settings' subtitle='Manage your profile, username, bio...' is_htmx=True %}
 
+  {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_academic' icon_class='bi-mortarboard' title='Academic & Institution' subtitle='University, programme, year of study...' is_htmx=True %}
+
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_appearance' icon_class='bi-palette' title='Appearance' subtitle='Theme, dark mode, language...' is_htmx=True %}
 
   {% include 'users/settings/components/settings_category_item.html' with url_name='users:settings_notifications' icon_class='bi-bell' title='Notifications' subtitle='Push notifications, mentions...' is_htmx=True %}

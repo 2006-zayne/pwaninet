@@ -4,7 +4,9 @@
   <p class="text-muted small mb-3">Tell us where you study so we can show the right programmes. You can skip this and continue.</p>
 
   {% if setup_saved %}
-  <div class="alert alert-success py-2 px-3 small" role="alert">Academic setup saved.</div>
+  <div class="alert alert-success py-2 px-3 small rounded-3" role="alert">
+    <i class="bi bi-check-circle me-1"></i>Academic setup saved! Your smart bio is active: <strong>"{{ user.get_display_bio }}"</strong>
+  </div>
   {% endif %}
   {% if setup_errors %}
   <div class="alert alert-danger py-2 px-3 small" role="alert">
@@ -32,7 +34,7 @@
               hx-trigger="change">
         <option value="">Select your institution (optional)</option>
         {% for inst in institutions %}
-        <option value="{{ inst.id }}" {% if setup_form.initial.institution and setup_form.initial.institution.id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
+        <option value="{{ inst.id }}" {% if setup_form.initial.institution and setup_form.initial.institution.id == inst.id %}selected{% elif user.institution and user.institution.id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
         {% empty %}
         <option value="" disabled>No institutions available yet</option>
         {% endfor %}
@@ -48,7 +50,7 @@
       <select name="programme" id="id_setup_programme" class="form-select">
         <option value="">Select your programme (optional)</option>
         {% for prog in setup_programmes %}
-        <option value="{{ prog.id }}" {% if setup_form.initial.programme and setup_form.initial.programme.id == prog.id %}selected{% endif %}>{{ prog.name }}{% if prog.code %} ({{ prog.code }}){% endif %}</option>
+        <option value="{{ prog.id }}" {% if setup_form.initial.programme and setup_form.initial.programme.id == prog.id %}selected{% elif user.programme and user.programme.id == prog.id %}selected{% endif %}>{{ prog.name }}{% if prog.code %} ({{ prog.code }}){% endif %}</option>
         {% endfor %}
       </select>
       {% for err in setup_form.programme.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}

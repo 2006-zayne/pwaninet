@@ -1,0 +1,153 @@
+{% load i18n static %}
+
+<div class="page-header">
+  <a href="{% url 'users:settings' %}"
+     hx-get="{% url 'users:settings' %}"
+     hx-target="#page-content-target"
+     hx-swap="innerHTML"
+     hx-push-url="true"
+     hx-history="true"
+     class="back-link">
+    <i class="bi bi-arrow-left"></i> {% trans "Back to Settings" %}
+  </a>
+  <h1 class="page-title">{% trans "Academic & Institution" %}</h1>
+  <p class="page-subtitle">{% trans "Manage your university, academic programme, year of study, and bio" %}</p>
+</div>
+
+<div class="settings-list-container mb-4">
+  <!-- Current Academic Status Overview -->
+  <div class="p-3 p-md-4 border-bottom" style="background: var(--bg-surface, rgba(0,0,0,0.02));">
+    <div class="d-flex align-items-center gap-3">
+      <div class="rounded-circle d-flex align-items-center justify-content-center text-primary" style="width: 52px; height: 52px; background: rgba(13, 110, 253, 0.12); font-size: 1.5rem;">
+        <i class="bi bi-mortarboard-fill"></i>
+      </div>
+      <div>
+        <h5 class="fw-bold mb-0">
+          {% if user.institution %}
+            {{ user.institution.name }}
+          {% else %}
+            {% trans "No Institution Set" %}
+          {% endif %}
+        </h5>
+        <div class="text-muted small">
+          {% if user.programme %}
+            {{ user.programme.name }}
+            {% if user.academic_level %} • {{ user.academic_level.name }}{% endif %}
+          {% else %}
+            {% trans "Select your institution and programme below to connect with classmates and course circles." %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Bio Preview -->
+    <div class="mt-3 p-2 px-3 rounded-3 border bg-white small">
+      <span class="text-muted fw-semibold me-1"><i class="bi bi-chat-quote-fill text-primary me-1"></i>{% trans "Active Bio:" %}</span>
+      <span class="fst-italic text-dark">"{{ user.get_display_bio }}"</span>
+    </div>
+  </div>
+
+  <div class="p-3 p-md-4">
+    <form method="POST"
+          action="{% url 'users:settings_academic' %}"
+          hx-post="{% url 'users:settings_academic' %}"
+          hx-target="#page-content-target"
+          hx-swap="innerHTML"
+          class="academic-update-form">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger py-2 px-3 small rounded-3 mb-3">
+        {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Institution Selection -->
+      <div class="form-group mb-3">
+        <label class="form-label fw-semibold small" for="id_academic_institution">{% trans "Institution / University" %}</label>
+        <select name="institution" id="id_academic_institution" class="form-select tactical-form-input"
+                hx-get="{% url 'users:load_programmes_by_institution' %}"
+                hx-target="#id_academic_programme" hx-swap="innerHTML"
+                hx-trigger="change">
+          <option value="">{% trans "Select your institution (optional)" %}</option>
+          {% for inst in institutions %}
+          <option value="{{ inst.id }}" {% if form.initial.institution and form.initial.institution.id == inst.id %}selected{% elif user.institution and user.institution.id == inst.id %}selected{% endif %}>
+            {{ inst.name }}{% if inst.short_name %} ({{ inst.short_name }}){% endif %}
+          </option>
+          {% empty %}
+          <option value="" disabled>{% trans "No institutions available yet" %}</option>
+          {% endfor %}
+        </select>
+        {% for err in form.institution.errors %}<div class="text-danger small mt-1">{{ err }}</div>{% endfor %}
+        <div class="form-text text-muted small">{% trans "Choose your university or college. Programmes will automatically filter to match." %}</div>
+      </div>
+
+      <!-- Programme Selection -->
+      <div class="form-group mb-3">
+        <label class="form-label fw-semibold small" for="id_academic_programme">{% trans "Academic Programme" %}</label>
+        <select name="programme" id="id_academic_programme" class="form-select tactical-form-input">
+          <option value="">{% trans "Select your programme (optional)" %}</option>
+          {% for prog in setup_programmes %}
+          <option value="{{ prog.id }}" {% if form.initial.programme and form.initial.programme.id == prog.id %}selected{% elif user.programme and user.programme.id == prog.id %}selected{% endif %}>
+            {{ prog.name }}{% if prog.code %} ({{ prog.code }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        {% for err in form.programme.errors %}<div class="text-danger small mt-1">{{ err }}</div>{% endfor %}
+      </div>
+
+      <!-- Academic Level / Year Selection -->
+      <div class="form-group mb-3">
+        <label class="form-label fw-semibold small" for="id_academic_level">{% trans "Year of Study" %}</label>
+        <select name="academic_level" id="id_academic_level" class="form-select tactical-form-input">
+          <option value="">{% trans "Select your year of study (optional)" %}</option>
+          {% for value, label in form.fields.academic_level.choices %}
+            {% if value %}
+            <option value="{{ value }}" {% if form.initial.academic_level and form.initial.academic_level.id|stringformat:"s" == value|stringformat:"s" %}selected{% elif user.academic_level and user.academic_level.id|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+        {% for err in form.academic_level.errors %}<div class="text-danger small mt-1">{{ err }}</div>{% endfor %}
+      </div>
+
+      <!-- Bio Customization or Smart Auto-Synthesis -->
+      <div class="form-group mb-4">
+        <label class="form-label fw-semibold small" for="id_academic_bio">{% trans "Bio Tagline" %}</label>
+        <textarea name="bio" id="id_academic_bio" rows="3" class="form-control tactical-form-input"
+                  placeholder="{% trans 'Tell classmates about yourself, or leave blank to auto-generate a smart bio...' %}">{{ form.initial.bio|default:user.bio }}</textarea>
+        {% for err in form.bio.errors %}<div class="text-danger small mt-1">{{ err }}</div>{% endfor %}
+        <div class="form-text text-muted small">
+          <i class="bi bi-magic me-1 text-primary"></i>{% trans "Leave blank to let Vasto automatically synthesize an intelligent tagline like" %} <em>"{{ user.generate_smart_bio }}"</em>.
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap pt-2">
+        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">
+          <i class="bi bi-check2-circle me-1"></i> {% trans "Save Academic Details" %}
+        </button>
+        <a href="{% url 'users:settings' %}"
+           hx-get="{% url 'users:settings' %}"
+           hx-target="#page-content-target"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           class="btn btn-outline-secondary rounded-pill px-4 fw-semibold">
+          {% trans "Cancel" %}
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  var inst = document.getElementById('id_academic_institution');
+  var prog = document.getElementById('id_academic_programme');
+  if (inst && prog) {
+    inst.addEventListener('change', function() {
+      if (typeof htmx === 'undefined') {
+        prog.innerHTML = '<option value="">Select your programme (optional)</option>';
+      }
+    });
+  }
+})();
+</script>

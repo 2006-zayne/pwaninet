@@ -383,6 +383,44 @@ class User(AbstractUser):
         from documents.academic.services import StudentAcademicEnrollmentService
         return StudentAcademicEnrollmentService.get_active_enrollments(self)
 
+    def generate_smart_bio(self):
+        """Intelligently construct a bio based on the user's institution, programme, and study level."""
+        prog_name = None
+        if self.programme:
+            prog_name = self.programme.name
+        elif self.course:
+            prog_name = self.course.name
+
+        level_name = None
+        if self.academic_level:
+            level_name = self.academic_level.name
+        elif self.year:
+            level_name = f"Year {self.year.level}"
+
+        inst_name = None
+        if self.institution:
+            inst_name = self.institution.name
+        elif self.programme and self.programme.get_institution():
+            inst_name = self.programme.get_institution().name
+
+        if level_name and prog_name and inst_name:
+            return f"{level_name} {prog_name} student at {inst_name}"
+        if prog_name and inst_name:
+            return f"{prog_name} student at {inst_name}"
+        if level_name and prog_name:
+            return f"{level_name} {prog_name} student"
+        if prog_name:
+            return f"{prog_name} student"
+        if inst_name:
+            return f"Student at {inst_name}"
+        return "Scholar on Vasto"
+
+    def get_display_bio(self):
+        """Return user's custom bio if present, otherwise dynamically synthesize an intelligent bio."""
+        if self.bio and self.bio.strip():
+            return self.bio.strip()
+        return self.generate_smart_bio()
+
     def __str__(self):
         return f"{self.first_name} {self.second_name}".strip() or self.username
     

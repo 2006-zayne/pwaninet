@@ -47,9 +47,18 @@ class Institution(models.Model):
         db_index=True,
         help_text="Type of institution"
     )
-    country = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, default='Kenya', blank=True)
     county_or_region = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100, blank=True)
     website = models.URLField(blank=True)
+    logo = models.ImageField(upload_to='institutions/logos/', null=True, blank=True)
+    cover_image = models.ImageField(upload_to='institutions/covers/', null=True, blank=True)
+    brand_color = models.CharField(max_length=7, default='#0d6efd', blank=True)
+    email_domains = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Comma-separated email domains (e.g., 'pu.ac.ke, student.pu.ac.ke')"
+    )
     is_active = models.BooleanField(
         default=True,
         db_index=True,
@@ -292,9 +301,20 @@ class School(models.Model):
         unique=True,
         help_text="URL-friendly slug"
     )
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name='schools',
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="The institution this school belongs to (optional if faculty is set)"
+    )
     faculty = models.ForeignKey(
         Faculty,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='schools',
         help_text="The faculty this school belongs to"
     )
@@ -313,18 +333,23 @@ class School(models.Model):
             models.Index(fields=['code']),
             models.Index(fields=['slug']),
             models.Index(fields=['faculty']),
+            models.Index(fields=['institution']),
         ]
     
     def __str__(self):
         return f"{self.code} - {self.name}"
 
     def get_institution(self):
-        """Derive the owning institution via school → faculty (None if unmapped)."""
-        school = getattr(self, 'school', None)
-        faculty = getattr(school, 'faculty', None) if school else None
-        return getattr(faculty, 'institution', None)
+        """Derive the owning institution (directly or via faculty)."""
+        if getattr(self, 'institution_id', None):
+            return self.institution
+        if getattr(self, 'faculty_id', None) and self.faculty:
+            return self.faculty.get_institution()
+        return None
 
     def save(self, *args, **kwargs):
+        if getattr(self, 'faculty_id', None) and not getattr(self, 'institution_id', None):
+            self.institution = self.faculty.institution
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
@@ -375,10 +400,10 @@ class Department(models.Model):
         return f"{self.code} - {self.name}"
 
     def get_institution(self):
-        """Derive the owning institution via school → faculty (None if unmapped)."""
-        school = getattr(self, 'school', None)
-        faculty = getattr(school, 'faculty', None) if school else None
-        return getattr(faculty, 'institution', None)
+        """Derive the owning institution via school."""
+        if getattr(self, 'school_id', None) and self.school:
+            return self.school.get_institution()
+        return None
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -443,11 +468,10 @@ class Programme(models.Model):
         return f"{self.code} - {self.name}"
 
     def get_institution(self):
-        """Derive the owning institution via department → school → faculty (None if unmapped)."""
-        department = getattr(self, 'department', None)
-        school = getattr(department, 'school', None) if department else None
-        faculty = getattr(school, 'faculty', None) if school else None
-        return getattr(faculty, 'institution', None)
+        """Derive the owning institution via department → school."""
+        if getattr(self, 'department_id', None) and self.department:
+            return self.department.get_institution()
+        return None
 
     def save(self, *args, **kwargs):
         if not self.slug:
