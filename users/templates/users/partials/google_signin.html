@@ -228,12 +228,14 @@
                 );
                 if (!idToken) {
                     console.error('[NativeGoogle] No idToken in response:', response);
-                    showError('Google sign-in failed: no identity token returned. Please try again.');
+                    showError('Google sign-in failed: plugin returned no token. Raw: ' + JSON.stringify(response).slice(0, 300));
                     btn.disabled = false;
                     return;
                 }
+                console.log('[NativeGoogle] Sending idToken to backend, length:', idToken.length);
                 postJson(COMPLETE_URL, { credential: idToken })
                     .then(function(data) {
+                        console.log('[NativeGoogle] Backend response:', JSON.stringify(data).slice(0, 500));
                         if (data && data.status === 'ok' && data.redirect) {
                             window.location.href = data.redirect;
                             return;
@@ -246,17 +248,20 @@
                         showError((data && data.message) || 'Google sign-in failed. Please try again.');
                         btn.disabled = false;
                     })
-                    .catch(function() {
-                        showError('Google sign-in failed. Please check your connection and try again.');
+                    .catch(function(err) {
+                        console.error('[NativeGoogle] Backend POST failed:', err);
+                        showError('Google sign-in failed: server error (' + (err && err.message ? err.message : 'network') + '). Please try again.');
                         btn.disabled = false;
                     });
             }).catch(function(e) {
-                if (e && e.message === 'native_login_timed_out') {
-                    showError('Google sign-in timed out on this device — please sign in with email/password instead.');
-                } else if (e && e.message === 'native_login_not_available') {
+                var msg = e && e.message ? e.message : String(e);
+                console.error('[NativeGoogle] Login rejected:', msg);
+                if (msg === 'native_login_timed_out') {
+                    showError('Google sign-in timed out waiting for you to pick an account. Please try again.');
+                } else if (msg === 'native_login_not_available') {
                     showError('Google sign-in is unavailable in this app version.');
                 } else {
-                    showError('Google sign-in failed. Please try again.');
+                    showError('Google sign-in failed: ' + msg);
                 }
                 btn.disabled = false;
             });
