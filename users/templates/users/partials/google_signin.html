@@ -218,14 +218,18 @@
             })]).then(function(response) {
                 // The plugin may return the token under result.idToken,
                 // top-level idToken, token, credential, or as a raw string.
-                var idToken = response && (
-                    typeof response === 'string'
-                        ? response
-                        : (response.result && response.result.idToken) ||
-                          response.idToken ||
-                          response.token ||
-                          response.credential
-                );
+                // Some versions resolve with {credential: {idToken}} or
+                // {idToken: ...} at various nesting levels.
+                var idToken = null;
+                if (typeof response === 'string') {
+                    idToken = response;
+                } else if (response) {
+                    idToken = response.idToken || response.token || response.credential ||
+                        (response.result && (response.result.idToken || response.result.token || response.result.credential)) ||
+                        (response.credential && response.credential.idToken) ||
+                        (response.data && response.data.idToken) ||
+                        (response.accessToken && response.accessToken.idToken);
+                }
                 if (!idToken) {
                     console.error('[NativeGoogle] No idToken in response:', response);
                     showError('Google sign-in failed: plugin returned no token. Raw: ' + JSON.stringify(response).slice(0, 300));
