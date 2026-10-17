@@ -123,7 +123,7 @@ class TimetableExtractionService:
         and construct the canonical schedule JSON.
         """
         api_key = getattr(settings, "PWANIMATE_GEMINI_API_KEY", "") or getattr(settings, "GEMINI_API_KEY", "")
-        model_name = getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-1.5-flash")
+        model_name = getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-3.8-flash")
 
         if api_key and api_key.strip():
             try:
