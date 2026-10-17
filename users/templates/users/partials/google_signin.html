@@ -216,6 +216,7 @@
             Promise.race([p, new Promise(function(_, rej) {
                 setTimeout(function() { rej(new Error('native_login_timed_out')); }, 60000);
             })]).then(function(response) {
+                console.log('[NativeGoogle] Raw login response:', (function(v) { try { return JSON.stringify(v); } catch (err) { return String(v); } })(response));
                 // The plugin may return the token under result.idToken,
                 // top-level idToken, token, credential, or as a raw string.
                 // Some versions resolve with {credential: {idToken}} or
@@ -259,7 +260,7 @@
                     });
             }).catch(function(e) {
                 var msg = e && e.message ? e.message : String(e);
-                console.error('[NativeGoogle] Login rejected:', msg);
+                console.error('[NativeGoogle] Login rejected:', msg, 'code:', e && e.code, 'raw:', (function(v) { try { return JSON.stringify(v); } catch (err) { return String(v); } })(e));
                 if (msg === 'native_login_timed_out') {
                     showError('Google sign-in timed out waiting for you to pick an account. Please try again.');
                 } else if (msg === 'native_login_not_available') {
