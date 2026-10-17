@@ -112,6 +112,7 @@ TEMPLATES = [
                 'notifications.context_processors.notification_count',
                 'uploads.context_processors.upload_flags',
                 'pwaninet.context_processors.release_metadata',
+                'pwaninet.context_processors.session_identity',
                 'groups.context_processors.groups_nav_context',
                 'messaging.context_processors.messaging_nav_context',
             ],

@@ -131,3 +131,20 @@ def release_metadata(request):
 
     return base_context
 
+
+
+def session_identity(request):
+    """
+    Expose the current session key (and the client device id, when present)
+    so client-side scripts can identify their own tab/device. Used by
+    session_guard.js for realtime force-logout matching.
+    """
+    try:
+        session_key = request.session.session_key or ''
+    except Exception:
+        session_key = ''
+    device_id = getattr(request, 'device_id', None) or request.headers.get('X-Device-ID', '')
+    return {
+        'current_session_key': session_key,
+        'client_device_id': device_id,
+    }

@@ -98,14 +98,32 @@
             <span class="device-detail"><i class="bi bi-activity"></i> Last active: {{ session.last_activity|timesince }} ago</span>
           </div>
         </div>
-        <div class="device-actions">
-          <button class="btn-sign-out"
-                  hx-post="{% url 'users:api_sign_out_session' session.id %}"
-                  hx-target="closest .device-card"
-                  hx-swap="outerHTML"
-                  aria-label="{% trans 'Sign out this device' %}">
+        <div class="device-actions" data-session-id="{{ session.id }}">
+          <button class="btn-sign-out dv-signout-toggle" type="button" aria-label="{% trans 'Sign out this device' %}">
             <i class="bi bi-box-arrow-right"></i> {% trans "Sign Out" %}
           </button>
+          <div class="dv-signout-choices" hidden>
+            <button class="btn btn-outline-secondary btn-sm"
+                    type="button"
+                    hx-post="{% url 'users:api_sign_out_session' session.id %}"
+                    hx-target="closest .device-card"
+                    hx-swap="outerHTML"
+                    hx-confirm="{% trans 'Sign out this device? It stays allowed to sign in again later.' %}">
+              <i class="bi bi-box-arrow-right"></i> {% trans "Kick out only" %}
+            </button>
+            {% if session.session_key in device_hash_by_session %}
+            <button class="btn btn-outline-danger btn-sm"
+                    type="button"
+                    hx-post="{% url 'users:api_sign_out_session' session.id %}"
+                    hx-vals='{"block": "1"}'
+                    hx-target="closest .device-card"
+                    hx-swap="outerHTML"
+                    hx-confirm="{% trans 'Kick out and block this device ID? It will not be able to sign into your account again.' %}">
+              <i class="bi bi-slash-circle"></i> {% trans "Kick out + block device ID" %}
+            </button>
+            {% endif %}
+            <button class="btn btn-link btn-sm dv-signout-toggle-cancel" type="button">{% trans "Cancel" %}</button>
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -223,6 +241,34 @@
 
 <script>
 (function () {
+  // Sign Out chooser: click reveals "kick out" / "kick out + block device id"
+  document.addEventListener('click', function (e) {
+    var toggle = e.target.closest('.dv-signout-toggle');
+    var cancel = e.target.closest('.dv-signout-toggle-cancel');
+    var choices = e.target.closest('.dv-signout-choices');
+    var hxButton = e.target.closest('[hx-post]');
+    if (toggle && !hxButton) {
+      var actions = toggle.closest('.device-actions');
+      var panel = actions && actions.querySelector('.dv-signout-choices');
+      if (panel) panel.hidden = !panel.hidden;
+      return;
+    }
+    if (cancel) {
+      var parentPanel = cancel.closest('.dv-signout-choices');
+      if (parentPanel) parentPanel.hidden = true;
+      return;
+    }
+    if (hxButton) {
+      var wrapPanel = hxButton.closest('.dv-signout-choices');
+      if (wrapPanel) wrapPanel.hidden = true;
+      return;
+    }
+    // Click anywhere else closes all open choosers
+    document.querySelectorAll('.dv-signout-choices').forEach(function (p) {
+      if (!p.hidden) p.hidden = true;
+    });
+  });
+
   function csrfToken() {
     var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
     return match ? decodeURIComponent(match[1]) : '';

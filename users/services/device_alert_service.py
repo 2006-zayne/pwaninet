@@ -427,9 +427,14 @@ def block_device(event, secure_account=False):
         defaults={'reason': DeviceBlockReason.USER_REPORTED, 'source_event': event},
     )
 
-    # 1. Kill the offending session immediately
+    # 1. Kill the offending session immediately — belt and braces: also hit
+    #    the Django Session row directly so revocation never depends on the
+    #    UserSession mirror row existing.
     if event.session_key:
         revoke_session(event.session_key, user=event.user)
+        _terminate_session_hard(event.user, event.session_key)
+
+    invalidate_blocked_hash_cache(event.user_id)
 
     if not secure_account:
         _notify_blocked_summary(event, nuke=False)
@@ -445,6 +450,7 @@ def block_device(event, secure_account=False):
         if session.session_key in trusted_keys:
             continue
         revoke_session(session.session_key, user=event.user)
+        _terminate_session_hard(event.user, session.session_key)
         revoked += 1
 
     _invalidate_password_and_email(event.user, event, revoked)
@@ -454,6 +460,62 @@ def block_device(event, secure_account=False):
         f"blocked device hash={event.device_hash[:10]}, sessions revoked={revoked}"
     )
     return blocked
+
+
+def _terminate_session_hard(user, session_key):
+    """Directly delete the Django Session row and push a realtime logout to
+    every open tab of this user (instant, no waiting for the next request or
+    the session-guard heartbeat)."""
+    if not session_key:
+        return
+    try:
+        from django.contrib.sessions.models import Session
+        Session.objects.filter(session_key=session_key).delete()
+    except Exception:
+        pass
+    dispatch_force_logout(user.pk, [session_key])
+
+
+def dispatch_force_logout(user_id, session_keys):
+    """
+    Broadcast an instant-logout event over the user's existing notifications
+    websocket channel. Any open tab holding one of these session keys
+    immediately drops itself to the login screen (session_guard.js).
+    """
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"notifications_{user_id}",
+                {
+                    'type': 'force_logout',
+                    'session_keys': list(session_keys or []),
+                },
+            )
+    except Exception as e:
+        logger.debug(f"[DEVICE-ALERT] force_logout broadcast unavailable: {e}")
+
+
+def invalidate_blocked_hash_cache(user_id):
+    try:
+        from pwaninet.middleware.device_block_middleware import invalidate_blocked_device_cache
+        invalidate_blocked_device_cache(user_id)
+    except Exception:
+        pass
+
+
+def revoke_session_keys(user, keep_session_key=None):
+    """Session keys about to be revoked (used to broadcast force_logout to
+    currently-open tabs). Pure query — the caller performs revocation."""
+    try:
+        qs = user.user_sessions.exclude(session_key='').filter(session_key__isnull=False)
+        if keep_session_key:
+            qs = qs.exclude(session_key=keep_session_key)
+        return list(qs.values_list('session_key', flat=True))
+    except Exception:
+        return []
 
 
 def _session_keys_for_hashes(user, device_hashes):

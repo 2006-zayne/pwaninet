@@ -2784,8 +2784,17 @@ def settings_notifications_view(request):
 @login_required
 @require_http_methods(["POST"])
 def api_sign_out_session(request, session_id):
-    """Sign out a specific session (API endpoint for HTMX)"""
+    """
+    Sign out a specific session (API endpoint for HTMX).
+
+    Optional form field ``block``: when truthy ("1"/"true"), the device
+    fingerprint bound to that session is added to BlockedDevice so it cannot
+    sign into this account again — the "kick out + block device" option.
+    """
     from users.services.session_service import revoke_session
+    from users.services.device_alert_service import (
+        _terminate_session_hard, invalidate_blocked_hash_cache,
+    )
     try:
         session = UserSession.objects.get(id=session_id, user=request.user)
 
@@ -2793,7 +2802,21 @@ def api_sign_out_session(request, session_id):
         if session.session_key == request.session.session_key:
             return JsonResponse({'error': 'Cannot sign out current session'}, status=400)
 
+        want_block = request.POST.get('block') in ('1', 'true', 'True', 'on')
+        if want_block:
+            device_hash = DeviceAccount.objects.filter(
+                user=request.user, session_key=session.session_key
+            ).values_list('device_id', flat=True).first()
+            if device_hash:
+                BlockedDevice.objects.get_or_create(
+                    user=request.user,
+                    device_hash=device_hash,
+                    defaults={'reason': 'user_reported'},
+                )
+                invalidate_blocked_hash_cache(request.user.pk)
+
         revoke_session(session.id, user=request.user)
+        _terminate_session_hard(request.user, session.session_key)
         return HttpResponse('')  # HTMX will remove the element
     except UserSession.DoesNotExist:
         return JsonResponse({'error': 'Session not found'}, status=404)
@@ -2801,12 +2824,50 @@ def api_sign_out_session(request, session_id):
 
 @login_required
 @require_http_methods(["POST"])
+def api_session_alive(request):
+    """
+    Session-guard heartbeat (Phase 1): tells an open tab whether its session
+    is still valid server-side. Covers logouts/reblocks that happen without
+    a websocket available (or while the socket is reconnecting).
+    """
+    from django.contrib.sessions.models import Session
+    from pwaninet.middleware.device_block_middleware import _blocked_hashes_for_user
+
+    claim = request.POST.get('session_key', '')
+    own_key = request.session.session_key or ''
+    if claim and claim != own_key:
+        return JsonResponse({'alive': False, 'reason': 'wrong_session'}, status=200)
+
+    reasons = []
+    if own_key and not Session.objects.filter(session_key=own_key).exists():
+        reasons.append('signed_out')
+
+    blocked_hashes = _blocked_hashes_for_user(request.user.pk)
+    device_hash = DeviceAccount.objects.filter(
+        user=request.user, session_key=own_key
+    ).values_list('device_id', flat=True).first() if own_key else None
+    if device_hash and device_hash in blocked_hashes:
+        reasons.append('device_blocked')
+
+    if reasons:
+        _terminate_session_hard(request.user, own_key)
+        return JsonResponse({'alive': False, 'reason': reasons[0]}, status=200)
+    return JsonResponse({'alive': True}, status=200)
+
+
+@login_required
+@require_http_methods(["POST"])
 def api_sign_out_all_sessions(request):
     """Sign out all other sessions (API endpoint for HTMX)"""
     from users.services.session_service import revoke_other_user_sessions
+    from users.services.device_alert_service import dispatch_force_logout, revoke_session_keys
     current_session_key = request.session.session_key
 
+    revoked_keys = revoke_session_keys(request.user, current_session_key)
+
     revoke_other_user_sessions(request.user, current_session_key)
+
+    dispatch_force_logout(request.user.pk, revoked_keys)
 
     messages.success(request, 'All other devices have been signed out.')
     if request.headers.get('HX-Request'):

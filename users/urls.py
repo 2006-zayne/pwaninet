@@ -102,6 +102,7 @@ urlpatterns = [
     path('api/security/blocked-devices/<int:blocked_id>/unblock/', views.api_blocked_device_unblock, name='api_blocked_device_unblock'),
 
     # Privacy API endpoints
+    path('api/security/session-alive/', views.api_session_alive, name='api_session_alive'),
     path('api/privacy/sign-out-session/<int:session_id>/', views.api_sign_out_session, name='api_sign_out_session'),
     path('api/privacy/sign-out-all-sessions/', views.api_sign_out_all_sessions, name='api_sign_out_all_sessions'),
     path('api/privacy/unblock/<int:user_id>/', views.api_unblock_user, name='api_unblock_user'),

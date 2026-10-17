@@ -157,9 +157,41 @@ class DeviceAlertTests(TestCase):
             UserSession.objects.filter(session_key=challenge.session.session_key).exists(),
             'the challenged session should be revoked on deny'
         )
+        # Regression for the reported flaw: the DJANGO session row itself must
+        # be gone so the browser is logged out on its very next request.
+        from django.contrib.sessions.models import Session
+        self.assertFalse(
+            Session.objects.filter(session_key=challenge.session.session_key).exists(),
+            'the underlying django session row must be deleted on deny'
+        )
         # password is untouched on a plain block
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('S3cure-pw!'))
+
+    # -- realtime kill ---------------------------------------------------------
+    def test_sign_out_session_with_block_creates_block_and_kills(self):
+        """Settings → Devices 'Sign Out' with block=1: the device id is
+        blocked and the realtime logout broadcast fires."""
+        hash_b = resolve_device_hash(_request(DEVICE_B))
+        key_b = SessionStore()
+        key_b.save()
+        row = UserSession.objects.create(user=self.user, session_key=key_b.session_key)
+        DeviceAccount.objects.create(user=self.user, device_id=hash_b, session_key=key_b.session_key)
+
+        from django.test import RequestFactory
+        from users.views import api_sign_out_session
+        req = RequestFactory().post('/', {'block': '1'})
+        req.user = self.user
+        req.session = SessionStore(); req.session.save()
+        response = api_sign_out_session(req, row.id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            BlockedDevice.objects.filter(user=self.user, device_hash=hash_b).exists()
+        )
+        self.assertFalse(UserSession.objects.filter(id=row.id).exists())
+        from django.contrib.sessions.models import Session
+        self.assertFalse(Session.objects.filter(session_key=key_b.session_key).exists())
 
     def test_nuke_revokes_sessions_and_disables_password(self):
         self._seed_trust()

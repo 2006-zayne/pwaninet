@@ -167,9 +167,11 @@
         if (approveBtn) approveBtn.addEventListener('click', function () {
           busy(approveBtn);
           post(APPROVE_URL).then(function (data) {
-            if (data.ok) { hideAll(); show(stateC); }
-            else { reset(approveBtn); hideAll(); showFail(data); }
-          });
+            if (data.ok) {
+              hideAll(); show(stateC);
+              setTimeout(dismiss, 1600);
+            } else { reset(approveBtn); hideAll(); showFail(data); }
+          }).catch(function () { reset(approveBtn); showFail({ error: 'network' }); });
         });
 
         var denyBtn = document.getElementById('dv-deny-btn');
@@ -194,11 +196,20 @@
                 msg.textContent = 'We blocked the device, signed you out everywhere except trusted devices, and emailed password reset instructions.';
               }
               show(stateD);
+              setTimeout(dismiss, 2600);
             } else {
               reset(denyBlockBtn); reset(denyNukeBtn);
               showFail(data);
             }
+          }).catch(function () {
+            reset(denyBlockBtn); reset(denyNukeBtn);
+            showFail({ error: 'network' });
           });
+        }
+
+        function dismiss() {
+          var wrap = document.getElementById('dv-sheet-{{ verification.pk }}');
+          if (wrap) wrap.hidden = true;
         }
 
         function showFail(data) {

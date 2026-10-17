@@ -1386,6 +1386,7 @@
         console.log('[HTMX Config] History caching configured — snapshot cache disabled, snapshot eviction active');
     </script>
     <script defer src="{% static 'js/device_manager.js' %}"></script>
+    <script defer src="{% static 'js/session_guard.js' %}"></script>
     <script defer src="{% static 'js/bottom-sheet-handles.js' %}"></script>
     <!-- Unified Haptics Engine (Ultra-responsive tactile feedback) -->
     <script defer src="{% static 'js/services/haptics-service.js' %}"></script>
@@ -2434,6 +2435,7 @@
     </style>
 </head>
 <body class="{% block body_class %}{% endblock %}{% if request.resolver_match.url_name == 'login' or request.resolver_match.url_name == 'login_direct' or request.resolver_match.url_name == 'register' %} auth-entry-page{% endif %}"
+      data-session-key="{{ current_session_key }}"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       data-user-id="{{ request.user.id|default:'' }}"
       data-user-username="{{ request.user.username|default:'' }}"
@@ -4201,6 +4203,20 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         // Handle user online/offline status updates
                         if (typeof handleUserStatusUpdate === 'function') {
                             handleUserStatusUpdate(data);
+                        }
+                    } else if (data.type === 'force_logout') {
+                        // Device security (Phase 1): another session of this
+                        // account was killed. If this tab owns the dead
+                        // session, drop straight to the login screen.
+                        try {
+                            var ownSessionKey = document.body.getAttribute('data-session-key') || '';
+                            var deadKeys = data.session_keys || [];
+                            if (ownSessionKey && deadKeys.indexOf(ownSessionKey) !== -1) {
+                                console.warn('[GLOBAL] This session was revoked in real time — redirecting to logout.');
+                                window.location.replace('/users/logout/');
+                            }
+                        } catch (flErr) {
+                            console.error('[GLOBAL] force_logout handling failed:', flErr);
                         }
                     }
                 } catch (error) {

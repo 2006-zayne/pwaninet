@@ -207,6 +207,18 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             'count': event['count']
         }))
 
+    async def force_logout(self, event):
+        """
+        Instant-logout broadcast (device security, Phase 1): tell every open
+        tab which session keys are dead so session_guard.js can drop the
+        matching device straight to the login screen.
+        """
+        print(f'[NOTIFICATIONS] Sending force_logout to user {self.user.id}: {event}')
+        await self.send(text_data=json.dumps({
+            'type': 'force_logout',
+            'session_keys': event.get('session_keys') or [],
+        }))
+
     @database_sync_to_async
     def get_unread_count(self):
         """Get unread count for current user."""
