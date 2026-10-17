@@ -216,14 +216,34 @@
             Promise.race([p, new Promise(function(_, rej) {
                 setTimeout(function() { rej(new Error('native_login_timed_out')); }, 8000);
             })]).then(function(response) {
-                var idToken = response && response.result && response.result.idToken;
+                // The plugin may return the token under result.idToken,
+                // top-level idToken, token, or credential depending on version.
+                var idToken = response && (
+                    (response.result && response.result.idToken) ||
+                    response.idToken ||
+                    response.token ||
+                    response.credential
+                );
                 if (!idToken) {
-                    showError('Google sign-in failed. Please try again.');
+                    console.error('[NativeGoogle] No idToken in response:', response);
+                    showError('Google sign-in failed: no identity token returned. Please try again.');
                     btn.disabled = false;
                     return;
                 }
                 postJson(COMPLETE_URL, { credential: idToken })
-                    .then(handleComplete)
+                    .then(function(data) {
+                        if (data && data.status === 'ok' && data.redirect) {
+                            window.location.href = data.redirect;
+                            return;
+                        }
+                        if (data && data.status === 'link_required') {
+                            showLinkForm(data.message || 'Sign in with your password to link Google sign-in.');
+                            btn.disabled = false;
+                            return;
+                        }
+                        showError((data && data.message) || 'Google sign-in failed. Please try again.');
+                        btn.disabled = false;
+                    })
                     .catch(function() {
                         showError('Google sign-in failed. Please check your connection and try again.');
                         btn.disabled = false;
