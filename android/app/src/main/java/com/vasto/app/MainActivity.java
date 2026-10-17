@@ -46,6 +46,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
+import ee.forgr.capacitor.social.login.ModifiedMainActivityForSocialLoginPlugin;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.WebViewListener;
@@ -67,7 +68,7 @@ import java.util.Locale;
 import java.util.ArrayList;
 import org.json.JSONObject;
 
-public class MainActivity extends BridgeActivity {
+public class MainActivity extends BridgeActivity implements ModifiedMainActivityForSocialLoginPlugin {
     private static final String GALLERY_BRIDGE_TAG = "GalleryBridge";
     private boolean isNetworkAvailable = true;
     private boolean isOfflinePageShowing = false;
@@ -1565,5 +1566,12 @@ public class MainActivity extends BridgeActivity {
                 }
             } catch (Exception ignored) {}
         });
+    }
+
+    // Marker required by @capgo/capacitor-social-login so scoped Google login
+    // (openid/email/profile) can launch from this activity.
+    @Override
+    public void IHaveModifiedTheMainActivityForTheUseWithSocialLoginPlugin() {
+        // Intentional no-op: presence of this method satisfies the plugin.
     }
 }
