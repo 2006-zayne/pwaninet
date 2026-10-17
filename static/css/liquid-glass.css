@@ -282,7 +282,7 @@ button:focus-visible, .btn:focus-visible, .nav-chip:focus-visible, .dropdown-ite
 
 .btn-outline-primary {
   background: var(--lg-surface-strong);
-  border-color: rgba(255,255,255,0.18);
+  border-color: var(--lg-separator);
   color: var(--lg-text);
 }
 
