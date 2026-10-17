@@ -5534,28 +5534,105 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
     // Instant Optimistic Like Button Interaction
     (function() {
-        function updateButtonVisual(btn, isLiked, count, shouldAnimate) {
+        function setButtonVisual(btn, isLiked, count, animate) {
             const icon = btn.querySelector('i');
-            const countEl = btn.querySelector('.like-count');
+            const isReel = btn.classList.contains('reel-action-btn');
             if (isLiked) {
-                btn.classList.add('text-danger');
-                btn.classList.remove('text-muted');
+                btn.classList.add('text-danger', 'liked');
+                if (isReel) { btn.classList.remove('text-white'); } else { btn.classList.remove('text-muted'); }
                 btn.setAttribute('aria-label', 'Unlike');
-                if (icon) {
-                    icon.className = 'bi bi-heart-fill fs-5' + (shouldAnimate ? ' heart-pop' : '');
-                }
+                if (icon) icon.className = isReel
+                    ? 'bi bi-heart-fill text-danger'
+                    : 'bi bi-heart-fill text-danger fs-5' + (animate ? ' heart-pop' : '');
             } else {
-                btn.classList.remove('text-danger');
-                btn.classList.add('text-muted');
+                btn.classList.remove('text-danger', 'liked');
+                if (isReel) { btn.classList.add('text-white'); } else { btn.classList.add('text-muted'); }
                 btn.setAttribute('aria-label', 'Like');
-                if (icon) {
-                    icon.className = 'bi bi-heart fs-5';
-                }
+                if (icon) icon.className = isReel
+                    ? 'bi bi-heart'
+                    : 'bi bi-heart fs-5';
             }
-            if (countEl && count !== undefined && count !== null) {
-                countEl.textContent = count;
+            if (count !== undefined && count !== null) {
+                const countEl = btn.querySelector('.like-count');
+                if (countEl) countEl.textContent = count;
             }
         }
+
+        function applyToEl(el, isLiked, count, animate) {
+            if (el.classList.contains('like-button')) {
+                setButtonVisual(el, isLiked, count, animate);
+            } else {
+                // Card roots / carousel cards carry the state as data attributes
+                // so the fullscreen reel player snapshots accurate like state.
+                if (isLiked !== undefined && isLiked !== null) {
+                    el.setAttribute('data-is-liked', isLiked ? 'true' : 'false');
+                }
+                if (count !== undefined && count !== null) {
+                    el.setAttribute('data-likes', String(count));
+                }
+            }
+        }
+
+        function snapshotEl(el) {
+            const snap = { el: el, liked: null, count: null };
+            if (el.classList.contains('like-button')) {
+                if (el.dataset.isLiked === 'true' || el.dataset.isLiked === 'false') {
+                    snap.liked = el.dataset.isLiked === 'true';
+                } else {
+                    snap.liked = el.classList.contains('text-danger');
+                }
+                const c = el.querySelector('.like-count');
+                if (c) snap.count = parseInt(c.textContent.trim(), 10) || 0;
+            } else {
+                if (el.dataset.isLiked === 'true' || el.dataset.isLiked === 'false') {
+                    snap.liked = el.dataset.isLiked === 'true';
+                }
+                if (el.dataset.likes !== undefined) {
+                    snap.count = parseInt(el.dataset.likes, 10) || 0;
+                }
+            }
+            return snap;
+        }
+
+        // Preferred state source order: server-rendered data-is-liked on the
+        // button (like_button.html), then the card root, then the legacy
+        // text-danger class signal.
+        function readLikedState(btn, shareId) {
+            if (btn.dataset.isLiked === 'true' || btn.dataset.isLiked === 'false') {
+                return btn.dataset.isLiked === 'true';
+            }
+            const card = (shareId && (document.getElementById('post-card-' + shareId) || document.getElementById('reel-card-' + shareId))) ||
+                         btn.closest('.post-card, .reel-post-card, .reels-carousel-card');
+            if (card && (card.dataset.isLiked === 'true' || card.dataset.isLiked === 'false')) {
+                return card.dataset.isLiked === 'true';
+            }
+            return btn.classList.contains('text-danger');
+        }
+
+        function findCardRoots(shareId) {
+            if (!shareId) return [];
+            return Array.from(document.querySelectorAll([
+                '#post-card-' + shareId,
+                '#reel-card-' + shareId,
+                '.post-card[data-post-id="' + shareId + '"]',
+                '.reel-post-card[data-post-id="' + shareId + '"]',
+                '.reels-carousel-card[data-post-id="' + shareId + '"]'
+            ].join(', ')));
+        }
+
+        function findAllLikeButtons(shareId, numericId) {
+            const selectors = [];
+            if (shareId) {
+                selectors.push('.like-button[data-share-id="' + shareId + '"]');
+            }
+            if (numericId) {
+                selectors.push('.like-button[data-post-id="' + numericId + '"]');
+            }
+            if (!selectors.length) return [];
+            return Array.from(document.querySelectorAll(selectors.join(', ')));
+        }
+
+        const pendingSync = new WeakMap();
 
         function toggleLikeOptimistic(btn, event) {
             if (!btn) return;
@@ -5569,39 +5646,48 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
             btn.dataset.pending = 'true';
 
+            const shareId = btn.dataset.shareId || '';
+            const numericId = btn.dataset.postId || '';
+            const isLiked = readLikedState(btn, shareId);
             const countEl = btn.querySelector('.like-count');
-            const isLiked = btn.classList.contains('text-danger');
-
-            btn.dataset.prevLiked = isLiked ? 'true' : 'false';
             const currentCount = parseInt(countEl ? countEl.textContent.trim() : '0', 10) || 0;
-            btn.dataset.prevCount = currentCount;
 
             const newLiked = !isLiked;
             const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
 
-            // Immediate 0ms visual update
-            updateButtonVisual(btn, newLiked, newCount, true);
+            // Snapshot every element we are about to touch so an htmx error
+            // can restore the WHOLE sync scope, not just the clicked button.
+            const ctx = { snaps: [] };
+            const clickedSnap = snapshotEl(btn);
+            ctx.snaps.push(clickedSnap);
+            clickedSnap.liked = isLiked;
+            clickedSnap.count = currentCount;
 
-            // Sync any duplicate buttons for the same post on page
-            const shareId = btn.dataset.shareId;
-            if (shareId) {
-                const siblings = document.querySelectorAll(`.like-button[data-share-id="${shareId}"]`);
-                siblings.forEach(s => {
-                    if (s !== btn) {
-                        updateButtonVisual(s, newLiked, newCount, false);
-                    }
-                });
-            }
+            const updates = [btn];
+            const related = findAllLikeButtons(shareId, numericId);
+            related.forEach(el => {
+                if (el !== btn) {
+                    ctx.snaps.push(snapshotEl(el));
+                    updates.push(el);
+                }
+            });
+            const cardRoots = findCardRoots(shareId);
+            cardRoots.forEach(el => {
+                if (el.dataset.isLiked !== undefined || el.dataset.likes !== undefined) {
+                    ctx.snaps.push(snapshotEl(el));
+                    updates.push(el);
+                }
+            });
+
+            updates.forEach(el => applyToEl(el, newLiked, newCount, el === btn));
+            pendingSync.set(btn, ctx);
         }
 
         function revertLikeOptimistic(btn) {
-            if (!btn || btn.dataset.prevLiked === undefined) return;
-            const wasLiked = btn.dataset.prevLiked === 'true';
-            const prevCount = parseInt(btn.dataset.prevCount, 10) || 0;
-            delete btn.dataset.pending;
-            delete btn.dataset.prevLiked;
-            delete btn.dataset.prevCount;
-            updateButtonVisual(btn, wasLiked, prevCount, false);
+            const ctx = pendingSync.get(btn);
+            if (!ctx) return;
+            ctx.snaps.forEach(s => applyToEl(s.el, s.liked, s.count, false));
+            pendingSync.delete(btn);
         }
 
         // Global capture-phase click handler so visual update runs instantly before HTMX
@@ -5612,7 +5698,16 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
         }, true);
 
-        // Revert optimistic update on HTMX error
+        // Clear the pending lock once the server response has been swapped in —
+        // the swapped button carries fresh server truth via data-is-liked.
+        document.addEventListener('htmx:afterSwap', function(e) {
+            const btn = e.detail && e.detail.elt;
+            if (btn && btn.matches && btn.matches('.like-button')) {
+                pendingSync.delete(btn);
+            }
+        });
+
+        // Revert optimistic update across the whole sync scope on HTMX error
         document.addEventListener('htmx:responseError', function(e) {
             const btn = (e.detail && e.detail.elt && e.detail.elt.matches && e.detail.elt.matches('.like-button')) ? e.detail.elt : null;
             if (btn) revertLikeOptimistic(btn);

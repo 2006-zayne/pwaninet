@@ -83,7 +83,7 @@ button:active, .btn:active, .nav-chip:active, .dropdown-item:active {
   transform: scale(0.97);
 }
 
-button:focus-visible, .btn:focus-visible, .nav-chip:focus-visible, .dropdown-item:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+button:focus-visible, .btn:focus-visible, .nav-chip:focus-visible, .dropdown-item:focus-visible, input:focus-visible, textarea:not(.pwanimate-textarea, .message-input):focus-visible, select:focus-visible {
   outline: 2px solid var(--lg-accent);
   outline-offset: 2px;
 }
@@ -288,7 +288,7 @@ button:focus-visible, .btn:focus-visible, .nav-chip:focus-visible, .dropdown-ite
 
 .form-control,
 .form-select,
-textarea,
+textarea:not(.pwanimate-textarea, .message-input),
 input[type="text"],
 input[type="email"],
 input[type="password"] {
@@ -301,7 +301,7 @@ input[type="password"] {
 
 .form-control:focus,
 .form-select:focus,
-textarea:focus,
+textarea:not(.pwanimate-textarea, .message-input):focus,
 input:focus {
   background: var(--lg-surface-strong);
   border-color: rgba(0,113,227,0.32);

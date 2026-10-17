@@ -50,7 +50,8 @@ def check_is_liked(context, post):
     if liked_post_ids is not None:
         post_id = getattr(post, 'id', None)
         share_id = getattr(post, 'share_id', None)
-        if (post_id in liked_post_ids) or (share_id in liked_post_ids) or (str(share_id) in liked_post_ids):
+        if (post_id in liked_post_ids) or (str(post_id) in liked_post_ids) or \
+           (share_id in liked_post_ids) or (str(share_id) in liked_post_ids):
             return True
         # If liked_post_ids was explicitly calculated for this feed/set, trust it!
         return False

@@ -291,6 +291,7 @@ class FeedConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'post_like_update',
             'post_id': event['post_id'],
+            'share_id': event.get('share_id'),
             'like_count': event['like_count'],
             'is_liked': event['is_liked'],
             'user_id': event['user_id']

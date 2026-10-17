@@ -969,6 +969,14 @@ def home_view(request):
             existing_ids = {p.id for p in context['posts']}
             if target_reel.id not in existing_ids:
                 context['posts'] = [target_reel] + list(context['posts'])
+                # The injected reel was not part of the slice used to compute
+                # liked_post_ids — augment the set or check_is_liked will
+                # trust the (incomplete) set and render it as un-liked.
+                if request.user.is_authenticated and target_reel.is_liked_by(request.user):
+                    liked_ids = context.setdefault('liked_post_ids', set())
+                    liked_ids.add(target_reel.id)
+                    liked_ids.add(target_reel.share_id)
+                    liked_ids.add(str(target_reel.share_id))
             context['auto_launch_reel_id'] = str(target_reel.share_id)
             context['shared_by'] = shared_by
 
@@ -1271,12 +1279,13 @@ def toggle_like(request, share_id):
 
     if request.headers.get('Accept') == 'application/json' or request.GET.get('format') == 'json' or request.POST.get('format') == 'json':
         from django.http import JsonResponse
+        canonical = result['post']
         return JsonResponse({
             'status': 'success',
             'is_liked': result['is_liked'],
             'like_count': result['like_count'],
-            'share_id': str(post.share_id),
-            'post_id': post.id
+            'share_id': str(canonical.share_id),
+            'post_id': canonical.id
         })
 
     return render(request, 'posts/partials/like_button.html', {

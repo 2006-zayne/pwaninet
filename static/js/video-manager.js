@@ -254,9 +254,16 @@
         });
     }
 
+    // In-flight like toggles per post — prevents double-tap / rapid clicks
+    // from firing two server toggles (the server toggle is a real toggle, so
+    // two requests = like added then removed).
+    const pendingLikeToggles = new Set();
+
     function toggleReelLike(postId) {
         if (!postId) return;
         postId = String(postId).trim();
+        if (pendingLikeToggles.has(postId)) return;
+        pendingLikeToggles.add(postId);
 
         const snapItem = document.querySelector(`.reels-snap-item[data-post-id="${postId}"]`);
         const fsLikeBtn = snapItem?.querySelector('.fs-like-proxy-btn') || document.querySelector(`.fs-like-proxy-btn[data-post-id="${postId}"]`);
@@ -287,6 +294,9 @@
         .catch(err => {
             console.warn('[VideoManager] Like toggle error, reverting:', err);
             syncLikeUiAcrossSite(postId, isCurrentlyLiked, currentCount);
+        })
+        .finally(() => {
+            pendingLikeToggles.delete(postId);
         });
     }
 
@@ -4015,13 +4025,12 @@
                             applyCommentLikeUi(serverLiked, serverCount);
                         }
                     } else {
-                        await fetch(`/comment/${commentId}/like/`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCsrfToken(),
-                                'HX-Request': 'true'
-                            }
-                        });
+                        // Do NOT fire a second toggle request — the first may
+                        // have still succeeded server-side, in which case a
+                        // retry toggles the like back off. Restore the UI
+                        // instead; the next render/refresh shows server truth.
+                        console.warn('[CommentsSheet] Like toggle rejected:', res.status);
+                        applyCommentLikeUi(wasLiked, curCount);
                     }
                 } catch (err) {
                     console.warn('[CommentsSheet] Like toggle error:', err);
