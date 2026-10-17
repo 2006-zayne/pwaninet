@@ -214,7 +214,7 @@
                 ? loginPromise
                 : Promise.reject(new Error('native_login_not_available'));
             Promise.race([p, new Promise(function(_, rej) {
-                setTimeout(function() { rej(new Error('native_login_timed_out')); }, 8000);
+                setTimeout(function() { rej(new Error('native_login_timed_out')); }, 20000);
             })]).then(function(response) {
                 // The plugin may return the token under result.idToken,
                 // top-level idToken, token, credential, or as a raw string.
