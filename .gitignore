@@ -105,3 +105,4 @@ android/**/captures/
 *.keystore
 *.signing.properties
 release.jks
+.aider*

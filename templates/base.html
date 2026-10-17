@@ -3306,8 +3306,13 @@
                         <!-- Dynamically populated continuous snap items -->
                     </div>
 
-                    <!-- Desktop Exterior Engagement Rail (Outside Video Container on the right) -->
-                    <div class="reel-desktop-actions-rail d-none d-lg-flex" id="reelDesktopActionsRail">
+                    <!-- Desktop Fixed Tools Column: engagement stack + up/down nav.
+                         Anchored once to the stage's right end — never repositions;
+                         the video card resizes around it (stage reserves a 104px strip). -->
+                    <div class="reel-desktop-tools d-none d-lg-flex" id="reelDesktopTools">
+
+                      <!-- Engagement Rail (Likes, Comments, Repost, Save, Share, Sound) -->
+                      <div class="reel-desktop-actions-rail" id="reelDesktopActionsRail">
                         <div class="reel-desktop-action-unit text-center">
                             <button type="button" class="reel-desktop-action-btn fs-like-proxy-btn" id="fsDesktopLikeBtn" title="{% trans 'Like' %}" aria-label="{% trans 'Like' %}">
                                 <i class="bi bi-heart"></i>
@@ -3350,17 +3355,18 @@
                             </button>
                             <span class="reel-desktop-action-label reel-mute-label">{% trans "Sound" %}</span>
                         </div>
-                    </div>
+                    </div><!-- /.reel-desktop-actions-rail -->
 
-                    <!-- Desktop Up/Down Navigation Floating Buttons (Docked near the comment rail) -->
-                    <div class="reel-desktop-nav-group d-none d-lg-flex">
+                      <!-- Up/Down Navigation (stacked in the fixed tools column) -->
+                      <div class="reel-desktop-nav-group d-none d-lg-flex">
                         <button type="button" class="reel-nav-btn reel-nav-prev" id="reelsNavPrev" title="{% trans 'Previous Reel' %}" aria-label="{% trans 'Previous Reel' %}">
                             <i class="bi bi-chevron-up"></i>
                         </button>
                         <button type="button" class="reel-nav-btn reel-nav-next" id="reelsNavNext" title="{% trans 'Next Reel' %}" aria-label="{% trans 'Next Reel' %}">
                             <i class="bi bi-chevron-down"></i>
                         </button>
-                    </div>
+                      </div><!-- /.reel-desktop-nav-group -->
+                    </div><!-- /.reel-desktop-tools -->
                 </div>
 
                 <!-- Right Side Rail for Desktop (TikTok Style Persistent Comments & Info) -->

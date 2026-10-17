@@ -1597,7 +1597,6 @@
                 if (vinyl) vinyl.classList.add('is-playing');
             }
             adaptSnapItemOrientation(activeItem);
-            repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
             updateDesktopSideRail(activeItem);
             updateFullscreenNavButtons(newActiveIndex);
         }
@@ -2534,6 +2533,159 @@
         `;
     }
 
+    // ============================================================================
+    // DESKTOP IMMERSION HELPERS (>=992px): idle doze + one-time rail tip.
+    //
+    // 1) Idle dozer: after ~4.5s with no input while a reel is actually playing,
+    //    the furniture layer (tools column + author scrim) whispers to ~25%.
+    //    Any input snaps it back. The video, the card and the comment rail are
+    //    NEVER hidden — immersion comes from visual quiet, not confiscation.
+    // 2) Immersive tip: one-time toast — if the user advances 3+ reels with the
+    //    rail open and no comment interaction, teach the collapse affordance.
+    //    Marked "seen" in localStorage; never shown twice.
+    // ============================================================================
+    const REEL_RAIL_TIP_KEY = 'pwaninetReelsRailTipSeen';
+    const REEL_DOZE_DELAY_MS = 4500;
+
+    function isReelDesktopMode() {
+        return window.innerWidth >= 992;
+    }
+
+    function setupReelIdleDozer() {
+        const overlay = document.getElementById('fullscreenReelsOverlay');
+        const layout = document.querySelector('.reel-player-layout');
+        if (!overlay || !layout) return function () {};
+
+        // DEV PROBE: expose dozer internals for debugging (remove after QA)
+        window.__reelFxProbe = { setup: true, dozeChecks: 0, lastShould: null, wakes: 0, timerSet: 0 };
+
+        let dozeTimer = null;
+
+        function shouldDoze() {
+            if (!isReelDesktopMode()) return false;
+            const active = getActiveSnapItem();
+            const vid = active ? active.querySelector('video') : null;
+            const verdict = !!vid && !vid.paused && !vid.ended;
+            probe().dozeChecks++;
+            probe().lastShould = { verdict, desktop: isReelDesktopMode(), hasVid: !!vid, paused: vid ? vid.paused : null };
+            return verdict;
+        }
+
+        function probe() { return window.__reelFxProbe || (window.__reelFxProbe = {}); }
+
+        function doze() {
+            window.__reelFxProbe.timerSet = 'fired';
+            if (shouldDoze()) layout.classList.add('is-dozing');
+        }
+
+        function wake() {
+            window.__reelFxProbe.wakes++;
+            if (dozeTimer) { clearTimeout(dozeTimer); dozeTimer = null; }
+            layout.classList.remove('is-dozing');
+            window.__reelFxProbe.timerSet = 'reset';
+            dozeTimer = setTimeout(doze, REEL_DOZE_DELAY_MS);
+        }
+
+        const activityEvents = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'pointerdown'];
+        activityEvents.forEach(ev => overlay.addEventListener(ev, wake, { passive: true }));
+        // Resuming playback wakes the room, even without pointer motion
+        overlay.addEventListener('play', wake, true);
+
+        window.__reelFxProbe.timerSet = 'initial';
+        dozeTimer = setTimeout(doze, REEL_DOZE_DELAY_MS);
+
+        return function teardown() {
+            if (dozeTimer) clearTimeout(dozeTimer);
+            dozeTimer = null;
+            activityEvents.forEach(ev => overlay.removeEventListener(ev, wake));
+            overlay.removeEventListener('play', wake, true);
+            layout.classList.remove('is-dozing');
+        };
+    }
+
+    function ensureImmersiveRailTip() {
+        let tip = document.getElementById('reelImmersiveTip');
+        if (tip) return tip;
+        const stage = document.querySelector('.reel-desktop-stage');
+        if (!stage) return null;
+        tip = document.createElement('div');
+        tip.id = 'reelImmersiveTip';
+        tip.className = 'reel-immersive-tip';
+        tip.innerHTML = [
+            '<i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i>',
+            '<span>' + (window.gettext ? gettext('Collapse the rail for full-cinema mode') : 'Collapse the rail for full-cinema mode') + '</span>',
+            '<button type="button" class="btn btn-sm btn-primary rounded-pill px-3 reel-immersive-tip-cta">' + (window.gettext ? gettext('Collapse') : 'Collapse') + '</button>'
+        ].join('');
+        tip.querySelector('.reel-immersive-tip-cta').addEventListener('click', function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            tip.classList.remove('is-visible');
+            toggleDesktopCommentRail(false);
+        });
+        stage.appendChild(tip);
+        return tip;
+    }
+
+    function setupImmersiveTipCounter() {
+        const viewport = document.getElementById('reelsSnapViewport');
+        const rail = document.getElementById('reelDesktopSideRail');
+        if (!viewport || !rail) return function () {};
+
+        // DEV PROBE: expose tip counter state for debugging (remove after QA)
+        window.__reelTipProbe = { registered: true, advances: 0, idx: null, detached: false, whyShow: null };
+
+        let lastIdx = Math.round(viewport.scrollTop / (viewport.clientHeight || 1));
+        let advances = 0;
+        let tipTimer = null;
+
+        function onScroll() {
+            const P = window.__reelTipProbe || {};
+            try {
+                if (localStorage.getItem(REEL_RAIL_TIP_KEY)) { P.detached = true; P.whyShow = 'seen-flag'; detach(); return; }
+            } catch (_) { return; }
+            if (!isReelDesktopMode()) { P.whyShow = 'not-desktop'; return; }
+
+            const h = viewport.clientHeight || 1;
+            const idx = Math.round(viewport.scrollTop / h);
+            if (idx > lastIdx) advances++;
+            if (idx !== lastIdx) lastIdx = idx;
+            P.idx = idx;
+            P.advances = advances;
+
+            // 3+ consecutive reels with the rail open and no comment input = browsing signal
+            if (advances >= 3 && !rail.classList.contains('rail-collapsed')) {
+                P.whyShow = 'show';
+                const tip = ensureImmersiveRailTip();
+                if (tip) {
+                    tip.classList.add('is-visible');
+                    if (tipTimer) clearTimeout(tipTimer);
+                    tipTimer = setTimeout(() => tip.classList.remove('is-visible'), 6500);
+                }
+                try { localStorage.setItem(REEL_RAIL_TIP_KEY, '1'); } catch (_) {}
+                detach();
+            }
+        }
+
+        function detach() {
+            window.__reelTipProbe && (window.__reelTipProbe.detached = true);
+            viewport.removeEventListener('scroll', onScroll);
+            if (tipTimer) clearTimeout(tipTimer);
+        }
+
+        viewport.addEventListener('scroll', onScroll, { passive: true });
+        return detach;
+    }
+
+    function setupReelDesktopFx() {
+        // ...teardown chains both helpers into one call
+        const t1 = setupReelIdleDozer();
+        const t2 = setupImmersiveTipCounter();
+        return function teardown() {
+            try { t1(); } catch (_) {}
+            try { t2(); } catch (_) {}
+        };
+    }
+
     function toggleDesktopCommentRail(forceOpen) {
         const rail = document.getElementById('reelDesktopSideRail');
         if (!rail) return;
@@ -2563,7 +2715,6 @@
             const activeSnap = getActiveSnapItem();
             if (activeSnap) {
                 adaptSnapItemOrientation(activeSnap);
-                repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
             }
         };
 
@@ -2644,32 +2795,6 @@
         return viewport.children[curIdx] || viewport.firstElementChild;
     }
 
-    function repositionDesktopActionsRail(content) {
-        if (window.innerWidth < 992) return;
-        const rail = document.getElementById('reelDesktopActionsRail');
-        const stage = document.querySelector('.reel-desktop-stage');
-        if (!rail || !stage) return;
-
-        const activeSnap = getActiveSnapItem();
-        const activeContent = (activeSnap ? activeSnap.querySelector('.reel-fullscreen-content') : null) ||
-                              content ||
-                              document.querySelector('.reels-snap-item .reel-fullscreen-content');
-        if (!activeContent) return;
-
-        const contentRect = activeContent.getBoundingClientRect();
-        const stageRect = stage.getBoundingClientRect();
-        if (stageRect.width === 0 || contentRect.width === 0) return;
-
-        // Position rail cleanly 16px to the right of the active card
-        const desiredLeft = contentRect.right - stageRect.left + 16;
-        // Nav buttons sit at stage right: 28px + 44px = 72px from stage right edge
-        const maxLeft = stageRect.width - 76;
-        const finalLeft = Math.min(desiredLeft, maxLeft);
-
-        rail.style.left = `${Math.round(finalLeft)}px`;
-        rail.classList.add('is-positioned');
-    }
-
     function adaptSnapItemOrientation(snapItem, initialCard) {
         if (!snapItem) return;
         const content = snapItem.querySelector('.reel-fullscreen-content');
@@ -2708,7 +2833,6 @@
                     content.classList.add('is-landscape');
                     content.style.aspectRatio = '16 / 9';
                 }
-                repositionDesktopActionsRail(content);
                 return;
             }
 
@@ -2719,16 +2843,18 @@
             const stageWidth = stage ? stage.clientWidth : window.innerWidth;
             const stageHeight = stage ? stage.clientHeight : window.innerHeight;
 
-            // Reserve 300px (150px on each side of the centered card) for exterior desktop engagement rail & nav buttons
-            const availableWidth = Math.max(260, stageWidth - 300);
-            const availableHeight = Math.max(300, stageHeight - 40);
+            // `clientWidth`/`clientHeight` include the stage paddings, so subtract them
+            // explicitly: 120px horizontal padding (104px fixed tools strip + 16px gutter)
+            // + 32px breathing room, and 24px vertical padding (12px top + 12px bottom).
+            const availableWidth = Math.max(260, stageWidth - 152);
+            const availableHeight = Math.max(300, stageHeight - 24);
 
             if (ratio >= 1.15) {
                 // True landscape video
                 content.classList.add('is-landscape');
                 content.style.aspectRatio = `${vw} / ${vh}`;
                 const maxWFromHeight = availableHeight * ratio;
-                const finalW = Math.min(availableWidth, maxWFromHeight, 860);
+                const finalW = Math.min(availableWidth, maxWFromHeight);
                 content.style.width = `${Math.round(finalW)}px`;
                 content.style.maxWidth = `${Math.round(availableWidth)}px`;
                 content.style.height = `${Math.round(finalW / ratio)}px`;
@@ -2737,7 +2863,7 @@
                 // Square video
                 content.classList.add('is-square');
                 content.style.aspectRatio = '1 / 1';
-                const sz = Math.min(availableWidth, availableHeight, 660);
+                const sz = Math.min(availableWidth, availableHeight);
                 content.style.width = `${Math.round(sz)}px`;
                 content.style.height = `${Math.round(sz)}px`;
                 content.style.maxWidth = `${Math.round(availableWidth)}px`;
@@ -2746,14 +2872,12 @@
                 // Portrait 9:16 video
                 content.classList.add('is-portrait');
                 content.style.aspectRatio = `${vw} / ${vh}`;
-                const finalH = Math.min(availableHeight, 920);
-                const finalW = Math.min(availableWidth, finalH * ratio, 520);
+                const finalH = availableHeight;
+                const finalW = Math.min(availableWidth, finalH * ratio);
                 content.style.height = `${Math.round(finalH)}px`;
                 content.style.width = `${Math.round(finalW)}px`;
                 content.style.maxWidth = `${Math.round(availableWidth)}px`;
             }
-
-            repositionDesktopActionsRail(content);
         }
 
         checkMetadata();
@@ -2814,7 +2938,6 @@
     function updateDesktopSideRail(activeItem) {
         if (activeItem) {
             updateFullscreenNavButtons(activeItem);
-            repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
         }
         if (!activeItem) return;
 
@@ -3227,6 +3350,13 @@
         overlay.classList.remove('d-none');
         overlay.setAttribute('aria-hidden', 'false');
 
+        // Start desktop immersion helpers (idle doze + one-time rail tip).
+        // Teardown of any previous session first — safe against double-open.
+        if (typeof state.reelDesktopFxTeardown === 'function') {
+            try { state.reelDesktopFxTeardown(); } catch (_) {}
+        }
+        state.reelDesktopFxTeardown = setupReelDesktopFx();
+
         // Force white icons in status bar for fullscreen reels mode
         try {
             if (typeof window.updateStatusBarForTheme === 'function') {
@@ -3335,7 +3465,6 @@
 
                 setTimeout(() => {
                     adaptSnapItemOrientation(activeItem);
-                    repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
                 }, 60);
             } else {
                 updateFullscreenNavButtons();
@@ -3432,6 +3561,12 @@
         overlay.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('reels-active');
         state.isFullScreenActive = false;
+
+        // Stop desktop immersion helpers (idle doze timer + tip toast)
+        if (typeof state.reelDesktopFxTeardown === 'function') {
+            try { state.reelDesktopFxTeardown(); } catch (_) {}
+            state.reelDesktopFxTeardown = null;
+        }
 
         // Restore home feed scroll position immediately
         if (typeof state.previousScrollY === 'number') {
@@ -5488,7 +5623,6 @@
                     const activeSnap = items[curIdx];
                     if (activeSnap) {
                         adaptSnapItemOrientation(activeSnap);
-                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                     updateFullscreenNavButtons(activeSnap);
                 }
@@ -5504,7 +5638,6 @@
                     const activeSnap = getActiveSnapItem();
                     if (activeSnap) {
                         adaptSnapItemOrientation(activeSnap);
-                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                 }, 40);
 
@@ -5581,7 +5714,6 @@
                             }
                         } else {
                             adaptSnapItemOrientation(activeSnap);
-                            repositionDesktopActionsRail(content);
                             updateDesktopSideRail(activeSnap);
                         }
                     }
@@ -6064,7 +6196,6 @@
                     const activeSnap = getActiveSnapItem();
                     if (activeSnap) {
                         adaptSnapItemOrientation(activeSnap);
-                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                 }
             }
@@ -6079,7 +6210,6 @@
                     const activeSnap = getActiveSnapItem();
                     if (activeSnap) {
                         adaptSnapItemOrientation(activeSnap);
-                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                 }
             }
