@@ -217,12 +217,14 @@
                 setTimeout(function() { rej(new Error('native_login_timed_out')); }, 8000);
             })]).then(function(response) {
                 // The plugin may return the token under result.idToken,
-                // top-level idToken, token, or credential depending on version.
+                // top-level idToken, token, credential, or as a raw string.
                 var idToken = response && (
-                    (response.result && response.result.idToken) ||
-                    response.idToken ||
-                    response.token ||
-                    response.credential
+                    typeof response === 'string'
+                        ? response
+                        : (response.result && response.result.idToken) ||
+                          response.idToken ||
+                          response.token ||
+                          response.credential
                 );
                 if (!idToken) {
                     console.error('[NativeGoogle] No idToken in response:', response);
