@@ -81,6 +81,9 @@
         }));
     }
 
+    // Exposed for upload_ui.js restoreBannerOnLoad cleanup
+    window.storeDelete = storeDelete;
+
     async function api(path, method, body) {
         const headers = { 'X-CSRFToken': getCSRFToken(), 'X-Requested-With': 'XMLHttpRequest' };
         const opts = { method, headers, credentials: 'same-origin' };
@@ -213,6 +216,31 @@
                 }
                 throw err;
             }
+
+            // Server is authoritative: if the record is already terminal on the
+            // server, don't re-authorize or re-complete — just clear local
+            // state and surface the outcome so the donut can dismiss.
+            if (status.status === 'cancelled' || status.status === 'failed') {
+                await storeDelete('sessions', clientUploadId);
+                await storeDelete('blobs', clientUploadId);
+                const err = new Error(`Upload ${status.status} on server`);
+                err.code = status.status.toUpperCase();
+                err.deleted = status.status === 'cancelled' ? 'UPLOAD_CANCELLED' : 'UPLOAD_FAILED';
+                err.clientUploadId = clientUploadId;
+                throw err;
+            }
+            if (status.status === 'completed') {
+                await storeDelete('blobs', clientUploadId);
+                await storePut('sessions', {
+                    client_upload_id: clientUploadId,
+                    server_id: serverId,
+                    filename: status.filename,
+                    post,
+                    done: true,
+                });
+                return status;
+            }
+
             const partSize = status.session_part_size || 8388608;
             const auth = await api(`${serverId}/authorize/`, 'POST', {});
             const total = status.total_bytes || blob.size;

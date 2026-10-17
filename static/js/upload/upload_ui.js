@@ -172,19 +172,18 @@ class UploadBanner {
     }
 
     /**
-     * Handle post published: bytes are done, so the donut's job is done.
+     * Handle upload published: bytes are done, so the donut's job is done.
      * Transcoding/processing continues on the Uploads manager page.
      */
     handleUploadPublished(data) {
         this.hasVideo = Boolean(data.hasVideo);
         this.updateDonutProgress(100, 'Uploaded!');
-        setTimeout(() => {
-            this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
-            this.updateCount();
-            if (this.activeUploadCount === 0) {
-                this.hide();
-            }
-        }, 2000);
+        this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
+        this.updateCount();
+        // Safety net: if no uploads are active, dismiss immediately
+        if (!uploadManager.getActiveUpload()) {
+            setTimeout(() => this.hide(), 2000);
+        }
     }
 
     /**
@@ -195,7 +194,7 @@ class UploadBanner {
         this.updateDonutProgress(100);
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (this.activeUploadCount === 0) {
+        if (!uploadManager.getActiveUpload()) {
             setTimeout(() => this.hide(), 1500);
         }
     }
@@ -206,7 +205,7 @@ class UploadBanner {
     handleUploadFailed(data) {
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (this.activeUploadCount === 0) {
+        if (!uploadManager.getActiveUpload()) {
             setTimeout(() => this.hide(), 3000);
         }
     }
@@ -217,7 +216,7 @@ class UploadBanner {
     handleUploadCancelled(data) {
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (this.activeUploadCount === 0) {
+        if (!uploadManager.getActiveUpload()) {
             this.hide();
         }
     }
@@ -338,9 +337,40 @@ class UploadUI {
                 const sessions = await window.resumableUpload.getAllSessions();
                 const activeSessions = sessions.filter(s => !s.done);
                 if (activeSessions.length > 0) {
-                    this.banner.activeUploadCount = activeSessions.length;
-                    this.banner.updateCount();
-                    this.banner.show();
+                    // Verify each session with the server before counting it.
+                    // Failed/cancelled/deleted records are terminal: clean them
+                    // from IndexedDB so they don't stick the donut count.
+                    let trulyActive = 0;
+                    for (const s of activeSessions) {
+                        try {
+                            const res = await fetch(`/api/uploads/${s.server_id}/`, {
+                                credentials: 'same-origin',
+                                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            });
+                            if (!res.ok) {
+                                // 410 Gone / 404 = terminal: clean up, don't count
+                                await window.storeDelete('sessions', s.client_upload_id);
+                                await window.storeDelete('blobs', s.client_upload_id);
+                                continue;
+                            }
+                            const data = await res.json();
+                            if (['uploading', 'verifying', 'preparing', 'queued'].includes(data.status)) {
+                                trulyActive++;
+                            } else {
+                                // Terminal on server: clean up local state
+                                await window.storeDelete('sessions', s.client_upload_id);
+                                await window.storeDelete('blobs', s.client_upload_id);
+                            }
+                        } catch (e) {
+                            // Network error: leave session alone, don't count it yet
+                            console.warn('[UploadUI] Could not verify session', s.client_upload_id, e);
+                        }
+                    }
+                    if (trulyActive > 0) {
+                        this.banner.activeUploadCount = trulyActive;
+                        this.banner.updateCount();
+                        this.banner.show();
+                    }
                 }
             }
         } catch (e) {
