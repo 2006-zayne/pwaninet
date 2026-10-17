@@ -307,17 +307,40 @@ AXES_RESET_ON_SUCCESS = True
 # AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True  # Deprecated in django-axes 6.0
 
 # Channels configuration
+#
+# channels_redis only forwards extra connection kwargs (socket timeouts, retry,
+# health checks) to the async Redis pool when each host entry is a dict. Bare
+# URL strings / tuples are passed straight to from_url() with no options, so a
+# stalled Redis connection can hang a WebSocket indefinitely with no retry.
+_CHANNEL_REDIS_KWARGS = {
+    "socket_connect_timeout": 5,
+    "socket_timeout": 10,
+    "retry_on_timeout": True,
+    "health_check_interval": 30,
+}
+
+
 def _channel_hosts():
+    """Build RedisChannelLayer host entries with connection-resilience options.
+
+    Returns a list of dicts so channels_redis forwards socket timeouts, retry
+    and health checks straight to the async Redis connection pool. A single
+    stalled Redis connection can no longer block WebSocket group operations
+    indefinitely.
+    """
     url = os.environ.get('REDIS_URL', '')
     if url:
-        # channels_redis accepts redis:// URL strings directly
-        return [url]
+        # from_url() still receives the URL (db/password encoded in it), plus
+        # the resilience kwargs below.
+        return [{"address": url, **_CHANNEL_REDIS_KWARGS}]
     host = os.environ.get('REDIS_HOST', '127.0.0.1')
     port = int(os.environ.get('REDIS_PORT', 6379))
     password = os.environ.get('REDIS_PASSWORD') or None
+    entry = {"host": host, "port": port, **_CHANNEL_REDIS_KWARGS}
     if password:
-        return [{'host': host, 'port': port, 'password': password}]
-    return [(host, port)]
+        entry["password"] = password
+    return [entry]
+
 
 CHANNEL_LAYERS = {
     'default': {

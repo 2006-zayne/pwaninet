@@ -67,12 +67,33 @@ CSRF_TRUSTED_ORIGINS = list(set(CSRF_TRUSTED_ORIGINS + _prod_csrf))
 
 # Channels layer Redis configuration for production multi-worker environments
 REDIS_URL = os.environ.get('REDIS_URL')
+REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD')
 if REDIS_URL:
+    # Embed the password into the connection URL when Redis requires auth
+    # (production Redis is started with --requirepass). Without this the
+    # channel layer connects unauthenticated and every group operation fails.
+    if REDIS_PASSWORD and "@" not in REDIS_URL.split("://", 1)[-1]:
+        _scheme, _rest = REDIS_URL.split("://", 1)
+        REDIS_URL = f"{_scheme}://:{REDIS_PASSWORD}@{_rest}"
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                'hosts': [REDIS_URL],
+                # Dict entries (not bare URL strings) let channels_redis forward
+                # socket timeouts, retry and health checks to the async Redis
+                # pool, so a stalled Redis connection cannot hang WebSocket
+                # group_add/group_discard indefinitely.
+                'hosts': [
+                    {
+                        'address': REDIS_URL,
+                        'socket_connect_timeout': 5,
+                        'socket_timeout': 10,
+                        'retry_on_timeout': True,
+                        'health_check_interval': 30,
+                    }
+                ],
+                'capacity': 300,
+                'expiry': 15,
             },
         },
     }
