@@ -133,6 +133,20 @@
         if (btn) { btn.disabled = false; }
     }
 
+    function getDeviceId() {
+        try {
+            var key = 'vasto_device_id';
+            var value = localStorage.getItem(key);
+            if (!value) {
+                var bytes = new Uint8Array(32);
+                crypto.getRandomValues(bytes);
+                value = Array.from(bytes, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+                localStorage.setItem(key, value);
+            }
+            return value;
+        } catch (e) { return ''; }
+    }
+
     function postJson(url, payload) {
         return fetch(url, {
             method: 'POST',
@@ -140,7 +154,8 @@
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Device-ID': getDeviceId()
             },
             body: JSON.stringify(payload)
         }).then(function(response) {

@@ -559,6 +559,13 @@ class PushAdapter(DeliveryAdapter):
 
         content = self._resolve_push_content(notification)
 
+        # Phase 1: metadata-declared deep links (e.g. device verification
+        # sheets) ride along when the payload adapter couldn't resolve one.
+        if not content.get('target_url') and isinstance(getattr(notification, 'metadata', None), dict):
+            metadata_target = notification.metadata.get('target_url')
+            if metadata_target:
+                content['target_url'] = metadata_target
+
         try:
             from firebase_admin import messaging
 
