@@ -18,6 +18,7 @@ from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
 from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel, PRIVACY_CHOICES, HeroShowcaseSet
+from users.models import TrustedDevice, BlockedDevice, DeviceVerificationEvent, DeviceVerificationStatus
 from posts.models import Post, Like, Repost
 from users.forms import PwaniSignupForm, PwaniAuthenticationForm, ProfileUpdateForm
 from django.contrib import messages
@@ -1429,14 +1430,6 @@ def profile_view(request, username):
     paginator = Paginator(posts_queryset, posts_per_page)
     posts_page = paginator.get_page(page)
 
-    # Get liked post IDs for the current user
-    liked_post_ids = set()
-    if request.user.is_authenticated:
-        for pid, sid in Like.objects.filter(user=request.user, post__in=posts_page).values_list('post_id', 'post__share_id'):
-            liked_post_ids.add(pid)
-            liked_post_ids.add(sid)
-            liked_post_ids.add(str(sid))
-
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
 
     # Get shared posts for this profile user
@@ -1465,6 +1458,25 @@ def profile_view(request, username):
     if is_limited_profile:
         reposted_posts = reposted_posts.none()
     repost_count = reposted_posts.count()
+
+    # Get liked post IDs for the current user.
+    # Must cover EVERY card surface rendered by this context: the Posts tab,
+    # the Reposts tab (their original posts) and the Shared tab (their
+    # original posts). liked_post_ids is treated as authoritative by the
+    # check_is_liked tag — an incomplete set silently renders cards un-liked.
+    liked_post_ids = set()
+    if request.user.is_authenticated:
+        relevant_ids = {p.id for p in posts_page}
+        for rp in reposted_posts:
+            if rp.original_post_id:
+                relevant_ids.add(rp.original_post_id)
+        for sp in shared_posts:
+            if sp.original_post_id:
+                relevant_ids.add(sp.original_post_id)
+        for pid, sid in Like.objects.filter(user=request.user, post_id__in=relevant_ids).values_list('post_id', 'post__share_id'):
+            liked_post_ids.add(pid)
+            liked_post_ids.add(sid)
+            liked_post_ids.add(str(sid))
 
     # Determine if viewing own profile
     is_own_profile = request.user == profile_user
@@ -2513,16 +2525,33 @@ def settings_active_devices_view(request):
         current_session.browser = device_info['browser']
         current_session.os = device_info['os']
 
+    # Phase 1: trusted + blocked device inventory for the devices page
+    trusted_devices = TrustedDevice.objects.filter(user=request.user).order_by('-is_primary', '-trusted_at')
+    blocked_devices = BlockedDevice.objects.filter(user=request.user).order_by('-created_at')
+    device_hash_by_session = {
+        account.session_key: account.device_id
+        for account in DeviceAccount.objects.exclude(session_key='').filter(user=request.user)
+    }
+    trusted_hashes = set(trusted_devices.values_list('device_hash', flat=True))
+
     if request.headers.get('HX-Request'):
         return render(request, 'users/settings/partials/settings_navigation_partial.html', {
             'settings_content_partial': 'users/settings/partials/active_devices_content.html',
             'current_session': current_session,
-            'other_sessions': other_sessions
+            'other_sessions': other_sessions,
+            'trusted_devices': trusted_devices,
+            'blocked_devices': blocked_devices,
+            'device_hash_by_session': device_hash_by_session,
+            'trusted_hashes': trusted_hashes,
         })
 
     return render(request, 'users/settings/active_devices.html', {
         'current_session': current_session,
-        'other_sessions': other_sessions
+        'other_sessions': other_sessions,
+        'trusted_devices': trusted_devices,
+        'blocked_devices': blocked_devices,
+        'device_hash_by_session': device_hash_by_session,
+        'trusted_hashes': trusted_hashes,
     })
 
 
@@ -3711,3 +3740,159 @@ def user_online_status_api(request, user_id):
             'user_id': int(user_id),
             'error': str(e)
         }, status=500)
+
+
+# ============================================================================
+# Phase 1: New-device login alerts — verification sheet + respond endpoints
+# ============================================================================
+
+def _acting_device_hash(request):
+    from users.services.device_alert_service import resolve_device_hash
+    return resolve_device_hash(request)
+
+
+def _verification_context(request, verification):
+    """Shared context for the challenge page/sheet states."""
+    from users.services.device_alert_service import event_is_expired
+    acting_hash = _acting_device_hash(request) or ''
+    is_pending = verification.status == DeviceVerificationStatus.PENDING
+    can_act = (
+        is_pending
+        and not event_is_expired(verification)
+        and acting_hash != verification.device_hash
+        and acting_hash != ''
+    )
+    own_device = acting_hash == verification.device_hash
+    if acting_hash == '' and is_pending:
+        # No device identity → safest default: show info, disable actions
+        can_act = False
+    return {
+        'verification': verification,
+        'device_label': verification.device_name or verification.device_type.title(),
+        'location_label': verification.location_label or 'Unknown location',
+        'is_pending': is_pending,
+        'is_expired': verification.status == DeviceVerificationStatus.EXPIRED,
+        'can_act': can_act,
+        'own_device': own_device,
+        'respond_url_approve': reverse('users:api_device_verification_approve', args=[verification.pk]),
+        'respond_url_deny': reverse('users:api_device_verification_deny', args=[verification.pk]),
+        'devices_url': reverse('users:settings_active_devices'),
+        'status': verification.status,
+    }
+
+
+@login_required
+def device_verification_view(request, verification_id):
+    """
+    New-device sign-in alert: opened by tapping the in-app notification card,
+    the FCM/WebPush push popup, or directly from Settings → Devices.
+    HTMX requests get the bottom-sheet partial; direct navigation gets a full
+    page that renders the same sheet centered.
+    """
+    verification = get_object_or_404(
+        DeviceVerificationEvent.objects.select_related('user'),
+        pk=verification_id,
+        user=request.user,
+    )
+    context = _verification_context(request, verification)
+    template = (
+        'users/partials/device_verification_sheet.html'
+        if request.headers.get('HX-Request')
+        else 'users/device_verification.html'
+    )
+    response = render(request, template, context)
+    if not request.headers.get('HX-Request'):
+        response['X-Frame-Options'] = 'DENY'
+    return response
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_device_verification_approve(request, verification_id):
+    """'Yes, it was me' — trust this device. Rejected if sent from the
+    device under verification itself (the attacker must not approve)."""
+    verification = get_object_or_404(
+        DeviceVerificationEvent, pk=verification_id, user=request.user
+    )
+    from users.services import device_alert_service as service
+    if not service._ratelimit_allow(request.user):
+        return JsonResponse({'ok': False, 'error': 'rate_limited'}, status=429)
+    ok, error_code = service.respond(
+        verification,
+        'approve',
+        acting_device_hash=_acting_device_hash(request) or '',
+    )
+    if not ok:
+        return JsonResponse({'ok': False, 'error': error_code}, status=409 if error_code == 'already_handled' else 403)
+    return JsonResponse({'ok': True, 'decision': 'approved', 'status': verification.status})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_device_verification_deny(request, verification_id):
+    """'It wasn't me' — block device; optional nuke escalation."""
+    verification = get_object_or_404(
+        DeviceVerificationEvent, pk=verification_id, user=request.user
+    )
+    from users.services import device_alert_service as service
+    if not service._ratelimit_allow(request.user):
+        return JsonResponse({'ok': False, 'error': 'rate_limited'}, status=429)
+    escalation = 'nuke' if (
+        request.POST.get('escalation') == 'nuke' or request.headers.get('X-Escalation') == 'nuke'
+    ) else 'block'
+    ok, error_code = service.respond(
+        verification,
+        'deny',
+        escalation=escalation,
+        acting_device_hash=_acting_device_hash(request) or '',
+    )
+    if not ok:
+        return JsonResponse({'ok': False, 'error': error_code}, status=409 if error_code == 'already_handled' else 403)
+    return JsonResponse({'ok': True, 'decision': 'blocked', 'escalation': escalation})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_trusted_device_untrust(request, device_id):
+    """Remove trust. Password confirmation required."""
+    trusted = get_object_or_404(TrustedDevice, pk=device_id, user=request.user)
+    password = request.POST.get('password', '')
+    if not request.user.check_password(password):
+        return JsonResponse({'ok': False, 'error': 'bad_password'}, status=403)
+    was_primary = trusted.is_primary
+    trusted_hash = trusted.device_hash
+    trusted.delete()
+    if was_primary:
+        remaining = TrustedDevice.objects.filter(user=request.user).order_by('trusted_at').first()
+        if remaining:
+            remaining.is_primary = True
+            remaining.save(update_fields=['is_primary'])
+
+    # Removed trust, so the events machinery sees it as a fresh device next login
+    from users.services.device_alert_service import invalidate_and_broadcast
+    _ = invalidate_and_broadcast  # no-op helper reference
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_trusted_device_make_primary(request, device_id):
+    trusted = get_object_or_404(TrustedDevice, pk=device_id, user=request.user)
+    TrustedDevice.objects.filter(user=request.user, is_primary=True).exclude(pk=trusted.pk).update(is_primary=False)
+    trusted.is_primary = True
+    trusted.save(update_fields=['is_primary'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_blocked_device_unblock(request, blocked_id):
+    """Unblock a device fingerprint. Password confirmation required."""
+    blocked = get_object_or_404(BlockedDevice, pk=blocked_id, user=request.user)
+    password = request.POST.get('password', '')
+    if not request.user.check_password(password):
+        return JsonResponse({'ok': False, 'error': 'bad_password'}, status=403)
+    blocked.delete()
+    from pwaninet.middleware.device_block_middleware import invalidate_blocked_device_cache
+    invalidate_blocked_device_cache(request.user.pk)
+    return JsonResponse({'ok': True})

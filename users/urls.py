@@ -93,6 +93,14 @@ urlpatterns = [
     path('user/<str:username>/photo/<str:photo_type>/', views.view_profile_photo_fullscreen, name='view_profile_photo_fullscreen'),
     path('people/search/', views.people_search, name='people_search'),
     
+    # API security endpoints
+    path('api/security/device-verifications/<int:verification_id>/approve/', views.api_device_verification_approve, name='api_device_verification_approve'),
+    path('api/security/device-verifications/<int:verification_id>/deny/', views.api_device_verification_deny, name='api_device_verification_deny'),
+    path('security/device-verifications/<int:verification_id>/', views.device_verification_view, name='device_verification'),
+    path('api/security/trusted-devices/<int:device_id>/untrust/', views.api_trusted_device_untrust, name='api_trusted_device_untrust'),
+    path('api/security/trusted-devices/<int:device_id>/primary/', views.api_trusted_device_make_primary, name='api_trusted_device_make_primary'),
+    path('api/security/blocked-devices/<int:blocked_id>/unblock/', views.api_blocked_device_unblock, name='api_blocked_device_unblock'),
+
     # Privacy API endpoints
     path('api/privacy/sign-out-session/<int:session_id>/', views.api_sign_out_session, name='api_sign_out_session'),
     path('api/privacy/sign-out-all-sessions/', views.api_sign_out_all_sessions, name='api_sign_out_all_sessions'),

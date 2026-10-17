@@ -1,0 +1,238 @@
+{% load i18n %}
+{# New-device sign-in approval sheet (Phase 1). Bottom-sheet styled like the  #}
+{# Google sign-in sheet. Pending -> camera  info card -> deny confirm -> done. #}
+
+<div class="dv-sheet-wrap" id="dv-sheet-{{ verification.pk }}">
+  <style>
+    .dv-sheet-wrap { --dv-danger: #c02626; --dv-green: #10893e; width: 100%; font-family: inherit; }
+    .dv-sheet-card {
+      background: #fff; border-radius: 16px; padding: 20px 20px 18px; margin: 0 auto;
+      max-width: 480px; text-align: left; box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+    }
+    .dv-sheet-grabber { width: 44px; height: 4px; border-radius: 2px; background: #d6d9dd; margin: 0 auto 14px; }
+    .dv-title { font-size: 1.15rem; font-weight: 700; margin: 0 0 4px; color: #17202a; }
+    .dv-sub { color: #5b6470; font-size: .92rem; margin: 0 0 14px; }
+    .dv-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .dv-row {
+      display: flex; align-items: center; gap: 10px; background: #f6f7f9;
+      border-radius: 10px; padding: 10px 12px; font-size: .93rem; color: #22303c;
+    }
+    .dv-row i { color: #5b6470; width: 18px; text-align: center; }
+    .dv-note { font-size: .8rem; color: #6b7684; margin: 0 0 14px; }
+    .dv-actions { display: grid; gap: 10px; }
+    .dv-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      border-radius: 10px; border: 0; padding: 12px 14px; font-weight: 600;
+      font-size: .95rem; cursor: pointer; transition: filter .15s ease; text-decoration: none;
+    }
+    .dv-btn:hover { filter: brightness(.97); }
+    .dv-btn:disabled { opacity: .55; cursor: not-allowed; }
+    .dv-btn-primary { background: var(--dv-green); color: #fff; }
+    .dv-btn-danger { background: #fff; color: var(--dv-danger); border: 1.5px solid var(--dv-danger); }
+    .dv-btn-danger-fill { background: var(--dv-danger); color: #fff; }
+    .dv-btn-ghost { background: transparent; color: #5b6470; font-weight: 500; padding: 8px; }
+    .dv-status { text-align: center; padding: 18px 8px; }
+    .dv-status i { font-size: 2rem; }
+    .dv-status.approved i { color: var(--dv-green); }
+    .dv-status.rejected i { color: var(--dv-danger); }
+    .dv-status.neutral i { color: #98a2ae; }
+    .dv-hidden { display: none !important; }
+    .dv-spin { animation: dvspin 1s linear infinite; display: inline-block; }
+    @keyframes dvspin { to { transform: rotate(360deg); } }
+  </style>
+
+  <div class="dv-sheet-card" role="dialog" aria-modal="true" aria-label="New sign-in security alert">
+    <div class="dv-sheet-grabber"></div>
+
+    {% if verification.status == 'pending' %}
+      {# ---- State A: pending device info -------- #}
+      <div id="dv-state-a">
+        <h2 class="dv-title">{% trans "New sign-in detected" %}</h2>
+        <p class="dv-sub">{% trans "A new device tried to access your vasto account" %}</p>
+
+        <div class="dv-rows">
+          <div class="dv-row">
+            <i class="bi bi-phone"></i>
+            <span>{{ device_label }}</span>
+          </div>
+          <div class="dv-row">
+            <i class="bi bi-geo-alt"></i>
+            <span>{{ location_label }}{% if location_label != 'Unknown location' %} ({% trans "approx." %}){% endif %}</span>
+          </div>
+          <div class="dv-row">
+            <i class="bi bi-clock"></i>
+            <span>{{ verification.created_at|date:"D d M Y, H:i" }}{% if verification.ip_address %} · IP {{ verification.ip_address }}{% endif %}</span>
+          </div>
+        </div>
+
+        {% if own_device %}
+          <div class="dv-status neutral">
+            <i class="bi bi-shield-lock"></i>
+            <p class="dv-sub">{% trans "Open this alert from a device you already trust to confirm or block." %}</p>
+          </div>
+        {% elif not can_act %}
+          <div class="dv-status neutral">
+            <i class="bi bi-shield-lock"></i>
+            <p class="dv-sub">{% trans "For your security, confirm this sign-in from one of your trusted devices." %}</p>
+          </div>
+        {% else %}
+          <p class="dv-note">
+            <i class="bi bi-shield-check"></i> {% trans "A sign-in is not a password leak — two-factor auth still protects your account." %}
+          </p>
+          <div class="dv-actions">
+            <button type="button" class="dv-btn dv-btn-primary" id="dv-approve-btn">
+              <i class="bi bi-hand-thumbs-up"></i> {% trans "Yes, it was me" %}
+            </button>
+            <button type="button" class="dv-btn dv-btn-danger" id="dv-deny-btn">
+              <i class="bi bi-hand-thumbs-down"></i> {% trans "It wasn't me" %}
+            </button>
+          </div>
+        {% endif %}
+      </div>
+
+      {# ---- State B: deny confirmation ---- #}
+      <div id="dv-state-b" hidden>
+        <h2 class="dv-title">{% trans "Block this device and secure your account?" %}</h2>
+        <p class="dv-sub">{% trans "Choose how far to go. You can unblock later in Settings → Devices." %}</p>
+        <div class="dv-actions">
+          <button type="button" class="dv-btn dv-btn-danger" id="dv-deny-block-btn">
+            <i class="bi bi-x-circle"></i>
+            <span>{% trans "Block device" %}<span class="d-block small fw-normal">{% trans "Sign out on that device and block its ID" %}</span></span>
+          </button>
+          <button type="button" class="dv-btn dv-btn-danger-fill" id="dv-deny-nuke-btn">
+            <i class="bi bi-shield-exclamation"></i>
+            <span>{% trans "Block device + secure my account" %}<span class="d-block small fw-normal">{% trans "Sign you out everywhere trusted devices stay, and require a password reset" %}</span></span>
+          </button>
+          <button type="button" class="dv-btn dv-btn-ghost" id="dv-back-btn">
+            <i class="bi bi-arrow-left"></i> {% trans "Back" %}
+          </button>
+        </div>
+      </div>
+
+      {# ---- State C: approved (shown after response) ---- #}
+      <div id="dv-state-c" hidden>
+        <div class="dv-status approved">
+          <i class="bi bi-shield-check"></i>
+          <h2 class="dv-title">{% trans "Device trusted" %}</h2>
+          <p class="dv-sub">{% trans "You won't get alerts for this device anymore." %}</p>
+        </div>
+        <a class="dv-btn dv-btn-ghost" href="{{ devices_url }}">{% trans "Manage devices" %}</a>
+      </div>
+
+      {# ---- State D: rejected (shown after response) ---- #}
+      <div id="dv-state-d" hidden>
+        <div class="dv-status rejected">
+          <i class="bi bi-shield-exclamation"></i>
+          <h2 class="dv-title" id="dv-reject-title">{% trans "Device blocked" %}</h2>
+          <p class="dv-sub" id="dv-reject-message">{% trans "We signed it out and blocked it from your account." %}</p>
+        </div>
+      </div>
+
+      <script>
+      (function () {
+        var APPROVE_URL = "{{ respond_url_approve|escapejs }}";
+        var DENY_URL = "{{ respond_url_deny|escapejs }}";
+        var stateA = document.getElementById('dv-state-a');
+        var stateB = document.getElementById('dv-state-b');
+        var stateC = document.getElementById('dv-state-c');
+        var stateD = document.getElementById('dv-state-d');
+        if (!stateA) return;
+
+        function csrfToken() {
+          var match = document.cookie.match(/(?:^|;\\s*)csrftoken=([^;]*)/);
+          return match ? decodeURIComponent(match[1]) : '';
+        }
+        function show(el) { if (el) el.hidden = false; }
+        function hideAll() { [stateA, stateB, stateC, stateD].forEach(function (s) { if (s) s.hidden = true; }); }
+        function busy(btn) {
+          btn.dataset.label = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="bi bi-arrow-repeat dv-spin"></i>';
+        }
+        function reset(btn) { if (btn.dataset.label) { btn.innerHTML = btn.dataset.label; btn.disabled = false; } }
+
+        function post(url, extra) {
+          var body = new URLSearchParams(extra || {});
+          return fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+            body: body
+          }).then(function (res) {
+            return res.json().catch(function () { return { ok: false, error: 'bad_response' }; });
+          });
+        }
+
+        var approveBtn = document.getElementById('dv-approve-btn');
+        if (approveBtn) approveBtn.addEventListener('click', function () {
+          busy(approveBtn);
+          post(APPROVE_URL).then(function (data) {
+            if (data.ok) { hideAll(); show(stateC); }
+            else { reset(approveBtn); hideAll(); showFail(data); }
+          });
+        });
+
+        var denyBtn = document.getElementById('dv-deny-btn');
+        if (denyBtn) denyBtn.addEventListener('click', function (e) {
+          e.preventDefault(); hideAll(); show(stateB);
+        });
+        var backBtn = document.getElementById('dv-back-btn');
+        if (backBtn) backBtn.addEventListener('click', function () { hideAll(); show(stateA); });
+
+        var denyBlockBtn = document.getElementById('dv-deny-block-btn');
+        var denyNukeBtn = document.getElementById('dv-deny-nuke-btn');
+        if (denyBlockBtn) denyBlockBtn.addEventListener('click', function () { deny('block', denyBlockBtn); });
+        if (denyNukeBtn) denyNukeBtn.addEventListener('click', function () { deny('nuke', denyNukeBtn); });
+
+        function deny(escalation, btn) {
+          busy(btn);
+          post(DENY_URL, { escalation: escalation }).then(function (data) {
+            hideAll();
+            if (data.ok) {
+              var msg = document.getElementById('dv-reject-message');
+              if (data.escalation === 'nuke' && msg) {
+                msg.textContent = 'We blocked the device, signed you out everywhere except trusted devices, and emailed password reset instructions.';
+              }
+              show(stateD);
+            } else {
+              reset(denyBlockBtn); reset(denyNukeBtn);
+              showFail(data);
+            }
+          });
+        }
+
+        function showFail(data) {
+          var title = document.getElementById('dv-reject-title');
+          if (title && data.error === 'self_approval_forbidden') {
+            title.textContent = 'Confirm from a trusted device';
+          }
+          show(stateD);
+        }
+      })();
+      </script>
+
+    {% else %}
+      {# ---- Not pending: server-rendered final states ---- #}
+      {% if verification.status == 'approved' %}
+        <div class="dv-status approved">
+          <i class="bi bi-shield-check"></i>
+          <h2 class="dv-title">{% trans "Device trusted" %}</h2>
+          <p class="dv-sub">{% trans "This sign-in was confirmed — you won't get alerts for this device." %}</p>
+        </div>
+      {% elif verification.status == 'rejected' %}
+        <div class="dv-status rejected">
+          <i class="bi bi-shield-exclamation"></i>
+          <h2 class="dv-title">{% trans "Device blocked" %}</h2>
+          <p class="dv-sub">{% trans "We signed it out and blocked it from your account." %}</p>
+        </div>
+      {% elif verification.status == 'expired' %}
+        <div class="dv-status neutral">
+          <i class="bi bi-clock-history"></i>
+          <h2 class="dv-title">{% trans "Alert expired" %}</h2>
+          <p class="dv-sub">{% trans "This sign-in was not confirmed within 24 hours. Nothing harmful happened — reply to a new alert if you see this device again." %}</p>
+        </div>
+      {% endif %}
+      <a class="dv-btn dv-btn-ghost" href="{{ devices_url }}">{% trans "Manage devices" %}</a>
+    {% endif %}
+  </div>
+</div>

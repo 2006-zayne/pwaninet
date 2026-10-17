@@ -106,6 +106,9 @@ class EventValidator:
         'security.login.detected': ['detected'],
         'security.password.changed': ['changed'],
         'security.account.locked': ['locked'],
+        'security.device.login_new': ['detected'],
+        'security.device.trusted': ['trusted', 'approved'],
+        'security.device.blocked': ['blocked', 'rejected'],
     }
     
     @classmethod

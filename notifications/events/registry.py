@@ -110,6 +110,9 @@ class EventTypes(Enum):
     SECURITY_LOGIN_DETECTED = "security.login.detected"
     SECURITY_PASSWORD_CHANGED = "security.password.changed"
     SECURITY_ACCOUNT_LOCKED = "security.account.locked"
+    SECURITY_DEVICE_LOGIN_NEW = "security.device.login_new"
+    SECURITY_DEVICE_TRUSTED = "security.device.trusted"
+    SECURITY_DEVICE_BLOCKED = "security.device.blocked"
     
     @classmethod
     def get_all_event_types(cls):
@@ -210,6 +213,8 @@ class EventActions(Enum):
     RATED = "rated"
     REPOSTED = "reposted"
     REPORTED = "reported"
+    TRUSTED = "trusted"
+    BLOCKED = "blocked"
     
     @classmethod
     def get_all_actions(cls):

@@ -130,6 +130,14 @@ def create_or_update_session(user, request):
             }
         )
 
+        # Phase 1: new-device sign-in detection (trust / challenge / block).
+        # Best-effort; never allowed to break the login path.
+        try:
+            from users.services.device_alert_service import evaluate_device_login
+            evaluate_device_login(user, request, user_session)
+        except Exception:
+            pass
+
     return user_session
 
 

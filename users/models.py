@@ -763,3 +763,209 @@ class PlatformInvite(models.Model):
 
     def __str__(self):
         return f"PlatformInvite({self.inviter.username}, type={self.invite_type}, token={self.token})"
+
+
+class DeviceAlertChannel(models.TextChoices):
+    """How a device verification challenge was delivered."""
+    PUSH = 'push', 'Push notification'
+    IN_APP = 'in_app', 'In-app notification'
+    EMAIL = 'email', 'Email fallback'
+
+
+class DeviceVerificationStatus(models.TextChoices):
+    """Lifecycle of a new-device sign-in challenge."""
+    PENDING = 'pending', 'Pending response'
+    APPROVED = 'approved', 'Approved by user'
+    REJECTED = 'rejected', 'Rejected by user'
+    EXPIRED = 'expired', 'Expired without response'
+
+
+class DeviceBlockReason(models.TextChoices):
+    """Why a device fingerprint was blocked from the account."""
+    USER_REPORTED = 'user_reported', 'User reported sign-in as not theirs'
+    SUSPECTED_ABUSE = 'suspected_abuse', 'Automatically suspected abuse'
+
+
+class TrustedDevice(models.Model):
+    """
+    A device fingerprint the user has confirmed as theirs.
+
+    Trusted devices receive new sign-in alerts (via their push subscription)
+    and are exempt from further verification challenges. Lookup always uses
+    the peppered hash from ``device_service.hash_device_id`` so raw device
+    identifiers are never stored.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='trusted_devices',
+        db_index=True,
+    )
+    device_hash = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="Peppered SHA-256 of the device ID (see device_service.hash_device_id)",
+    )
+    nickname = models.CharField(max_length=100, blank=True, default='')
+    device_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Device label snapshot at trust time, e.g. 'iPhone 15 Pro (Safari)'",
+    )
+    is_primary = models.BooleanField(
+        default=False,
+        help_text="Primary trusted device; at most one per user (enforced in services)",
+    )
+    source_event = models.ForeignKey(
+        'DeviceVerificationEvent',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='trusted_from_event',
+        help_text="Verification event whose approval created this trust, if any",
+    )
+    trusted_at = models.DateTimeField(auto_now_add=True)
+    last_confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Trusted Device"
+        verbose_name_plural = "Trusted Devices"
+        unique_together = ('user', 'device_hash')
+        ordering = ['-is_primary', '-trusted_at']
+        indexes = [
+            models.Index(fields=['user', 'device_hash']),
+            models.Index(fields=['device_hash']),
+        ]
+
+    def __str__(self):
+        label = self.nickname or self.device_name or self.device_hash[:10]
+        return f"TrustedDevice({self.user.username}, {label})"
+
+
+class DeviceVerificationEvent(models.Model):
+    """
+    One challenge emitted when a sign-in comes from a device the user has
+    never trusted. Non-blocking: the session is live either way; this row is
+    the alert + audit trail the user acts on from a trusted device.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='device_verifications',
+        db_index=True,
+    )
+    device_hash = models.CharField(max_length=64, db_index=True)
+    # Snapshot of device metadata at challenge time (no FK to UserSession so
+    # the audit trail survives session revocation).
+    device_name = models.CharField(max_length=255, blank=True, default='')
+    device_type = models.CharField(
+        max_length=20,
+        choices=[('mobile', 'Mobile'), ('tablet', 'Tablet'), ('desktop', 'Desktop')],
+        default='desktop',
+        blank=True,
+    )
+    browser = models.CharField(max_length=100, blank=True, default='')
+    operating_system = models.CharField(max_length=100, blank=True, default='')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    location_city = models.CharField(max_length=100, blank=True, default='')
+    location_country = models.CharField(max_length=100, blank=True, default='')
+    location_source = models.CharField(
+        max_length=20,
+        default='ip',
+        help_text="Source of the location estimate (IP-only in phase 1)",
+    )
+    session_key = models.CharField(max_length=255, blank=True, default='')
+    notification = models.ForeignKey(
+        'notifications.NotificationObject',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='device_verifications',
+    )
+    channel = models.CharField(
+        max_length=20,
+        choices=DeviceAlertChannel.choices,
+        default=DeviceAlertChannel.IN_APP,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=DeviceVerificationStatus.choices,
+        default=DeviceVerificationStatus.PENDING,
+        db_index=True,
+    )
+    expires_at = models.DateTimeField()
+    responded_at = models.DateTimeField(null=True, blank=True)
+    responded_from_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        help_text="Device hash of the trusted device that acted on this event",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Device Verification Event"
+        verbose_name_plural = "Device Verification Events"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['status', 'expires_at']),
+            models.Index(fields=['device_hash']),
+        ]
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return self.status == self.status.PENDING and self.expires_at <= timezone.now()
+
+    @property
+    def location_label(self):
+        parts = [p for p in (self.location_city, self.location_country) if p]
+        return ", ".join(parts)
+
+    def __str__(self):
+        return (
+            f"DeviceVerificationEvent({self.user.username}, "
+            f"{self.device_name or 'Unknown Device'}, status={self.status})"
+        )
+
+
+class BlockedDevice(models.Model):
+    """
+    A device fingerprint the user said was not theirs, refused both for fresh
+    logins and any session bound to it. Stores the peppered hash only.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='blocked_devices',
+        db_index=True,
+    )
+    device_hash = models.CharField(max_length=64, db_index=True)
+    reason = models.CharField(
+        max_length=20,
+        choices=DeviceBlockReason.choices,
+        default=DeviceBlockReason.USER_REPORTED,
+    )
+    source_event = models.ForeignKey(
+        'DeviceVerificationEvent',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='blocks_from_event',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Blocked Device"
+        verbose_name_plural = "Blocked Devices"
+        unique_together = ('user', 'device_hash')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'device_hash']),
+        ]
+
+    def __str__(self):
+        return f"BlockedDevice({self.user.username}, {self.device_hash[:10]}, {self.reason})"

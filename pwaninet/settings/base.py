@@ -83,6 +83,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'pwaninet.middleware.device_block_middleware.BlockedDeviceMiddleware',
     'pwaninet.middleware.maintenance.MaintenanceModeMiddleware',
     'pwaninet.middleware.user_activity.UserActivityMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -224,6 +225,13 @@ GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
 # local/dev DummyCache performs no counting.
 GOOGLE_COMPLETE_RATELIMIT_ATTEMPTS = int(os.environ.get('GOOGLE_COMPLETE_RATELIMIT_ATTEMPTS', 20))
 GOOGLE_COMPLETE_RATELIMIT_WINDOW = int(os.environ.get('GOOGLE_COMPLETE_RATELIMIT_WINDOW', 300))
+
+# New-device login alerts (Phase 1). GeoIP is optional: point GEOIP_PATH at a
+# GeoLite2-City database directory (and install the geoip2 package) to show
+# approximate city/country in device alerts.
+DEVICE_VERIFICATION_EXPIRY_HOURS = int(os.environ.get('DEVICE_VERIFICATION_EXPIRY_HOURS', 24))
+DEVICE_ALERT_EMAIL_FALLBACK = os.environ.get('DEVICE_ALERT_EMAIL_FALLBACK', 'True') == 'True'
+GEOIP_PATH = os.environ.get('GEOIP_PATH', '')
 
 # Caching configuration
 CACHES = {
@@ -427,6 +435,11 @@ CELERY_BEAT_SCHEDULE = {
     'uploads-reconcile-stale-uploads': {
         'task': 'uploads.tasks.reconcile_stale_uploads',
         'schedule': 1800.0,  # every 30 minutes
+        'options': {'queue': 'default'},
+    },
+    'users-expire-device-verifications': {
+        'task': 'users.tasks.expire_device_verifications',
+        'schedule': 900.0,  # every 15 minutes
         'options': {'queue': 'default'},
     },
 }
