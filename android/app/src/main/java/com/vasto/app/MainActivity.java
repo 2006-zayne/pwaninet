@@ -89,6 +89,14 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
     private WebAppInterface androidWebAppInterface;
     private WebView androidBridgeWebView;
 
+    /**
+     * True while MainActivity is resumed. Read by PwaninetFirebaseMessagingService
+     * to skip posting the system notification while the app is open — the WebView
+     * already renders the thin in-app banner for foreground pushes. Prevents the
+     * duplicate thick system heads-up banner appearing on top of the in-app card.
+     */
+    public static volatile boolean isAppForeground = false;
+
     private static final class PendingMediaDownload {
         final String url, filename, mimeType, category;
         PendingMediaDownload(String url, String filename, String mimeType, String category) {
@@ -1218,9 +1226,16 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
     @Override
     public void onResume() {
         super.onResume();
+        MainActivity.isAppForeground = true;
         injectSafeAreaInsets();
         syncSystemBarThemeFromDom();
         injectThemeObserver();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        MainActivity.isAppForeground = false;
     }
 
     private void setupWebViewDownloads() {
