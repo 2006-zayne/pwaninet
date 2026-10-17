@@ -203,26 +203,39 @@
         });
         btn.addEventListener('click', function() {
             btn.disabled = true;
-            SocialLogin.login({
+            var loginPromise = SocialLogin.login({
                 provider: 'google',
                 options: { scopes: ['openid', 'email', 'profile'] }
-            }).then(function(response) {
+            });
+            // Guard against plugins that return no thenable or never settle
+            // on a device without a Google account / Play Services: never
+            // leave the button dead.
+            var p = loginPromise && typeof loginPromise.then === 'function'
+                ? loginPromise
+                : Promise.reject(new Error('native_login_not_available'));
+            Promise.race([p, new Promise(function(_, rej) {
+                setTimeout(function() { rej(new Error('native_login_timed_out')); }, 8000);
+            })]).then(function(response) {
                 var idToken = response && response.result && response.result.idToken;
                 if (!idToken) {
                     showError('Google sign-in failed. Please try again.');
                     btn.disabled = false;
                     return;
                 }
-                // Same backend contract as web (ok / link_required / error);
-                // the ID token aud is the web client ID, verified server-side.
                 postJson(COMPLETE_URL, { credential: idToken })
                     .then(handleComplete)
                     .catch(function() {
                         showError('Google sign-in failed. Please check your connection and try again.');
                         btn.disabled = false;
                     });
-            }).catch(function() {
-                // Includes user cancellation of the native account sheet.
+            }).catch(function(e) {
+                if (e && e.message === 'native_login_timed_out') {
+                    showError('Google sign-in timed out on this device — please sign in with email/password instead.');
+                } else if (e && e.message === 'native_login_not_available') {
+                    showError('Google sign-in is unavailable in this app version.');
+                } else {
+                    showError('Google sign-in failed. Please try again.');
+                }
                 btn.disabled = false;
             });
         });
