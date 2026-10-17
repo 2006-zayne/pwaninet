@@ -19,4 +19,8 @@ urlpatterns = [
     path('my-units/sync/', views.sync_student_units_api, name='sync_student_units_api'),
     path('my-units/enroll/', views.enroll_student_unit, name='enroll_student_unit'),
     path('my-units/<int:unit_id>/unenroll/', views.unenroll_student_unit, name='unenroll_student_unit'),
+    path('timetable/upload/', views.upload_timetable_view, name='timetable_upload'),
+    path('timetable/active/', views.timetable_active_api, name='timetable_active'),
+    path('timetable/<int:timetable_id>/status/', views.timetable_status_api, name='timetable_status'),
+    path('timetable/<int:timetable_id>/slot/', views.timetable_slot_mutation_view, name='timetable_slot_mutation'),
 ]

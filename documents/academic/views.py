@@ -2,12 +2,26 @@
 HTMX and API views for academic dropdowns and student unit enrollments.
 """
 import json
+import logging
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
-from .models import AcademicLevel, AcademicUnit, AcademicYear, Programme, Semester
+from .models import (
+    AcademicLevel,
+    AcademicUnit,
+    AcademicYear,
+    Institution,
+    Programme,
+    ProgrammeTimetable,
+    Semester,
+    TimetableStatus,
+    TimetableType,
+)
 from .services import StudentAcademicEnrollmentService
+from .timetable_service import ProgrammeTimetableManager, compute_free_slots
+
+logger = logging.getLogger(__name__)
 
 
 def load_academic_levels(request):
@@ -245,6 +259,15 @@ def academic_dashboard(request):
 
     programmes = Programme.objects.filter(is_active=True).select_related('department__school').order_by('name')
 
+    active_timetable = None
+    if selected_programme and selected_level_obj:
+        active_timetable = ProgrammeTimetableManager.get_active_timetable(
+            institution=getattr(user, 'institution', None),
+            programme=selected_programme,
+            academic_level=selected_level_obj,
+            semester=summary.get('semester') or getattr(user, 'semester', None),
+        )
+
     context = {
         'page_title': 'Academic & Units Dashboard',
         'academic_summary': summary,
@@ -259,6 +282,7 @@ def academic_dashboard(request):
         'context_units_count': len(context_units),
         'academic_levels': academic_levels,
         'programmes': programmes,
+        'active_timetable': active_timetable,
         'document_content_partial': 'documents/partials/academic_dashboard_content.html',
         'show_library_button': False,
         'show_upload_button': False,
@@ -507,5 +531,216 @@ def update_academic_profile_api(request):
         'semester_number': summary['semester_number'],
         'enrolled_count': summary['enrolled_count'],
     })
+
+
+@login_required
+@require_POST
+def upload_timetable_view(request):
+    """
+    Handle student timetable image upload (from fullscreen crop composer).
+
+    Phase 1 (this view): Validates the upload, saves the image file, creates a
+    ProgrammeTimetable record at status=PROCESSING, fires the Celery extraction
+    task, and responds immediately — the student never waits for AI.
+
+    Phase 2 (Celery task): process_timetable_image_task calls Gemini Vision,
+    populates schedule_data, and marks the record ACTIVE.
+    """
+    user = request.user
+    image_file = request.FILES.get('image') or request.FILES.get('timetable_image')
+    if not image_file:
+        return JsonResponse({'success': False, 'error': 'No timetable image file provided.'}, status=400)
+
+    # ── Resolve programme and academic level ──────────────────────────────────
+    prog_id = request.POST.get('programme_id') or request.POST.get('programme')
+    level_id = request.POST.get('academic_level') or request.POST.get('level') or request.POST.get('year')
+    sem_id = request.POST.get('semester')
+    change_summary = request.POST.get('change_summary', '').strip()
+
+    programme = None
+    if prog_id and str(prog_id).isdigit():
+        programme = Programme.objects.filter(pk=int(prog_id), is_active=True).first()
+    if not programme:
+        programme = getattr(user, 'programme', None)
+    if not programme:
+        return JsonResponse(
+            {'success': False, 'error': 'Please set your academic programme before uploading a timetable.'},
+            status=400,
+        )
+
+    academic_level = None
+    if level_id and str(level_id).isdigit():
+        academic_level = StudentAcademicEnrollmentService.resolve_or_ensure_academic_level(int(level_id))
+    if not academic_level:
+        academic_level = getattr(user, 'academic_level', None) or \
+            StudentAcademicEnrollmentService.resolve_or_ensure_academic_level(1)
+
+    semester = None
+    if sem_id and str(sem_id).isdigit():
+        semester = Semester.objects.filter(pk=int(sem_id)).first()
+    if not semester:
+        semester = getattr(user, 'semester', None)
+
+    institution = getattr(user, 'institution', None)
+    if not institution:
+        institution = Institution.objects.filter(is_active=True).first()
+
+    # ── Save image + create PROCESSING record + fire task ────────────────────
+    try:
+        timetable = ProgrammeTimetableManager.save_timetable_image(
+            user=user,
+            image_file=image_file,
+            institution=institution,
+            programme=programme,
+            academic_level=academic_level,
+            semester=semester,
+            academic_year=getattr(user, 'academic_year', None),
+            change_summary=change_summary,
+        )
+    except Exception as exc:
+        logger.error('[TIMETABLE_UPLOAD] Error saving timetable: %s', exc, exc_info=True)
+        return JsonResponse({'success': False, 'error': f'Failed to save timetable: {str(exc)}'}, status=500)
+
+    # HTMX path: render the timetable panel immediately in "processing" state
+    if request.headers.get('HX-Request'):
+        context = {
+            'active_timetable': timetable,
+            'academic_summary': StudentAcademicEnrollmentService.get_student_academic_summary(user),
+            'selected_programme': programme,
+            'selected_level_obj': academic_level,
+        }
+        return render(request, 'documents/partials/timetable_panel.html', context)
+
+    return JsonResponse({
+        'success': True,
+        'processing': timetable.status == TimetableStatus.PROCESSING,
+        'message': 'Timetable uploaded — Spark AI is now extracting the schedule in the background.',
+        'timetable_id': timetable.id,
+        'revision_number': timetable.revision_number,
+        'title': timetable.title,
+        'status': timetable.status,
+    })
+
+
+@login_required
+@require_GET
+def timetable_status_api(request, timetable_id: int):
+    """
+    Polling endpoint used by the HTMX "Processing..." skeleton in timetable_panel.html.
+
+    Returns the current timetable status.  When status is ACTIVE the full
+    schedule_data is included so the client can update the panel without a
+    page refresh.  When status is PROCESSING the client should poll again.
+    When status is FAILED the client should surface an error and offer a retry.
+    """
+    timetable = ProgrammeTimetable.objects.filter(pk=timetable_id).first()
+    if not timetable:
+        return JsonResponse({'found': False, 'status': 'not_found'}, status=404)
+
+    payload = {
+        'found': True,
+        'timetable_id': timetable.id,
+        'status': timetable.status,
+        'is_active': timetable.is_active,
+        'revision_number': timetable.revision_number,
+        'title': timetable.title,
+    }
+
+    if timetable.status == TimetableStatus.ACTIVE and timetable.is_active:
+        payload['schedule_data'] = timetable.schedule_data
+
+    # If HTMX request and timetable is now active, return a fully rendered panel
+    if request.headers.get('HX-Request') and timetable.status == TimetableStatus.ACTIVE:
+        context = {
+            'active_timetable': timetable,
+            'academic_summary': StudentAcademicEnrollmentService.get_student_academic_summary(request.user),
+            'selected_programme': timetable.programme,
+            'selected_level_obj': timetable.academic_level,
+        }
+        return render(request, 'documents/partials/timetable_panel.html', context)
+
+    return JsonResponse(payload)
+
+
+@login_required
+@require_GET
+def timetable_active_api(request):
+    """Return active timetable and free slots for the student's cohort."""
+    user = request.user
+    prog_id = request.GET.get('programme_id')
+    level_id = request.GET.get('year') or request.GET.get('level')
+
+    programme = Programme.objects.filter(pk=int(prog_id)).first() if (prog_id and str(prog_id).isdigit()) else getattr(user, 'programme', None)
+    academic_level = StudentAcademicEnrollmentService.resolve_or_ensure_academic_level(int(level_id)) if (level_id and str(level_id).isdigit()) else getattr(user, 'academic_level', None)
+
+    if not programme or not academic_level:
+        return JsonResponse({'active': False, 'timetable': None, 'message': 'Cohort not fully specified.'})
+
+    timetable = ProgrammeTimetableManager.get_active_timetable(
+        institution=getattr(user, 'institution', None),
+        programme=programme,
+        academic_level=academic_level,
+        semester=getattr(user, 'semester', None),
+    )
+
+    if not timetable:
+        return JsonResponse({'active': False, 'timetable': None, 'message': 'No active timetable found for this cohort.'})
+
+    return JsonResponse({
+        'active': True,
+        'timetable': {
+            'id': timetable.id,
+            'title': timetable.title,
+            'revision_number': timetable.revision_number,
+            'programme': timetable.programme.code if timetable.programme else None,
+            'academic_level': timetable.academic_level.name if timetable.academic_level else None,
+            'semester': str(timetable.semester) if timetable.semester else None,
+            'schedule_data': timetable.schedule_data,
+            'updated_at': timetable.updated_at.isoformat(),
+        }
+    })
+
+
+@login_required
+@require_POST
+def timetable_slot_mutation_view(request, timetable_id: int):
+    """Add, edit, or delete a lecture slot in an existing timetable."""
+    user = request.user
+    timetable = ProgrammeTimetable.objects.filter(pk=timetable_id).first()
+    if not timetable:
+        return JsonResponse({'success': False, 'error': 'Timetable not found.'}, status=404)
+
+    payload = _parse_request_payload(request)
+    action = payload.get('action', 'update').lower().strip()
+    slot_id = payload.get('slot_id') or payload.get('id')
+    slot_data = payload.get('slot') or payload
+
+    try:
+        updated_tt = ProgrammeTimetableManager.mutate_timetable_slot(
+            timetable=timetable,
+            action=action,
+            slot_data=slot_data if isinstance(slot_data, dict) else None,
+            slot_id=slot_id,
+            user=user,
+        )
+    except Exception as exc:
+        logger.error(f"[TIMETABLE_MUTATE] Error mutating slot: {exc}", exc_info=True)
+        return JsonResponse({'success': False, 'error': str(exc)}, status=400)
+
+    if request.headers.get('HX-Request'):
+        context = {
+            'active_timetable': updated_tt,
+            'academic_summary': StudentAcademicEnrollmentService.get_student_academic_summary(user),
+            'selected_programme': updated_tt.programme,
+            'selected_level_obj': updated_tt.academic_level,
+        }
+        return render(request, 'documents/partials/timetable_panel.html', context)
+
+    return JsonResponse({
+        'success': True,
+        'message': f"Timetable slot {action}d successfully.",
+        'schedule_data': updated_tt.schedule_data,
+    })
+
 
 

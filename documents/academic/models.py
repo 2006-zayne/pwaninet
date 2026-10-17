@@ -701,3 +701,154 @@ class StudentUnitEnrollment(models.Model):
     def __str__(self):
         return f"{getattr(self.user, 'username', self.user_id)} -> {self.academic_unit.code} ({'active' if self.is_active else 'inactive'})"
 
+
+class TimetableStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending Extraction'
+    PROCESSING = 'PROCESSING', 'Processing Image'
+    ACTIVE = 'ACTIVE', 'Active'
+    SUPERSEDED = 'SUPERSEDED', 'Superseded'
+    FAILED = 'FAILED', 'Failed'
+
+
+class TimetableType(models.TextChoices):
+    LECTURE = 'LECTURE', 'Weekly Lecture Schedule'
+    EXAM = 'EXAM', 'Examination Timetable'
+    CAT = 'CAT', 'CAT / Midterm Schedule'
+
+
+class ProgrammeTimetable(models.Model):
+    """Multi-tenant timetable for a specific programme, academic level, and semester."""
+
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name='timetables',
+        help_text="The institution this timetable belongs to"
+    )
+    programme = models.ForeignKey(
+        Programme,
+        on_delete=models.CASCADE,
+        related_name='timetables',
+        help_text="The academic programme this timetable applies to"
+    )
+    academic_level = models.ForeignKey(
+        AcademicLevel,
+        on_delete=models.CASCADE,
+        related_name='timetables',
+        help_text="The year of study / academic level"
+    )
+    academic_year = models.ForeignKey(
+        AcademicYear,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='timetables',
+        help_text="The academic year"
+    )
+    semester = models.ForeignKey(
+        Semester,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='timetables',
+        help_text="The semester"
+    )
+    timetable_type = models.CharField(
+        max_length=20,
+        choices=TimetableType.choices,
+        default=TimetableType.LECTURE,
+        db_index=True
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=TimetableStatus.choices,
+        default=TimetableStatus.ACTIVE,
+        db_index=True
+    )
+    revision_number = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Revision number (1 for original, 2 for revised, etc.)"
+    )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Human-readable title (e.g. 'Semester 1 Official Lecture Timetable')"
+    )
+    change_summary = models.TextField(
+        blank=True,
+        help_text="Summary of changes in this revision"
+    )
+    source_image = models.ImageField(
+        upload_to='timetables/images/%Y/%m/',
+        help_text="The uploaded (or cropped) timetable image"
+    )
+    schedule_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Structured JSON weekly schedule extracted from the image"
+    )
+    raw_extracted_text = models.TextField(
+        blank=True,
+        help_text="Raw OCR or model text output"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Whether this is the current active timetable for the cohort"
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='uploaded_timetables',
+        help_text="Student or administrator who uploaded the timetable"
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_timetables',
+        help_text="User (class rep, delegate, or staff) who verified this timetable"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Programme Timetable"
+        verbose_name_plural = "Programme Timetables"
+        indexes = [
+            models.Index(fields=['institution', 'programme', 'academic_level', 'is_active']),
+            models.Index(fields=['status']),
+            models.Index(fields=['timetable_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.programme.code} - {self.academic_level.name} (Rev {self.revision_number})"
+
+    def save(self, *args, **kwargs):
+        if self.is_active and self.programme_id and self.academic_level_id:
+            ProgrammeTimetable.objects.filter(
+                institution_id=self.institution_id,
+                programme_id=self.programme_id,
+                academic_level_id=self.academic_level_id,
+                timetable_type=self.timetable_type,
+                is_active=True
+            ).exclude(pk=self.pk).update(is_active=False, status=TimetableStatus.SUPERSEDED)
+        super().save(*args, **kwargs)
+
+    def get_weekly_schedule(self):
+        """Return list of weekly schedule slots sorted by day_index and start_time."""
+        if isinstance(self.schedule_data, dict):
+            return self.schedule_data.get('weekly_schedule', [])
+        return []
+
+    def get_free_slots(self):
+        """Return list of computed free study blocks."""
+        if isinstance(self.schedule_data, dict):
+            return self.schedule_data.get('free_slots', [])
+        return []
+
+

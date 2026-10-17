@@ -573,6 +573,9 @@
     </div>
     {% endif %}
 
+    <!-- 2b. Cohort Weekly Timetable & Spark Free Slots -->
+    {% include 'documents/partials/timetable_panel.html' %}
+
     <!-- 3. Programme Curriculum Registry (All Years & Semesters) -->
     {% if selected_programme %}
     <div class="acad-panel" id="curriculum-browser-card">
@@ -967,3 +970,6 @@
         });
     }
 </script>
+
+<!-- Fullscreen Cropping Composer Overlay for Timetables -->
+{% include 'documents/partials/timetable_composer_overlay.html' %}

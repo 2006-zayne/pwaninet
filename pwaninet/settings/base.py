@@ -727,7 +727,7 @@ PWANIMATE_CLOUDFLARE_MODEL = os.environ.get('PWANIMATE_CLOUDFLARE_MODEL', os.env
 
 # AI Gateway (LLM Generation)
 PWANIMATE_DEFAULT_LLM_PROVIDER = os.environ.get('PWANIMATE_DEFAULT_LLM_PROVIDER', 'gemini')
-PWANIMATE_GEMINI_MODEL = os.environ.get('PWANIMATE_GEMINI_MODEL', 'gemini-3.6-flash')
+PWANIMATE_GEMINI_MODEL = os.environ.get('PWANIMATE_GEMINI_MODEL', 'gemini-3.8-flash')
 PWANIMATE_VISION_MODEL = os.environ.get('PWANIMATE_VISION_MODEL', 'gemini-3.6-flash')
 PWANIMATE_VISION_FALLBACK_CHAIN = [
     {"provider": "groq", "model": os.environ.get('PWANIMATE_GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')},
