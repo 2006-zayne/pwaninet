@@ -3427,9 +3427,36 @@
 
                     <!-- Rail Comments Scrollable Stream -->
                     <div class="reel-rail-comments-body flex-grow-1" id="fsRailCommentsBody">
-                        <div class="text-center py-4 text-muted" id="fsRailCommentsLoading">
-                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                            <span>{% trans "Loading comments..." %}</span>
+                        <div class="rail-comments-skeleton" id="fsRailCommentsLoading" role="status" aria-label="{% trans 'Loading comments' %}">
+                            <div class="rail-sk-item">
+                                <div class="rail-sk-avatar sk-shimmer"></div>
+                                <div class="rail-sk-lines">
+                                    <div class="rail-sk-line sk-shimmer" style="width: 42%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 88%"></div>
+                                </div>
+                            </div>
+                            <div class="rail-sk-item">
+                                <div class="rail-sk-avatar sk-shimmer"></div>
+                                <div class="rail-sk-lines">
+                                    <div class="rail-sk-line sk-shimmer" style="width: 35%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 74%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 52%"></div>
+                                </div>
+                            </div>
+                            <div class="rail-sk-item">
+                                <div class="rail-sk-avatar sk-shimmer"></div>
+                                <div class="rail-sk-lines">
+                                    <div class="rail-sk-line sk-shimmer" style="width: 48%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 82%"></div>
+                                </div>
+                            </div>
+                            <div class="rail-sk-item">
+                                <div class="rail-sk-avatar sk-shimmer"></div>
+                                <div class="rail-sk-lines">
+                                    <div class="rail-sk-line sk-shimmer" style="width: 30%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 66%"></div>
+                                </div>
+                            </div>
                         </div>
                         <div id="fsRailCommentsList" class="p-3"></div>
                     </div>

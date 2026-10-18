@@ -1599,6 +1599,24 @@
             adaptSnapItemOrientation(activeItem);
             updateDesktopSideRail(activeItem);
             updateFullscreenNavButtons(newActiveIndex);
+
+            // Soft 200ms crossfade on every reel hand-off so the video swap
+            // never flashes black (slow CDN/HLS loads are hidden behind it).
+            if (!activeItem._reelEnterWired) {
+                activeItem._reelEnterWired = true;
+                activeItem.addEventListener('animationend', (e) => {
+                    if (e.animationName === 'reelCardEnter') activeItem.classList.remove('is-entering');
+                });
+            }
+            activeItem.classList.remove('is-entering');
+            void activeItem.offsetWidth; // force reflow so the animation restarts
+            activeItem.classList.add('is-entering');
+
+            // Warm the NEXT reel's comments while this one plays — by the time
+            // the user swipes, the rail is already painted (no skeleton flash).
+            if (reelSlotEngine.nextIndex !== -1) {
+                prefetchReelComments(extractPostId(items[reelSlotEngine.nextIndex]));
+            }
         }
 
         // Check if approaching end of queue to load more cards
@@ -2325,6 +2343,34 @@
     let sideRailWebSocket = null;
     let sideRailWsPostId = null;
 
+    // Warm HTML cache for the rail's comment stream. `prefetchReelComments`
+    // pre-fills it for the NEXT reel while you're still watching the current
+    // one, so a swipe paints the comments instantly instead of showing the
+    // skeleton. Insertion order doubles as the eviction order (Map API).
+    const railCommentsHtmlCache = new Map();
+    const RAIL_COMMENTS_CACHE_MAX = 16;
+
+    function cacheRailComments(postId, html) {
+        if (!postId || !html) return;
+        if (!railCommentsHtmlCache.has(postId) && railCommentsHtmlCache.size >= RAIL_COMMENTS_CACHE_MAX) {
+            const oldest = railCommentsHtmlCache.keys().next().value;
+            railCommentsHtmlCache.delete(oldest);
+        }
+        railCommentsHtmlCache.delete(postId); // refresh insertion order on rewrite
+        railCommentsHtmlCache.set(postId, html);
+    }
+
+    function prefetchReelComments(postId) {
+        if (!postId || railCommentsHtmlCache.has(postId)) return;
+        if (!state.isFullScreenActive || !isReelDesktopMode()) return;
+        fetch(`/post/${postId}/?show_all=1`, { headers: { 'HX-Request': 'true' } })
+            .then(res => (res && res.ok ? res.text() : null))
+            .then(html => {
+                if (html) cacheRailComments(postId, html);
+            })
+            .catch(() => { /* warm miss — the normal loader path will fetch */ });
+    }
+
     function closeSideRailWebSocket() {
         if (sideRailWebSocket) {
             try {
@@ -2556,33 +2602,22 @@
         const layout = document.querySelector('.reel-player-layout');
         if (!overlay || !layout) return function () {};
 
-        // DEV PROBE: expose dozer internals for debugging (remove after QA)
-        window.__reelFxProbe = { setup: true, dozeChecks: 0, lastShould: null, wakes: 0, timerSet: 0 };
-
         let dozeTimer = null;
 
         function shouldDoze() {
             if (!isReelDesktopMode()) return false;
             const active = getActiveSnapItem();
             const vid = active ? active.querySelector('video') : null;
-            const verdict = !!vid && !vid.paused && !vid.ended;
-            probe().dozeChecks++;
-            probe().lastShould = { verdict, desktop: isReelDesktopMode(), hasVid: !!vid, paused: vid ? vid.paused : null };
-            return verdict;
+            return !!vid && !vid.paused && !vid.ended;
         }
 
-        function probe() { return window.__reelFxProbe || (window.__reelFxProbe = {}); }
-
         function doze() {
-            window.__reelFxProbe.timerSet = 'fired';
             if (shouldDoze()) layout.classList.add('is-dozing');
         }
 
         function wake() {
-            window.__reelFxProbe.wakes++;
             if (dozeTimer) { clearTimeout(dozeTimer); dozeTimer = null; }
             layout.classList.remove('is-dozing');
-            window.__reelFxProbe.timerSet = 'reset';
             dozeTimer = setTimeout(doze, REEL_DOZE_DELAY_MS);
         }
 
@@ -2590,8 +2625,12 @@
         activityEvents.forEach(ev => overlay.addEventListener(ev, wake, { passive: true }));
         // Resuming playback wakes the room, even without pointer motion
         overlay.addEventListener('play', wake, true);
+        // Keyboard nav lands on <body> (nothing inside the overlay holds focus),
+        // so the overlay's own keydown listener never sees it — wake from the
+        // document too, or arrow-key browsing never lifts the chrome.
+        const onDocKeydown = () => { if (state.isFullScreenActive) wake(); };
+        document.addEventListener('keydown', onDocKeydown, { passive: true });
 
-        window.__reelFxProbe.timerSet = 'initial';
         dozeTimer = setTimeout(doze, REEL_DOZE_DELAY_MS);
 
         return function teardown() {
@@ -2599,6 +2638,7 @@
             dozeTimer = null;
             activityEvents.forEach(ev => overlay.removeEventListener(ev, wake));
             overlay.removeEventListener('play', wake, true);
+            document.removeEventListener('keydown', onDocKeydown);
             layout.classList.remove('is-dozing');
         };
     }
@@ -2631,30 +2671,23 @@
         const rail = document.getElementById('reelDesktopSideRail');
         if (!viewport || !rail) return function () {};
 
-        // DEV PROBE: expose tip counter state for debugging (remove after QA)
-        window.__reelTipProbe = { registered: true, advances: 0, idx: null, detached: false, whyShow: null };
-
         let lastIdx = Math.round(viewport.scrollTop / (viewport.clientHeight || 1));
         let advances = 0;
         let tipTimer = null;
 
         function onScroll() {
-            const P = window.__reelTipProbe || {};
             try {
-                if (localStorage.getItem(REEL_RAIL_TIP_KEY)) { P.detached = true; P.whyShow = 'seen-flag'; detach(); return; }
+                if (localStorage.getItem(REEL_RAIL_TIP_KEY)) { detach(); return; }
             } catch (_) { return; }
-            if (!isReelDesktopMode()) { P.whyShow = 'not-desktop'; return; }
+            if (!isReelDesktopMode()) return;
 
             const h = viewport.clientHeight || 1;
             const idx = Math.round(viewport.scrollTop / h);
             if (idx > lastIdx) advances++;
             if (idx !== lastIdx) lastIdx = idx;
-            P.idx = idx;
-            P.advances = advances;
 
             // 3+ consecutive reels with the rail open and no comment input = browsing signal
             if (advances >= 3 && !rail.classList.contains('rail-collapsed')) {
-                P.whyShow = 'show';
                 const tip = ensureImmersiveRailTip();
                 if (tip) {
                     tip.classList.add('is-visible');
@@ -2667,7 +2700,6 @@
         }
 
         function detach() {
-            window.__reelTipProbe && (window.__reelTipProbe.detached = true);
             viewport.removeEventListener('scroll', onScroll);
             if (tipTimer) clearTimeout(tipTimer);
         }
@@ -2742,6 +2774,7 @@
             if (icon) icon.classList.remove('spinning');
             if (refreshBtn) refreshBtn.disabled = false;
             if (commentsLoading) commentsLoading.style.display = 'none';
+            cacheRailComments(postId, html); // refreshed html supersedes any warm copy
 
             if (commentsList) {
                 commentsList.innerHTML = html;
@@ -3188,11 +3221,8 @@
             initSheetCommentsInteractions(commentsList, postId);
         }
 
-        fetch(`/post/${postId}/?show_all=1`, {
-            headers: { 'HX-Request': 'true' }
-        })
-        .then(res => res.text())
-        .then(html => {
+        // Shared paint path: identical for a warm cache hit and a fresh fetch.
+        function paintRailComments(html) {
             if (currentDesktopRailPostId !== postId) return;
             if (commentsLoading) commentsLoading.style.display = 'none';
             if (commentsList) {
@@ -3201,6 +3231,23 @@
                 initSheetCommentsInteractions(commentsList, postId);
                 initSideRailWebSocket(postId);
             }
+        }
+
+        const cachedCommentsHtml = railCommentsHtmlCache.get(postId);
+        if (cachedCommentsHtml) {
+            // Warm hit from prefetch (or a previous visit) — skip the network
+            // entirely; freshness comes from the live comment WebSocket and the
+            // manual refresh button.
+            paintRailComments(cachedCommentsHtml);
+        } else {
+        fetch(`/post/${postId}/?show_all=1`, {
+            headers: { 'HX-Request': 'true' }
+        })
+        .then(res => res.text())
+        .then(html => {
+            if (currentDesktopRailPostId !== postId) return;
+            cacheRailComments(postId, html);
+            paintRailComments(html);
         })
         .catch(err => {
             if (currentDesktopRailPostId !== postId) return;
@@ -3208,6 +3255,7 @@
             if (commentsLoading) commentsLoading.style.display = 'none';
             if (commentsList) commentsList.innerHTML = '<div class="text-center py-4 text-muted small">Could not load comments.</div>';
         });
+        }
 
         // Bind desktop side rail comment form submission
         const formEl = document.getElementById('fsRailCommentForm');
@@ -5511,6 +5559,12 @@
             if (event.key.toLowerCase() === 'm') {
                 event.preventDefault();
                 toggleGlobalMute();
+                return;
+            }
+
+            if (event.key.toLowerCase() === 'c') {
+                event.preventDefault();
+                toggleDesktopCommentRail();
                 return;
             }
         });
