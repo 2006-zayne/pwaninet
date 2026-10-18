@@ -124,11 +124,25 @@ class UploadDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = UploadRecordSerializer
 
-    def get_object(self):
-        return get_object_or_404(
-            UploadRecord.objects.select_related("session", "post"),
-            id=self.kwargs["id"], user=self.request.user,
-        )
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            record = UploadRecord.objects.select_related("session", "post").get(
+                id=self.kwargs["id"], user=request.user,
+            )
+        except UploadRecord.DoesNotExist:
+            return Response(
+                {"error_code": "NOT_FOUND",
+                 "detail": "No UploadRecord matches the given query."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if record.deleted_at is not None:
+            return Response(
+                {"error_code": "UPLOAD_DELETED",
+                 "detail": "This upload was deleted. Start a new upload."},
+                status=status.HTTP_410_GONE,
+            )
+        serializer = self.get_serializer(record)
+        return Response(serializer.data)
 
 
 class UploadEventsView(generics.ListAPIView):
@@ -159,8 +173,14 @@ class UploadAuthorizeView(APIView):
         try:
             record = get_object_or_404(
                 UploadRecord.objects.select_related("session"),
-                id=id, user=request.user, deleted_at__isnull=True,
+                id=id, user=request.user,
             )
+            if record.deleted_at is not None:
+                return Response(
+                    {"error_code": "UPLOAD_DELETED",
+                     "detail": "This upload was deleted. Start a new upload."},
+                    status=status.HTTP_410_GONE,
+                )
             serializer = AuthorizeSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             try:
@@ -432,6 +452,7 @@ class UploadCancelView(APIView):
             record.save()
             UploadEvent.objects.create(
                 record=record, event_type=UploadEvent.EventType.CANCELLED)
+            post_id = record.post_id
         session = record.session
         if session.protocol == UploadSession.PROTOCOL_S3_MULTIPART and session.r2_upload_id:
             try:
@@ -440,6 +461,14 @@ class UploadCancelView(APIView):
                     session.r2_key, session.r2_upload_id)
             except r2.R2Unavailable:
                 pass
+        # Cancelling mid-transcode must nuke the post too, or Celery keeps
+        # burning on media the user rejected (guard self-aborts the tasks).
+        if post_id:
+            live = UploadRecord.objects.filter(
+                post_id=post_id, deleted_at__isnull=True,
+            ).exclude(status="cancelled").exists()
+            if not live:
+                _delete_upload_post(post_id)
         return Response(
             UploadRecordSerializer(record).data, status=status.HTTP_200_OK)
 
@@ -473,6 +502,7 @@ class UploadDeleteView(APIView):
             record.save(update_fields=["status", "completed_at", "deleted_at", "updated_at"])
             UploadEvent.objects.create(
                 record=record, event_type=UploadEvent.EventType.DELETED)
+            post_id = record.post_id
         session = record.session
         if session.protocol == UploadSession.PROTOCOL_S3_MULTIPART and session.r2_upload_id:
             try:
@@ -481,4 +511,79 @@ class UploadDeleteView(APIView):
                     session.r2_key, session.r2_upload_id)
             except r2.R2Unavailable:
                 pass
+        # Cancelling/deleting must stop the waste, not just hide history:
+        # an in-flight transcode keeps burning CPU + R2 space otherwise.
+        # A COMPLETED (ready) post is done work: deleting its card only
+        # clears history and keeps the post + media. Anything unfinished
+        # deletes the linked post too (when no other live upload record
+        # still references it). In-flight Celery tasks also self-abort
+        # via _source_upload_dead() once this lands.
+        if post_id and record.status != "completed":
+            live = UploadRecord.objects.filter(
+                post_id=post_id, deleted_at__isnull=True,
+            ).exclude(status="cancelled").exists()
+            if not live:
+                _delete_upload_post(post_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _delete_upload_post(post_id):
+    """Delete a post born from an upload plus its media and HLS output.
+
+    Best-effort everywhere: never let a storage error fail the delete.
+    """
+    from posts.models import PostImage
+    try:
+        from posts.models import Post
+        post = Post.objects.get(id=post_id)
+    except Exception:
+        return
+    storage_fields = (
+        "video", "video_preview", "video_poster",
+        "docs", "audio", "thumbnail",
+    )
+    try:
+        for image in post.images.all():
+            try:
+                if image.image:
+                    image.image.delete(save=False)
+            except Exception:
+                pass
+        for field_name in storage_fields:
+            try:
+                field = getattr(post, field_name, None)
+                if field:
+                    field.delete(save=False)
+            except Exception:
+                pass
+        _delete_post_hls(post_id)
+    finally:
+        try:
+            post.delete()
+        except Exception:
+            pass
+
+
+def _delete_post_hls(post_id):
+    """Remove HLS output for a post locally and on R2 (best-effort)."""
+    import os
+    import shutil
+    from django.conf import settings
+    rel_dir = os.path.join("posts", "videos", str(post_id), "hls")
+    try:
+        shutil.rmtree(os.path.join(settings.MEDIA_ROOT, rel_dir), ignore_errors=True)
+    except Exception:
+        pass
+    try:
+        client = r2.get_r2_client()
+        bucket = r2.get_bucket()
+        prefix = f"media/{rel_dir.replace(os.sep, '/')}/"
+        paginator = client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                try:
+                    client.delete_object(Bucket=bucket, Key=obj["Key"])
+                except Exception:
+                    pass
+    except Exception:
+        pass

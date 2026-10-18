@@ -17,6 +17,34 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def _source_upload_dead(post_id):
+    """True when an upload-born post was cancelled/deleted mid-flight.
+
+    Legacy posts have no UploadRecord rows → never dead (must transcode).
+    Upload-born posts with zero live records (cancelled or tombstoned)
+    mean the user walked away: abort instead of burning CPU + R2 space.
+    """
+    try:
+        from uploads.models import UploadRecord
+        records = UploadRecord.objects.filter(post_id=post_id)
+        if not records.exists():
+            return False
+        return not records.filter(
+            deleted_at__isnull=True,
+        ).exclude(status="cancelled").exists()
+    except Exception:
+        return False
+
+
+def _abort_dead_post(post_id):
+    """Best-effort cleanup for an aborted transcode (partial HLS)."""
+    try:
+        from uploads.views import _delete_post_hls
+        _delete_post_hls(post_id)
+    except Exception:
+        pass
+
+
 @shared_task(bind=True)
 def create_post_with_media(self, user_id, content, unit_id=None, group_id=None, 
                           gradient_class='none', images_data=None, video_data=None, 
@@ -249,6 +277,11 @@ def process_large_video(self, post_id):
         post = Post.objects.get(id=post_id)
         user_id = post.author_id
 
+        if _source_upload_dead(post_id):
+            logger.info('[HLS] Post %s cancelled/deleted, aborting transcode', post_id)
+            _abort_dead_post(post_id)
+            return
+
         video_logger.info(
             'VIDEO_TASK_STARTED post_id=%s task_id=%s has_video=%s',
             post_id, self.request.id, bool(post.video),
@@ -403,6 +436,11 @@ def process_large_video(self, post_id):
             produced.append((label, target_w, target_h, (video_kbps + audio_kbps) * 1000, playlist_rel))
             logger.info('[HLS] Post %s: %s (%dx%d) done', post_id, label, target_w, target_h)
 
+            if _source_upload_dead(post_id):
+                logger.info('[HLS] Post %s cancelled mid-transcode, aborting', post_id)
+                _abort_dead_post(post_id)
+                return
+
             done_pct = int(step / total_steps * 80) + 10
             _emit(user_id, {
                 'post_id':  post_id,
@@ -524,6 +562,7 @@ def process_large_video(self, post_id):
     except Post.DoesNotExist:
         logger.error('[HLS] Post %s not found', post_id)
         video_logger.error('VIDEO_TASK_POST_NOT_FOUND post_id=%s task_id=%s', post_id, self.request.id)
+        _abort_dead_post(post_id)
 
     except Exception as exc:
         logger.error('[HLS] Transcoding failed for post %s: %s', post_id, exc, exc_info=True)
@@ -836,6 +875,10 @@ def generate_video_poster(post_id):
     
     try:
         post = Post.objects.get(id=post_id)
+
+        if _source_upload_dead(post_id):
+            logger.info(f"Poster: post {post_id} cancelled/deleted, skipping")
+            return
         
         if not post.video or post.video_poster:
             logger.info(f"Post {post_id} has no video or already has poster, skipping")

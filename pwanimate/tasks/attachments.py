@@ -64,7 +64,7 @@ def _transcribe_pdf_page(page, attachment: PwanimateAttachment, page_number: int
         attachment_type="image",
         data_bytes=page_bytes,
     )
-    model = getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.6-flash")
+    model = getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.8-flash")
     result = AIGateway().generate(LLMRequest(
         task="attachment_vision_extraction",
         messages=[ChatMessage(

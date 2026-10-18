@@ -43,7 +43,7 @@ class GeminiLLMProvider(BaseLLMProvider):
         session: Optional[requests.Session] = None,
     ):
         self.api_key = api_key if api_key is not None else getattr(settings, "PWANIMATE_GEMINI_API_KEY", "")
-        self.model_name = model_name or getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-3.6-flash")
+        self.model_name = model_name or getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-3.8-flash")
         self.timeout = timeout if timeout is not None else getattr(settings, "PWANIMATE_LLM_TIMEOUT", 30.0)
         self.connect_timeout = (
             connect_timeout if connect_timeout is not None else getattr(settings, "PWANIMATE_LLM_CONNECT_TIMEOUT", 5.0)
@@ -65,6 +65,8 @@ class GeminiLLMProvider(BaseLLMProvider):
             )
 
         model = request.model or self.model_name
+        if model in {"gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.5-pro", "gemini-1.5-pro"}:
+            model = "gemini-3.8-flash"
         url = GEMINI_GENERATE_URL.format(model=model)
 
         # Build payload

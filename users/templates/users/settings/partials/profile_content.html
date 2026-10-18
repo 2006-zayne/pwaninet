@@ -130,6 +130,30 @@
     </div>
   </div>
 
+  <a href="{% url 'users:settings_academic' %}"
+     hx-get="{% url 'users:settings_academic' %}"
+     hx-target="#page-content-target"
+     hx-swap="innerHTML"
+     hx-push-url="true"
+     class="settings-list-item text-decoration-none" style="color: inherit;">
+    <div class="settings-list-icon text-primary">
+      <i class="bi bi-mortarboard"></i>
+    </div>
+    <div class="settings-list-content">
+      <div class="settings-list-title">{% trans "Academic & Institution" %}</div>
+      <div class="settings-list-subtitle">
+        {% if user.institution %}
+          {{ user.institution.name }}{% if user.programme %} • {{ user.programme.name }}{% endif %}
+        {% else %}
+          {% trans "Set your university, programme, and study year" %}
+        {% endif %}
+      </div>
+    </div>
+    <div class="settings-list-chevron">
+      <i class="bi bi-chevron-right"></i>
+    </div>
+  </a>
+
   <div class="settings-list-item expandable" data-target="linked-accounts">
     <div class="settings-list-icon">
       <i class="bi bi-link-45deg"></i>

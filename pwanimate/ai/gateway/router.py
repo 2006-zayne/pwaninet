@@ -133,7 +133,7 @@ class LLMRouter:
             for p in provider_order:
                 if p == "gemini":
                     configured_chain.append(
-                        {"provider": "gemini", "model": getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-3.6-flash")}
+                        {"provider": "gemini", "model": getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-3.8-flash")}
                     )
                 elif p == "groq":
                     configured_chain.extend([
@@ -142,7 +142,7 @@ class LLMRouter:
                     ])
                 elif p == "openrouter":
                     configured_chain.append(
-                        {"provider": "openrouter", "model": getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "google/gemini-2.5-flash")}
+                        {"provider": "openrouter", "model": getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "google/gemini-flash-latest")}
                     )
                 else:
                     configured_chain.append({"provider": p, "model": None})

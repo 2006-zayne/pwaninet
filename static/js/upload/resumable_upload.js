@@ -81,6 +81,9 @@
         }));
     }
 
+    // Exposed for upload_ui.js restoreBannerOnLoad cleanup
+    window.storeDelete = storeDelete;
+
     async function api(path, method, body) {
         const headers = { 'X-CSRFToken': getCSRFToken(), 'X-Requested-With': 'XMLHttpRequest' };
         const opts = { method, headers, credentials: 'same-origin' };
@@ -99,6 +102,11 @@
             const err = new Error((data && data.detail) || JSON.stringify(data) || `Upload API ${res.status}`);
             err.status = res.status;
             err.data = data;
+            err.code = (data && data.error_code) || null;
+            // 410 Gone = record soft-deleted on server; not a transient failure
+            if (res.status === 410 || err.code === 'UPLOAD_DELETED') {
+                err.deleted = true;
+            }
             console.error('[ResumableUpload] API error:', { status: res.status, path, body, data });
             throw err;
         }
@@ -193,7 +201,46 @@
         }
 
         async _run(clientUploadId, serverId, blob, post) {
-            const status = await api(`${serverId}/`, 'GET');
+            let status;
+            try {
+                status = await api(`${serverId}/`, 'GET');
+            } catch (err) {
+                if (err.deleted) {
+                    // Server tombstoned this record: clear local state and stop.
+                    await storeDelete('sessions', clientUploadId);
+                    await storeDelete('blobs', clientUploadId);
+                    const err2 = new Error('This upload was deleted. Start a new upload.');
+                    err2.code = 'UPLOAD_DELETED';
+                    err2.clientUploadId = clientUploadId;
+                    throw err2;
+                }
+                throw err;
+            }
+
+            // Server is authoritative: if the record is already terminal on the
+            // server, don't re-authorize or re-complete — just clear local
+            // state and surface the outcome so the donut can dismiss.
+            if (status.status === 'cancelled' || status.status === 'failed') {
+                await storeDelete('sessions', clientUploadId);
+                await storeDelete('blobs', clientUploadId);
+                const err = new Error(`Upload ${status.status} on server`);
+                err.code = status.status.toUpperCase();
+                err.deleted = status.status === 'cancelled' ? 'UPLOAD_CANCELLED' : 'UPLOAD_FAILED';
+                err.clientUploadId = clientUploadId;
+                throw err;
+            }
+            if (status.status === 'completed') {
+                await storeDelete('blobs', clientUploadId);
+                await storePut('sessions', {
+                    client_upload_id: clientUploadId,
+                    server_id: serverId,
+                    filename: status.filename,
+                    post,
+                    done: true,
+                });
+                return status;
+            }
+
             const partSize = status.session_part_size || 8388608;
             const auth = await api(`${serverId}/authorize/`, 'POST', {});
             const total = status.total_bytes || blob.size;
@@ -280,6 +327,13 @@
                     if (ACTIVE_STATES.indexOf(status.status) === -1) continue;
                     results.push(await this.resume(s.client_upload_id));
                 } catch (err) {
+                    if (err.deleted) {
+                        // Server tombstoned this record: prune from local IndexedDB.
+                        await storeDelete('sessions', s.client_upload_id);
+                        await storeDelete('blobs', s.client_upload_id);
+                        results.push({ deleted: true, session: s });
+                        continue;
+                    }
                     results.push({ error: String((err && err.message) || err), session: s });
                 }
             }

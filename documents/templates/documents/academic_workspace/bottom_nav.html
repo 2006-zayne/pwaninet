@@ -1,0 +1,50 @@
+{% load i18n %}{% comment %}
+  Mobile bottom nav — mimics vasto's global mobile bottom nav (same
+  .mobile-bottom-nav / .nav-chip classes and haptic markup as base.html's
+  global block, so styling is managed there). Vasto keeps the account-switcher
+  avatar? no — the dashboard's five centre tools ride the pill.
+{% endcomment %}
+
+{% url 'documents:academic:dashboard' as dash_url %}
+<div class="mobile-bottom-nav vdw-bottom-nav d-md-none" role="navigation" aria-label="Dashboard navigation">
+  <a href="{{ dash_url }}?section=timetable"
+     class="nav-chip{% if active_section == 'timetable' %} active{% endif %}" data-vdw-nav="timetable"
+     data-haptic="light"
+     hx-get="{{ dash_url }}?section=timetable" hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true"
+     hx-trigger="click delay:10ms" aria-label="Timetable">
+    <i class="bi bi-calendar-week-fill"></i>
+    <span>{% trans "Timetable" %}</span>
+  </a>
+  <a href="{{ dash_url }}?section=overall"
+     class="nav-chip{% if active_section == 'overall' %} active{% endif %}" data-vdw-nav="overall"
+     data-haptic="light"
+     hx-get="{{ dash_url }}?section=overall" hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true"
+     hx-trigger="click delay:10ms" aria-label="Overall">
+    <i class="bi bi-speedometer2"></i>
+    <span>{% trans "Overall" %}</span>
+  </a>
+  <a href="{{ dash_url }}?section=calendar"
+     class="nav-chip{% if active_section == 'calendar' %} active{% endif %}" data-vdw-nav="calendar"
+     data-haptic="light"
+     hx-get="{{ dash_url }}?section=calendar" hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true"
+     hx-trigger="click delay:10ms" aria-label="Calendar">
+    <i class="bi bi-calendar4-event"></i>
+    <span>{% trans "Calendar" %}</span>
+  </a>
+  <a href="{{ dash_url }}?section=assignments"
+     class="nav-chip{% if active_section == 'assignments' %} active{% endif %}" data-vdw-nav="assignments"
+     data-haptic="light"
+     hx-get="{{ dash_url }}?section=assignments" hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true"
+     hx-trigger="click delay:10ms" aria-label="Assignments">
+    <i class="bi bi-journal-check"></i>
+    <span>{% trans "Assignments" %}</span>
+  </a>
+  <a href="{{ dash_url }}?section=exams"
+     class="nav-chip{% if active_section == 'exams' %} active{% endif %}" data-vdw-nav="exams"
+     data-haptic="light"
+     hx-get="{{ dash_url }}?section=exams" hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true"
+     hx-trigger="click delay:10ms" aria-label="Exams">
+    <i class="bi bi-file-earmark-text"></i>
+    <span>{% trans "Exams" %}</span>
+  </a>
+</div>

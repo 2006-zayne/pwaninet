@@ -486,6 +486,23 @@
         }
         const likeButtons = document.querySelectorAll(selectors.join(', '));
 
+        // Keep card root snapshots in sync (post/reel/carousel cards) so the
+        // fullscreen reel player never snapshots a stale like state.
+        if (data.is_liked !== undefined || data.like_count !== undefined) {
+            const rootSelectors = [];
+            if (shareId) {
+                rootSelectors.push(`#post-card-${shareId}`, `#reel-card-${shareId}`, `.post-card[data-post-id="${shareId}"]`, `.reel-post-card[data-post-id="${shareId}"]`, `.reels-carousel-card[data-post-id="${shareId}"]`);
+            }
+            document.querySelectorAll(rootSelectors.join(', ')).forEach(card => {
+                if (card.dataset.isLiked !== undefined && data.is_liked !== undefined) {
+                    card.setAttribute('data-is-liked', data.is_liked ? 'true' : 'false');
+                }
+                if (card.dataset.likes !== undefined && data.like_count !== undefined) {
+                    card.setAttribute('data-likes', String(data.like_count));
+                }
+            });
+        }
+
         likeButtons.forEach(likeButton => {
             const likeCountElement = likeButton.querySelector('.like-count');
             if (likeCountElement && data.like_count !== undefined) {
@@ -494,12 +511,12 @@
             if (isCurrentUser && data.is_liked !== undefined) {
                 const icon = likeButton.querySelector('i');
                 if (data.is_liked) {
-                    likeButton.classList.add('text-danger');
+                    likeButton.classList.add('text-danger', 'liked');
                     likeButton.classList.remove('text-muted');
                     likeButton.setAttribute('aria-label', 'Unlike');
-                    if (icon) icon.className = 'bi bi-heart-fill fs-5';
+                    if (icon) icon.className = 'bi bi-heart-fill fs-5 heart-pop';
                 } else {
-                    likeButton.classList.remove('text-danger');
+                    likeButton.classList.remove('text-danger', 'liked');
                     likeButton.classList.add('text-muted');
                     likeButton.setAttribute('aria-label', 'Like');
                     if (icon) icon.className = 'bi bi-heart fs-5';

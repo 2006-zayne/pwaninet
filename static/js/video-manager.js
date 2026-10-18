@@ -254,9 +254,16 @@
         });
     }
 
+    // In-flight like toggles per post — prevents double-tap / rapid clicks
+    // from firing two server toggles (the server toggle is a real toggle, so
+    // two requests = like added then removed).
+    const pendingLikeToggles = new Set();
+
     function toggleReelLike(postId) {
         if (!postId) return;
         postId = String(postId).trim();
+        if (pendingLikeToggles.has(postId)) return;
+        pendingLikeToggles.add(postId);
 
         const snapItem = document.querySelector(`.reels-snap-item[data-post-id="${postId}"]`);
         const fsLikeBtn = snapItem?.querySelector('.fs-like-proxy-btn') || document.querySelector(`.fs-like-proxy-btn[data-post-id="${postId}"]`);
@@ -287,6 +294,9 @@
         .catch(err => {
             console.warn('[VideoManager] Like toggle error, reverting:', err);
             syncLikeUiAcrossSite(postId, isCurrentlyLiked, currentCount);
+        })
+        .finally(() => {
+            pendingLikeToggles.delete(postId);
         });
     }
 
@@ -1587,9 +1597,26 @@
                 if (vinyl) vinyl.classList.add('is-playing');
             }
             adaptSnapItemOrientation(activeItem);
-            repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
             updateDesktopSideRail(activeItem);
             updateFullscreenNavButtons(newActiveIndex);
+
+            // Soft 200ms crossfade on every reel hand-off so the video swap
+            // never flashes black (slow CDN/HLS loads are hidden behind it).
+            if (!activeItem._reelEnterWired) {
+                activeItem._reelEnterWired = true;
+                activeItem.addEventListener('animationend', (e) => {
+                    if (e.animationName === 'reelCardEnter') activeItem.classList.remove('is-entering');
+                });
+            }
+            activeItem.classList.remove('is-entering');
+            void activeItem.offsetWidth; // force reflow so the animation restarts
+            activeItem.classList.add('is-entering');
+
+            // Warm the NEXT reel's comments while this one plays — by the time
+            // the user swipes, the rail is already painted (no skeleton flash).
+            if (reelSlotEngine.nextIndex !== -1) {
+                prefetchReelComments(extractPostId(items[reelSlotEngine.nextIndex]));
+            }
         }
 
         // Check if approaching end of queue to load more cards
@@ -2316,6 +2343,34 @@
     let sideRailWebSocket = null;
     let sideRailWsPostId = null;
 
+    // Warm HTML cache for the rail's comment stream. `prefetchReelComments`
+    // pre-fills it for the NEXT reel while you're still watching the current
+    // one, so a swipe paints the comments instantly instead of showing the
+    // skeleton. Insertion order doubles as the eviction order (Map API).
+    const railCommentsHtmlCache = new Map();
+    const RAIL_COMMENTS_CACHE_MAX = 16;
+
+    function cacheRailComments(postId, html) {
+        if (!postId || !html) return;
+        if (!railCommentsHtmlCache.has(postId) && railCommentsHtmlCache.size >= RAIL_COMMENTS_CACHE_MAX) {
+            const oldest = railCommentsHtmlCache.keys().next().value;
+            railCommentsHtmlCache.delete(oldest);
+        }
+        railCommentsHtmlCache.delete(postId); // refresh insertion order on rewrite
+        railCommentsHtmlCache.set(postId, html);
+    }
+
+    function prefetchReelComments(postId) {
+        if (!postId || railCommentsHtmlCache.has(postId)) return;
+        if (!state.isFullScreenActive || !isReelDesktopMode()) return;
+        fetch(`/post/${postId}/?show_all=1`, { headers: { 'HX-Request': 'true' } })
+            .then(res => (res && res.ok ? res.text() : null))
+            .then(html => {
+                if (html) cacheRailComments(postId, html);
+            })
+            .catch(() => { /* warm miss — the normal loader path will fetch */ });
+    }
+
     function closeSideRailWebSocket() {
         if (sideRailWebSocket) {
             try {
@@ -2524,6 +2579,266 @@
         `;
     }
 
+    // ============================================================================
+    // DESKTOP IMMERSION HELPERS (>=992px): idle doze + one-time rail tip.
+    //
+    // 1) Idle dozer: after ~4.5s with no input while a reel is actually playing,
+    //    the furniture layer (tools column + author scrim) whispers to ~25%.
+    //    Any input snaps it back. The video, the card and the comment rail are
+    //    NEVER hidden — immersion comes from visual quiet, not confiscation.
+    // 2) Immersive tip: one-time toast — if the user advances 3+ reels with the
+    //    rail open and no comment interaction, teach the collapse affordance.
+    //    Marked "seen" in localStorage; never shown twice.
+    // ============================================================================
+    const REEL_RAIL_TIP_KEY = 'pwaninetReelsRailTipSeen';
+    const REEL_DOZE_DELAY_MS = 4500;
+
+    function isReelDesktopMode() {
+        return window.innerWidth >= 992;
+    }
+
+    function setupReelIdleDozer() {
+        const overlay = document.getElementById('fullscreenReelsOverlay');
+        const layout = document.querySelector('.reel-player-layout');
+        if (!overlay || !layout) return function () {};
+
+        let dozeTimer = null;
+
+        function shouldDoze() {
+            if (!isReelDesktopMode()) return false;
+            // Never dim the room while the first-run keyboard coach is up —
+            // a dimmed cheat-sheet teaches nobody anything.
+            const coach = document.getElementById('reelKbCoach');
+            if (coach && coach.classList.contains('is-visible')) return false;
+            const active = getActiveSnapItem();
+            const vid = active ? active.querySelector('video') : null;
+            return !!vid && !vid.paused && !vid.ended;
+        }
+
+        function doze() {
+            if (shouldDoze()) layout.classList.add('is-dozing');
+        }
+
+        function wake() {
+            if (dozeTimer) { clearTimeout(dozeTimer); dozeTimer = null; }
+            layout.classList.remove('is-dozing');
+            dozeTimer = setTimeout(doze, REEL_DOZE_DELAY_MS);
+        }
+
+        const activityEvents = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'pointerdown'];
+        activityEvents.forEach(ev => overlay.addEventListener(ev, wake, { passive: true }));
+        // Resuming playback wakes the room, even without pointer motion
+        overlay.addEventListener('play', wake, true);
+        // Keyboard nav lands on <body> (nothing inside the overlay holds focus),
+        // so the overlay's own keydown listener never sees it — wake from the
+        // document too, or arrow-key browsing never lifts the chrome.
+        const onDocKeydown = () => { if (state.isFullScreenActive) wake(); };
+        document.addEventListener('keydown', onDocKeydown, { passive: true });
+
+        dozeTimer = setTimeout(doze, REEL_DOZE_DELAY_MS);
+
+        return function teardown() {
+            if (dozeTimer) clearTimeout(dozeTimer);
+            dozeTimer = null;
+            activityEvents.forEach(ev => overlay.removeEventListener(ev, wake));
+            overlay.removeEventListener('play', wake, true);
+            document.removeEventListener('keydown', onDocKeydown);
+            layout.classList.remove('is-dozing');
+        };
+    }
+
+    function ensureImmersiveRailTip() {
+        let tip = document.getElementById('reelImmersiveTip');
+        if (tip) return tip;
+        const stage = document.querySelector('.reel-desktop-stage');
+        if (!stage) return null;
+        tip = document.createElement('div');
+        tip.id = 'reelImmersiveTip';
+        tip.className = 'reel-immersive-tip';
+        tip.innerHTML = [
+            '<i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i>',
+            '<span>' + (window.gettext ? gettext('Collapse the rail for full-cinema mode') : 'Collapse the rail for full-cinema mode') + '</span>',
+            '<button type="button" class="btn btn-sm btn-primary rounded-pill px-3 reel-immersive-tip-cta">' + (window.gettext ? gettext('Collapse') : 'Collapse') + '</button>'
+        ].join('');
+        tip.querySelector('.reel-immersive-tip-cta').addEventListener('click', function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            tip.classList.remove('is-visible');
+            toggleDesktopCommentRail(false);
+        });
+        stage.appendChild(tip);
+        return tip;
+    }
+
+    function setupImmersiveTipCounter() {
+        const viewport = document.getElementById('reelsSnapViewport');
+        const rail = document.getElementById('reelDesktopSideRail');
+        if (!viewport || !rail) return function () {};
+
+        let lastIdx = Math.round(viewport.scrollTop / (viewport.clientHeight || 1));
+        let advances = 0;
+        let tipTimer = null;
+
+        function onScroll() {
+            try {
+                if (localStorage.getItem(REEL_RAIL_TIP_KEY)) { detach(); return; }
+            } catch (_) { return; }
+            if (!isReelDesktopMode()) return;
+
+            const h = viewport.clientHeight || 1;
+            const idx = Math.round(viewport.scrollTop / h);
+            if (idx > lastIdx) advances++;
+            if (idx !== lastIdx) lastIdx = idx;
+
+            // 3+ consecutive reels with the rail open and no comment input = browsing signal
+            if (advances >= 3 && !rail.classList.contains('rail-collapsed')) {
+                const tip = ensureImmersiveRailTip();
+                if (tip) {
+                    tip.classList.add('is-visible');
+                    if (tipTimer) clearTimeout(tipTimer);
+                    tipTimer = setTimeout(() => tip.classList.remove('is-visible'), 6500);
+                }
+                try { localStorage.setItem(REEL_RAIL_TIP_KEY, '1'); } catch (_) {}
+                detach();
+            }
+        }
+
+        function detach() {
+            viewport.removeEventListener('scroll', onScroll);
+            if (tipTimer) clearTimeout(tipTimer);
+        }
+
+        viewport.addEventListener('scroll', onScroll, { passive: true });
+        return detach;
+    }
+
+    // ============================================================================
+    // KEYBOARD EDUCATION — first-run coach card + always-available "?"/panel.
+    // Same pattern as the immersive rail tip: localStorage-gated, one-time,
+    // appended to the stage so the existing doze/teardown machinery covers it.
+    // ============================================================================
+
+    const REEL_KB_COACH_KEY = 'pwaninetReelsKbCoachSeen';
+    let reelKbPanelOpen = false;
+    let reelKbCoachKeyTimer = null;
+
+    function reelKbRowsHtml() {
+        const rows = [
+            ['Space', 'Play / pause'],
+            ['\u2191 / \u2193', 'Previous / next reel'],
+            ['M', 'Mute / unmute'],
+            ['C', 'Cinema mode (hide rail)'],
+            ['Esc', 'Close player']
+        ];
+        return '<div class="reel-kb-rows">' + rows.map(function (r) {
+            var label = window.gettext ? gettext(r[1]) : r[1];
+            return '<div class="reel-kb-row"><kbd class="reel-kb-key">' + r[0] + '</kbd><span class="reel-kb-desc">' + label + '</span></div>';
+        }).join('') + '</div>';
+    }
+
+    function ensureKbHelpDom() {
+        const stage = document.querySelector('.reel-desktop-stage');
+        if (!stage) return null;
+
+        let coach = document.getElementById('reelKbCoach');
+        if (!coach) {
+            coach = document.createElement('div');
+            coach.id = 'reelKbCoach';
+            coach.className = 'reel-kb-coach';
+            coach.innerHTML = [
+                '<button type="button" class="reel-kb-coach-close" aria-label="Dismiss"><i class="bi bi-x-lg"></i></button>',
+                '<div class="reel-kb-coach-title"><i class="bi bi-keyboard" aria-hidden="true"></i><span>' + (window.gettext ? gettext('Browse with your keyboard') : 'Browse with your keyboard') + '</span></div>',
+                reelKbRowsHtml()
+            ].join('');
+            coach.addEventListener('click', function (e) { e.stopPropagation(); });
+            coach.querySelector('.reel-kb-coach-close').addEventListener('click', function () { dismissReelKbCoach(); });
+            stage.appendChild(coach);
+        }
+
+        let panel = document.getElementById('reelKbPanel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'reelKbPanel';
+            panel.className = 'reel-kb-panel';
+            panel.innerHTML = reelKbRowsHtml();
+            panel.addEventListener('click', function (e) { e.stopPropagation(); });
+            stage.appendChild(panel);
+        }
+
+        return { coach: coach, panel: panel };
+    }
+
+    function hideReelKbCoach() {
+        // Teardown-safe: just vanish. MUST NOT mark the coach as "seen" —
+        // teardown also runs when an open supersedes a previous open, and that
+        // would suppress the coach before it ever displayed.
+        const coach = document.getElementById('reelKbCoach');
+        if (coach) coach.classList.remove('is-visible');
+        if (reelKbCoachKeyTimer) { clearTimeout(reelKbCoachKeyTimer); reelKbCoachKeyTimer = null; }
+    }
+
+    function dismissReelKbCoach() {
+        hideReelKbCoach();
+        try { localStorage.setItem(REEL_KB_COACH_KEY, '1'); } catch (_) {}
+    }
+
+    function maybeShowReelKbCoach() {
+        if (!isReelDesktopMode()) return;
+        try { if (localStorage.getItem(REEL_KB_COACH_KEY)) return; } catch (_) { return; }
+        const dom = ensureKbHelpDom();
+        if (!dom) return;
+
+        dom.coach.classList.add('is-visible');
+        try { localStorage.setItem(REEL_KB_COACH_KEY, '1'); } catch (_) {}
+
+        // Pressing any key IS the lesson working — dismiss on the first one.
+        const onFirstKey = function () {
+            dismissReelKbCoach();
+            document.removeEventListener('keydown', onFirstKey, true);
+        };
+        document.addEventListener('keydown', onFirstKey, true);
+        reelKbCoachKeyTimer = setTimeout(onFirstKey, 9000);
+    }
+
+    function toggleReelKbPanel(force) {
+        const dom = ensureKbHelpDom();
+        if (!dom) return;
+        const helpBtn = document.getElementById('reelKbHelpBtn');
+        reelKbPanelOpen = (typeof force === 'boolean') ? force : !reelKbPanelOpen;
+        dom.panel.classList.toggle('is-open', reelKbPanelOpen);
+        if (helpBtn) helpBtn.classList.toggle('is-active', reelKbPanelOpen);
+    }
+
+    function setupReelKbEducation() {
+        // Idempotent document-level wiring (button toggle + outside-click close)
+        if (window._reelKbHelpBound) return;
+        window._reelKbHelpBound = true;
+        document.addEventListener('click', function (e) {
+            if (!state.isFullScreenActive) return;
+            if (e.target.closest && e.target.closest('#reelKbHelpBtn')) {
+                e.preventDefault();
+                toggleReelKbPanel();
+                return;
+            }
+            if (reelKbPanelOpen && !(e.target.closest && e.target.closest('#reelKbPanel'))) {
+                toggleReelKbPanel(false);
+            }
+        });
+    }
+
+    function setupReelDesktopFx() {
+        // ...teardown chains all helpers into one call
+        setupReelKbEducation();
+        const t1 = setupReelIdleDozer();
+        const t2 = setupImmersiveTipCounter();
+        return function teardown() {
+            try { t1(); } catch (_) {}
+            try { t2(); } catch (_) {}
+            toggleReelKbPanel(false);
+            hideReelKbCoach();
+        };
+    }
+
     function toggleDesktopCommentRail(forceOpen) {
         const rail = document.getElementById('reelDesktopSideRail');
         if (!rail) return;
@@ -2553,7 +2868,6 @@
             const activeSnap = getActiveSnapItem();
             if (activeSnap) {
                 adaptSnapItemOrientation(activeSnap);
-                repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
             }
         };
 
@@ -2581,6 +2895,7 @@
             if (icon) icon.classList.remove('spinning');
             if (refreshBtn) refreshBtn.disabled = false;
             if (commentsLoading) commentsLoading.style.display = 'none';
+            cacheRailComments(postId, html); // refreshed html supersedes any warm copy
 
             if (commentsList) {
                 commentsList.innerHTML = html;
@@ -2634,32 +2949,6 @@
         return viewport.children[curIdx] || viewport.firstElementChild;
     }
 
-    function repositionDesktopActionsRail(content) {
-        if (window.innerWidth < 992) return;
-        const rail = document.getElementById('reelDesktopActionsRail');
-        const stage = document.querySelector('.reel-desktop-stage');
-        if (!rail || !stage) return;
-
-        const activeSnap = getActiveSnapItem();
-        const activeContent = (activeSnap ? activeSnap.querySelector('.reel-fullscreen-content') : null) ||
-                              content ||
-                              document.querySelector('.reels-snap-item .reel-fullscreen-content');
-        if (!activeContent) return;
-
-        const contentRect = activeContent.getBoundingClientRect();
-        const stageRect = stage.getBoundingClientRect();
-        if (stageRect.width === 0 || contentRect.width === 0) return;
-
-        // Position rail cleanly 16px to the right of the active card
-        const desiredLeft = contentRect.right - stageRect.left + 16;
-        // Nav buttons sit at stage right: 28px + 44px = 72px from stage right edge
-        const maxLeft = stageRect.width - 76;
-        const finalLeft = Math.min(desiredLeft, maxLeft);
-
-        rail.style.left = `${Math.round(finalLeft)}px`;
-        rail.classList.add('is-positioned');
-    }
-
     function adaptSnapItemOrientation(snapItem, initialCard) {
         if (!snapItem) return;
         const content = snapItem.querySelector('.reel-fullscreen-content');
@@ -2698,7 +2987,6 @@
                     content.classList.add('is-landscape');
                     content.style.aspectRatio = '16 / 9';
                 }
-                repositionDesktopActionsRail(content);
                 return;
             }
 
@@ -2709,16 +2997,18 @@
             const stageWidth = stage ? stage.clientWidth : window.innerWidth;
             const stageHeight = stage ? stage.clientHeight : window.innerHeight;
 
-            // Reserve 300px (150px on each side of the centered card) for exterior desktop engagement rail & nav buttons
-            const availableWidth = Math.max(260, stageWidth - 300);
-            const availableHeight = Math.max(300, stageHeight - 40);
+            // `clientWidth`/`clientHeight` include the stage paddings, so subtract them
+            // explicitly: 120px horizontal padding (104px fixed tools strip + 16px gutter)
+            // + 32px breathing room, and 24px vertical padding (12px top + 12px bottom).
+            const availableWidth = Math.max(260, stageWidth - 152);
+            const availableHeight = Math.max(300, stageHeight - 24);
 
             if (ratio >= 1.15) {
                 // True landscape video
                 content.classList.add('is-landscape');
                 content.style.aspectRatio = `${vw} / ${vh}`;
                 const maxWFromHeight = availableHeight * ratio;
-                const finalW = Math.min(availableWidth, maxWFromHeight, 860);
+                const finalW = Math.min(availableWidth, maxWFromHeight);
                 content.style.width = `${Math.round(finalW)}px`;
                 content.style.maxWidth = `${Math.round(availableWidth)}px`;
                 content.style.height = `${Math.round(finalW / ratio)}px`;
@@ -2727,7 +3017,7 @@
                 // Square video
                 content.classList.add('is-square');
                 content.style.aspectRatio = '1 / 1';
-                const sz = Math.min(availableWidth, availableHeight, 660);
+                const sz = Math.min(availableWidth, availableHeight);
                 content.style.width = `${Math.round(sz)}px`;
                 content.style.height = `${Math.round(sz)}px`;
                 content.style.maxWidth = `${Math.round(availableWidth)}px`;
@@ -2736,14 +3026,12 @@
                 // Portrait 9:16 video
                 content.classList.add('is-portrait');
                 content.style.aspectRatio = `${vw} / ${vh}`;
-                const finalH = Math.min(availableHeight, 920);
-                const finalW = Math.min(availableWidth, finalH * ratio, 520);
+                const finalH = availableHeight;
+                const finalW = Math.min(availableWidth, finalH * ratio);
                 content.style.height = `${Math.round(finalH)}px`;
                 content.style.width = `${Math.round(finalW)}px`;
                 content.style.maxWidth = `${Math.round(availableWidth)}px`;
             }
-
-            repositionDesktopActionsRail(content);
         }
 
         checkMetadata();
@@ -2804,7 +3092,6 @@
     function updateDesktopSideRail(activeItem) {
         if (activeItem) {
             updateFullscreenNavButtons(activeItem);
-            repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
         }
         if (!activeItem) return;
 
@@ -3055,11 +3342,8 @@
             initSheetCommentsInteractions(commentsList, postId);
         }
 
-        fetch(`/post/${postId}/?show_all=1`, {
-            headers: { 'HX-Request': 'true' }
-        })
-        .then(res => res.text())
-        .then(html => {
+        // Shared paint path: identical for a warm cache hit and a fresh fetch.
+        function paintRailComments(html) {
             if (currentDesktopRailPostId !== postId) return;
             if (commentsLoading) commentsLoading.style.display = 'none';
             if (commentsList) {
@@ -3068,6 +3352,23 @@
                 initSheetCommentsInteractions(commentsList, postId);
                 initSideRailWebSocket(postId);
             }
+        }
+
+        const cachedCommentsHtml = railCommentsHtmlCache.get(postId);
+        if (cachedCommentsHtml) {
+            // Warm hit from prefetch (or a previous visit) — skip the network
+            // entirely; freshness comes from the live comment WebSocket and the
+            // manual refresh button.
+            paintRailComments(cachedCommentsHtml);
+        } else {
+        fetch(`/post/${postId}/?show_all=1`, {
+            headers: { 'HX-Request': 'true' }
+        })
+        .then(res => res.text())
+        .then(html => {
+            if (currentDesktopRailPostId !== postId) return;
+            cacheRailComments(postId, html);
+            paintRailComments(html);
         })
         .catch(err => {
             if (currentDesktopRailPostId !== postId) return;
@@ -3075,6 +3376,7 @@
             if (commentsLoading) commentsLoading.style.display = 'none';
             if (commentsList) commentsList.innerHTML = '<div class="text-center py-4 text-muted small">Could not load comments.</div>';
         });
+        }
 
         // Bind desktop side rail comment form submission
         const formEl = document.getElementById('fsRailCommentForm');
@@ -3217,6 +3519,15 @@
         overlay.classList.remove('d-none');
         overlay.setAttribute('aria-hidden', 'false');
 
+        // Start desktop immersion helpers (idle doze + one-time rail tip).
+        // Teardown of any previous session first — safe against double-open.
+        if (typeof state.reelDesktopFxTeardown === 'function') {
+            try { state.reelDesktopFxTeardown(); } catch (_) {}
+        }
+        state.reelDesktopFxTeardown = setupReelDesktopFx();
+        // First desktop run: teach the keyboard (one-time, localStorage-gated)
+        setTimeout(maybeShowReelKbCoach, 900);
+
         // Force white icons in status bar for fullscreen reels mode
         try {
             if (typeof window.updateStatusBarForTheme === 'function') {
@@ -3325,7 +3636,6 @@
 
                 setTimeout(() => {
                     adaptSnapItemOrientation(activeItem);
-                    repositionDesktopActionsRail(activeItem.querySelector('.reel-fullscreen-content'));
                 }, 60);
             } else {
                 updateFullscreenNavButtons();
@@ -3422,6 +3732,12 @@
         overlay.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('reels-active');
         state.isFullScreenActive = false;
+
+        // Stop desktop immersion helpers (idle doze timer + tip toast)
+        if (typeof state.reelDesktopFxTeardown === 'function') {
+            try { state.reelDesktopFxTeardown(); } catch (_) {}
+            state.reelDesktopFxTeardown = null;
+        }
 
         // Restore home feed scroll position immediately
         if (typeof state.previousScrollY === 'number') {
@@ -4015,13 +4331,12 @@
                             applyCommentLikeUi(serverLiked, serverCount);
                         }
                     } else {
-                        await fetch(`/comment/${commentId}/like/`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCsrfToken(),
-                                'HX-Request': 'true'
-                            }
-                        });
+                        // Do NOT fire a second toggle request — the first may
+                        // have still succeeded server-side, in which case a
+                        // retry toggles the like back off. Restore the UI
+                        // instead; the next render/refresh shows server truth.
+                        console.warn('[CommentsSheet] Like toggle rejected:', res.status);
+                        applyCommentLikeUi(wasLiked, curCount);
                     }
                 } catch (err) {
                     console.warn('[CommentsSheet] Like toggle error:', err);
@@ -5312,7 +5627,20 @@
 
             if (event.key === 'Escape') {
                 event.preventDefault();
+                // Esc closes the shortcuts panel first — never yank the player
+                // away while someone is just reading the cheat-sheet.
+                if (reelKbPanelOpen) {
+                    toggleReelKbPanel(false);
+                    return;
+                }
                 closeFullscreenReels();
+                return;
+            }
+
+            // '?' (Shift + /) — YouTube parity: open/close the shortcuts panel
+            if (event.key === '?' || (event.shiftKey && event.key === '/')) {
+                event.preventDefault();
+                toggleReelKbPanel();
                 return;
             }
 
@@ -5351,23 +5679,42 @@
 
             if (event.key === ' ' || event.code === 'Space') {
                 event.preventDefault();
-                if (state.currentPlayingVideo) {
-                    const snapItem = state.currentPlayingVideo.closest('.reels-snap-item');
-                    if (state.currentPlayingVideo.paused) {
-                        playVideo(state.currentPlayingVideo, false);
+                // pauseVideo() nulls state.currentPlayingVideo, so after a
+                // Space-pause the resume path must resolve the video from the
+                // active snap item instead of the (now null) state pointer.
+                let targetVideo = state.currentPlayingVideo;
+                if (!targetVideo || targetVideo.paused) {
+                    const activeItem = getActiveSnapItem();
+                    if (activeItem) {
+                        const activeVid = activeItem.querySelector('video');
+                        if (activeVid) targetVideo = activeVid;
+                    }
+                }
+                if (targetVideo) {
+                    const snapItem = targetVideo.closest('.reels-snap-item');
+                    if (targetVideo.paused) {
+                        playVideo(targetVideo, false);
                         if (snapItem) triggerPlayHud(snapItem, true);
                     } else {
-                        pauseVideo(state.currentPlayingVideo);
+                        pauseVideo(targetVideo);
                         if (snapItem) triggerPlayHud(snapItem, false);
                     }
                 }
                 return;
             }
 
-            if (event.key.toLowerCase() === 'm') {
-                event.preventDefault();
-                toggleGlobalMute();
-                return;
+            if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+                if (event.key.toLowerCase() === 'm') {
+                    event.preventDefault();
+                    toggleGlobalMute();
+                    return;
+                }
+
+                if (event.key.toLowerCase() === 'c') {
+                    event.preventDefault();
+                    toggleDesktopCommentRail();
+                    return;
+                }
             }
         });
 
@@ -5479,7 +5826,6 @@
                     const activeSnap = items[curIdx];
                     if (activeSnap) {
                         adaptSnapItemOrientation(activeSnap);
-                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                     updateFullscreenNavButtons(activeSnap);
                 }
@@ -5495,7 +5841,6 @@
                     const activeSnap = getActiveSnapItem();
                     if (activeSnap) {
                         adaptSnapItemOrientation(activeSnap);
-                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                 }, 40);
 
@@ -5572,7 +5917,6 @@
                             }
                         } else {
                             adaptSnapItemOrientation(activeSnap);
-                            repositionDesktopActionsRail(content);
                             updateDesktopSideRail(activeSnap);
                         }
                     }
@@ -6055,7 +6399,6 @@
                     const activeSnap = getActiveSnapItem();
                     if (activeSnap) {
                         adaptSnapItemOrientation(activeSnap);
-                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                 }
             }
@@ -6070,7 +6413,6 @@
                     const activeSnap = getActiveSnapItem();
                     if (activeSnap) {
                         adaptSnapItemOrientation(activeSnap);
-                        repositionDesktopActionsRail(activeSnap.querySelector('.reel-fullscreen-content'));
                     }
                 }
             }

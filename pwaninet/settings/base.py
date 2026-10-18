@@ -83,6 +83,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'pwaninet.middleware.device_block_middleware.BlockedDeviceMiddleware',
     'pwaninet.middleware.maintenance.MaintenanceModeMiddleware',
     'pwaninet.middleware.user_activity.UserActivityMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -111,6 +112,7 @@ TEMPLATES = [
                 'notifications.context_processors.notification_count',
                 'uploads.context_processors.upload_flags',
                 'pwaninet.context_processors.release_metadata',
+                'pwaninet.context_processors.session_identity',
                 'groups.context_processors.groups_nav_context',
                 'messaging.context_processors.messaging_nav_context',
             ],
@@ -225,6 +227,13 @@ GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
 GOOGLE_COMPLETE_RATELIMIT_ATTEMPTS = int(os.environ.get('GOOGLE_COMPLETE_RATELIMIT_ATTEMPTS', 20))
 GOOGLE_COMPLETE_RATELIMIT_WINDOW = int(os.environ.get('GOOGLE_COMPLETE_RATELIMIT_WINDOW', 300))
 
+# New-device login alerts (Phase 1). GeoIP is optional: point GEOIP_PATH at a
+# GeoLite2-City database directory (and install the geoip2 package) to show
+# approximate city/country in device alerts.
+DEVICE_VERIFICATION_EXPIRY_HOURS = int(os.environ.get('DEVICE_VERIFICATION_EXPIRY_HOURS', 24))
+DEVICE_ALERT_EMAIL_FALLBACK = os.environ.get('DEVICE_ALERT_EMAIL_FALLBACK', 'True') == 'True'
+GEOIP_PATH = os.environ.get('GEOIP_PATH', '')
+
 # Caching configuration
 CACHES = {
     'default': {
@@ -307,17 +316,40 @@ AXES_RESET_ON_SUCCESS = True
 # AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True  # Deprecated in django-axes 6.0
 
 # Channels configuration
+#
+# channels_redis only forwards extra connection kwargs (socket timeouts, retry,
+# health checks) to the async Redis pool when each host entry is a dict. Bare
+# URL strings / tuples are passed straight to from_url() with no options, so a
+# stalled Redis connection can hang a WebSocket indefinitely with no retry.
+_CHANNEL_REDIS_KWARGS = {
+    "socket_connect_timeout": 5,
+    "socket_timeout": 10,
+    "retry_on_timeout": True,
+    "health_check_interval": 30,
+}
+
+
 def _channel_hosts():
+    """Build RedisChannelLayer host entries with connection-resilience options.
+
+    Returns a list of dicts so channels_redis forwards socket timeouts, retry
+    and health checks straight to the async Redis connection pool. A single
+    stalled Redis connection can no longer block WebSocket group operations
+    indefinitely.
+    """
     url = os.environ.get('REDIS_URL', '')
     if url:
-        # channels_redis accepts redis:// URL strings directly
-        return [url]
+        # from_url() still receives the URL (db/password encoded in it), plus
+        # the resilience kwargs below.
+        return [{"address": url, **_CHANNEL_REDIS_KWARGS}]
     host = os.environ.get('REDIS_HOST', '127.0.0.1')
     port = int(os.environ.get('REDIS_PORT', 6379))
     password = os.environ.get('REDIS_PASSWORD') or None
+    entry = {"host": host, "port": port, **_CHANNEL_REDIS_KWARGS}
     if password:
-        return [{'host': host, 'port': port, 'password': password}]
-    return [(host, port)]
+        entry["password"] = password
+    return [entry]
+
 
 CHANNEL_LAYERS = {
     'default': {
@@ -404,6 +436,11 @@ CELERY_BEAT_SCHEDULE = {
     'uploads-reconcile-stale-uploads': {
         'task': 'uploads.tasks.reconcile_stale_uploads',
         'schedule': 1800.0,  # every 30 minutes
+        'options': {'queue': 'default'},
+    },
+    'users-expire-device-verifications': {
+        'task': 'users.tasks.expire_device_verifications',
+        'schedule': 900.0,  # every 15 minutes
         'options': {'queue': 'default'},
     },
 }
@@ -690,14 +727,14 @@ PWANIMATE_CLOUDFLARE_MODEL = os.environ.get('PWANIMATE_CLOUDFLARE_MODEL', os.env
 
 # AI Gateway (LLM Generation)
 PWANIMATE_DEFAULT_LLM_PROVIDER = os.environ.get('PWANIMATE_DEFAULT_LLM_PROVIDER', 'gemini')
-PWANIMATE_GEMINI_MODEL = os.environ.get('PWANIMATE_GEMINI_MODEL', 'gemini-3.6-flash')
-PWANIMATE_VISION_MODEL = os.environ.get('PWANIMATE_VISION_MODEL', 'gemini-3.6-flash')
+PWANIMATE_GEMINI_MODEL = os.environ.get('PWANIMATE_GEMINI_MODEL', 'gemini-3.8-flash')
+PWANIMATE_VISION_MODEL = os.environ.get('PWANIMATE_VISION_MODEL', 'gemini-3.8-flash')
 PWANIMATE_VISION_FALLBACK_CHAIN = [
     {"provider": "groq", "model": os.environ.get('PWANIMATE_GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')},
 ]
 PWANIMATE_ATTACHMENT_VISION_MAX_PAGES = int(os.environ.get('PWANIMATE_ATTACHMENT_VISION_MAX_PAGES', '20'))
 PWANIMATE_GROQ_MODEL = os.environ.get('PWANIMATE_GROQ_MODEL', 'openai/gpt-oss-120b')
-PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'google/gemini-2.5-flash')
+PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'google/gemini-flash-latest')
 PWANIMATE_LLM_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_TIMEOUT', '30.0'))
 PWANIMATE_LLM_CONNECT_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_CONNECT_TIMEOUT', '2.0'))
 PWANIMATE_PROVIDER_FALLBACK_ORDER = os.environ.get(
@@ -708,17 +745,19 @@ PWANIMATE_RATE_LIMIT_COOLDOWN = float(os.environ.get('PWANIMATE_RATE_LIMIT_COOLD
 # Model-level fallback chain: interleaved across providers so that when one provider
 # is throttled or quota-depleted, the gateway immediately fails over to an available provider.
 PWANIMATE_LLM_FALLBACK_CHAIN = [
-    {"provider": "gemini", "model": "gemini-3.6-flash"},
+    {"provider": "gemini", "model": "gemini-3.8-flash"},
     {"provider": "groq", "model": "openai/gpt-oss-120b"},
-    {"provider": "openrouter", "model": "google/gemini-2.5-flash"},
+    {"provider": "gemini", "model": "gemini-3.6-flash"},
+    {"provider": "openrouter", "model": "google/gemini-flash-latest"},
     {"provider": "groq", "model": "openai/gpt-oss-20b"},
-    {"provider": "gemini", "model": "gemini-3.5-flash"},
+    {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
     {"provider": "openrouter", "model": "nvidia/nemotron-3.5-lightning:free"},
     {"provider": "groq", "model": "qwen/qwen3.8-27b"},
-    {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
+    {"provider": "gemini", "model": "gemini-flash-lite-latest"},
     {"provider": "openrouter", "model": "nex-agi/nex-n2.5-pro:free"},
-    {"provider": "groq", "model": "groq/compound-mini"},
     {"provider": "gemini", "model": "gemini-flash-latest"},
+    {"provider": "groq", "model": "groq/compound-mini"},
+    {"provider": "gemini", "model": "gemini-pro-latest"},
     {"provider": "openrouter", "model": "liquid/lfm-2.5-2.6b:free"},
     # Final fallback: mock provider returns a friendly error message
     # instead of raising a 502 when all real providers are unreachable

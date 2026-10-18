@@ -46,6 +46,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
+import ee.forgr.capacitor.social.login.ModifiedMainActivityForSocialLoginPlugin;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.WebViewListener;
@@ -67,7 +68,7 @@ import java.util.Locale;
 import java.util.ArrayList;
 import org.json.JSONObject;
 
-public class MainActivity extends BridgeActivity {
+public class MainActivity extends BridgeActivity implements ModifiedMainActivityForSocialLoginPlugin {
     private static final String GALLERY_BRIDGE_TAG = "GalleryBridge";
     private boolean isNetworkAvailable = true;
     private boolean isOfflinePageShowing = false;
@@ -87,6 +88,14 @@ public class MainActivity extends BridgeActivity {
     private PendingMediaDownload pendingMediaDownload;
     private WebAppInterface androidWebAppInterface;
     private WebView androidBridgeWebView;
+
+    /**
+     * True while MainActivity is resumed. Read by PwaninetFirebaseMessagingService
+     * to skip posting the system notification while the app is open — the WebView
+     * already renders the thin in-app banner for foreground pushes. Prevents the
+     * duplicate thick system heads-up banner appearing on top of the in-app card.
+     */
+    public static volatile boolean isAppForeground = false;
 
     private static final class PendingMediaDownload {
         final String url, filename, mimeType, category;
@@ -1217,9 +1226,16 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        MainActivity.isAppForeground = true;
         injectSafeAreaInsets();
         syncSystemBarThemeFromDom();
         injectThemeObserver();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        MainActivity.isAppForeground = false;
     }
 
     private void setupWebViewDownloads() {
@@ -1565,5 +1581,12 @@ public class MainActivity extends BridgeActivity {
                 }
             } catch (Exception ignored) {}
         });
+    }
+
+    // Marker required by @capgo/capacitor-social-login so scoped Google login
+    // (openid/email/profile) can launch from this activity.
+    @Override
+    public void IHaveModifiedTheMainActivityForTheUseWithSocialLoginPlugin() {
+        // Intentional no-op: presence of this method satisfies the plugin.
     }
 }

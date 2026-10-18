@@ -85,13 +85,10 @@
     </a>
 
     <a href="{% url 'documents:academic:dashboard' %}"
-       hx-get="{% url 'documents:academic:dashboard' %}"
-       hx-target="#page-content-target"
-       hx-swap="innerHTML"
-       hx-push-url="true"
-       hx-history="true"
-       class="doc-library-tab {% if active_tab == 'academic' %}active{% endif %}">
-        Academic &amp; Units
+       data-bypass-htmx="true"
+       hx-boost="false"
+       class="doc-library-tab">
+        Dashboard
     </a>
 
     <a href="{% url 'documents:my_resources' %}"

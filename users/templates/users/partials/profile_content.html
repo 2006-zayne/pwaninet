@@ -86,7 +86,7 @@
                             {% else %}
                             <p class="small mb-0 text-secondary italic">
                                 <i class="bi bi-shield-lock me-1"></i>
-                                "{{ profile_user.bio|default:_('Pwani University Student.') }}"
+                                "{{ profile_user.get_display_bio }}"
                             </p>
                             {% endif %}
                         </div>
@@ -128,13 +128,10 @@
                                     <i class="bi bi-gear-wide-connected me-1"></i> {% trans "UPDATE PROFILE" %}
                                 </a>
                                 <a href="{% url 'documents:academic:dashboard' %}"
-                                   hx-get="{% url 'documents:academic:dashboard' %}"
-                                   hx-target="#page-content-target"
-                                   hx-swap="innerHTML"
-                                   hx-push-url="true"
-                                   hx-history="true"
+                                   data-bypass-htmx="true"
+                                   hx-boost="false"
                                    class="btn btn-outline-primary rounded-pill fw-bold btn-sm">
-                                    <i class="bi bi-mortarboard me-1"></i> {% trans "ACADEMIC & UNITS" %}
+                                    <i class="bi bi-mortarboard me-1"></i> {% trans "DASHBOARD" %}
                                 </a>
                                 <a href="{% url 'users:settings' %}" class="btn btn-outline-info rounded-pill fw-bold btn-sm" hx-get="{% url 'users:settings' %}" hx-target="#page-content-target" hx-swap="innerHTML" hx-push-url="true" hx-history="true">
                                     <i class="bi bi-gear me-1"></i> {% trans "SETTINGS" %}
@@ -235,6 +232,12 @@
                         <span></span><span></span><span></span><span></span>
                     </div>
                     {% else %}
+                    {% if profile_user.institution %}
+                        <div class="mb-2 d-flex justify-content-between align-items-center">
+                            <small class="text-muted">{% trans "Institution" %}</small>
+                            <span class="badge bg-primary bg-opacity-10 text-primary fw-bold small text-wrap text-end">{{ profile_user.institution.name }}</span>
+                        </div>
+                    {% endif %}
                     {% if profile_user.programme %}
                         <div class="mb-2 d-flex justify-content-between">
                             <small class="text-muted">{% trans "Programme" %}</small>
@@ -286,6 +289,19 @@
                     {% else %}
                         <div class="text-muted small">
                             {% trans "No academic information available" %}
+                        </div>
+                    {% endif %}
+
+                    {% if is_own_profile %}
+                        <div class="mt-3 pt-2 border-top text-end">
+                            <a href="{% url 'users:settings_academic' %}"
+                               hx-get="{% url 'users:settings_academic' %}"
+                               hx-target="#page-content-target"
+                               hx-swap="innerHTML"
+                               hx-push-url="true"
+                               class="btn btn-sm btn-outline-primary rounded-pill py-1 px-3 small">
+                                <i class="bi bi-pencil-square me-1"></i>{% trans "Edit Academic Info" %}
+                            </a>
                         </div>
                     {% endif %}
                     {% endif %}

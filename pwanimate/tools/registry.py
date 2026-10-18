@@ -91,6 +91,7 @@ def get_default_tool_registry() -> ToolRegistry:
         registry = ToolRegistry()
         from pwanimate.tools.domain import (
             AcademicLookupTool,
+            StudentTimetableTool,
             DocumentDetailTool,
             GroupAnnouncementsTool,
             UserProfileTool,
@@ -101,6 +102,7 @@ def get_default_tool_registry() -> ToolRegistry:
             SiteInfoTool,
         )
         registry.register(AcademicLookupTool())
+        registry.register(StudentTimetableTool())
         registry.register(DocumentDetailTool())
         registry.register(GroupAnnouncementsTool())
         registry.register(UserProfileTool())

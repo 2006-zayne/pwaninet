@@ -271,6 +271,7 @@ class StudentContext:
     tone: Optional[str] = None
     response_style: Optional[str] = None
     personal_instructions: Optional[str] = None
+    weekly_timetable: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dictionary."""
@@ -288,6 +289,7 @@ class StudentContext:
             "tone": self.tone,
             "response_style": self.response_style,
             "personal_instructions": self.personal_instructions,
+            "weekly_timetable": self.weekly_timetable,
         }
 
     def format_context_block(self) -> str:
@@ -315,6 +317,23 @@ class StudentContext:
             lines.append(f"Skills: {', '.join(self.relevant_skills)}")
         if self.collaboration_status:
             lines.append(f"Collaboration Status: {self.collaboration_status}")
+
+        if self.weekly_timetable and isinstance(self.weekly_timetable, dict):
+            sched = self.weekly_timetable.get("weekly_schedule") or []
+            free = self.weekly_timetable.get("free_slots") or []
+            if sched or free:
+                lines.append("<weekly_timetable>")
+                if sched:
+                    lines.append("Weekly Lectures:")
+                    for s in sched:
+                        venue = f" ({s['venue']})" if s.get('venue') else ""
+                        stype = f" [{s['session_type']}]" if s.get('session_type') else ""
+                        lines.append(f"- {s.get('day')}: {s.get('start_time')}-{s.get('end_time')} {s.get('unit_code')} {s.get('unit_name', '')}{venue}{stype}".rstrip())
+                if free:
+                    lines.append("Free Study & Revision Slots:")
+                    for f in free:
+                        lines.append(f"- {f.get('day')}: {f.get('start_time')}-{f.get('end_time')} ({f.get('duration_hours', '')}h free)")
+                lines.append("</weekly_timetable>")
         
         if self.nickname or self.tone or self.response_style or self.personal_instructions:
             lines.append("Preferences:")
@@ -342,6 +361,7 @@ class StudentContext:
             self.relevant_interests or
             self.relevant_skills or
             self.collaboration_status or
+            self.weekly_timetable or
             self.nickname or
             self.tone or
             self.response_style or

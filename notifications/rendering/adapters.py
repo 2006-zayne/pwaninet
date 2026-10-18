@@ -670,7 +670,20 @@ class NotificationObjectAdapter(PayloadAdapter):
                 url=f"/dashboard/feedback/user/{ticket_id}/",
                 title=metadata.get('context_name') or 'Feedback Ticket'
             )
-        
+
+        # Generic fallback: security/smart flows declare their deep link in
+        # metadata['target_url'] (e.g. device-verification sheets).
+        generic_url = metadata.get('target_url')
+        if generic_url and isinstance(generic_url, str) and generic_url.startswith('/'):
+            return NotificationResource(
+                type=ResourceType.SYSTEM,
+                id=0,
+                url=generic_url,
+                title=metadata.get('device_label')
+                    or notification.title
+                    or 'Open details'
+            )
+
         return None
     
     def _get_post_image_url(self, post) -> Optional[str]:

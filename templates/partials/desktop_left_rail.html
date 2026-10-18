@@ -75,13 +75,10 @@
 
         <a href="{% url 'documents:academic:dashboard' %}"
            class="left-rail-link nav-chip {% if request.resolver_match.url_name == 'dashboard' and 'academic' in request.path %}active{% endif %}"
-           hx-get="{% url 'documents:academic:dashboard' %}"
-           hx-target="#page-content-target"
-           hx-swap="innerHTML"
-           hx-push-url="true"
-           hx-history="true">
-            <i class="bi bi-mortarboard-fill left-rail-icon"></i>
-            <span class="left-rail-label">{% trans "Academic & Units" %}</span>
+           data-bypass-htmx="true"
+           hx-boost="false">
+            <img src="{% static 'images/vasto-transparent.png' %}" alt="Dashboard" class="left-rail-icon" style="width: 24px; height: 24px; object-fit: contain;">
+            <span class="left-rail-label">{% trans "Dashboard" %}</span>
         </a>
         {% endif %}
 

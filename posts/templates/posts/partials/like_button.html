@@ -2,23 +2,25 @@
 {% load post_filters %}
 {% check_is_liked post as user_has_liked %}
 {% if is_reel %}
-<button class="reel-action-btn like-button {% if user_has_liked %}text-danger{% else %}text-white{% endif %}"
+<button class="reel-action-btn like-button {% if user_has_liked %}text-danger liked{% else %}text-white{% endif %}"
         hx-post="{% url 'posts:toggle_like' post.share_id %}?is_reel=1"
         hx-target="this"
         hx-swap="outerHTML"
         data-share-id="{{ post.share_id }}"
         data-post-id="{{ post.id }}"
+        data-is-liked="{% if user_has_liked %}true{% else %}false{% endif %}"
         aria-label="{% if user_has_liked %}{% trans 'Unlike post' %}{% else %}{% trans 'Like post' %}{% endif %}">
     <i class="bi {% if user_has_liked %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
 </button>
 {% else %}
-<button class="like-button btn {% if user_has_liked %}text-danger{% else %}text-muted{% endif %} btn-sm border-0 d-flex align-items-center justify-content-center w-100 engagement-button"
+<button class="like-button btn {% if user_has_liked %}text-danger liked{% else %}text-muted{% endif %} btn-sm border-0 d-flex align-items-center justify-content-center w-100 engagement-button"
         style="flex: 1 1 0px; min-width: 0;"
         hx-post="{% url 'posts:toggle_like' post.share_id %}"
         hx-target="this"
         hx-swap="outerHTML"
         data-share-id="{{ post.share_id }}"
         data-post-id="{{ post.id }}"
+        data-is-liked="{% if user_has_liked %}true{% else %}false{% endif %}"
         aria-label="{% if user_has_liked %}{% trans 'Unlike post' %}{% else %}{% trans 'Like post' %}{% endif %}">
     <i class="bi {% if user_has_liked %}bi-heart-fill text-danger heart-pop{% else %}bi-heart{% endif %} fs-5"></i>
     <span class="like-count ms-1 fw-bold">{{ like_count|default:post.like_count }}</span>

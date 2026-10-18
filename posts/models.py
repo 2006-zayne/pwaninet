@@ -282,19 +282,33 @@ class Post(models.Model):
     def is_liked_by(self, user):
         if not self.pk:
             return False
-        if user.is_authenticated:
-            return self.likes.filter(user=user).exists()
-        return False
+        if not user.is_authenticated:
+            return False
+        # Legacy repost rows share content with their original post — check
+        # both so the rendered flag matches what a like on this card targets.
+        if self.repost_of_id and self.repost_of_id != self.id:
+            try:
+                if self.repost_of.likes.filter(user=user).exists():
+                    return True
+            except Exception:
+                pass
+        return self.likes.filter(user=user).exists()
 
     @property
     def like_count(self):
         if not self.pk:
             return 0
+        # Legacy repost rows show the combined like count with the original
+        # they duplicate, so both card representations agree on the count.
+        if self.repost_of_id and self.repost_of_id != self.id:
+            try:
+                return int(self.repost_of.like_count) + self.likes.count()
+            except Exception:
+                pass
         # Cache the count on the instance to avoid repeated queries
         if not hasattr(self, '_like_count'):
             self._like_count = self.likes.count()
         return self._like_count
-
 
     @property
     def repost_count(self):

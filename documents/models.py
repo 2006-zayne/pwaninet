@@ -28,6 +28,9 @@ from .academic.models import (
     AcademicUnit,
     ProgrammeUnit,
     StudentUnitEnrollment,
+    ProgrammeTimetable,
+    TimetableStatus,
+    TimetableType,
 )
 
 # Document Domain
@@ -98,6 +101,9 @@ __all__ = [
     'AcademicUnit',
     'ProgrammeUnit',
     'StudentUnitEnrollment',
+    'ProgrammeTimetable',
+    'TimetableStatus',
+    'TimetableType',
     # Document Domain
     'Category',
     'Tag',

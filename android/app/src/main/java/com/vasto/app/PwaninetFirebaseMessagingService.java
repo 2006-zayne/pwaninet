@@ -102,6 +102,16 @@ public class PwaninetFirebaseMessagingService extends FirebaseMessagingService {
             return;
         }
 
+        // While the app is open, the WebView already renders the thin in-app
+        // banner (PushNotifications plugin -> showNativePushBanner). Posting a
+        // native notification here used to stack Android's thick heads-up
+        // banner on top of it — so suppress it in the foreground. Background
+        // and killed app states still post the rich native notification.
+        if (MainActivity.isAppForeground) {
+            Log.d(TAG, "App is in the foreground; skipping native system banner (in-app card handles this push).");
+            return;
+        }
+
         Map<String, String> data = remoteMessage.getData();
         if (data == null || data.isEmpty()) {
             Log.w(TAG, "Empty data payload received; cannot construct notification.");

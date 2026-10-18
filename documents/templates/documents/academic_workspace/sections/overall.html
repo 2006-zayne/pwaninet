@@ -1,0 +1,93 @@
+{% load academic_workspace_extras %}{% comment %}
+  Centre section: OVERALL — stat strip + today's agenda + enrolled units.
+{% endcomment %}
+
+{% url 'documents:academic:dashboard' as dash_url %}
+<div class="vdw-section on" data-vdw-section="overall"
+     data-vdw-refresh-url="{{ dash_url }}?section=overall{% if selected_year_num %}&year={{ selected_year_num }}{% endif %}{% if selected_sem_num %}&semester={{ selected_sem_num }}{% endif %}">
+
+  <div class="vdw-page-head">
+    <div>
+      <h1><i class="bi bi-speedometer2"></i> Overall</h1>
+      <p class="vdw-page-sub">
+        {% if selected_programme %}{{ selected_programme.code|default:selected_programme.name }} · {% endif %}Semester snapshot at a glance
+      </p>
+    </div>
+  </div>
+
+  {# ── Stat strip ── #}
+  {% with enrolled=academic_summary.enrolled_units total_docs=0 %}
+  <div class="vdw-card">
+    <div class="vdw-stats">
+      <div class="vdw-stat">
+        <div class="vdw-stat-num">{{ enrolled|length }}<small> units</small></div>
+        <div class="vdw-stat-lbl">Enrolled Units</div>
+      </div>
+      <div class="vdw-stat">
+        <div class="vdw-stat-num">{{ week_grid.contact_total_hours|default:0 }}<small> hrs/wk</small></div>
+        <div class="vdw-stat-lbl">Contact Hours</div>
+      </div>
+      <div class="vdw-stat">
+        <div class="vdw-stat-num">{{ week_grid.free_total_hours|default:0 }}<small> hrs/wk</small></div>
+        <div class="vdw-stat-lbl">Free Study</div>
+      </div>
+      <div class="vdw-stat">
+        <div class="vdw-stat-num">{{ total_docs }}<small> docs</small></div>
+        <div class="vdw-stat-lbl">Documents Ready</div>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+
+  {# ── Today's agenda ── #}
+  <div class="vdw-card">
+    <div class="vdw-card-head">
+      <h2 class="vdw-card-title"><i class="bi bi-sunrise"></i> Today's Sessions</h2>
+      <span class="vdw-pill">{{ today_rows|length }} session{{ today_rows|length|pluralize }}</span>
+    </div>
+    {% if today_rows %}
+      {% for slot in today_rows %}
+        <div class="vdw-row">
+          <div class="vdw-due">
+            <b>{{ slot.start_time }}</b><span>→ {{ slot.end_time }}</span>
+          </div>
+          <div style="min-width:0;">
+            <div class="vdw-unit-name">{{ slot.unit_code }} · {{ slot.type_label|capfirst }}</div>
+            <div class="vdw-unit-code">{{ slot.unit_name|default:"Session" }}{% if slot.venue %} · {{ slot.venue }}{% endif %}</div>
+          </div>
+          <span class="vdw-pill"><i class="bi bi-geo-alt"></i> {{ slot.venue|default:"TBA" }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="vdw-empty" style="padding:26px 16px;">
+        <p><i class="bi bi-cup-hot"></i> No sessions today — enjoy the breathing room.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {# ── Enrolled units ── #}
+  <div class="vdw-card">
+    <div class="vdw-card-head">
+      <h2 class="vdw-card-title"><i class="bi bi-collection-play"></i> My Units</h2>
+      <a class="vdw-btn" href="{{ dash_url }}?section=timetable" hx-get="{{ dash_url }}?section=timetable" hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">Timetable</a>
+    </div>
+    {% if academic_summary.enrolled_units %}
+      {% for unit in academic_summary.enrolled_units %}
+        <div class="vdw-row">
+          <span class="vdw-unit-dot" style="--ubg: {{ unit.code|unit_tint_var:'ubg' }};"></span>
+          <div style="min-width:0;flex:1;">
+            <div class="vdw-unit-name">{{ unit.name|default:unit.code }}</div>
+            <div class="vdw-unit-code">{{ unit.code }}{% if unit.credit_hours %} · {{ unit.credit_hours }} credit hours{% endif %}</div>
+          </div>
+          {% if unit.doc_count %}<span class="vdw-pill">{{ unit.doc_count }} docs</span>{% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="vdw-empty" style="padding:26px 16px;">
+        <p>No enrolled units yet. Use the <b>Cohort</b> tab in the Units &amp; Cohort panel to sync this semester's units.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% include 'documents/academic_workspace/_ctx_oob.html' %}

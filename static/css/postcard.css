@@ -2150,7 +2150,7 @@ body.reels-active .modal-backdrop {
   font-size: 1.25rem;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: transform 0.15s ease, background 0.15s ease, opacity 0.45s ease;
 }
 
 .close-fs-reels-btn:hover {
@@ -2248,6 +2248,10 @@ body.reels-active .modal-backdrop {
     background: var(--background, #f8fafc);
     overflow: hidden;
     transition: flex 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Reserve a fixed 104px right strip for the .reel-desktop-tools column (never moves),
+       plus small 12px top/bottom pads and a 16px left gutter. Cards center inside
+       the remaining zone, so they can never collide with the tools at any size. */
+    padding: 12px 104px 12px 16px;
   }
 
   [data-theme="dark"] .reel-desktop-stage {
@@ -2293,6 +2297,11 @@ body.reels-active .modal-backdrop {
   .reels-snap-item {
     background: transparent;
   }
+  /* Desktop: item must equal the padded viewport height (100dvh - 24px),
+     not 100dvh, or scroll-snap positions drift by 24px per reel. */
+  .reels-snap-item {
+    height: 100%;
+  }
 }
 
 .reels-snap-item .reel-fullscreen-content {
@@ -2310,9 +2319,9 @@ body.reels-active .modal-backdrop {
 
 @media (min-width: 992px) {
   .reels-snap-item .reel-fullscreen-content {
-    max-height: calc(100vh - 40px);
-    max-height: calc(100dvh - 40px);
-    max-width: min(calc(100% - 300px), 860px);
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    max-width: calc(100% - 32px);
     border-radius: 16px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.16), 0 2px 10px rgba(0, 0, 0, 0.08);
     border: 1px solid var(--border, #e2e8f0);
@@ -2331,42 +2340,41 @@ body.reels-active .modal-backdrop {
     border-color: var(--card-border, #3a3b3c);
   }
 
-  /* Default / Portrait: taller immersive player leaving breathing room top and bottom */
+  /* Default / Portrait: fills the full vertical budget (small 12px pads top/bottom).
+     Stage is height-bound, so this grows freely on tall monitors (no 940px cap). */
   .reels-snap-item .reel-fullscreen-content,
   .reels-snap-item .reel-fullscreen-content.is-portrait {
-    height: calc(100vh - 40px);
-    height: calc(100dvh - 40px);
-    max-height: 940px;
-    width: calc(min(calc(100vh - 40px), 940px) * 9 / 16);
-    max-width: min(calc(100% - 300px), 520px);
+    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
+    width: calc((100dvh - 24px) * 9 / 16);
+    max-width: calc(100% - 32px);
     aspect-ratio: 9 / 16;
   }
 
-  /* Landscape: wide responsive card container with rounded corners and border */
+  /* Landscape: grows until width OR height bounds against the stage.
+     Height budget = 100dvh - 24px, so pick the smaller of full width and ratio-matched width. */
   .reels-snap-item .reel-fullscreen-content.is-landscape {
-    width: min(calc(100% - 300px), 860px);
-    max-width: calc(100% - 300px);
+    width: min(calc(100% - 32px), calc((100dvh - 24px) * 16 / 9));
+    max-width: calc(100% - 32px);
     height: auto;
-    max-height: calc(100vh - 40px);
-    max-height: calc(100dvh - 40px);
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
     aspect-ratio: 16 / 9;
   }
 
-  /* Square: 1:1 responsive card */
+  /* Square: 1:1 responsive card filling the vertical budget */
   .reels-snap-item .reel-fullscreen-content.is-square {
-    width: min(calc(100vh - 40px), calc(100% - 300px), 660px);
-    height: min(calc(100vh - 40px), calc(100% - 300px), 660px);
-    max-width: calc(100% - 300px);
+    width: min(calc(100dvh - 24px), calc(100% - 32px));
+    height: min(calc(100vh - 24px), calc(100% - 32px));
+    max-width: calc(100% - 32px);
     aspect-ratio: 1 / 1;
   }
 
-  /* On desktop, hide in-video floating overlays since they are in the side rail and exterior rail,
-     but keep the floating repost badge visible at the bottom-left of the video */
+  /* On desktop, hide in-video floating overlays while the comment side rail is open
+     — author, caption and audio live in the rail (and engagement lives in the
+     fixed tools column). Keep the floating repost badge visible at the bottom-left. */
   .reels-snap-item .reel-fullscreen-content .reel-actions-stack,
-  .reels-snap-item .reel-fullscreen-content .reel-scrim-top,
-  .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-creator-row,
-  .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-caption-wrap,
-  .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-audio-wrap {
+  .reels-snap-item .reel-fullscreen-content .reel-scrim-top {
     display: none !important;
   }
 
@@ -2375,6 +2383,69 @@ body.reels-active .modal-backdrop {
     background: none !important;
     padding: 0 0 24px 18px !important;
     pointer-events: none;
+  }
+
+  /* Author info lives in the comment rail while the rail is open */
+  .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-creator-row,
+  .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-caption-wrap,
+  .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-audio-wrap {
+    display: none !important;
+  }
+
+  /* Comment rail collapsed -> condensed author scrim appears on the video
+     (TikTok-style). Creator row + 2-line caption + audio pill, soft gradient.
+     Tapping it reopens the rail, so it doubles as a reopen affordance. */
+  .reel-player-layout.rail-collapsed .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.38) 55%, rgba(0, 0, 0, 0.08) 85%, transparent 100%) !important;
+    padding: 48px 20px 18px 18px !important;
+  }
+
+  .reel-player-layout.rail-collapsed .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-creator-row {
+    display: flex !important;
+  }
+
+  .reel-player-layout.rail-collapsed .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-caption-wrap {
+    display: block !important;
+    max-width: 62%;
+  }
+
+  .reel-player-layout.rail-collapsed .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-audio-wrap {
+    display: flex !important;
+  }
+
+  /* Allow clicks through the scrim gradient but keep links/buttons tappable */
+  .reel-player-layout.rail-collapsed .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom > * {
+    pointer-events: auto;
+  }
+
+  /* Idle doze: furniture whispers after ~4.5s with no input while a reel plays.
+     Video, card and comment rail are never hidden — only the furniture dims. */
+  .reel-desktop-tools {
+    transition: opacity 0.45s ease;
+  }
+
+  .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom {
+    transition: opacity 0.45s ease;
+  }
+
+  .reel-player-layout.is-dozing .reel-desktop-tools {
+    opacity: 0.25;
+  }
+
+  /* Top chrome joins the whisper set: during doze only the video really remains.
+     Opacity does not affect hit-testing, so both stay instantly clickable.
+     NOTE: the close button is a sibling of .reel-player-layout (children of the
+     modal), hence the :has() bridge. */
+  .fullscreen-reels-modal:has(.reel-player-layout.is-dozing) .close-fs-reels-btn {
+    opacity: 0.25;
+  }
+
+  .reel-player-layout.is-dozing .reel-comment-rail-toggle-wrapper {
+    opacity: 0.25;
+  }
+
+  .reel-player-layout.is-dozing .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom {
+    opacity: 0.25;
   }
 
   .reels-snap-item .reel-fullscreen-content .reel-scrim-bottom .reel-fullscreen-repost-badge:not(.d-none) {
@@ -2394,24 +2465,318 @@ body.reels-active .modal-backdrop {
   z-index: 1;
 }
 
-/* Desktop Exterior Engagement Rail (Outside Video Container on the Right) */
-.reel-desktop-actions-rail {
+/* Desktop Fixed Tools Column — engagement stack + up/down nav, anchored once
+   to the stage's right end. NEVER repositions: only the video card resizes
+   around it (stage reserves a 104px strip for this column). */
+.reel-desktop-tools {
   position: absolute;
-  left: calc(50% + 280px);
+  right: 24px;
   top: 50%;
   transform: translateY(-50%);
-  flex-direction: column;
-  gap: 18px;
   z-index: 10720;
+  flex-direction: column;
   align-items: center;
-  pointer-events: none;
-  opacity: 0;
-  transition: left 0.15s ease, opacity 0.15s ease;
+  gap: 18px;
 }
 
-.reel-desktop-actions-rail.is-positioned {
-  opacity: 1;
+.reel-desktop-actions-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+/* One-time immersive tip toast: teaches the rail-collapse affordance.
+   Desktop only (created exclusively in >=992px flow). */
+.reel-immersive-tip {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translate(-50%, 10px);
+  z-index: 10740;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--card-border, #e4e6eb);
+  color: var(--text-primary, #050505);
+  padding: 9px 10px 9px 16px;
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  font-size: 0.82rem;
   pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+}
+
+.reel-immersive-tip i {
+  color: var(--text-secondary, #65676b);
+  font-size: 1rem;
+}
+
+.reel-immersive-tip.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%);
+}
+
+.reel-immersive-tip .reel-immersive-tip-cta {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   Rail comments skeleton — quiet shimmering bones instead of the loud purple
+   spinner + "Loading comments..." text. Never blocks perceived speed: it paints
+   instantly and is torn down by the loader's display toggling (#fsRailCommentsLoading).
+   ========================================================================== */
+.rail-comments-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 14px 4px;
+}
+
+.rail-sk-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* The loader toggles display:block inline, which would drop the parent's flex
+   gap — margins keep the rhythm in either mode. */
+.rail-sk-item + .rail-sk-item {
+  margin-top: 18px;
+}
+
+.rail-sk-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex: 0 0 30px;
+}
+
+.rail-sk-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-top: 4px;
+}
+
+.rail-sk-line {
+  height: 9px;
+  border-radius: 5px;
+}
+
+.sk-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(128, 138, 158, 0.14) 25%,
+    rgba(128, 138, 158, 0.30) 37%,
+    rgba(128, 138, 158, 0.14) 63%
+  );
+  background-size: 400% 100%;
+  animation: railCommentsShimmer 1.4s ease infinite;
+}
+
+[data-theme="dark"] .sk-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.13) 37%,
+    rgba(255, 255, 255, 0.06) 63%
+  );
+  background-size: 400% 100%;
+}
+
+@keyframes railCommentsShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-shimmer { animation: none; }
+}
+
+/* ============================================================================
+   Reel crossfade — 200ms opacity settle on every active-reel hand-off (the
+   is-entering class is toggled by updateThreeSlotWindow). Hides the black
+   flash while a slow CDN/HLS source spins up.
+   ========================================================================== */
+@keyframes reelCardEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.reels-snap-item.is-entering .reel-fullscreen-content {
+  animation: reelCardEnter 200ms ease-out;
+}
+
+/* ============================================================================
+   Keyboard education — first-run coach card + "?" shortcuts panel.
+   Both float over the stage, share the floating-rail card language
+   (card bg, 1px ring, soft shadow) and never block the video.
+   ========================================================================== */
+.reel-kb-help-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.reel-kb-help-btn:hover,
+.reel-kb-help-btn.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  opacity: 1;
+}
+
+[data-theme="dark"] .reel-kb-help-btn {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.reel-kb-coach,
+.reel-kb-panel {
+  position: absolute;
+  z-index: 10745;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--card-border, #e4e6eb);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 3px 12px rgba(0, 0, 0, 0.25);
+  color: var(--text-primary, #050505);
+}
+
+/* Coach card — bottom-center of the stage, above the progress line */
+.reel-kb-coach {
+  bottom: 96px;
+  left: 50%;
+  transform: translate(-50%, 12px);
+  min-width: 264px;
+  max-width: 320px;
+  padding: 14px 16px 15px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+}
+
+.reel-kb-coach.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.reel-kb-coach-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 11px;
+  padding-right: 22px;
+}
+
+.reel-kb-coach-title i {
+  color: var(--text-secondary, #65676b);
+  font-size: 1rem;
+}
+
+.reel-kb-coach-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary, #65676b);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+}
+
+.reel-kb-coach-close:hover {
+  background: rgba(128, 138, 158, 0.14);
+  color: var(--text-primary, #050505);
+}
+
+/* "?" panel — floats just left of the tools column, vertically centered */
+.reel-kb-panel {
+  right: 84px;
+  top: 50%;
+  transform: translateY(-50%) translateX(10px);
+  padding: 14px 16px;
+  min-width: 252px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+}
+
+.reel-kb-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(-50%) translateX(0);
+}
+
+.reel-kb-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.reel-kb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+
+.reel-kb-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-primary, #050505);
+  background: rgba(128, 138, 158, 0.14);
+  border: 1px solid var(--card-border, #e4e6eb);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 3px 8px;
+  min-width: 40px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.reel-kb-desc {
+  color: var(--text-primary, #050505);
+}
+
+[data-theme="dark"] .reel-kb-key {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-kb-coach,
+  .reel-kb-panel {
+    transition: opacity 0.01s linear, visibility 0.01s linear;
+  }
 }
 
 .reel-desktop-action-unit {
@@ -2476,15 +2841,28 @@ body.reels-active .modal-backdrop {
   color: var(--text-secondary, #b0b3b8);
 }
 
-/* Desktop Up/Down Navigation Group (Docked near the comment rail) */
+/* Desktop Up/Down Navigation Group (stacked inside the fixed tools column,
+   divided from the engagement stack by a hairline) */
 .reel-desktop-nav-group {
-  position: absolute;
-  right: 28px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: relative;
   flex-direction: column;
   gap: 14px;
-  z-index: 10720;
+  padding-top: 16px;
+}
+
+.reel-desktop-nav-group::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 1px;
+  background: var(--border, #e2e8f0);
+}
+
+[data-theme="dark"] .reel-desktop-nav-group::before {
+  background: var(--card-border, #3a3b3c);
 }
 
 .reel-desktop-nav-group .reel-nav-btn {
@@ -2532,23 +2910,31 @@ body.reels-active .modal-backdrop {
     width: clamp(340px, 31vw, 440px);
     min-width: 320px;
     max-width: 440px;
-    height: 100vh;
-    height: 100dvh;
+    /* Floating rail: shares the video card's exact frame — height 100dvh - 24px,
+       12px breathing room on top/bottom AND right, matching corner radius and a
+       full-ring shadow — so it hovers like the card instead of walling the edge. */
+    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
+    margin: 12px 12px 12px 0;
+    align-self: center;
     background: var(--card-bg, #ffffff);
-    border-left: 1px solid var(--card-border, #e4e6eb);
+    border: 1px solid var(--card-border, #e4e6eb);
+    border-radius: 16px;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     z-index: 10730;
     color: var(--text-primary, #050505);
-    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.06);
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.16), 0 2px 10px rgba(0, 0, 0, 0.08);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, margin 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .reel-desktop-side-rail.rail-collapsed {
     width: 0 !important;
     min-width: 0 !important;
     max-width: 0 !important;
-    border-left: none !important;
+    border: none !important;
+    margin-right: 0 !important;
     box-shadow: none !important;
     overflow: hidden !important;
     pointer-events: none !important;
@@ -2561,7 +2947,7 @@ body.reels-active .modal-backdrop {
     background: var(--card-bg, #242526);
     border-color: var(--card-border, #3a3b3c);
     color: var(--text-primary, #e4e6eb);
-    box-shadow: -10px 0 35px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 3px 12px rgba(0, 0, 0, 0.4);
   }
 
   .reel-rail-header {
@@ -2666,6 +3052,7 @@ body.reels-active .modal-backdrop {
   z-index: 10725;
   pointer-events: none;
   display: none !important;
+  transition: opacity 0.45s ease;
 }
 
 .reel-comment-rail-toggle-wrapper .reel-collapse-toggle-btn {

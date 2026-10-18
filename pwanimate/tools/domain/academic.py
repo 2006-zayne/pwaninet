@@ -219,3 +219,133 @@ class AcademicLookupTool(BaseDomainTool):
             query=query,
             entity_type=entity_type,
         )
+
+
+class StudentTimetableTool(BaseDomainTool):
+    """
+    Look up current student cohort weekly timetable, lectures for a day,
+    or free study slots for revision planning.
+    """
+    name = "student_timetable"
+    description = (
+        "Look up the student's cohort lecture timetable, today's classes, "
+        "or computed free slots for study revision and schedule planning."
+    )
+    parameters_schema = {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["get_today_schedule", "get_weekly_schedule", "find_free_slots", "get_classes_on_day"],
+                "description": "The timetable operation to perform (default: get_today_schedule)",
+                "default": "get_today_schedule",
+            },
+            "day": {
+                "type": "string",
+                "description": "Specific day of the week (e.g. 'Monday', 'Friday')",
+            },
+        },
+        "required": [],
+    }
+
+    def execute(
+        self,
+        user: Any,
+        action: str = "get_today_schedule",
+        day: Optional[str] = None,
+        **kwargs,
+    ) -> ToolResult:
+        if not user or not getattr(user, "is_authenticated", False):
+            return ToolResult.error("Authentication required to view student cohort timetable.")
+
+        programme = getattr(user, "programme", None)
+        academic_level = getattr(user, "academic_level", None)
+
+        if not programme or not academic_level:
+            return ToolResult.error(
+                "Your academic programme or level is not yet set. "
+                "Please configure them in your Academic Dashboard."
+            )
+
+        try:
+            from documents.academic.timetable_service import ProgrammeTimetableManager
+            from documents.academic.models import Institution
+            from datetime import datetime
+
+            inst = getattr(user, "institution", None) or Institution.objects.filter(is_active=True).first()
+            timetable = ProgrammeTimetableManager.get_active_timetable(
+                institution=inst,
+                programme=programme,
+                academic_level=academic_level,
+                semester=getattr(user, "semester", None),
+            )
+
+            if not timetable or not timetable.schedule_data:
+                return ToolResult.ok({
+                    "has_timetable": False,
+                    "message": f"No active timetable found for {programme.code} ({academic_level.name}).",
+                    "programme": programme.code,
+                    "academic_level": academic_level.name,
+                })
+
+            sched_data = timetable.schedule_data
+            weekly_schedule = sched_data.get("weekly_schedule", [])
+            free_slots = sched_data.get("free_slots", [])
+
+            action = (action or "get_today_schedule").lower().strip()
+
+            if action == "get_today_schedule":
+                today_name = datetime.now().strftime("%A")
+                today_classes = [s for s in weekly_schedule if s.get("day", "").lower() == today_name.lower()]
+                today_free = [f for f in free_slots if f.get("day", "").lower() == today_name.lower()]
+
+                return ToolResult.ok({
+                    "has_timetable": True,
+                    "day": today_name,
+                    "classes_count": len(today_classes),
+                    "classes": today_classes,
+                    "free_slots": today_free,
+                    "revision_number": timetable.revision_number,
+                })
+
+            elif action == "get_classes_on_day":
+                target_day = (day or datetime.now().strftime("%A")).capitalize()
+                day_classes = [s for s in weekly_schedule if s.get("day", "").lower() == target_day.lower()]
+                day_free = [f for f in free_slots if f.get("day", "").lower() == target_day.lower()]
+
+                return ToolResult.ok({
+                    "has_timetable": True,
+                    "day": target_day,
+                    "classes_count": len(day_classes),
+                    "classes": day_classes,
+                    "free_slots": day_free,
+                })
+
+            elif action == "find_free_slots":
+                if day:
+                    target_day = day.capitalize()
+                    matched_free = [f for f in free_slots if f.get("day", "").lower() == target_day.lower()]
+                else:
+                    target_day = "All Week"
+                    matched_free = free_slots
+
+                return ToolResult.ok({
+                    "has_timetable": True,
+                    "day": target_day,
+                    "free_slots_count": len(matched_free),
+                    "free_slots": matched_free,
+                })
+
+            else:  # get_weekly_schedule
+                return ToolResult.ok({
+                    "has_timetable": True,
+                    "programme": programme.code,
+                    "academic_level": academic_level.name,
+                    "revision_number": timetable.revision_number,
+                    "weekly_schedule": weekly_schedule,
+                    "free_slots": free_slots,
+                })
+
+        except Exception as exc:
+            return ToolResult.error(f"Error retrieving timetable: {str(exc)}")
+

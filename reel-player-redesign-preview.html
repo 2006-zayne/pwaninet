@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reel Player Redesign — Current vs Proposed (with buttons)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0b0d12;
+    color: #e7eaf0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 28px 32px 48px;
+  }
+  h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+  .sub { color: #8a92a6; font-size: 0.85rem; margin-top: 4px; }
+
+  .mode-toggle {
+    display: inline-flex; gap: 4px; margin: 18px 0 10px;
+    background: #161a23; border: 1px solid #242a38; border-radius: 10px; padding: 4px;
+  }
+  .mode-toggle button {
+    border: 0; background: transparent; color: #8a92a6; font: inherit; font-size: 0.8rem;
+    padding: 7px 16px; border-radius: 7px; cursor: pointer; transition: 0.15s;
+  }
+  .mode-toggle button.active { background: #2e3546; color: #fff; }
+
+  .viewport-wrap { display: flex; gap: 28px; flex-wrap: wrap; }
+  .vp-card {
+    flex: 1 1 640px;
+    min-width: 560px;
+    background: #131722; border: 1px solid #242a38; border-radius: 16px; padding: 20px;
+  }
+  .vp-card h2 { font-size: 0.95rem; margin-bottom: 2px; }
+  .tag {
+    display: inline-block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 3px 9px; border-radius: 999px; margin: 6px 0 10px;
+  }
+  .tag.cur { background: #3a2430; color: #ff8fa3; }
+  .tag.new { background: #17323a; color: #57d9c7; }
+  .vp-card p { font-size: 0.78rem; color: #8a92a6; line-height: 1.5; margin-bottom: 14px; }
+
+  .vp-frame {
+    width: 100%;
+    aspect-ratio: 1440 / 900;
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #f8fafc;
+    outline: 1px solid #2a3142;
+  }
+
+  /* fixed 1440x900 mock screen, scaled to fill the frame by JS */
+  .vp-inner {
+    position: absolute; top: 0; left: 0; width: 1440px; height: 900px;
+    transform-origin: top left;
+    display: flex; flex-direction: row;
+  }
+
+  .stage {
+    flex: 1 1 0%;
+    min-width: 0;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    background: #f8fafc;
+  }
+  .rail {
+    width: 380px; flex: 0 0 380px;   /* clamp(340, 31vw, 440) @1440 = 446 ≈ use 380 for clarity */
+    background: #ffffff; border-left: 1px solid #e2e8f0;
+    padding: 22px 20px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .rail .bar { height: 10px; border-radius: 5px; background: #e5e9f0; }
+  .rail .bar.w60 { width: 60%; }
+  .rail .bar.w40 { width: 40%; }
+  .rail .profile { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .rail .avatar { width: 36px; height: 36px; border-radius: 50%; background: #dfe5ee; flex: 0 0 36px; }
+  .rail .cols { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+
+  .video-card {
+    position: relative;
+    background: #000; border-radius: 16px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.16), 0 2px 10px rgba(0,0,0,0.08);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .video-card .vfill {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    color: #6b7280; font-size: 24px; letter-spacing: 0.2em;
+    background: linear-gradient(135deg, #1f2430 0%, #3a4254 55%, #1f2430 100%);
+  }
+
+  /* ===== CURRENT SIZES @1440x900 mock (100dvh=900 → 100dvh-40 = 860) ===== */
+  .cur-portrait { height: 860px; width: 488px; max-width: 520px; aspect-ratio: 9/16; }
+  .cur-landscape { width: 860px; height: auto; aspect-ratio: 16/9; }
+  .cur-square { width: 660px; height: 660px; aspect-ratio: 1/1; }
+
+  /* ===== PROPOSED SIZES (900 - 24 = 876 vertical budget; stage 1060 − 104 strip = 956 card zone) ===== */
+  .new-portrait { height: 876px; width: 493px; aspect-ratio: 9/16; }
+  .new-landscape { height: 876px; width: 924px; aspect-ratio: 16/9; }  /* min(956 - 32 gutter, 1557) */
+  .new-square { height: 876px; width: 876px; aspect-ratio: 1/1; }
+
+  /* padding guides */
+  .pad-guide { position: absolute; inset: 0; pointer-events: none; }
+  .pad-guide .top, .pad-guide .bottom {
+    position: absolute; left: 0; right: 0;
+    background: repeating-linear-gradient(45deg, rgba(255,99,132,.14) 0 10px, rgba(255,99,132,.05) 10px 20px);
+  }
+  .pad-guide .top { top: 0; height: var(--guide-pad, 20px); border-bottom: 1px dashed rgba(255,99,132,.55); }
+  .pad-guide .bottom { bottom: 0; height: var(--guide-pad, 20px); border-top: 1px dashed rgba(255,99,132,.55); }
+  .pad-guide .lbl {
+    position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: #ff6384; font-weight: 600;
+  }
+  .pad-guide .lbl.b { top: auto; bottom: 2px; }
+
+  .close-btn-mock {
+    position: absolute; top: 20px; left: 24px; width: 40px; height: 40px;
+    border-radius: 50%; background: #fff; border: 1px solid #e4e6eb;
+    display: flex; align-items: center; justify-content: center; color: #333; font-size: 18px;
+    z-index: 6;
+  }
+
+  .dim-note {
+    position: absolute; z-index: 6; top: 8px; right: 8px;
+    background: rgba(10,12,18,0.85); color: #ff9db1; font-size: 12px;
+    font-family: ui-monospace, monospace; padding: 6px 10px; border-radius: 8px;
+  }
+  .dim-note.new { color: #7ee7d4; }
+
+  /* ===== MOCK BUTTONS ===== */
+  .mbtn {
+    width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px; z-index: 4;
+  }
+  .mgrp { position: absolute; z-index: 5; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  .mgrp .mlabel { font-size: 11px; font-family: ui-monospace, monospace; color: #9aa3b5; background: rgba(10,12,18,.7); padding: 2px 6px; border-radius: 5px; white-space: nowrap; }
+
+  /* Current: floating exterior rail (light chip buttons) + docked arrows at stage right */
+  .chip { background: #ffffff; border: 1px solid #e4e6eb; box-shadow: 0 2px 8px rgba(0,0,0,.08); color: #050505; }
+  .cur-actions { left: var(--ax, 0px); top: 50%; transform: translateY(-50%); }
+  .cur-nav { right: 28px; top: 50%; transform: translateY(-50%); gap: 14px; }
+  .cur-nav::after {
+    content: ""; position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+    width: 1px; height: 30px; background: #c9d0dc;
+  }
+  .cur-nav.co-above::after { top: 100%; }
+  .cur-nav.co-below::after { top: auto; bottom: 100%; }
+
+  /* Proposed: FIXED exterior column at the stage right end — never moves, only the card resizes around it */
+  .glass { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.28); color: #fff; backdrop-filter: blur(6px); }
+  .fixed-rail { right: 24px; top: 50%; transform: translateY(-50%); gap: 14px; }
+  .fixed-rail .divider { width: 1px; height: 26px; background: rgba(120,132,155,0.45); margin: 2px 0; }
+  /* reserved strip the buttons live in */
+  .stage.pr { padding-right: 104px; }
+  .btnzone {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 104px; z-index: 1; pointer-events: none;
+    background: repeating-linear-gradient(45deg, rgba(87,217,199,.10) 0 10px, transparent 10px 20px);
+    border-left: 1px dashed rgba(87,217,199,.5);
+  }
+  .btnzone .zl {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(90deg);
+    font-size: 11px; font-family: ui-monospace, monospace; color: #57d9c7; white-space: nowrap;
+  }
+
+  /* size comparison table */
+  table.compare { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 8px; }
+  table.compare th, table.compare td { padding: 8px 10px; border-bottom: 1px solid #232937; text-align: left; }
+  table.compare th { color: #8a92a6; font-weight: 600; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.06em; }
+  table.compare td.num { font-family: ui-monospace, monospace; }
+  td.gain { color: #57d9c7; font-weight: 600; }
+
+  .legend {
+    display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.75rem; color: #8a92a6; margin: 14px 0 6px;
+  }
+  .legend .k { display: inline-flex; align-items: center; gap: 7px; }
+  .legend .sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+</style>
+</head>
+<body>
+  <h1>Fullscreen Reel Player — Desktop Redesign Preview</h1>
+  <div class="sub">Simulated 1440×900 desktop · 380px side rail · mock buttons show engagement (♥ 💬 ↗ 🔖, ⤴ ⤵) and scroll (▲ ▼) placement</div>
+
+  <div class="mode-toggle" id="toggle">
+    <button data-mode="light" class="active">Light theme</button>
+    <button data-mode="dark">Dark theme</button>
+  </div>
+
+  <div class="legend">
+    <span class="k"><span class="sw" style="background:#fff;border:1px solid #e4e6eb"></span>Current: JS-repositioned floats</span>
+    <span class="k"><span class="sw" style="background:repeating-linear-gradient(45deg,rgba(87,217,199,.25) 0 4px,transparent 4px 8px)"></span>Proposed: FIXED exterior strip (teal hatch)</span>
+    <span class="k"><span class="sw" style="background:repeating-linear-gradient(45deg,rgba(255,99,132,.4) 0 4px,transparent 4px 8px)"></span>Padding zones</span>
+  </div>
+
+  <div class="viewport-wrap">
+
+    <!-- ============ CURRENT ============ -->
+    <div class="vp-card">
+      <span class="tag cur">Current</span>
+      <h2>Today's layout — exterior floating buttons</h2>
+      <p>JS measures the card and floats the engagement rail 16px right of it (<code style="color:#ff8fa1">left: cardRight + 16</code>, clamped to <code>stage − 76px</code>). Arrows dock at stage right. On bigger cards the two collide — that's why the clamp exists.</p>
+
+      <!-- CURRENT LANDSCAPE -->
+      <div class="vp-frame">
+        <div class="vp-inner">
+          <div class="stage">
+            <div class="video-card cur-landscape"><div class="vfill">16 : 9</div></div>
+            <div class="mgrp cur-actions" style="--ax: 462px">
+              <div class="mbtn chip">♥</div><div class="mbtn chip">💬</div><div class="mbtn chip">↗</div><div class="mbtn chip">🔖</div>
+              <div class="mlabel">JS-repositioned</div>
+            </div>
+            <div class="mgrp cur-nav co-above">
+              <div class="mbtn chip">▲</div><div class="mbtn chip">▼</div>
+              <div class="mlabel">dock 28px</div>
+            </div>
+            <div class="dim-note">860 × 484</div>
+          </div>
+          <div class="rail">
+            <div class="profile"><div class="avatar"></div><div class="cols"><div class="bar w60"></div><div class="bar w40"></div></div></div>
+            <div class="bar"></div><div class="bar w60"></div><div class="bar"></div><div class="bar w40"></div><div class="bar w60"></div>
+          </div>
+          <div class="close-btn-mock">✕</div>
+          <div class="pad-guide" style="--guide-pad: 20px">
+            <div class="top"><span class="lbl">20px pad</span></div>
+            <div class="bottom"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CURRENT PORTRAIT -->
+      <div class="vp-frame" style="margin-top:16px">
+        <div class="vp-inner">
+          <div class="stage">
+            <div class="video-card cur-portrait"><div class="vfill">9 : 16</div></div>
+            <div class="mgrp cur-actions" style="--ax: 276px">
+              <div class="mbtn chip">♥</div><div class="mbtn chip">💬</div><div class="mbtn chip">↗</div><div class="mbtn chip">🔖</div>
+              <div class="mlabel">JS-repositioned</div>
+            </div>
+            <div class="mgrp cur-nav co-below">
+              <div class="mbtn chip">▲</div><div class="mbtn chip">▼</div>
+              <div class="mlabel">dock 28px</div>
+            </div>
+            <div class="dim-note">488 × 860</div>
+          </div>
+          <div class="rail">
+            <div class="profile"><div class="avatar"></div><div class="cols"><div class="bar w60"></div><div class="bar w40"></div></div></div>
+            <div class="bar"></div><div class="bar w60"></div><div class="bar"></div><div class="bar w40"></div><div class="bar w60"></div>
+          </div>
+          <div class="close-btn-mock">✕</div>
+          <div class="pad-guide" style="--guide-pad: 20px">
+            <div class="top"><span class="lbl">20px pad</span></div>
+            <div class="bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PROPOSED ============ -->
+    <div class="vp-card">
+      <span class="tag new">Proposed</span>
+      <h2>"Fill the stage" — buttons FIXED exterior, card resizes around them</h2>
+      <p>12px top/bottom padding only. The stage reserves a <code style="color:#57d9c7">104px</code> strip on its right end — engagement stack + arrows live there, <b>anchored once, never moving</b> across portrait / landscape / 1:1. The card centers in the remaining video area, so it shifts with orientation while the buttons stay put. No JS positioning — pure CSS <code>right</code> anchoring.</p>
+
+      <!-- PROPOSED LANDSCAPE -->
+      <div class="vp-frame">
+        <div class="vp-inner">
+          <div class="stage pr">
+            <div class="btnzone"><span class="zl">reserved 104px</span></div>
+            <div class="video-card new-landscape"><div class="vfill">16 : 9</div></div>
+            <div class="mgrp fixed-rail">
+              <div class="mbtn chip">♥</div><div class="mbtn chip">💬</div><div class="mbtn chip">↗</div><div class="mbtn chip">🔖</div>
+              <div class="divider"></div>
+              <div class="mbtn chip">▲</div><div class="mbtn chip">▼</div>
+              <div class="mlabel">FIXED · never moves</div>
+            </div>
+            <div class="dim-note new">924 × 876</div>
+          </div>
+          <div class="rail">
+            <div class="profile"><div class="avatar"></div><div class="cols"><div class="bar w60"></div><div class="bar w40"></div></div></div>
+            <div class="bar"></div><div class="bar w60"></div><div class="bar"></div><div class="bar w40"></div><div class="bar w60"></div>
+          </div>
+          <div class="close-btn-mock">✕</div>
+          <div class="pad-guide" style="--guide-pad: 12px">
+            <div class="top"><span class="lbl">12px pad</span></div>
+            <div class="bottom"><span class="lbl b">12px pad</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROPOSED PORTRAIT (buttons in the SAME spot) -->
+      <div class="vp-frame" style="margin-top:16px">
+        <div class="vp-inner">
+          <div class="stage pr">
+            <div class="btnzone"><span class="zl">reserved 104px</span></div>
+            <div class="video-card new-portrait"><div class="vfill">9 : 16</div></div>
+            <div class="mgrp fixed-rail">
+              <div class="mbtn chip">♥</div><div class="mbtn chip">💬</div><div class="mbtn chip">↗</div><div class="mbtn chip">🔖</div>
+              <div class="divider"></div>
+              <div class="mbtn chip">▲</div><div class="mbtn chip">▼</div>
+              <div class="mlabel">FIXED · never moves</div>
+            </div>
+            <div class="dim-note new">493 × 876</div>
+          </div>
+          <div class="rail">
+            <div class="profile"><div class="avatar"></div><div class="cols"><div class="bar w60"></div><div class="bar w40"></div></div></div>
+            <div class="bar"></div><div class="bar w60"></div><div class="bar"></div><div class="bar w40"></div><div class="bar w60"></div>
+          </div>
+          <div class="close-btn-mock">✕</div>
+          <div class="pad-guide" style="--guide-pad: 12px">
+            <div class="top"><span class="lbl">12px pad</span></div>
+            <div class="bottom"><span class="lbl b">12px pad</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h1 style="margin-top:36px; font-size:1.1rem">Size math @ 1440×900 (380px rail → 1060px stage, 104px button strip → 956px card zone)</h1>
+  <table class="compare">
+    <tr><th>Orientation</th><th>Current</th><th>Proposed</th><th>Gain</th></tr>
+    <tr><td>Portrait 9:16</td><td class="num">488 × 860 = 419,680 px²</td><td class="num">493 × 876 = 431,868 px²</td><td class="gain">+3%</td></tr>
+    <tr><td>Landscape 16:9</td><td class="num">860 × 484 = 416,183 px²</td><td class="num">924 × 876 = 809,424 px²</td><td class="gain">+94%</td></tr>
+    <tr><td>Square 1:1</td><td class="num">660 × 660 = 435,600 px²</td><td class="num">876 × 876 = 767,376 px²</td><td class="gain">+76%</td></tr>
+  </table>
+
+  <h2 style="margin-top:28px; font-size:1rem">Button placement notes</h2>
+  <ul class="sub" style="line-height:1.8; margin-top:8px; padding-left:18px">
+    <li><b>Engagement stack (FIXED):</b> replaces the JS-measured float entirely — one column anchored to the stage's right end (<code>right: 24px</code>), vertically centered. Identical pixel position in portrait, landscape, and 1:1; only the card resizes around it. <code>repositionDesktopActionsRail()</code> and its live re-measure calls get deleted.</li>
+    <li><b>_reserved strip:</b> stage gets <code>padding-right: 104px</code> (24px edge + 48px button + 32px breathing room) — card sizing formulas compute against the padded zone, so the landscape card can never collide with the column at any viewport size.</li>
+    <li><b>Up/Down arrows:</b> same fixed column, below a hairline divider — no more separate dock, no more clamp math.</li>
+    <li><b>In-video overlay hides</b> (postcard.css 2365–2371) stay as-is — nothing moves inside the card anymore.</li>
+  </ul>
+
+<script>
+  // scale 1440x900 mock canvas into each frame
+  function fitAll() {
+    document.querySelectorAll('.vp-frame').forEach(frame => {
+      const inner = frame.querySelector('.vp-inner');
+      if (!inner) return;
+      const s = frame.clientWidth / 1440;
+      inner.style.transform = 'scale(' + s + ')';
+    });
+  }
+  window.addEventListener('resize', fitAll);
+  document.getElementById('toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    document.querySelectorAll('#toggle button').forEach(b => b.classList.toggle('active', b === btn));
+    document.body.style.filter = btn.dataset.mode === 'dark' ? 'none' : 'none';
+  });
+  fitAll();
+</script>
+</body>
+</html>

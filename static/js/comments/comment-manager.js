@@ -905,11 +905,14 @@ const CommentManager = {
    * Handle like update via WebSocket
    */
   handleLikeUpdate(data) {
-    const button = document.querySelector(`[data-action="like"][data-comment-id="${data.comment_id}"]`);
-    if (!button) return;
-    
-    const countSpan = button.querySelector('span');
-    countSpan.textContent = data.likes_count;
+    // Update ALL comment-like buttons for this comment — the same comment
+    // can be rendered in multiple places (sheet, thread, detail page).
+    document.querySelectorAll(`[data-action="like"][data-comment-id="${data.comment_id}"]`).forEach(button => {
+      const countSpan = button.querySelector('span');
+      if (countSpan && data.likes_count !== undefined) {
+        countSpan.textContent = data.likes_count;
+      }
+    });
   }
 };
 

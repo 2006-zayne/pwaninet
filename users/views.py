@@ -18,6 +18,7 @@ from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
 from users.models import User, Follow, DeviceAccount, Pinch, UserSession, Block, HiddenAuthor, PrivacyLevel, PRIVACY_CHOICES, HeroShowcaseSet
+from users.models import TrustedDevice, BlockedDevice, DeviceVerificationEvent, DeviceVerificationStatus
 from posts.models import Post, Like, Repost
 from users.forms import PwaniSignupForm, PwaniAuthenticationForm, ProfileUpdateForm
 from django.contrib import messages
@@ -663,14 +664,15 @@ def load_semesters(request):
 def load_programmes_by_institution(request):
     """HTMX endpoint returning programme <option>s scoped to an institution.
 
-    Institution scope is derived via
-    Programme → Department → School → Faculty → Institution.
+    Institution scope is derived via Programme → Department → School (→ Faculty) → Institution.
     Unknown or inactive institutions yield an empty list (never an error page
     for HTMX swaps, never unscoped data).
     """
     from documents.academic.models import Institution, Programme
+    from django.db.models import Q
 
     institution_id = request.GET.get('institution_id') or request.GET.get('institution')
+    selected_programme_id = request.GET.get('selected_programme_id') or request.GET.get('programme')
     institution = None
     programmes = Programme.objects.none()
     if institution_id:
@@ -681,12 +683,15 @@ def load_programmes_by_institution(request):
             institution = None
         if institution is not None:
             programmes = Programme.objects.filter(
-                is_active=True,
-                department__school__faculty__institution=institution,
-            ).order_by('name')
+                is_active=True
+            ).filter(
+                Q(department__school__institution=institution) |
+                Q(department__school__faculty__institution=institution)
+            ).distinct().order_by('name')
     return render(request, 'users/partials/programme_options.html', {
         'programmes': programmes,
         'institution': institution,
+        'selected_programme_id': selected_programme_id,
     })
 
 
@@ -750,7 +755,31 @@ def save_institution_setup(request):
             return render(request, 'users/onboarding/partials/step_institution.html', ctx, status=400)
         messages.error(request, "Selected academic combination is invalid. Please review and try again.")
         return redirect('users:onboarding')
-    user.save(update_fields=['institution', 'programme', 'academic_level'])
+    fields_to_update = ['institution', 'programme', 'academic_level']
+    if not user.bio:
+        user.bio = user.generate_smart_bio()
+        fields_to_update.append('bio')
+    
+    if programme:
+        try:
+            from courses.models import Course, Year
+            matching_course = Course.objects.filter(name__iexact=programme.name).first()
+            if matching_course:
+                user.course = matching_course
+                fields_to_update.append('course')
+                if academic_level:
+                    matching_year = Year.objects.filter(course=matching_course, level=academic_level.level).first()
+                    if matching_year:
+                        user.year = matching_year
+                        fields_to_update.append('year')
+        except Exception:
+            pass
+    elif institution_changed and not programme:
+        user.course = None
+        user.year = None
+        fields_to_update.extend(['course', 'year'])
+
+    user.save(update_fields=list(set(fields_to_update)))
 
     if programme_changed or (institution_changed and not programme):
         try:
@@ -1429,14 +1458,6 @@ def profile_view(request, username):
     paginator = Paginator(posts_queryset, posts_per_page)
     posts_page = paginator.get_page(page)
 
-    # Get liked post IDs for the current user
-    liked_post_ids = set()
-    if request.user.is_authenticated:
-        for pid, sid in Like.objects.filter(user=request.user, post__in=posts_page).values_list('post_id', 'post__share_id'):
-            liked_post_ids.add(pid)
-            liked_post_ids.add(sid)
-            liked_post_ids.add(str(sid))
-
     is_following = Follow.objects.filter(follower=request.user, followed=profile_user).exists()
 
     # Get shared posts for this profile user
@@ -1465,6 +1486,25 @@ def profile_view(request, username):
     if is_limited_profile:
         reposted_posts = reposted_posts.none()
     repost_count = reposted_posts.count()
+
+    # Get liked post IDs for the current user.
+    # Must cover EVERY card surface rendered by this context: the Posts tab,
+    # the Reposts tab (their original posts) and the Shared tab (their
+    # original posts). liked_post_ids is treated as authoritative by the
+    # check_is_liked tag — an incomplete set silently renders cards un-liked.
+    liked_post_ids = set()
+    if request.user.is_authenticated:
+        relevant_ids = {p.id for p in posts_page}
+        for rp in reposted_posts:
+            if rp.original_post_id:
+                relevant_ids.add(rp.original_post_id)
+        for sp in shared_posts:
+            if sp.original_post_id:
+                relevant_ids.add(sp.original_post_id)
+        for pid, sid in Like.objects.filter(user=request.user, post_id__in=relevant_ids).values_list('post_id', 'post__share_id'):
+            liked_post_ids.add(pid)
+            liked_post_ids.add(sid)
+            liked_post_ids.add(str(sid))
 
     # Determine if viewing own profile
     is_own_profile = request.user == profile_user
@@ -2020,6 +2060,121 @@ def settings_profile_view(request):
 
 
 @login_required
+def settings_academic_view(request):
+    """Academic institution & programme settings page (full-page & HTMX supported)."""
+    from users.forms import AcademicProfileUpdateForm
+    from documents.academic.models import Institution, Programme
+
+    is_htmx = bool(request.headers.get('HX-Request'))
+
+    if request.method == 'POST':
+        form = AcademicProfileUpdateForm(request.POST, user=request.user)
+        if form.is_valid():
+            try:
+                form.save()
+                messages.success(request, 'Academic details updated successfully.')
+                if is_htmx:
+                    from pwaninet.utils.htmx import htmx_location_response
+                    from django.urls import reverse
+                    return htmx_location_response(reverse('users:settings_academic'))
+                return redirect('users:settings_academic')
+            except Exception as e:
+                messages.error(request, f'Error saving academic details: {str(e)}')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}' if field != '__all__' else str(error))
+    else:
+        form = AcademicProfileUpdateForm(user=request.user)
+
+    institutions = Institution.objects.filter(is_active=True).order_by('name')
+    setup_programmes = Programme.objects.none()
+    if request.user.institution_id:
+        from django.db.models import Q
+        setup_programmes = Programme.objects.filter(
+            is_active=True
+        ).filter(
+            Q(department__school__institution_id=request.user.institution_id) |
+            Q(department__school__faculty__institution_id=request.user.institution_id)
+        ).distinct().order_by('name')
+
+    context = {
+        'form': form,
+        'institutions': institutions,
+        'setup_programmes': setup_programmes,
+    }
+
+    if is_htmx:
+        return render(request, 'users/settings/partials/settings_navigation_partial.html', {
+            'settings_content_partial': 'users/settings/partials/academic_content.html',
+            **context,
+        })
+    return render(request, 'users/settings/academic.html', context)
+
+
+@login_required
+@require_http_methods(["GET", "PATCH", "POST"])
+def api_user_academic_view(request):
+    """REST API endpoint to retrieve or update the authenticated user's academic profile."""
+    from users.forms import AcademicProfileUpdateForm
+    from documents.academic.models import Institution, Programme
+    import json
+
+    user = request.user
+
+    if request.method == "GET":
+        return JsonResponse({
+            'status': 'success',
+            'academic_profile': {
+                'institution': {
+                    'id': user.institution.id,
+                    'name': user.institution.name,
+                    'short_name': user.institution.short_name,
+                    'slug': user.institution.slug,
+                } if user.institution else None,
+                'programme': {
+                    'id': user.programme.id,
+                    'name': user.programme.name,
+                    'code': user.programme.code,
+                } if user.programme else None,
+                'academic_level': {
+                    'id': user.academic_level.id,
+                    'level': user.academic_level.level,
+                    'name': user.academic_level.name,
+                } if user.academic_level else None,
+                'bio': user.bio,
+                'display_bio': user.get_display_bio(),
+            }
+        })
+
+    data = request.POST
+    if not data and request.body:
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+        except Exception:
+            data = {}
+
+    form = AcademicProfileUpdateForm(data, user=user)
+    if form.is_valid():
+        updated_user = form.save()
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Academic profile updated successfully.',
+            'academic_profile': {
+                'institution_id': updated_user.institution_id,
+                'programme_id': updated_user.programme_id,
+                'academic_level_id': updated_user.academic_level_id,
+                'bio': updated_user.bio,
+                'display_bio': updated_user.get_display_bio(),
+            }
+        })
+    return JsonResponse({
+        'status': 'error',
+        'errors': form.errors.get_json_data()
+    }, status=400)
+
+
+@login_required
 @require_http_methods(["POST"])
 def settings_delete_account_view(request):
     """Delete the account and either erase or anonymize its authored content."""
@@ -2513,16 +2668,33 @@ def settings_active_devices_view(request):
         current_session.browser = device_info['browser']
         current_session.os = device_info['os']
 
+    # Phase 1: trusted + blocked device inventory for the devices page
+    trusted_devices = TrustedDevice.objects.filter(user=request.user).order_by('-is_primary', '-trusted_at')
+    blocked_devices = BlockedDevice.objects.filter(user=request.user).order_by('-created_at')
+    device_hash_by_session = {
+        account.session_key: account.device_id
+        for account in DeviceAccount.objects.exclude(session_key='').filter(user=request.user)
+    }
+    trusted_hashes = set(trusted_devices.values_list('device_hash', flat=True))
+
     if request.headers.get('HX-Request'):
         return render(request, 'users/settings/partials/settings_navigation_partial.html', {
             'settings_content_partial': 'users/settings/partials/active_devices_content.html',
             'current_session': current_session,
-            'other_sessions': other_sessions
+            'other_sessions': other_sessions,
+            'trusted_devices': trusted_devices,
+            'blocked_devices': blocked_devices,
+            'device_hash_by_session': device_hash_by_session,
+            'trusted_hashes': trusted_hashes,
         })
 
     return render(request, 'users/settings/active_devices.html', {
         'current_session': current_session,
-        'other_sessions': other_sessions
+        'other_sessions': other_sessions,
+        'trusted_devices': trusted_devices,
+        'blocked_devices': blocked_devices,
+        'device_hash_by_session': device_hash_by_session,
+        'trusted_hashes': trusted_hashes,
     })
 
 
@@ -2755,8 +2927,17 @@ def settings_notifications_view(request):
 @login_required
 @require_http_methods(["POST"])
 def api_sign_out_session(request, session_id):
-    """Sign out a specific session (API endpoint for HTMX)"""
+    """
+    Sign out a specific session (API endpoint for HTMX).
+
+    Optional form field ``block``: when truthy ("1"/"true"), the device
+    fingerprint bound to that session is added to BlockedDevice so it cannot
+    sign into this account again — the "kick out + block device" option.
+    """
     from users.services.session_service import revoke_session
+    from users.services.device_alert_service import (
+        _terminate_session_hard, invalidate_blocked_hash_cache,
+    )
     try:
         session = UserSession.objects.get(id=session_id, user=request.user)
 
@@ -2764,7 +2945,21 @@ def api_sign_out_session(request, session_id):
         if session.session_key == request.session.session_key:
             return JsonResponse({'error': 'Cannot sign out current session'}, status=400)
 
+        want_block = request.POST.get('block') in ('1', 'true', 'True', 'on')
+        if want_block:
+            device_hash = DeviceAccount.objects.filter(
+                user=request.user, session_key=session.session_key
+            ).values_list('device_id', flat=True).first()
+            if device_hash:
+                BlockedDevice.objects.get_or_create(
+                    user=request.user,
+                    device_hash=device_hash,
+                    defaults={'reason': 'user_reported'},
+                )
+                invalidate_blocked_hash_cache(request.user.pk)
+
         revoke_session(session.id, user=request.user)
+        _terminate_session_hard(request.user, session.session_key)
         return HttpResponse('')  # HTMX will remove the element
     except UserSession.DoesNotExist:
         return JsonResponse({'error': 'Session not found'}, status=404)
@@ -2772,12 +2967,50 @@ def api_sign_out_session(request, session_id):
 
 @login_required
 @require_http_methods(["POST"])
+def api_session_alive(request):
+    """
+    Session-guard heartbeat (Phase 1): tells an open tab whether its session
+    is still valid server-side. Covers logouts/reblocks that happen without
+    a websocket available (or while the socket is reconnecting).
+    """
+    from django.contrib.sessions.models import Session
+    from pwaninet.middleware.device_block_middleware import _blocked_hashes_for_user
+
+    claim = request.POST.get('session_key', '')
+    own_key = request.session.session_key or ''
+    if claim and claim != own_key:
+        return JsonResponse({'alive': False, 'reason': 'wrong_session'}, status=200)
+
+    reasons = []
+    if own_key and not Session.objects.filter(session_key=own_key).exists():
+        reasons.append('signed_out')
+
+    blocked_hashes = _blocked_hashes_for_user(request.user.pk)
+    device_hash = DeviceAccount.objects.filter(
+        user=request.user, session_key=own_key
+    ).values_list('device_id', flat=True).first() if own_key else None
+    if device_hash and device_hash in blocked_hashes:
+        reasons.append('device_blocked')
+
+    if reasons:
+        _terminate_session_hard(request.user, own_key)
+        return JsonResponse({'alive': False, 'reason': reasons[0]}, status=200)
+    return JsonResponse({'alive': True}, status=200)
+
+
+@login_required
+@require_http_methods(["POST"])
 def api_sign_out_all_sessions(request):
     """Sign out all other sessions (API endpoint for HTMX)"""
     from users.services.session_service import revoke_other_user_sessions
+    from users.services.device_alert_service import dispatch_force_logout, revoke_session_keys
     current_session_key = request.session.session_key
 
+    revoked_keys = revoke_session_keys(request.user, current_session_key)
+
     revoke_other_user_sessions(request.user, current_session_key)
+
+    dispatch_force_logout(request.user.pk, revoked_keys)
 
     messages.success(request, 'All other devices have been signed out.')
     if request.headers.get('HX-Request'):
@@ -3711,3 +3944,159 @@ def user_online_status_api(request, user_id):
             'user_id': int(user_id),
             'error': str(e)
         }, status=500)
+
+
+# ============================================================================
+# Phase 1: New-device login alerts — verification sheet + respond endpoints
+# ============================================================================
+
+def _acting_device_hash(request):
+    from users.services.device_alert_service import resolve_device_hash
+    return resolve_device_hash(request)
+
+
+def _verification_context(request, verification):
+    """Shared context for the challenge page/sheet states."""
+    from users.services.device_alert_service import event_is_expired
+    acting_hash = _acting_device_hash(request) or ''
+    is_pending = verification.status == DeviceVerificationStatus.PENDING
+    can_act = (
+        is_pending
+        and not event_is_expired(verification)
+        and acting_hash != verification.device_hash
+        and acting_hash != ''
+    )
+    own_device = acting_hash == verification.device_hash
+    if acting_hash == '' and is_pending:
+        # No device identity → safest default: show info, disable actions
+        can_act = False
+    return {
+        'verification': verification,
+        'device_label': verification.device_name or verification.device_type.title(),
+        'location_label': verification.location_label or 'Unknown location',
+        'is_pending': is_pending,
+        'is_expired': verification.status == DeviceVerificationStatus.EXPIRED,
+        'can_act': can_act,
+        'own_device': own_device,
+        'respond_url_approve': reverse('users:api_device_verification_approve', args=[verification.pk]),
+        'respond_url_deny': reverse('users:api_device_verification_deny', args=[verification.pk]),
+        'devices_url': reverse('users:settings_active_devices'),
+        'status': verification.status,
+    }
+
+
+@login_required
+def device_verification_view(request, verification_id):
+    """
+    New-device sign-in alert: opened by tapping the in-app notification card,
+    the FCM/WebPush push popup, or directly from Settings → Devices.
+    HTMX requests get the bottom-sheet partial; direct navigation gets a full
+    page that renders the same sheet centered.
+    """
+    verification = get_object_or_404(
+        DeviceVerificationEvent.objects.select_related('user'),
+        pk=verification_id,
+        user=request.user,
+    )
+    context = _verification_context(request, verification)
+    template = (
+        'users/partials/device_verification_sheet.html'
+        if request.headers.get('HX-Request')
+        else 'users/device_verification.html'
+    )
+    response = render(request, template, context)
+    if not request.headers.get('HX-Request'):
+        response['X-Frame-Options'] = 'DENY'
+    return response
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_device_verification_approve(request, verification_id):
+    """'Yes, it was me' — trust this device. Rejected if sent from the
+    device under verification itself (the attacker must not approve)."""
+    verification = get_object_or_404(
+        DeviceVerificationEvent, pk=verification_id, user=request.user
+    )
+    from users.services import device_alert_service as service
+    if not service._ratelimit_allow(request.user):
+        return JsonResponse({'ok': False, 'error': 'rate_limited'}, status=429)
+    ok, error_code = service.respond(
+        verification,
+        'approve',
+        acting_device_hash=_acting_device_hash(request) or '',
+    )
+    if not ok:
+        return JsonResponse({'ok': False, 'error': error_code}, status=409 if error_code == 'already_handled' else 403)
+    return JsonResponse({'ok': True, 'decision': 'approved', 'status': verification.status})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_device_verification_deny(request, verification_id):
+    """'It wasn't me' — block device; optional nuke escalation."""
+    verification = get_object_or_404(
+        DeviceVerificationEvent, pk=verification_id, user=request.user
+    )
+    from users.services import device_alert_service as service
+    if not service._ratelimit_allow(request.user):
+        return JsonResponse({'ok': False, 'error': 'rate_limited'}, status=429)
+    escalation = 'nuke' if (
+        request.POST.get('escalation') == 'nuke' or request.headers.get('X-Escalation') == 'nuke'
+    ) else 'block'
+    ok, error_code = service.respond(
+        verification,
+        'deny',
+        escalation=escalation,
+        acting_device_hash=_acting_device_hash(request) or '',
+    )
+    if not ok:
+        return JsonResponse({'ok': False, 'error': error_code}, status=409 if error_code == 'already_handled' else 403)
+    return JsonResponse({'ok': True, 'decision': 'blocked', 'escalation': escalation})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_trusted_device_untrust(request, device_id):
+    """Remove trust. Password confirmation required."""
+    trusted = get_object_or_404(TrustedDevice, pk=device_id, user=request.user)
+    password = request.POST.get('password', '')
+    if not request.user.check_password(password):
+        return JsonResponse({'ok': False, 'error': 'bad_password'}, status=403)
+    was_primary = trusted.is_primary
+    trusted_hash = trusted.device_hash
+    trusted.delete()
+    if was_primary:
+        remaining = TrustedDevice.objects.filter(user=request.user).order_by('trusted_at').first()
+        if remaining:
+            remaining.is_primary = True
+            remaining.save(update_fields=['is_primary'])
+
+    # Removed trust, so the events machinery sees it as a fresh device next login
+    from users.services.device_alert_service import invalidate_and_broadcast
+    _ = invalidate_and_broadcast  # no-op helper reference
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_trusted_device_make_primary(request, device_id):
+    trusted = get_object_or_404(TrustedDevice, pk=device_id, user=request.user)
+    TrustedDevice.objects.filter(user=request.user, is_primary=True).exclude(pk=trusted.pk).update(is_primary=False)
+    trusted.is_primary = True
+    trusted.save(update_fields=['is_primary'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_blocked_device_unblock(request, blocked_id):
+    """Unblock a device fingerprint. Password confirmation required."""
+    blocked = get_object_or_404(BlockedDevice, pk=blocked_id, user=request.user)
+    password = request.POST.get('password', '')
+    if not request.user.check_password(password):
+        return JsonResponse({'ok': False, 'error': 'bad_password'}, status=403)
+    blocked.delete()
+    from pwaninet.middleware.device_block_middleware import invalidate_blocked_device_cache
+    invalidate_blocked_device_cache(request.user.pk)
+    return JsonResponse({'ok': True})

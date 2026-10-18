@@ -1064,7 +1064,87 @@ ADMIN_FEEDBACK_SUBMITTED_RULE = NotificationRule(
     }],
 )
 
-# All rules registry
+# ============================================================================
+# Device Security Rules (Phase 1 — new-device login alerts)
+# ============================================================================
+
+SECURITY_DEVICE_LOGIN_NEW_RULE = NotificationRule(
+    name="security_device_login_new",
+    trigger="security.device.login_new",
+    condition=None,
+    notification_type="SECURITY",
+    category="SECURITY",
+    priority="CRITICAL",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="NEVER",
+    recipients=lambda event_data: (
+        [int(event_data['target_user_id'])] if event_data.get('target_user_id') else []
+    ),
+    title_template="New sign-in detected",
+    summary_template="{device_label} · {location_label} · {event_time}",
+    actions=lambda event: [
+        {
+            'action_type': 'ACCEPT',
+            'label': 'Yes, it was me',
+            'url': f"/users/api/security/device-verifications/{event.get('challenge_id')}/approve/",
+            'method': 'POST',
+            'payload': {'decision': 'approve'},
+            'is_primary': True,
+            'order': 0,
+        },
+        {
+            'action_type': 'DECLINE',
+            'label': "It wasn't me",
+            'url': f"/users/api/security/device-verifications/{event.get('challenge_id')}/deny/",
+            'method': 'POST',
+            'payload': {'decision': 'deny'},
+            'is_primary': False,
+            'order': 1,
+        },
+        {
+            'action_type': 'OPEN',
+            'label': 'View details',
+            'url': f"/users/security/device-verifications/{event.get('challenge_id')}/",
+            'method': 'GET',
+            'is_primary': False,
+            'order': 2,
+        },
+    ],
+)
+
+SECURITY_DEVICE_TRUSTED_RULE = NotificationRule(
+    name="security_device_trusted",
+    trigger="security.device.trusted",
+    condition=None,
+    notification_type="SECURITY",
+    category="SECURITY",
+    priority="NORMAL",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="NEVER",
+    recipients=lambda event_data: (
+        [int(event_data['target_user_id'])] if event_data.get('target_user_id') else []
+    ),
+    title_template="Device trusted",
+    summary_template="{device_label} won't trigger sign-in alerts anymore.",
+)
+
+SECURITY_DEVICE_BLOCKED_RULE = NotificationRule(
+    name="security_device_blocked",
+    trigger="security.device.blocked",
+    condition=None,
+    notification_type="SECURITY",
+    category="SECURITY",
+    priority="CRITICAL",
+    delivery_policy="IMMEDIATE",
+    aggregation_policy="NEVER",
+    recipients=lambda event_data: (
+        [int(event_data['target_user_id'])] if event_data.get('target_user_id') else []
+    ),
+    title_template="Device blocked",
+    summary_template="The blocked device was signed out and cannot sign in again.",
+)
+
+# All rules registry (device security rules appended further down)
 RULES_REGISTRY = [
     POST_LIKE_RULE,
     POST_COMMENT_RULE,
@@ -1096,6 +1176,9 @@ RULES_REGISTRY = [
     RELEASE_PUBLISHED_RULE,
     ADMIN_FEEDBACK_REPLY_RULE,
     ADMIN_FEEDBACK_SUBMITTED_RULE,
+    SECURITY_DEVICE_LOGIN_NEW_RULE,
+    SECURITY_DEVICE_TRUSTED_RULE,
+    SECURITY_DEVICE_BLOCKED_RULE,
 ]
 
 

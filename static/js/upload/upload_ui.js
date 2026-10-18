@@ -126,9 +126,9 @@ class UploadBanner {
             this.handleResumableProgress(e.detail);
         });
 
-        // Tracker bus: upload bytes + server processing/publication.
-        // Without these the donut freezes at 100% on publish and the
-        // transcoding phase shows no progress (the reported bug).
+        // Tracker bus: upload bytes drive the donut. Transcoding and
+        // later stages are NOT shown here by design — they live on the
+        // Uploads manager page. The banner hides on publish.
         uploadEvents.on(UploadEventNames.UPLOAD_PROGRESS, (data) => {
             if (data && (data.uploadId === this.currentUploadId || !this.currentUploadId)) {
                 this.currentUploadId = data.uploadId || this.currentUploadId;
@@ -137,18 +137,8 @@ class UploadBanner {
             }
         });
 
-        uploadEvents.on(UploadEventNames.PROGRESS_UPDATED, (data) => {
-            if (!data || (this.currentUploadId && data.uploadId !== this.currentUploadId)) return;
-            const percent = Math.round(data.percent || 0);
-            if (data.stage === 'serverProcessing') {
-                this.updateDonutProgress(percent, data.status || `Processing ${percent}%`);
-            } else if (data.stage === 'publication') {
-                this.updateDonutProgress(percent, 'Publishing…');
-            }
-        });
-
         uploadEvents.on(UploadEventNames.UPLOAD_FAILED, () => {
-            this.setStatus('Upload failed — tap ✕ or retry from Uploads');
+            this.setStatus('Upload failed — see Uploads');
         });
     }
 
@@ -182,26 +172,18 @@ class UploadBanner {
     }
 
     /**
-     * Handle post published
+     * Handle upload published: bytes are done, so the donut's job is done.
+     * Transcoding/processing continues on the Uploads manager page.
      */
     handleUploadPublished(data) {
         this.hasVideo = Boolean(data.hasVideo);
-        if (!this.hasVideo) {
-            this.updateDonutProgress(100, 'Published!');
-            // Non-video: hide after short delay
-            setTimeout(() => {
-                this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
-                this.updateCount();
-                if (this.activeUploadCount === 0) {
-                    this.hide();
-                }
-            }, 2000);
-            return;
+        this.updateDonutProgress(100, 'Uploaded!');
+        this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
+        this.updateCount();
+        // Safety net: if no uploads are active, dismiss immediately
+        if (!uploadManager.getActiveUpload()) {
+            setTimeout(() => this.hide(), 2000);
         }
-        // Video: upload bytes are done, transcoding starts. Do NOT freeze
-        // at 100% with no label — hand over to serverProcessing events.
-        this.updateDonutProgress(100, 'Upload complete — processing video…');
-        // Video: stay visible during processing
     }
 
     /**
@@ -212,7 +194,7 @@ class UploadBanner {
         this.updateDonutProgress(100);
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (this.activeUploadCount === 0) {
+        if (!uploadManager.getActiveUpload()) {
             setTimeout(() => this.hide(), 1500);
         }
     }
@@ -223,7 +205,7 @@ class UploadBanner {
     handleUploadFailed(data) {
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (this.activeUploadCount === 0) {
+        if (!uploadManager.getActiveUpload()) {
             setTimeout(() => this.hide(), 3000);
         }
     }
@@ -234,7 +216,7 @@ class UploadBanner {
     handleUploadCancelled(data) {
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (this.activeUploadCount === 0) {
+        if (!uploadManager.getActiveUpload()) {
             this.hide();
         }
     }
@@ -292,15 +274,33 @@ class UploadBanner {
     }
 
     /**
-     * Cancel current upload
+     * Dismiss the banner. Active upload gets a confirm dialogue:
+     * OK cancels it, Cancel keeps it running in the background.
+     * The banner always hides either way — ✕ must never stick.
      */
     cancelCurrentUpload() {
         const currentUpload = uploadManager.getActiveUpload();
-        if (currentUpload) {
-            uploadManager.cancelUpload(currentUpload.id);
-        } else if (this.currentUploadId) {
-            uploadManager.cancelUpload(this.currentUploadId);
+        if (!currentUpload) {
+            this.hide();
+            return;
         }
+        const choice = window.confirm(
+            `An upload is in progress (${this.currentStatusText()}).\n\n` +
+            'Press OK to cancel the upload, or Cancel to keep uploading in the background.'
+        );
+        if (choice) {
+            try {
+                uploadManager.cancelUpload(currentUpload.id);
+            } catch (_) {}
+        }
+        // Banner always hides: dismissed UI only, or cancelled upload.
+        // A backgrounded upload keeps flowing; /uploads/ shows its status.
+        this.hide();
+    }
+
+    currentStatusText() {
+        const el = document.getElementById('upload-status');
+        return (el && el.textContent) || 'in progress';
     }
 
     isBannerVisible() {
@@ -337,9 +337,40 @@ class UploadUI {
                 const sessions = await window.resumableUpload.getAllSessions();
                 const activeSessions = sessions.filter(s => !s.done);
                 if (activeSessions.length > 0) {
-                    this.banner.activeUploadCount = activeSessions.length;
-                    this.banner.updateCount();
-                    this.banner.show();
+                    // Verify each session with the server before counting it.
+                    // Failed/cancelled/deleted records are terminal: clean them
+                    // from IndexedDB so they don't stick the donut count.
+                    let trulyActive = 0;
+                    for (const s of activeSessions) {
+                        try {
+                            const res = await fetch(`/api/uploads/${s.server_id}/`, {
+                                credentials: 'same-origin',
+                                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            });
+                            if (!res.ok) {
+                                // 410 Gone / 404 = terminal: clean up, don't count
+                                await window.storeDelete('sessions', s.client_upload_id);
+                                await window.storeDelete('blobs', s.client_upload_id);
+                                continue;
+                            }
+                            const data = await res.json();
+                            if (['uploading', 'verifying', 'preparing', 'queued'].includes(data.status)) {
+                                trulyActive++;
+                            } else {
+                                // Terminal on server: clean up local state
+                                await window.storeDelete('sessions', s.client_upload_id);
+                                await window.storeDelete('blobs', s.client_upload_id);
+                            }
+                        } catch (e) {
+                            // Network error: leave session alone, don't count it yet
+                            console.warn('[UploadUI] Could not verify session', s.client_upload_id, e);
+                        }
+                    }
+                    if (trulyActive > 0) {
+                        this.banner.activeUploadCount = trulyActive;
+                        this.banner.updateCount();
+                        this.banner.show();
+                    }
                 }
             }
         } catch (e) {

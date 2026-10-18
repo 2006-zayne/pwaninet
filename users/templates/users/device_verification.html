@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans "New sign-in — vasto security" %}{% endblock %}
+{% block body_class %}dv-fullpage{% endblock %}
+
+{% block content %}
+<div class="dv-page-wrap">
+  <style>
+    .dv-page-wrap {
+      min-height: calc(100vh - 120px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 12px;
+      background: transparent;
+    }
+    body.dv-fullpage .dv-sheet-card { box-shadow: 0 12px 50px rgba(0,0,0,.12); border: 1px solid #eceef1; }
+  </style>
+  {% include 'users/partials/device_verification_sheet.html' %}
+</div>
+{% endblock %}

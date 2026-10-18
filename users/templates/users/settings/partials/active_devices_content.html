@@ -98,14 +98,32 @@
             <span class="device-detail"><i class="bi bi-activity"></i> Last active: {{ session.last_activity|timesince }} ago</span>
           </div>
         </div>
-        <div class="device-actions">
-          <button class="btn-sign-out"
-                  hx-post="{% url 'users:api_sign_out_session' session.id %}"
-                  hx-target="closest .device-card"
-                  hx-swap="outerHTML"
-                  aria-label="{% trans 'Sign out this device' %}">
+        <div class="device-actions" data-session-id="{{ session.id }}">
+          <button class="btn-sign-out dv-signout-toggle" type="button" aria-label="{% trans 'Sign out this device' %}">
             <i class="bi bi-box-arrow-right"></i> {% trans "Sign Out" %}
           </button>
+          <div class="dv-signout-choices" hidden>
+            <button class="btn btn-outline-secondary btn-sm"
+                    type="button"
+                    hx-post="{% url 'users:api_sign_out_session' session.id %}"
+                    hx-target="closest .device-card"
+                    hx-swap="outerHTML"
+                    hx-confirm="{% trans 'Sign out this device? It stays allowed to sign in again later.' %}">
+              <i class="bi bi-box-arrow-right"></i> {% trans "Kick out only" %}
+            </button>
+            {% if session.session_key in device_hash_by_session %}
+            <button class="btn btn-outline-danger btn-sm"
+                    type="button"
+                    hx-post="{% url 'users:api_sign_out_session' session.id %}"
+                    hx-vals='{"block": "1"}'
+                    hx-target="closest .device-card"
+                    hx-swap="outerHTML"
+                    hx-confirm="{% trans 'Kick out and block this device ID? It will not be able to sign into your account again.' %}">
+              <i class="bi bi-slash-circle"></i> {% trans "Kick out + block device ID" %}
+            </button>
+            {% endif %}
+            <button class="btn btn-link btn-sm dv-signout-toggle-cancel" type="button">{% trans "Cancel" %}</button>
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -126,6 +144,217 @@
     </button>
   </div>
 </div>
+
+{# ---- Phase 1: Trusted devices (device login alerts) ---- #}
+<div class="settings-list-container">
+  <div class="settings-list-header">
+    <div class="settings-list-header-icon" style="background:#10893e;">
+      <i class="bi bi-shield-check"></i>
+    </div>
+    <div class="settings-list-header-content">
+      <div class="settings-list-header-title">{% trans "Trusted Devices" %}</div>
+      <div class="settings-list-header-subtitle">{% trans "These devices get sign-in alerts and don't need approval" %}</div>
+    </div>
+  </div>
+  <div class="settings-list-body" id="dv-trusted-section">
+    {% for device in trusted_devices %}
+      <div class="device-card" id="dv-trusted-{{ device.pk }}">
+        <div class="device-icon" style="background:#10893e;">
+          <i class="bi bi-shield-check"></i>
+        </div>
+        <div class="device-info">
+          <div class="device-name">
+            {{ device.nickname|default:device.device_name|default:"Trusted device" }}
+            {% if device.is_primary %}<span class="badge text-bg-success ms-1" style="font-size:.65rem;">{% trans "Primary" %}</span>{% endif %}
+          </div>
+          <div class="device-details">
+            <span class="device-detail"><i class="bi bi-calendar-check"></i> Trusted: {{ device.trusted_at|date:"M d, Y" }}</span>
+          </div>
+        </div>
+        <div class="device-actions dv-trusted-actions" data-device-id="{{ device.pk }}">
+          {% if not device.is_primary %}
+            <button type="button" class="btn btn-outline-primary btn-sm dv-set-primary-btn">
+              <i class="bi bi-star"></i> {% trans "Make primary" %}
+            </button>
+          {% endif %}
+          <button type="button" class="btn btn-outline-danger btn-sm dv-untrust-btn">
+            <i class="bi bi-shield-x"></i> {% trans "Untrust" %}
+          </button>
+          <form class="dv-password-form" hidden>
+            <input type="password" class="form-control form-control-sm mt-2 dv-password-input"
+                   placeholder="{% trans 'Confirm your password to untrust' %}" autocomplete="current-password">
+            <button type="submit" class="btn btn-danger btn-sm mt-2">{% trans "Confirm untrust" %}</button>
+            <button type="button" class="btn btn-link btn-sm mt-2 dv-cancel-pw">{% trans "Cancel" %}</button>
+          </form>
+        </div>
+      </div>
+    {% empty %}
+      <div class="placeholder-section">
+        <i class="bi bi-shield"></i>
+        <p>{% trans "No trusted devices yet — your current device is auto-trusted on sign-in." %}</p>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ---- Phase 1: Blocked devices ---- #}
+{% if blocked_devices %}
+<div class="settings-list-container">
+  <div class="settings-list-header">
+    <div class="settings-list-header-icon" style="background:#c02626;">
+      <i class="bi bi-slash-circle"></i>
+    </div>
+    <div class="settings-list-header-content">
+      <div class="settings-list-header-title">{% trans "Blocked Devices" %}</div>
+      <div class="settings-list-header-subtitle">{% trans "Devices you reported as not yours — they cannot sign in" %}</div>
+    </div>
+  </div>
+  <div class="settings-list-body" id="dv-blocked-section">
+    {% for blocked in blocked_devices %}
+      <div class="device-card" id="dv-blocked-{{ blocked.pk }}">
+        <div class="device-icon" style="background:#c02626;">
+          <i class="bi bi-slash-circle"></i>
+        </div>
+        <div class="device-info">
+          <div class="device-name">Blocked device</div>
+          <div class="device-details">
+            <span class="device-detail"><i class="bi bi-clock"></i> Blocked: {{ blocked.created_at|date:"M d, Y H:i" }}</span>
+            <span class="device-detail"><i class="bi bi-exclamation-circle"></i> {{ blocked.get_reason_display }}</span>
+          </div>
+        </div>
+        <div class="device-actions dv-blocked-actions" data-blocked-id="{{ blocked.pk }}">
+          <button type="button" class="btn btn-outline-secondary btn-sm dv-unblock-btn">
+            <i class="bi bi-unlock"></i> {% trans "Unblock" %}
+          </button>
+          <form class="dv-password-form" hidden>
+            <input type="password" class="form-control form-control-sm mt-2 dv-password-input"
+                   placeholder="{% trans 'Confirm your password to unblock' %}" autocomplete="current-password">
+            <button type="submit" class="btn btn-warning btn-sm mt-2">{% trans "Confirm unblock" %}</button>
+            <button type="button" class="btn btn-link btn-sm mt-2 dv-cancel-pw">{% trans "Cancel" %}</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+(function () {
+  // Sign Out chooser: click reveals "kick out" / "kick out + block device id"
+  document.addEventListener('click', function (e) {
+    var toggle = e.target.closest('.dv-signout-toggle');
+    var cancel = e.target.closest('.dv-signout-toggle-cancel');
+    var choices = e.target.closest('.dv-signout-choices');
+    var hxButton = e.target.closest('[hx-post]');
+    if (toggle && !hxButton) {
+      var actions = toggle.closest('.device-actions');
+      var panel = actions && actions.querySelector('.dv-signout-choices');
+      if (panel) panel.hidden = !panel.hidden;
+      return;
+    }
+    if (cancel) {
+      var parentPanel = cancel.closest('.dv-signout-choices');
+      if (parentPanel) parentPanel.hidden = true;
+      return;
+    }
+    if (hxButton) {
+      var wrapPanel = hxButton.closest('.dv-signout-choices');
+      if (wrapPanel) wrapPanel.hidden = true;
+      return;
+    }
+    // Click anywhere else closes all open choosers
+    document.querySelectorAll('.dv-signout-choices').forEach(function (p) {
+      if (!p.hidden) p.hidden = true;
+    });
+  });
+
+  function csrfToken() {
+    var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : '';
+  }
+  function post(url, data) {
+    var body = new URLSearchParams(data || {});
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': csrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+      body: body
+    }).then(function (res) { return res.json(); });
+  }
+  function icon(btn, html) {
+    btn.dataset.label = btn.dataset.label || btn.innerHTML;
+    btn.innerHTML = html;
+    btn.disabled = true;
+  }
+  function restore(btn) { btn.innerHTML = btn.dataset.label; btn.disabled = false; }
+
+  function bind() {
+  document.querySelectorAll('.dv-trusted-actions').forEach(function (wrap) {
+    var id = wrap.dataset.deviceId;
+    var setPrimary = wrap.querySelector('.dv-set-primary-btn');
+    if (setPrimary) setPrimary.addEventListener('click', function () {
+      icon(setPrimary, '<span class="spinner-border spinner-border-sm"></span>');
+      post('/users/api/security/trusted-devices/' + id + '/primary/')
+        .then(function () { return fetch(location.href, { credentials: 'same-origin' }); })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var frag = document.createElement('div'); frag.innerHTML = html;
+          var updated = frag.querySelector('.dv-trusted-section');
+          document.querySelector('.dv-trusted-section').innerHTML = updated ? updated.innerHTML : '';
+          var blockedUpdated = frag.querySelector('#dv-blocked-section');
+          var blocked = document.querySelector('#dv-blocked-section');
+          if (blocked && blockedUpdated) blocked.innerHTML = blockedUpdated.innerHTML;
+          bind();
+        });
+    });
+    var untrust = wrap.querySelector('.dv-untrust-btn');
+    var form = wrap.querySelector('.dv-password-form');
+    if (untrust) untrust.addEventListener('click', function () { form.hidden = !form.hidden; });
+    var cancel = wrap.querySelector('.dv-cancel-pw');
+    if (cancel) cancel.addEventListener('click', function (e) { e.preventDefault(); form.hidden = true; });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pw = form.querySelector('.dv-password-input').value;
+      if (!pw) return;
+      icon(untrust, '<span class="spinner-border spinner-border-sm"></span>');
+      post('/users/api/security/trusted-devices/' + id + '/untrust/', { password: pw })
+        .then(function (data) {
+          if (data.ok) {
+            form.hidden = true;
+            var card = document.getElementById('dv-trusted-' + id);
+            if (card) card.remove();
+          } else { restore(untrust); alert('Password not accepted — try again.'); }
+        });
+    });
+  });
+
+  document.querySelectorAll('.dv-blocked-actions').forEach(function (wrap) {
+    var id = wrap.dataset.blockedId;
+    var unblock = wrap.querySelector('.dv-unblock-btn');
+    var form = wrap.querySelector('.dv-password-form');
+    if (unblock) unblock.addEventListener('click', function () { form.hidden = !form.hidden; });
+    var cancel = wrap.querySelector('.dv-cancel-pw');
+    if (cancel) cancel.addEventListener('click', function (e) { e.preventDefault(); form.hidden = true; });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pw = form.querySelector('.dv-password-input').value;
+      if (!pw) return;
+      icon(unblock, '<span class="spinner-border spinner-border-sm"></span>');
+      post('/users/api/security/blocked-devices/' + id + '/unblock/', { password: pw })
+        .then(function (data) {
+          if (data.ok) {
+            form.hidden = true;
+            var card = document.getElementById('dv-blocked-' + id);
+            if (card) card.closest('.device-card').remove();
+          } else { restore(unblock); alert('Password not accepted — try again.'); }
+        });
+    });
+  }
+
+  bind();
+})();
+</script>
 
 {% if messages %}
 <div class="alert-container">

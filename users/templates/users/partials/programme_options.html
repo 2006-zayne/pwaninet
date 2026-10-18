@@ -1,4 +1,4 @@
 <option value="">Select your programme (optional)</option>
 {% for prog in programmes %}
-<option value="{{ prog.id }}">{{ prog.name }}{% if prog.code %} ({{ prog.code }}){% endif %}</option>
+<option value="{{ prog.id }}" {% if selected_programme_id and selected_programme_id|stringformat:"s" == prog.id|stringformat:"s" %}selected{% endif %}>{{ prog.name }}{% if prog.code %} ({{ prog.code }}){% endif %}</option>
 {% endfor %}

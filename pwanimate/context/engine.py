@@ -125,7 +125,22 @@ class ContextEngine:
         if intent == IntentCategory.PERSONALIZED_DISCOVERY or 'collaborat' in query_lower:
             if hasattr(user_context, 'collaboration_status'):
                 collaboration_status = user_context.collaboration_status or ""
-        
+
+        # Weekly timetable for academic, schedule, revision, or study planning
+        weekly_timetable = None
+        timetable_keywords = [
+            'timetable', 'schedule', 'class', 'lecture', 'revision',
+            'free time', 'free slot', 'study slot', 'today', 'tomorrow',
+            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+            'plan', 'exam', 'session', 'when do i have'
+        ]
+        if (
+            intent in [IntentCategory.Vasto_KNOWLEDGE, IntentCategory.MIXED, IntentCategory.GENERAL_KNOWLEDGE]
+            or any(kw in query_lower for kw in timetable_keywords)
+        ):
+            if hasattr(user_context, 'weekly_timetable'):
+                weekly_timetable = user_context.weekly_timetable
+
         # Build StudentContext if any relevant fields exist
         student_ctx = StudentContext(
             programme_name=programme_name,
@@ -141,6 +156,7 @@ class ContextEngine:
             tone=tone,
             response_style=response_style,
             personal_instructions=personal_instructions,
+            weekly_timetable=weekly_timetable,
         )
         
         return student_ctx if student_ctx.has_content() else None

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reel Rail Redesign — Floating Comment Rail Preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0b0d12;
+    color: #e7eaf0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 28px 32px 48px;
+  }
+  h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+  .sub { color: #8a92a6; font-size: 0.85rem; margin-top: 4px; }
+
+  /* ===== controls ===== */
+  .controls {
+    display: flex; align-items: center; gap: 26px; flex-wrap: wrap;
+    margin: 20px 0 8px; padding: 14px 18px;
+    background: #131722; border: 1px solid #242a38; border-radius: 14px;
+  }
+  .ctl { display: flex; flex-direction: column; gap: 6px; }
+  .ctl label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #8a92a6; }
+  .ctl label b { color: #57d9c7; font-family: ui-monospace, monospace; font-weight: 700; }
+  .ctl input[type="range"] { width: 170px; accent-color: #57d9c7; }
+  .mode-toggle {
+    display: inline-flex; gap: 4px;
+    background: #161a23; border: 1px solid #242a38; border-radius: 10px; padding: 4px; margin-left: auto;
+  }
+  .mode-toggle button {
+    border: 0; background: transparent; color: #8a92a6; font: inherit; font-size: 0.8rem;
+    padding: 7px 14px; border-radius: 7px; cursor: pointer; transition: 0.15s;
+  }
+  .mode-toggle button.active { background: #2e3546; color: #fff; }
+  .recap { font-family: ui-monospace, monospace; font-size: 0.78rem; color: #7ee7d4; margin: 6px 2px 16px; }
+  .recap span { color: #8a92a6; }
+
+  /* ===== frames ===== */
+  .viewport-wrap { display: flex; gap: 28px; flex-wrap: wrap; }
+  .vp-card {
+    flex: 1 1 620px;
+    min-width: 560px;
+    background: #131722; border: 1px solid #242a38; border-radius: 16px; padding: 18px 20px 20px;
+  }
+  .vp-card h2 { font-size: 0.95rem; margin-bottom: 2px; }
+  .vp-card p { font-size: 0.78rem; color: #8a92a6; line-height: 1.5; margin-bottom: 14px; }
+  .tag {
+    display: inline-block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 3px 9px; border-radius: 999px; margin: 6px 0 8px;
+  }
+  .tag.cur { background: #3a2430; color: #ff8fa3; }
+  .tag.new { background: #17323a; color: #57d9c7; }
+
+  .vp-frame {
+    width: 100%;
+    aspect-ratio: 1440 / 900;
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #eef1f6;
+    outline: 1px solid #2a3142;
+  }
+  /* fixed 1440x900 mock screen scaled to fit */
+  .vp-inner {
+    position: absolute; top: 0; left: 0; width: 1440px; height: 900px;
+    transform-origin: top left;
+    display: flex; flex-direction: row;
+  }
+
+  /* ============ MOCK APP — dark (default) ============ */
+  .vp-inner { background: #0e1016; }
+  .vp-inner.light { background: #eef1f6; }
+  .stage {
+    flex: 1 1 0%; min-width: 0; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    padding-left: 16px;
+  }
+  .stage::after { /* fixed tools strip hatch */
+    content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 104px;
+    background: repeating-linear-gradient(45deg, rgba(87,217,199,.07) 0 10px, transparent 10px 20px);
+    border-left: 1px dashed rgba(87,217,199,.35);
+  }
+  .vp-inner.light .stage::after { background: repeating-linear-gradient(45deg, rgba(23,120,110,.10) 0 10px, transparent 10px 20px); border-left-color: rgba(23,120,110,.4); }
+
+  .video-card {
+    position: relative; background: #000; border-radius: var(--radius, 16px);
+    border: 1px solid rgba(255,255,255,.10);
+    box-shadow: 0 18px 50px rgba(0,0,0,.45), 0 3px 12px rgba(0,0,0,.25);
+    overflow: hidden; display: flex; align-items: center; justify-content: center;
+    height: calc(900px - 2*var(--gutter, 12px));
+    transition: height .12s linear;
+  }
+  .vp-inner.light .video-card { border-color: rgba(0,0,0,.10); box-shadow: 0 16px 48px rgba(0,0,0,.16), 0 2px 10px rgba(0,0,0,.08); }
+  .video-card .vfill {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, monospace; font-size: 26px; letter-spacing: .2em; color: #6b7280;
+    background: linear-gradient(135deg, #1f2430 0%, #3a4254 55%, #1f2430 100%);
+  }
+  .portrait { aspect-ratio: 9/16; }
+  .landscape { aspect-ratio: 16/9; }
+
+  /* tools column (fixed exterior, as shipped) */
+  .tools {
+    position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 13px; align-items: center; z-index: 5;
+  }
+  .tools .divider { width: 1px; height: 26px; background: rgba(120,132,155,.45); margin: 2px 0; }
+  .glass {
+    width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 19px;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.28); color: #fff; backdrop-filter: blur(6px);
+  }
+  .vp-inner.light .glass { background: #fff; border: 1px solid #e4e6eb; color: #333; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+
+  .close-mock {
+    position: absolute; top: 14px; left: 18px; width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 17px; z-index: 6;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.28); color: #fff;
+  }
+  .vp-inner.light .close-mock { background: #fff; border-color: #e4e6eb; color: #333; }
+
+  /* ============ RAIL — CURRENT (glued) ============ */
+  .rail-cur {
+    flex: 0 0 440px; width: 440px;
+    background: #171a21; border-left: 1px solid rgba(255,255,255,.08);
+    display: flex; flex-direction: column;
+    box-shadow: -4px 0 20px rgba(0,0,0,.35);
+  }
+  .vp-inner.light .rail-cur { background: #fff; border-left-color: #e2e8f0; box-shadow: -4px 0 20px rgba(0,0,0,.06); }
+
+  /* ============ RAIL — NEW (floating) ============ */
+  .rail-new {
+    flex: 0 0 440px; width: 440px;
+    margin: var(--gutter, 12px) var(--gutter, 12px) var(--gutter, 12px) 0;
+    height: calc(900px - 2*var(--gutter, 12px));
+    align-self: center;
+    background: #171a21;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: var(--radius, 16px);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 18px 50px rgba(0,0,0,.5), 0 3px 12px rgba(0,0,0,.3);
+    transition: margin .12s linear, border-radius .12s linear;
+  }
+  .vp-inner.light .rail-new { background: #fff; border-color: rgba(0,0,0,.10); box-shadow: 0 16px 48px rgba(0,0,0,.16), 0 2px 10px rgba(0,0,0,.08); }
+
+  /* rail interior content (shared) */
+  .rr-head { padding: 20px 20px 14px; display: flex; gap: 12px; align-items: center; }
+  .rr-avatar { width: 40px; height: 40px; border-radius: 50%; background: #39415a; flex: 0 0 40px; }
+  .vp-inner.light .rr-avatar { background: #dfe5ee; }
+  .rr-cols { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .rr-bar { height: 9px; border-radius: 5px; background: rgba(255,255,255,.12); }
+  .rr-bar.w60 { width: 58%; } .rr-bar.w40 { width: 38%; }
+  .vp-inner.light .rr-bar { background: #e5e9f0; }
+  .rr-sep { height: 1px; background: rgba(255,255,255,.07); }
+  .vp-inner.light .rr-sep { background: #edf0f5; }
+  .rr-cmt-head { padding: 12px 20px; font-size: 15px; font-weight: 700; color: #cfd5e2; }
+  .vp-inner.light .rr-cmt-head { color: #333; }
+  .rr-body { flex: 1 1 0%; min-height: 0; overflow: hidden; padding: 4px 20px; display: flex; flex-direction: column; gap: 18px; }
+  .rr-cmt { display: flex; gap: 10px; }
+  .rr-cmt .dot { width: 30px; height: 30px; border-radius: 50%; background: #2a3042; flex: 0 0 30px; }
+  .vp-inner.light .rr-cmt .dot { background: #dfe5ee; }
+  .rr-cmt .lines { display: flex; flex-direction: column; gap: 7px; flex: 1; padding-top: 4px; }
+  .rr-composer {
+    margin: 12px 16px 16px; padding: 12px 14px; border-radius: 999px;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10);
+    font-size: 13px; color: #79839a;
+  }
+  .vp-inner.light .rr-composer { background: #f1f3f8; border-color: #e2e8f0; color: #8a92a6; }
+
+  /* alignment guide (floating frame only) */
+  .align-guide { position: absolute; left: 0; right: 0; top: calc(var(--gutter, 12px)); border-top: 1px dashed rgba(87,217,199,.6); z-index: 7; pointer-events: none; }
+  .align-guide b {
+    position: absolute; top: 5px; left: 24px; font-size: 11px; font-weight: 600;
+    font-family: ui-monospace, monospace; color: #57d9c7;
+    background: rgba(10,12,18,.85); padding: 3px 8px; border-radius: 6px;
+  }
+  .align-guide.off { display: none; }
+
+  .dim-note {
+    position: absolute; z-index: 6; bottom: 10px; right: 12px;
+    background: rgba(10,12,18,.85); color: #8fd8ff; font-size: 12px;
+    font-family: ui-monospace, monospace; padding: 6px 10px; border-radius: 8px;
+  }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.75rem; color: #8a92a6; margin: 14px 0 6px; }
+  .legend .k { display: inline-flex; align-items: center; gap: 7px; }
+  .legend .sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+</style>
+</head>
+<body>
+  <h1>Fullscreen Reel Player — Floating Comment Rail</h1>
+  <div class="sub">The rail stops being a floor-to-ceiling wall and starts hovering like the video card: same height, same breathing room, same corner language.</div>
+
+  <div class="controls">
+    <div class="ctl">
+      <label>Side gutter (top/bottom/right) — <b id="gutterVal">12px</b></label>
+      <input type="range" id="gutter" min="6" max="24" step="1" value="12">
+    </div>
+    <div class="ctl">
+      <label>Corner radius (card + rail) — <b id="radiusVal">16px</b></label>
+      <input type="range" id="radius" min="4" max="28" step="1" value="16">
+    </div>
+    <div class="ctl">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.8rem;color:#e7eaf0">
+        <input type="checkbox" id="guide" checked style="accent-color:#57d9c7"> alignment guide
+      </label>
+    </div>
+    <div class="mode-toggle" id="toggle">
+      <button data-mode="dark" class="active">Dark</button>
+      <button data-mode="light">Light</button>
+    </div>
+  </div>
+  <div class="recap" id="recap"></div>
+
+  <div class="legend">
+    <span class="k"><span class="sw" style="background:repeating-linear-gradient(45deg,rgba(87,217,199,.25) 0 4px,transparent 4px 8px)"></span>Fixed tools strip (as shipped)</span>
+    <span class="k"><span class="sw" style="background:#171a21;border:1px solid rgba(255,255,255,.3)"></span>Rail</span>
+  </div>
+
+  <div class="viewport-wrap">
+
+    <!-- ============ CURRENT ============ -->
+    <div class="vp-card">
+      <span class="tag cur">Current</span>
+      <h2>Glued rail — full height, flush edge</h2>
+      <p>Height <code>100dvh</code>, touches top/right/bottom of the window, square corners, attached shadow on the left edge only. The card floats with its 12px gutters; the rail is a wall.</p>
+      <div class="vp-frame" data-frame-scale>
+        <div class="vp-inner">
+          <div class="stage">
+            <div class="video-card portrait" style="width:492px"><div class="vfill">9 : 16</div></div>
+            <div class="tools">
+              <div class="glass">♥</div><div class="glass">💬</div><div class="glass">↗</div><div class="glass">🔖</div>
+              <div class="divider"></div>
+              <div class="glass">▲</div><div class="glass">▼</div>
+            </div>
+            <div class="close-mock">✕</div>
+            <div class="dim-note">card 492 × 876 · rail 440 × 900</div>
+          </div>
+          <div class="rail-cur">
+            <div class="rr-head"><div class="rr-avatar"></div><div class="rr-cols"><div class="rr-bar w60"></div><div class="rr-bar w40"></div></div></div>
+            <div class="rr-sep"></div>
+            <div class="rr-cmt-head">Comments (4)</div>
+            <div class="rr-body">
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar w60"></div><div class="rr-bar w40"></div></div></div>
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar"></div><div class="rr-bar w60"></div></div></div>
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar w40"></div><div class="rr-bar"></div></div></div>
+            </div>
+            <div class="rr-composer">Add a comment…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ NEW ============ -->
+    <div class="vp-card">
+      <span class="tag new">Proposed</span>
+      <h2>Floating rail — card-height, inset, rounded</h2>
+      <p>Height <code>calc(100dvh − 2 × gutter)</code> — exactly the portrait card's frame — inset by the same gutter on top, bottom <em>and right</em>, corner radius matching the card, full-ring shadow. The guide line shows card top and rail top share one edge.</p>
+      <div class="vp-frame" data-frame-scale>
+        <div class="vp-inner">
+          <div class="stage">
+            <div class="video-card portrait" style="width:492px"><div class="vfill">9 : 16</div></div>
+            <div class="tools">
+              <div class="glass">♥</div><div class="glass">💬</div><div class="glass">↗</div><div class="glass">🔖</div>
+              <div class="divider"></div>
+              <div class="glass">▲</div><div class="glass">▼</div>
+            </div>
+            <div class="close-mock">✕</div>
+            <div class="align-guide"><b>card top = rail top</b></div>
+            <div class="dim-note">card 492 × 876 · rail 440 × 876</div>
+          </div>
+          <div class="rail-new">
+            <div class="rr-head"><div class="rr-avatar"></div><div class="rr-cols"><div class="rr-bar w60"></div><div class="rr-bar w40"></div></div></div>
+            <div class="rr-sep"></div>
+            <div class="rr-cmt-head">Comments (4)</div>
+            <div class="rr-body">
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar w60"></div><div class="rr-bar w40"></div></div></div>
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar"></div><div class="rr-bar w60"></div></div></div>
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar w40"></div><div class="rr-bar"></div></div></div>
+            </div>
+            <div class="rr-composer">Add a comment…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ NEW + LANDSCAPE ============ -->
+    <div class="vp-card">
+      <span class="tag new">Proposed · landscape</span>
+      <h2>Floating rail holds its frame around shorter reels</h2>
+      <p>Landscape/square cards are shorter — the rail keeps the same floating portrait-height frame instead of looming wall-height, so the stage stays balanced.</p>
+      <div class="vp-frame" data-frame-scale>
+        <div class="vp-inner">
+          <div class="stage">
+            <div class="video-card landscape" style="width:864px"><div class="vfill">16 : 9</div></div>
+            <div class="tools">
+              <div class="glass">♥</div><div class="glass">💬</div><div class="glass">↗</div><div class="glass">🔖</div>
+              <div class="divider"></div>
+              <div class="glass">▲</div><div class="glass">▼</div>
+            </div>
+            <div class="close-mock">✕</div>
+            <div class="dim-note">card 864 × 486 · rail 440 × 876</div>
+          </div>
+          <div class="rail-new">
+            <div class="rr-head"><div class="rr-avatar"></div><div class="rr-cols"><div class="rr-bar w60"></div><div class="rr-bar w40"></div></div></div>
+            <div class="rr-sep"></div>
+            <div class="rr-cmt-head">Comments (4)</div>
+            <div class="rr-body">
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar w60"></div><div class="rr-bar w40"></div></div></div>
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar"></div><div class="rr-bar w60"></div></div></div>
+              <div class="rr-cmt"><div class="dot"></div><div class="lines"><div class="rr-bar w40"></div><div class="rr-bar"></div></div></div>
+            </div>
+            <div class="rr-composer">Add a comment…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // scale each 1440x900 mock into its frame
+    function rescale() {
+      document.querySelectorAll('[data-frame-scale]').forEach(frame => {
+        const inner = frame.querySelector('.vp-inner');
+        if (inner) inner.style.transform = 'scale(' + (frame.clientWidth / 1440) + ')';
+      });
+    }
+    window.addEventListener('resize', rescale);
+    window.addEventListener('load', rescale);
+    rescale();
+
+    // live controls
+    const gutter = document.getElementById('gutter');
+    const radius = document.getElementById('radius');
+    const gutterVal = document.getElementById('gutterVal');
+    const radiusVal = document.getElementById('radiusVal');
+    const recap = document.getElementById('recap');
+    function apply() {
+      const g = +gutter.value, r = +radius.value;
+      document.documentElement.style.setProperty('--gutter', g + 'px');
+      document.documentElement.style.setProperty('--radius', r + 'px');
+      gutterVal.textContent = g + 'px';
+      radiusVal.textContent = r + 'px';
+      const h = 900 - 2 * g, w = Math.round(h * 9 / 16);
+      recap.textContent = '@900 window → card ' + w + ' × ' + h + '   ·   rail ' + h + ' tall, inset ' + g + '/' + g + '/' + g + ' · radius ' + r + 'px';
+    }
+    gutter.addEventListener('input', apply);
+    radius.addEventListener('input', apply);
+    apply();
+
+    // theme toggle
+    document.querySelectorAll('#toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#toggle button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.vp-inner').forEach(f => f.classList.toggle('light', btn.dataset.mode === 'light'));
+      });
+    });
+
+    // guide toggle
+    const guide = document.getElementById('guide');
+    function applyGuide() {
+      document.querySelectorAll('.align-guide').forEach(el => el.classList.toggle('off', !guide.checked));
+    }
+    guide.addEventListener('change', applyGuide);
+    applyGuide();
+  </script>
+</body>
+</html>

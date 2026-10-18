@@ -237,10 +237,13 @@ class InstitutionSetupForm(forms.Form):
         programme_id = self.data.get('programme') if self.data else None
         if institution_id:
             try:
+                from django.db.models import Q
                 self.fields['programme'].queryset = Programme.objects.filter(
-                    is_active=True,
-                    department__school__faculty__institution_id=institution_id,
-                ).order_by('name')
+                    is_active=True
+                ).filter(
+                    Q(department__school__institution_id=institution_id) |
+                    Q(department__school__faculty__institution_id=institution_id)
+                ).distinct().order_by('name')
             except (ValueError, TypeError):
                 self.fields['programme'].queryset = Programme.objects.none()
         elif programme_id:
@@ -285,6 +288,95 @@ class InstitutionSetupForm(forms.Form):
                     f'Selected year is beyond this programme\'s duration ({duration} years).')
 
         return cleaned
+
+
+class AcademicProfileUpdateForm(InstitutionSetupForm):
+    """Form for updating academic institution, programme, study level, and bio."""
+
+    bio = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'class': 'form-control tactical-form-input',
+            'placeholder': 'Tell us about yourself, or leave blank to auto-generate a smart bio.',
+        }),
+        help_text="Custom bio. If left blank, Vasto will intelligently synthesize one from your academic details."
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        if user and 'initial' not in kwargs:
+            kwargs['initial'] = {
+                'institution': user.institution,
+                'programme': user.programme,
+                'academic_level': user.academic_level,
+                'bio': user.bio,
+            }
+        super().__init__(*args, **kwargs)
+        if user and not self.data and user.institution_id:
+            from documents.academic.models import Programme
+            from django.db.models import Q
+            self.fields['programme'].queryset = Programme.objects.filter(
+                is_active=True
+            ).filter(
+                Q(department__school__institution_id=user.institution_id) |
+                Q(department__school__faculty__institution_id=user.institution_id)
+            ).distinct().order_by('name')
+
+    def save(self, user=None):
+        target_user = user or self.user
+        if not target_user:
+            raise ValueError("A user instance must be provided to save AcademicProfileUpdateForm.")
+
+        institution = self.cleaned_data.get('institution')
+        programme = self.cleaned_data.get('programme')
+        academic_level = self.cleaned_data.get('academic_level')
+        bio_input = self.cleaned_data.get('bio', '').strip()
+
+        institution_changed = target_user.institution_id != (institution.pk if institution else None)
+        programme_changed = target_user.programme_id != (programme.pk if programme else None)
+
+        target_user.institution = institution
+        target_user.programme = programme
+        target_user.academic_level = academic_level
+
+        if bio_input:
+            target_user.bio = bio_input
+        elif not target_user.bio:
+            target_user.bio = target_user.generate_smart_bio()
+
+        # Sync legacy academic fields for backward compatibility
+        if programme:
+            try:
+                from courses.models import Course, Year
+                matching_course = Course.objects.filter(name__iexact=programme.name).first()
+                if matching_course:
+                    target_user.course = matching_course
+                    if academic_level:
+                        matching_year = Year.objects.filter(course=matching_course, level=academic_level.level).first()
+                        if matching_year:
+                            target_user.year = matching_year
+            except Exception:
+                pass
+        elif institution_changed and not programme:
+            target_user.course = None
+            target_user.year = None
+
+        target_user.save()
+
+        # Handle enrollment changes
+        if programme_changed or (institution_changed and not programme):
+            try:
+                from documents.academic.models import StudentUnitEnrollment
+                from documents.academic.services import StudentAcademicEnrollmentService
+                StudentUnitEnrollment.objects.filter(
+                    user=target_user, source='auto_programme', is_active=True).update(is_active=False)
+                if programme:
+                    StudentAcademicEnrollmentService.sync_student_units(target_user, force_resync=True)
+            except Exception:
+                pass
+
+        return target_user
 
 
 class ProfileUpdateForm(forms.ModelForm):
@@ -528,3 +620,8 @@ class NotificationPreferencesForm(forms.ModelForm):
             'notify_on_pinch': 'Pinch notifications',
             'email_notifications': 'Email notifications'
         }
+
+
+# Vasto rebrand aliases (preserving Pwani* for backward compatibility)
+VastoSignupForm = PwaniSignupForm
+VastoAuthenticationForm = PwaniAuthenticationForm

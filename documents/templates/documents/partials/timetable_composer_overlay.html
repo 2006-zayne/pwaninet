@@ -1,0 +1,115 @@
+{% load static %}
+
+<!-- Link to Media Composer CSS (reusing existing styling) -->
+<link rel="stylesheet" href="{% static 'css/messaging/media-composer.css' %}">
+
+<style>
+  /* Ensure crop overlay has highest layer priority and pristine contrast */
+  #timetableCropOverlay {
+    z-index: 10990;
+  }
+  #timetableCropOverlay .media-preview-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  #timetableCropOverlay .media-preview-image-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 96vw;
+    max-height: 82vh;
+  }
+  #timetableCropOverlay .media-preview-image {
+    max-width: 96vw;
+    max-height: 82vh;
+    object-fit: contain;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  }
+  .crop-dock-btn.crop-dock-apply {
+    background: #2563eb;
+    color: #ffffff;
+    font-weight: 600;
+  }
+  .crop-dock-btn.crop-dock-apply:hover {
+    background: #1d4ed8;
+  }
+</style>
+
+<!-- Fullscreen Media Composer Cropping Overlay -->
+<div id="timetableCropOverlay" class="media-composer-overlay is-cropping" role="dialog" aria-modal="true" aria-label="Timetable Cropper">
+  <div class="media-composer-container">
+    <!-- Top Floating Scrim & Circular Controls -->
+    <header class="media-composer-header" id="timetableCropHeader">
+      <!-- Floating Close / Cancel Button (Top Left) -->
+      <div class="media-composer-header-left">
+        <button type="button" class="media-composer-btn media-composer-close" id="timetableCropCloseBtn" title="Cancel & Close" aria-label="Close">
+          <i class="bi bi-x-lg close-icon"></i>
+        </button>
+      </div>
+
+      <!-- Floating Crop Actions Dock (Top Center Bar) -->
+      <div class="media-crop-actions-dock" id="timetableCropActionsDock">
+        <button type="button" class="crop-dock-btn crop-dock-cancel" id="timetableCropCancelBtn" title="Cancel crop">
+          <i class="bi bi-x-lg me-1"></i>
+          <span>Cancel</span>
+        </button>
+
+        <!-- Aspect Ratio Pills -->
+        <div class="crop-dock-aspect-pills" id="timetableCropAspectPills">
+          <button type="button" class="crop-aspect-pill active" data-aspect="free">Free</button>
+          <button type="button" class="crop-aspect-pill" data-aspect="16:9">16:9</button>
+          <button type="button" class="crop-aspect-pill" data-aspect="4:3">4:3</button>
+          <button type="button" class="crop-aspect-pill" data-aspect="1:1">1:1</button>
+        </div>
+
+        <!-- Rotate Button -->
+        <button type="button" class="crop-dock-btn text-white" id="timetableCropRotateBtn" title="Rotate 90°" style="background: rgba(255,255,255,0.12);">
+          <i class="bi bi-arrow-clockwise me-1"></i>
+          <span>Rotate</span>
+        </button>
+
+        <!-- Done & Process Button -->
+        <button type="button" class="crop-dock-btn crop-dock-apply" id="timetableCropDoneBtn" title="Done & Process Timetable">
+          <i class="bi bi-cloud-arrow-up-fill me-1"></i>
+          <span>Process Timetable</span>
+        </button>
+      </div>
+
+      <!-- Top Right Spacer for Layout Symmetry -->
+      <div class="media-composer-header-actions" style="visibility: hidden; pointer-events: none;">
+        <button type="button" class="media-composer-btn"><i class="bi bi-x"></i></button>
+      </div>
+    </header>
+
+    <!-- Main Full Bleed Media Playground Area -->
+    <main class="media-composer-main" id="timetableCropMain">
+      <div class="media-preview-container" id="timetablePreviewContainer">
+        <div class="media-preview-image-wrap" id="timetablePreviewImageWrap">
+          <img id="timetablePreviewImg" class="media-preview-image" alt="Timetable preview">
+        </div>
+      </div>
+    </main>
+
+    <!-- Processing AI Scrim -->
+    <div id="timetableProcessingScrim" class="d-none" style="position: absolute; inset: 0; z-index: 150; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; gap: 16px;">
+      <div class="spinner-border text-primary" style="width: 3.5rem; height: 3.5rem;" role="status">
+        <span class="visually-hidden">Analyzing...</span>
+      </div>
+      <div style="font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em;">Analyzing Timetable with Spark AI...</div>
+      <div style="font-size: 0.88rem; color: rgba(255, 255, 255, 0.75); max-width: 360px; text-align: center; line-height: 1.45;">
+        Extracting lecture units, weekly schedule, venues, and computing optimal study revision blocks for your cohort.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/timetable/timetable-cropper.js' %}"></script>

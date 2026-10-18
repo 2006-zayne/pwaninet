@@ -14,6 +14,7 @@ from .processing import (
     reindex_all_documents,
     get_local_filepath,
 )
+from .timetable import process_timetable_image_task  # noqa: F401
 
 __all__ = [
     'process_document',
@@ -28,4 +29,5 @@ __all__ = [
     'remove_from_search_index',
     'reindex_all_documents',
     'get_local_filepath',
+    'process_timetable_image_task',
 ]

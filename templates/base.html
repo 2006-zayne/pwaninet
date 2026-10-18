@@ -1334,7 +1334,7 @@
     <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}?v=4">
     <link rel="stylesheet" href="{% static 'css/downloads/offline_media_viewer.css' %}">
     <link rel="stylesheet" id="pwanimate-css" href="{% static 'css/pwanimate/pwanimate.css' %}?v={{ pwanimate_version|default:'2.0.0' }}-20260929-3">
-    <link rel="stylesheet" href="{% static 'css/liquid-glass.css' %}">
+    <link rel="stylesheet" href="{% static 'css/liquid-glass.css' %}?v=2">
     {% block extra_css %}{% endblock %}
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script>
@@ -1386,6 +1386,7 @@
         console.log('[HTMX Config] History caching configured — snapshot cache disabled, snapshot eviction active');
     </script>
     <script defer src="{% static 'js/device_manager.js' %}"></script>
+    <script defer src="{% static 'js/session_guard.js' %}"></script>
     <script defer src="{% static 'js/bottom-sheet-handles.js' %}"></script>
     <!-- Unified Haptics Engine (Ultra-responsive tactile feedback) -->
     <script defer src="{% static 'js/services/haptics-service.js' %}"></script>
@@ -2434,6 +2435,7 @@
     </style>
 </head>
 <body class="{% block body_class %}{% endblock %}{% if request.resolver_match.url_name == 'login' or request.resolver_match.url_name == 'login_direct' or request.resolver_match.url_name == 'register' %} auth-entry-page{% endif %}"
+      data-session-key="{{ current_session_key }}"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       data-user-id="{{ request.user.id|default:'' }}"
       data-user-username="{{ request.user.username|default:'' }}"
@@ -3304,8 +3306,13 @@
                         <!-- Dynamically populated continuous snap items -->
                     </div>
 
-                    <!-- Desktop Exterior Engagement Rail (Outside Video Container on the right) -->
-                    <div class="reel-desktop-actions-rail d-none d-lg-flex" id="reelDesktopActionsRail">
+                    <!-- Desktop Fixed Tools Column: engagement stack + up/down nav.
+                         Anchored once to the stage's right end — never repositions;
+                         the video card resizes around it (stage reserves a 104px strip). -->
+                    <div class="reel-desktop-tools d-none d-lg-flex" id="reelDesktopTools">
+
+                      <!-- Engagement Rail (Likes, Comments, Repost, Save, Share, Sound) -->
+                      <div class="reel-desktop-actions-rail" id="reelDesktopActionsRail">
                         <div class="reel-desktop-action-unit text-center">
                             <button type="button" class="reel-desktop-action-btn fs-like-proxy-btn" id="fsDesktopLikeBtn" title="{% trans 'Like' %}" aria-label="{% trans 'Like' %}">
                                 <i class="bi bi-heart"></i>
@@ -3348,17 +3355,23 @@
                             </button>
                             <span class="reel-desktop-action-label reel-mute-label">{% trans "Sound" %}</span>
                         </div>
-                    </div>
+                    </div><!-- /.reel-desktop-actions-rail -->
 
-                    <!-- Desktop Up/Down Navigation Floating Buttons (Docked near the comment rail) -->
-                    <div class="reel-desktop-nav-group d-none d-lg-flex">
+                      <!-- Up/Down Navigation (stacked in the fixed tools column) -->
+                      <div class="reel-desktop-nav-group d-none d-lg-flex">
                         <button type="button" class="reel-nav-btn reel-nav-prev" id="reelsNavPrev" title="{% trans 'Previous Reel' %}" aria-label="{% trans 'Previous Reel' %}">
                             <i class="bi bi-chevron-up"></i>
                         </button>
                         <button type="button" class="reel-nav-btn reel-nav-next" id="reelsNavNext" title="{% trans 'Next Reel' %}" aria-label="{% trans 'Next Reel' %}">
                             <i class="bi bi-chevron-down"></i>
                         </button>
-                    </div>
+                      </div><!-- /.reel-desktop-nav-group -->
+
+                      <!-- Keyboard shortcuts reference (? panel trigger) -->
+                      <button type="button" class="reel-kb-help-btn" id="reelKbHelpBtn" title="{% trans 'Keyboard shortcuts' %}" aria-label="{% trans 'Keyboard shortcuts' %}">
+                          <i class="bi bi-keyboard"></i>
+                      </button>
+                    </div><!-- /.reel-desktop-tools -->
                 </div>
 
                 <!-- Right Side Rail for Desktop (TikTok Style Persistent Comments & Info) -->
@@ -3419,9 +3432,36 @@
 
                     <!-- Rail Comments Scrollable Stream -->
                     <div class="reel-rail-comments-body flex-grow-1" id="fsRailCommentsBody">
-                        <div class="text-center py-4 text-muted" id="fsRailCommentsLoading">
-                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                            <span>{% trans "Loading comments..." %}</span>
+                        <div class="rail-comments-skeleton" id="fsRailCommentsLoading" role="status" aria-label="{% trans 'Loading comments' %}">
+                            <div class="rail-sk-item">
+                                <div class="rail-sk-avatar sk-shimmer"></div>
+                                <div class="rail-sk-lines">
+                                    <div class="rail-sk-line sk-shimmer" style="width: 42%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 88%"></div>
+                                </div>
+                            </div>
+                            <div class="rail-sk-item">
+                                <div class="rail-sk-avatar sk-shimmer"></div>
+                                <div class="rail-sk-lines">
+                                    <div class="rail-sk-line sk-shimmer" style="width: 35%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 74%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 52%"></div>
+                                </div>
+                            </div>
+                            <div class="rail-sk-item">
+                                <div class="rail-sk-avatar sk-shimmer"></div>
+                                <div class="rail-sk-lines">
+                                    <div class="rail-sk-line sk-shimmer" style="width: 48%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 82%"></div>
+                                </div>
+                            </div>
+                            <div class="rail-sk-item">
+                                <div class="rail-sk-avatar sk-shimmer"></div>
+                                <div class="rail-sk-lines">
+                                    <div class="rail-sk-line sk-shimmer" style="width: 30%"></div>
+                                    <div class="rail-sk-line sk-shimmer" style="width: 66%"></div>
+                                </div>
+                            </div>
                         </div>
                         <div id="fsRailCommentsList" class="p-3"></div>
                     </div>
@@ -4201,6 +4241,20 @@ window.addEventListener('beforeinstallprompt', (e) => {
                         // Handle user online/offline status updates
                         if (typeof handleUserStatusUpdate === 'function') {
                             handleUserStatusUpdate(data);
+                        }
+                    } else if (data.type === 'force_logout') {
+                        // Device security (Phase 1): another session of this
+                        // account was killed. If this tab owns the dead
+                        // session, drop straight to the login screen.
+                        try {
+                            var ownSessionKey = document.body.getAttribute('data-session-key') || '';
+                            var deadKeys = data.session_keys || [];
+                            if (ownSessionKey && deadKeys.indexOf(ownSessionKey) !== -1) {
+                                console.warn('[GLOBAL] This session was revoked in real time — redirecting to logout.');
+                                window.location.replace('/users/logout/');
+                            }
+                        } catch (flErr) {
+                            console.error('[GLOBAL] force_logout handling failed:', flErr);
                         }
                     }
                 } catch (error) {
@@ -5534,28 +5588,105 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
     // Instant Optimistic Like Button Interaction
     (function() {
-        function updateButtonVisual(btn, isLiked, count, shouldAnimate) {
+        function setButtonVisual(btn, isLiked, count, animate) {
             const icon = btn.querySelector('i');
-            const countEl = btn.querySelector('.like-count');
+            const isReel = btn.classList.contains('reel-action-btn');
             if (isLiked) {
-                btn.classList.add('text-danger');
-                btn.classList.remove('text-muted');
+                btn.classList.add('text-danger', 'liked');
+                if (isReel) { btn.classList.remove('text-white'); } else { btn.classList.remove('text-muted'); }
                 btn.setAttribute('aria-label', 'Unlike');
-                if (icon) {
-                    icon.className = 'bi bi-heart-fill fs-5' + (shouldAnimate ? ' heart-pop' : '');
-                }
+                if (icon) icon.className = isReel
+                    ? 'bi bi-heart-fill text-danger'
+                    : 'bi bi-heart-fill text-danger fs-5' + (animate ? ' heart-pop' : '');
             } else {
-                btn.classList.remove('text-danger');
-                btn.classList.add('text-muted');
+                btn.classList.remove('text-danger', 'liked');
+                if (isReel) { btn.classList.add('text-white'); } else { btn.classList.add('text-muted'); }
                 btn.setAttribute('aria-label', 'Like');
-                if (icon) {
-                    icon.className = 'bi bi-heart fs-5';
-                }
+                if (icon) icon.className = isReel
+                    ? 'bi bi-heart'
+                    : 'bi bi-heart fs-5';
             }
-            if (countEl && count !== undefined && count !== null) {
-                countEl.textContent = count;
+            if (count !== undefined && count !== null) {
+                const countEl = btn.querySelector('.like-count');
+                if (countEl) countEl.textContent = count;
             }
         }
+
+        function applyToEl(el, isLiked, count, animate) {
+            if (el.classList.contains('like-button')) {
+                setButtonVisual(el, isLiked, count, animate);
+            } else {
+                // Card roots / carousel cards carry the state as data attributes
+                // so the fullscreen reel player snapshots accurate like state.
+                if (isLiked !== undefined && isLiked !== null) {
+                    el.setAttribute('data-is-liked', isLiked ? 'true' : 'false');
+                }
+                if (count !== undefined && count !== null) {
+                    el.setAttribute('data-likes', String(count));
+                }
+            }
+        }
+
+        function snapshotEl(el) {
+            const snap = { el: el, liked: null, count: null };
+            if (el.classList.contains('like-button')) {
+                if (el.dataset.isLiked === 'true' || el.dataset.isLiked === 'false') {
+                    snap.liked = el.dataset.isLiked === 'true';
+                } else {
+                    snap.liked = el.classList.contains('text-danger');
+                }
+                const c = el.querySelector('.like-count');
+                if (c) snap.count = parseInt(c.textContent.trim(), 10) || 0;
+            } else {
+                if (el.dataset.isLiked === 'true' || el.dataset.isLiked === 'false') {
+                    snap.liked = el.dataset.isLiked === 'true';
+                }
+                if (el.dataset.likes !== undefined) {
+                    snap.count = parseInt(el.dataset.likes, 10) || 0;
+                }
+            }
+            return snap;
+        }
+
+        // Preferred state source order: server-rendered data-is-liked on the
+        // button (like_button.html), then the card root, then the legacy
+        // text-danger class signal.
+        function readLikedState(btn, shareId) {
+            if (btn.dataset.isLiked === 'true' || btn.dataset.isLiked === 'false') {
+                return btn.dataset.isLiked === 'true';
+            }
+            const card = (shareId && (document.getElementById('post-card-' + shareId) || document.getElementById('reel-card-' + shareId))) ||
+                         btn.closest('.post-card, .reel-post-card, .reels-carousel-card');
+            if (card && (card.dataset.isLiked === 'true' || card.dataset.isLiked === 'false')) {
+                return card.dataset.isLiked === 'true';
+            }
+            return btn.classList.contains('text-danger');
+        }
+
+        function findCardRoots(shareId) {
+            if (!shareId) return [];
+            return Array.from(document.querySelectorAll([
+                '#post-card-' + shareId,
+                '#reel-card-' + shareId,
+                '.post-card[data-post-id="' + shareId + '"]',
+                '.reel-post-card[data-post-id="' + shareId + '"]',
+                '.reels-carousel-card[data-post-id="' + shareId + '"]'
+            ].join(', ')));
+        }
+
+        function findAllLikeButtons(shareId, numericId) {
+            const selectors = [];
+            if (shareId) {
+                selectors.push('.like-button[data-share-id="' + shareId + '"]');
+            }
+            if (numericId) {
+                selectors.push('.like-button[data-post-id="' + numericId + '"]');
+            }
+            if (!selectors.length) return [];
+            return Array.from(document.querySelectorAll(selectors.join(', ')));
+        }
+
+        const pendingSync = new WeakMap();
 
         function toggleLikeOptimistic(btn, event) {
             if (!btn) return;
@@ -5569,39 +5700,48 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
             btn.dataset.pending = 'true';
 
+            const shareId = btn.dataset.shareId || '';
+            const numericId = btn.dataset.postId || '';
+            const isLiked = readLikedState(btn, shareId);
             const countEl = btn.querySelector('.like-count');
-            const isLiked = btn.classList.contains('text-danger');
-
-            btn.dataset.prevLiked = isLiked ? 'true' : 'false';
             const currentCount = parseInt(countEl ? countEl.textContent.trim() : '0', 10) || 0;
-            btn.dataset.prevCount = currentCount;
 
             const newLiked = !isLiked;
             const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
 
-            // Immediate 0ms visual update
-            updateButtonVisual(btn, newLiked, newCount, true);
+            // Snapshot every element we are about to touch so an htmx error
+            // can restore the WHOLE sync scope, not just the clicked button.
+            const ctx = { snaps: [] };
+            const clickedSnap = snapshotEl(btn);
+            ctx.snaps.push(clickedSnap);
+            clickedSnap.liked = isLiked;
+            clickedSnap.count = currentCount;
 
-            // Sync any duplicate buttons for the same post on page
-            const shareId = btn.dataset.shareId;
-            if (shareId) {
-                const siblings = document.querySelectorAll(`.like-button[data-share-id="${shareId}"]`);
-                siblings.forEach(s => {
-                    if (s !== btn) {
-                        updateButtonVisual(s, newLiked, newCount, false);
-                    }
-                });
-            }
+            const updates = [btn];
+            const related = findAllLikeButtons(shareId, numericId);
+            related.forEach(el => {
+                if (el !== btn) {
+                    ctx.snaps.push(snapshotEl(el));
+                    updates.push(el);
+                }
+            });
+            const cardRoots = findCardRoots(shareId);
+            cardRoots.forEach(el => {
+                if (el.dataset.isLiked !== undefined || el.dataset.likes !== undefined) {
+                    ctx.snaps.push(snapshotEl(el));
+                    updates.push(el);
+                }
+            });
+
+            updates.forEach(el => applyToEl(el, newLiked, newCount, el === btn));
+            pendingSync.set(btn, ctx);
         }
 
         function revertLikeOptimistic(btn) {
-            if (!btn || btn.dataset.prevLiked === undefined) return;
-            const wasLiked = btn.dataset.prevLiked === 'true';
-            const prevCount = parseInt(btn.dataset.prevCount, 10) || 0;
-            delete btn.dataset.pending;
-            delete btn.dataset.prevLiked;
-            delete btn.dataset.prevCount;
-            updateButtonVisual(btn, wasLiked, prevCount, false);
+            const ctx = pendingSync.get(btn);
+            if (!ctx) return;
+            ctx.snaps.forEach(s => applyToEl(s.el, s.liked, s.count, false));
+            pendingSync.delete(btn);
         }
 
         // Global capture-phase click handler so visual update runs instantly before HTMX
@@ -5612,7 +5752,16 @@ window.addEventListener('beforeinstallprompt', (e) => {
             }
         }, true);
 
-        // Revert optimistic update on HTMX error
+        // Clear the pending lock once the server response has been swapped in —
+        // the swapped button carries fresh server truth via data-is-liked.
+        document.addEventListener('htmx:afterSwap', function(e) {
+            const btn = e.detail && e.detail.elt;
+            if (btn && btn.matches && btn.matches('.like-button')) {
+                pendingSync.delete(btn);
+            }
+        });
+
+        // Revert optimistic update across the whole sync scope on HTMX error
         document.addEventListener('htmx:responseError', function(e) {
             const btn = (e.detail && e.detail.elt && e.detail.elt.matches && e.detail.elt.matches('.like-button')) ? e.detail.elt : null;
             if (btn) revertLikeOptimistic(btn);

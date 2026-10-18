@@ -278,25 +278,49 @@ def create_post_for_user(form, user, files, group_id=None):
     return post
    
 
-@transaction.atomic
-
-
 def toggle_post_like_for_user(post, user):
-    like_qs = Like.objects.filter(user=user, post=post)
+    # Legacy repost rows (Post.repost_of) are duplicates of their original post.
+    # Always converge on the canonical original so a given piece of content has
+    # exactly one like target — regardless of which card representation the
+    # like button was rendered on.
+    target = post
+    if post.repost_of_id and post.repost_of_id != post.id:
+        try:
+            target = post.repost_of or post
+        except Exception:
+            target = post
 
-    if like_qs.exists():
-        like_qs.delete()
-        is_liked = False
-    else:
-        Like.objects.create(user=user, post=post)
-        is_liked = True
+    # Serialize concurrent toggles on the same post so two rapid clicks
+    # (double-tap, websocket races) can never both read "not liked" and
+    # double-insert/double-delete — the source of likes "removing themselves".
+    with transaction.atomic():
+        Post.objects.select_for_update().filter(pk=target.pk).values('pk').first()
+
+        # If this is a legacy repost-child card, remove any historical like
+        # stored on the child itself so its display state collapses onto the
+        # canonical target.
+        child_like_removed = False
+        if target is not post:
+            child_like_removed = Like.objects.filter(user=user, post=post).exists()
+            Like.objects.filter(user=user, post=post).delete()
+
+        like_exists = Like.objects.filter(user=user, post=target).exists()
+        if like_exists:
+            Like.objects.filter(user=user, post=target).delete()
+            is_liked = False
+        elif child_like_removed:
+            # The child row carried the user's like — this click removed it.
+            is_liked = False
+        else:
+            Like.objects.create(user=user, post=target)
+            is_liked = True
 
     invalidate_home_feed_context(user.id)
 
-    if post.author_id != user.id:
-        invalidate_home_feed_context(post.author_id)
-    
-    like_count = post.likes.count()
+    if target.author_id != user.id:
+        invalidate_home_feed_context(target.author_id)
+
+    like_count = target.likes.count()
 
     # Broadcast like update via WebSocket
     try:
@@ -306,8 +330,8 @@ def toggle_post_like_for_user(post, user):
                 "feed_updates",
                 {
                     'type': 'post_like_update',
-                    'post_id': post.id,
-                    'share_id': str(post.share_id),
+                    'post_id': target.id,
+                    'share_id': str(target.share_id),
                     'like_count': like_count,
                     'is_liked': is_liked,
                     'user_id': user.id
@@ -318,7 +342,7 @@ def toggle_post_like_for_user(post, user):
         logging.getLogger(__name__).warning(f"Error broadcasting like update via WebSocket: {e}")
 
     return {
-        "post": post,
+        "post": target,
         "is_liked": is_liked,
         "like_count": like_count
     }

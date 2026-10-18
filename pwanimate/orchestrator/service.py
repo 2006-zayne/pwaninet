@@ -1413,7 +1413,7 @@ class PwanimateOrchestrator:
             system_instruction=system_instruction,
             provider=("gemini" if is_multimodal_turn else request.provider),
             model=(
-                getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.6-flash")
+                getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.8-flash")
                 if is_multimodal_turn
                 else request.model
             ),
@@ -1467,7 +1467,7 @@ class PwanimateOrchestrator:
                     "vision_fallback_error": type(vision_error).__name__,
                     "fallback_used": True,
                     "original_provider": "gemini",
-                    "original_model": getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.6-flash"),
+                    "original_model": getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.8-flash"),
                 })
         else:
             llm_response = self.gateway.generate(llm_request)

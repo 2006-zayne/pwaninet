@@ -121,34 +121,49 @@ class QuotaTracker:
             settings,
             "PWANIMATE_LLM_FALLBACK_CHAIN",
             [
-                {"provider": "gemini", "model": "gemini-3.6-flash"},
+                {"provider": "gemini", "model": "gemini-3.8-flash"},
                 {"provider": "groq", "model": "openai/gpt-oss-120b"},
-                {"provider": "groq", "model": "openai/gpt-oss-20b"},
-                {"provider": "openrouter", "model": "google/gemini-2.5-flash"},
+                {"provider": "gemini", "model": "gemini-3.6-flash"},
+                {"provider": "openrouter", "model": "google/gemini-flash-latest"},
             ],
         )
 
         MODEL_METADATA = {
-            # Google Gemini
+            # Google Gemini (Google AI Studio API)
+            ("gemini", "gemini-3.8-flash"): {
+                "display_name": "Gemini 3.8 Flash",
+                "provider_label": "Google",
+                "description": "Google's latest flagship high-efficiency multimodal model",
+            },
+            ("gemini", "gemini-3.7-flash"): {
+                "display_name": "Gemini 3.7 Flash",
+                "provider_label": "Google",
+                "description": "Hybrid reasoning and low-latency multimodal model",
+            },
             ("gemini", "gemini-3.6-flash"): {
                 "display_name": "Gemini 3.6 Flash",
                 "provider_label": "Google",
-                "description": "Google's flagship multimodal reasoning model",
-            },
-            ("gemini", "gemini-3.5-flash"): {
-                "display_name": "Gemini 3.5 Flash",
-                "provider_label": "Google",
-                "description": "High-speed balanced multimodal model",
+                "description": "High-throughput, balanced multimodal reasoning model",
             },
             ("gemini", "gemini-3.5-flash-lite"): {
                 "display_name": "Gemini 3.5 Flash-Lite",
                 "provider_label": "Google",
                 "description": "Ultra-lightweight low-latency model",
             },
+            ("gemini", "gemini-flash-lite-latest"): {
+                "display_name": "Gemini Flash-Lite Latest",
+                "provider_label": "Google",
+                "description": "Latest stable Gemini Flash-Lite channel",
+            },
             ("gemini", "gemini-flash-latest"): {
                 "display_name": "Gemini Flash Latest",
                 "provider_label": "Google",
                 "description": "Latest stable Gemini Flash channel",
+            },
+            ("gemini", "gemini-pro-latest"): {
+                "display_name": "Gemini Pro Latest",
+                "provider_label": "Google",
+                "description": "Google's advanced reasoning and complex analysis model",
             },
             # Groq
             ("groq", "openai/gpt-oss-120b"): {
@@ -172,6 +187,11 @@ class QuotaTracker:
                 "description": "Compound reasoning model on Groq",
             },
             # OpenRouter
+            ("openrouter", "google/gemini-flash-latest"): {
+                "display_name": "Gemini Flash Latest",
+                "provider_label": "OpenRouter",
+                "description": "Multimodal Flash hosted on OpenRouter",
+            },
             ("openrouter", "google/gemini-2.5-flash"): {
                 "display_name": "Gemini 2.5 Flash",
                 "provider_label": "OpenRouter",

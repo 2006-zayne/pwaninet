@@ -1,0 +1,14 @@
+{% comment %}
+  Fullscreen landscape timetable overlay (mobile).
+  Hidden by default; academic_workspace.js clones the fitted week grid into
+  #vdwTtOverlayGrid on tap and raises this overlay. One tap = nothing (scroll
+  freely), double-tap anywhere = close and drop back to the fitted card grid.
+  z-index sits BELOW .vdw-topbar (and the glass bottom nav) so the global
+  header remains visible, as designed.
+{% endcomment %}
+<div id="vdwTtOverlay" aria-hidden="true" aria-label="Fullscreen timetable">
+  <div class="vdw-tt-overlay-scroll" id="vdwTtOverlayScroll">
+    <div class="vdw-tt-overlay-inner" id="vdwTtOverlayGrid"></div>
+  </div>
+  <div class="vdw-tt-overlay-hint"><i class="bi bi-arrows-angle-expand"></i> double-tap to close</div>
+</div>

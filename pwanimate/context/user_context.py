@@ -138,6 +138,7 @@ class UserContext:
     tone: str = "neutral"
     response_style: str = "balanced"
     personal_instructions: str = ""
+    weekly_timetable: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to a structured, JSON-serializable dictionary."""
@@ -158,6 +159,7 @@ class UserContext:
             "enrolled_units": list(self.enrolled_units),
             "enrolled_unit_ids": list(self.enrolled_unit_ids),
             "enrolled_unit_codes": list(self.enrolled_unit_codes),
+            "weekly_timetable": self.weekly_timetable,
             "interests": list(self.interests),
             "skills": list(self.skills),
             "collaboration_status": self.collaboration_status,
@@ -217,6 +219,21 @@ class UserContext:
             lines.append("Academic:")
             for part in academic_parts:
                 lines.append(f"- {part}")
+
+        if self.weekly_timetable and isinstance(self.weekly_timetable, dict):
+            sched = self.weekly_timetable.get("weekly_schedule") or []
+            free = self.weekly_timetable.get("free_slots") or []
+            if sched or free:
+                lines.append("Weekly Timetable:")
+                if sched:
+                    lines.append("- Lectures:")
+                    for s in sched:
+                        venue = f" ({s['venue']})" if s.get('venue') else ""
+                        lines.append(f"  * {s.get('day')}: {s.get('start_time')}-{s.get('end_time')} {s.get('unit_code')} {s.get('unit_name', '')}{venue}".rstrip())
+                if free:
+                    lines.append("- Free Study & Revision Blocks:")
+                    for f in free:
+                        lines.append(f"  * {f.get('day')}: {f.get('start_time')}-{f.get('end_time')} ({f.get('duration_hours', '')}h free)")
 
         profile_parts = []
         if self.interests:
@@ -372,6 +389,23 @@ class UserContextService:
         except Exception as exc:
             logger.warning("Error loading enrolled units for user %s: %s", user_id, exc)
 
+        # 2c. Student Cohort Weekly Timetable & Free Revision Slots
+        weekly_timetable = None
+        try:
+            from documents.academic.timetable_service import ProgrammeTimetableManager
+            from documents.academic.models import Institution
+            inst = getattr(target_user, "institution", None) or Institution.objects.filter(is_active=True).first()
+            tt = ProgrammeTimetableManager.get_active_timetable(
+                institution=inst,
+                programme=programme,
+                academic_level=academic_level,
+                semester=semester,
+            )
+            if tt and tt.schedule_data:
+                weekly_timetable = tt.schedule_data
+        except Exception as exc:
+            logger.warning("Error loading timetable for user %s: %s", user_id, exc)
+
         # 3. Interests & Skills Normalization
         interests = normalize_interests(getattr(target_user, "interests", None))
         skills = normalize_skills(getattr(target_user, "skills", None))
@@ -415,6 +449,7 @@ class UserContextService:
             enrolled_units=enrolled_units,
             enrolled_unit_ids=enrolled_unit_ids,
             enrolled_unit_codes=enrolled_unit_codes,
+            weekly_timetable=weekly_timetable,
             interests=interests,
             skills=skills,
             collaboration_status=collaboration_status,
