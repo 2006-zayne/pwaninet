@@ -157,13 +157,11 @@
                     </p>
                 </div>
                 <a href="{% url 'documents:academic:dashboard' %}"
-                   hx-get="{% url 'documents:academic:dashboard' %}"
-                   hx-target="#page-content-target"
-                   hx-swap="innerHTML"
-                   hx-push-url="true"
+                   data-bypass-htmx="true"
+                   hx-boost="false"
                    style="font-size: 0.82rem; font-weight: 600; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
                     <i class="bi bi-mortarboard"></i>
-                    Academic &amp; Units Dashboard
+                    Dashboard
                 </a>
             </div>
             

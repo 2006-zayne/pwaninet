@@ -130,7 +130,7 @@ class PwanimateUIView(View):
                 if hasattr(user, "get_enrolled_units"):
                     try:
                         enrolled_unit_ids = [
-                            e.academic_unit_id for e in user.get_enrolled_units(auto_sync=False)
+                            e.academic_unit_id for e in user.get_enrolled_units()
                         ]
                     except Exception:
                         enrolled_unit_ids = []
