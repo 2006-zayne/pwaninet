@@ -2606,6 +2606,10 @@
 
         function shouldDoze() {
             if (!isReelDesktopMode()) return false;
+            // Never dim the room while the first-run keyboard coach is up —
+            // a dimmed cheat-sheet teaches nobody anything.
+            const coach = document.getElementById('reelKbCoach');
+            if (coach && coach.classList.contains('is-visible')) return false;
             const active = getActiveSnapItem();
             const vid = active ? active.querySelector('video') : null;
             return !!vid && !vid.paused && !vid.ended;
@@ -2708,13 +2712,130 @@
         return detach;
     }
 
+    // ============================================================================
+    // KEYBOARD EDUCATION — first-run coach card + always-available "?"/panel.
+    // Same pattern as the immersive rail tip: localStorage-gated, one-time,
+    // appended to the stage so the existing doze/teardown machinery covers it.
+    // ============================================================================
+
+    const REEL_KB_COACH_KEY = 'pwaninetReelsKbCoachSeen';
+    let reelKbPanelOpen = false;
+    let reelKbCoachKeyTimer = null;
+
+    function reelKbRowsHtml() {
+        const rows = [
+            ['Space', 'Play / pause'],
+            ['\u2191 / \u2193', 'Previous / next reel'],
+            ['M', 'Mute / unmute'],
+            ['C', 'Cinema mode (hide rail)'],
+            ['Esc', 'Close player']
+        ];
+        return '<div class="reel-kb-rows">' + rows.map(function (r) {
+            var label = window.gettext ? gettext(r[1]) : r[1];
+            return '<div class="reel-kb-row"><kbd class="reel-kb-key">' + r[0] + '</kbd><span class="reel-kb-desc">' + label + '</span></div>';
+        }).join('') + '</div>';
+    }
+
+    function ensureKbHelpDom() {
+        const stage = document.querySelector('.reel-desktop-stage');
+        if (!stage) return null;
+
+        let coach = document.getElementById('reelKbCoach');
+        if (!coach) {
+            coach = document.createElement('div');
+            coach.id = 'reelKbCoach';
+            coach.className = 'reel-kb-coach';
+            coach.innerHTML = [
+                '<button type="button" class="reel-kb-coach-close" aria-label="Dismiss"><i class="bi bi-x-lg"></i></button>',
+                '<div class="reel-kb-coach-title"><i class="bi bi-keyboard" aria-hidden="true"></i><span>' + (window.gettext ? gettext('Browse with your keyboard') : 'Browse with your keyboard') + '</span></div>',
+                reelKbRowsHtml()
+            ].join('');
+            coach.addEventListener('click', function (e) { e.stopPropagation(); });
+            coach.querySelector('.reel-kb-coach-close').addEventListener('click', function () { dismissReelKbCoach(); });
+            stage.appendChild(coach);
+        }
+
+        let panel = document.getElementById('reelKbPanel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'reelKbPanel';
+            panel.className = 'reel-kb-panel';
+            panel.innerHTML = reelKbRowsHtml();
+            panel.addEventListener('click', function (e) { e.stopPropagation(); });
+            stage.appendChild(panel);
+        }
+
+        return { coach: coach, panel: panel };
+    }
+
+    function hideReelKbCoach() {
+        // Teardown-safe: just vanish. MUST NOT mark the coach as "seen" —
+        // teardown also runs when an open supersedes a previous open, and that
+        // would suppress the coach before it ever displayed.
+        const coach = document.getElementById('reelKbCoach');
+        if (coach) coach.classList.remove('is-visible');
+        if (reelKbCoachKeyTimer) { clearTimeout(reelKbCoachKeyTimer); reelKbCoachKeyTimer = null; }
+    }
+
+    function dismissReelKbCoach() {
+        hideReelKbCoach();
+        try { localStorage.setItem(REEL_KB_COACH_KEY, '1'); } catch (_) {}
+    }
+
+    function maybeShowReelKbCoach() {
+        if (!isReelDesktopMode()) return;
+        try { if (localStorage.getItem(REEL_KB_COACH_KEY)) return; } catch (_) { return; }
+        const dom = ensureKbHelpDom();
+        if (!dom) return;
+
+        dom.coach.classList.add('is-visible');
+        try { localStorage.setItem(REEL_KB_COACH_KEY, '1'); } catch (_) {}
+
+        // Pressing any key IS the lesson working — dismiss on the first one.
+        const onFirstKey = function () {
+            dismissReelKbCoach();
+            document.removeEventListener('keydown', onFirstKey, true);
+        };
+        document.addEventListener('keydown', onFirstKey, true);
+        reelKbCoachKeyTimer = setTimeout(onFirstKey, 9000);
+    }
+
+    function toggleReelKbPanel(force) {
+        const dom = ensureKbHelpDom();
+        if (!dom) return;
+        const helpBtn = document.getElementById('reelKbHelpBtn');
+        reelKbPanelOpen = (typeof force === 'boolean') ? force : !reelKbPanelOpen;
+        dom.panel.classList.toggle('is-open', reelKbPanelOpen);
+        if (helpBtn) helpBtn.classList.toggle('is-active', reelKbPanelOpen);
+    }
+
+    function setupReelKbEducation() {
+        // Idempotent document-level wiring (button toggle + outside-click close)
+        if (window._reelKbHelpBound) return;
+        window._reelKbHelpBound = true;
+        document.addEventListener('click', function (e) {
+            if (!state.isFullScreenActive) return;
+            if (e.target.closest && e.target.closest('#reelKbHelpBtn')) {
+                e.preventDefault();
+                toggleReelKbPanel();
+                return;
+            }
+            if (reelKbPanelOpen && !(e.target.closest && e.target.closest('#reelKbPanel'))) {
+                toggleReelKbPanel(false);
+            }
+        });
+    }
+
     function setupReelDesktopFx() {
-        // ...teardown chains both helpers into one call
+        // ...teardown chains all helpers into one call
+        setupReelKbEducation();
         const t1 = setupReelIdleDozer();
         const t2 = setupImmersiveTipCounter();
         return function teardown() {
             try { t1(); } catch (_) {}
             try { t2(); } catch (_) {}
+            toggleReelKbPanel(false);
+            hideReelKbCoach();
         };
     }
 
@@ -3404,6 +3525,8 @@
             try { state.reelDesktopFxTeardown(); } catch (_) {}
         }
         state.reelDesktopFxTeardown = setupReelDesktopFx();
+        // First desktop run: teach the keyboard (one-time, localStorage-gated)
+        setTimeout(maybeShowReelKbCoach, 900);
 
         // Force white icons in status bar for fullscreen reels mode
         try {
@@ -5504,7 +5627,20 @@
 
             if (event.key === 'Escape') {
                 event.preventDefault();
+                // Esc closes the shortcuts panel first — never yank the player
+                // away while someone is just reading the cheat-sheet.
+                if (reelKbPanelOpen) {
+                    toggleReelKbPanel(false);
+                    return;
+                }
                 closeFullscreenReels();
+                return;
+            }
+
+            // '?' (Shift + /) — YouTube parity: open/close the shortcuts panel
+            if (event.key === '?' || (event.shiftKey && event.key === '/')) {
+                event.preventDefault();
+                toggleReelKbPanel();
                 return;
             }
 

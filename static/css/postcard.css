@@ -2614,6 +2614,171 @@ body.reels-active .modal-backdrop {
   animation: reelCardEnter 200ms ease-out;
 }
 
+/* ============================================================================
+   Keyboard education — first-run coach card + "?" shortcuts panel.
+   Both float over the stage, share the floating-rail card language
+   (card bg, 1px ring, soft shadow) and never block the video.
+   ========================================================================== */
+.reel-kb-help-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.reel-kb-help-btn:hover,
+.reel-kb-help-btn.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  opacity: 1;
+}
+
+[data-theme="dark"] .reel-kb-help-btn {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.reel-kb-coach,
+.reel-kb-panel {
+  position: absolute;
+  z-index: 10745;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--card-border, #e4e6eb);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 3px 12px rgba(0, 0, 0, 0.25);
+  color: var(--text-primary, #050505);
+}
+
+/* Coach card — bottom-center of the stage, above the progress line */
+.reel-kb-coach {
+  bottom: 96px;
+  left: 50%;
+  transform: translate(-50%, 12px);
+  min-width: 264px;
+  max-width: 320px;
+  padding: 14px 16px 15px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+}
+
+.reel-kb-coach.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.reel-kb-coach-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 11px;
+  padding-right: 22px;
+}
+
+.reel-kb-coach-title i {
+  color: var(--text-secondary, #65676b);
+  font-size: 1rem;
+}
+
+.reel-kb-coach-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary, #65676b);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+}
+
+.reel-kb-coach-close:hover {
+  background: rgba(128, 138, 158, 0.14);
+  color: var(--text-primary, #050505);
+}
+
+/* "?" panel — floats just left of the tools column, vertically centered */
+.reel-kb-panel {
+  right: 84px;
+  top: 50%;
+  transform: translateY(-50%) translateX(10px);
+  padding: 14px 16px;
+  min-width: 252px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+}
+
+.reel-kb-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(-50%) translateX(0);
+}
+
+.reel-kb-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.reel-kb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+
+.reel-kb-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-primary, #050505);
+  background: rgba(128, 138, 158, 0.14);
+  border: 1px solid var(--card-border, #e4e6eb);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 3px 8px;
+  min-width: 40px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.reel-kb-desc {
+  color: var(--text-primary, #050505);
+}
+
+[data-theme="dark"] .reel-kb-key {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-kb-coach,
+  .reel-kb-panel {
+    transition: opacity 0.01s linear, visibility 0.01s linear;
+  }
+}
+
 .reel-desktop-action-unit {
   display: flex;
   flex-direction: column;
