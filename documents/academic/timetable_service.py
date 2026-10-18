@@ -317,22 +317,36 @@ class ProgrammeTimetableManager:
         programme: Optional[Programme],
         academic_level: Optional[AcademicLevel],
         semester: Optional[Semester] = None,
-        timetable_type: str = TimetableType.LECTURE
+        timetable_type: str = TimetableType.LECTURE,
+        include_processing: bool = True,
     ) -> Optional[ProgrammeTimetable]:
-        """Fetch active timetable for a specific student cohort."""
+        """Fetch active (or currently processing) timetable for a specific student cohort."""
+        from django.db.models import Q
         if not programme or not academic_level:
             return None
 
+        # Include PROCESSING so the dashboard panel shows the Spark AI shimmer animation and HTMX auto-poll
+        status_q = Q(is_active=True)
+        if include_processing:
+            status_q |= Q(status=TimetableStatus.PROCESSING)
+
         qs = ProgrammeTimetable.objects.filter(
+            status_q,
             programme=programme,
             academic_level=academic_level,
             timetable_type=timetable_type,
-            is_active=True,
         )
+
         if institution:
-            qs = qs.filter(institution=institution)
+            qs_inst = qs.filter(Q(institution=institution) | Q(institution__isnull=True))
+            if qs_inst.exists():
+                qs = qs_inst
+
         if semester:
-            qs = qs.filter(semester=semester)
+            # Try matching specific semester first; fall back to unmapped or cohort-wide timetable
+            qs_sem = qs.filter(semester=semester)
+            if qs_sem.exists():
+                return qs_sem.order_by('-revision_number', '-created_at').first()
 
         return qs.order_by('-revision_number', '-created_at').first()
 

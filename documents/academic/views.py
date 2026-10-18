@@ -267,6 +267,20 @@ def academic_dashboard(request):
             academic_level=selected_level_obj,
             semester=summary.get('semester') or getattr(user, 'semester', None),
         )
+    # If the currently selected year tab has no timetable, fall back to student's enrolled level
+    if not active_timetable and selected_programme and student_lvl and student_lvl != selected_level_obj:
+        active_timetable = ProgrammeTimetableManager.get_active_timetable(
+            institution=getattr(user, 'institution', None),
+            programme=selected_programme,
+            academic_level=student_lvl,
+            semester=summary.get('semester') or getattr(user, 'semester', None),
+        )
+    # Final fallback: display the latest active or processing timetable for this programme
+    if not active_timetable and selected_programme:
+        active_timetable = ProgrammeTimetable.objects.filter(
+            programme=selected_programme,
+            is_active=True,
+        ).order_by('-revision_number', '-created_at').first()
 
     context = {
         'page_title': 'Academic & Units Dashboard',
