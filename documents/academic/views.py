@@ -20,8 +20,12 @@ from .models import (
 )
 from .services import StudentAcademicEnrollmentService
 from .timetable_service import ProgrammeTimetableManager, compute_free_slots
+from .workspace import build_week_grid, today_agenda
 
 logger = logging.getLogger(__name__)
+
+# Centre sections served inside the VASTO Student Dashboard workspace.
+_ACADEMIC_SECTIONS = ('timetable', 'overall', 'calendar', 'assignments', 'exams')
 
 
 def load_academic_levels(request):
@@ -192,6 +196,46 @@ def _build_programme_curriculum_matrix(programme, duration_years: int = 4):
     return matrix
 
 
+def _enrolled_unit_document_counts(unit_ids):
+    """Map unit_id → public ready-document count for the enrolled-units rail list."""
+    from django.db.models import Count, Q
+    ids = [u for u in (unit_ids or []) if u]
+    if not ids:
+        return {}
+    rows = AcademicUnit.objects.filter(id__in=ids).annotate(
+        ready_doc_count=Count(
+            'documents',
+            filter=Q(
+                documents__document__status='ready',
+                documents__document__is_available=True,
+                documents__document__visibility='public',
+            ),
+            distinct=True,
+        )
+    )
+    return {row.id: getattr(row, 'ready_doc_count', 0) or 0 for row in rows}
+
+
+def _workspace_week_grid(active_timetable, summary):
+    """Render-ready geometry for the dashboard week grid (None when no data)."""
+    if not active_timetable or not getattr(active_timetable, 'is_active', False):
+        return None
+    summary = summary or {}
+    student_level_id = summary.get('academic_level_id')
+    student_semester_id = summary.get('semester_id')
+    # "Today" chrome only when the viewed timetable belongs to the student's
+    # own live cohort — otherwise the grid is a historical/other-cohort view.
+    is_current = bool(
+        summary.get('programme_id')
+        and active_timetable.academic_level_id == student_level_id
+        and active_timetable.semester_id == student_semester_id
+    )
+    return build_week_grid(
+        getattr(active_timetable, 'schedule_data', None),
+        is_current_context=is_current,
+    )
+
+
 @login_required
 @require_GET
 def academic_dashboard(request):
@@ -267,23 +311,32 @@ def academic_dashboard(request):
             academic_level=selected_level_obj,
             semester=summary.get('semester') or getattr(user, 'semester', None),
         )
-    # If the currently selected year tab has no timetable, fall back to student's enrolled level
-    if not active_timetable and selected_programme and student_lvl and student_lvl != selected_level_obj:
-        active_timetable = ProgrammeTimetableManager.get_active_timetable(
-            institution=getattr(user, 'institution', None),
-            programme=selected_programme,
-            academic_level=student_lvl,
-            semester=summary.get('semester') or getattr(user, 'semester', None),
-        )
-    # Final fallback: display the latest active or processing timetable for this programme
-    if not active_timetable and selected_programme:
-        active_timetable = ProgrammeTimetable.objects.filter(
-            programme=selected_programme,
-            is_active=True,
-        ).order_by('-revision_number', '-created_at').first()
+    # No silent cross-cohort fallbacks: if this cohort has no published
+    # timetable, the section renders its honest empty state (upload CTA).
+    # Other cohorts are still browseable deliberately via the year pills.
+
+    week_grid = _workspace_week_grid(active_timetable, summary)
+    enrolled_units = summary.get('enrolled_units') or []
+    enrolled_doc_counts = _enrolled_unit_document_counts(
+        [entry.get('id') for entry in enrolled_units]
+    )
+    for entry in enrolled_units:
+        entry['doc_count'] = enrolled_doc_counts.get(entry.get('id'), 0)
+
+    today_rows = []
+    if active_timetable and getattr(active_timetable, 'is_active', False):
+        try:
+            today_rows = today_agenda(getattr(active_timetable, 'schedule_data', None))
+        except Exception:
+            logger.warning('[ACADEMIC_DASHBOARD] today_agenda failed', exc_info=True)
+
+    section = request.GET.get('section') or 'timetable'
+    if section not in _ACADEMIC_SECTIONS:
+        section = 'timetable'
+    refresh_ctx = bool(('year' in request.GET or 'semester' in request.GET))
 
     context = {
-        'page_title': 'Academic & Units Dashboard',
+        'page_title': 'vasto student dashboard',
         'academic_summary': summary,
         'selected_programme': selected_programme,
         'selected_year_num': selected_year_num,
@@ -297,13 +350,20 @@ def academic_dashboard(request):
         'academic_levels': academic_levels,
         'programmes': programmes,
         'active_timetable': active_timetable,
-        'document_content_partial': 'documents/partials/academic_dashboard_content.html',
+        'week_grid': week_grid,
+        'today_rows': today_rows,
+        'enrolled_doc_counts': enrolled_doc_counts,
+        'active_section': section,
+        'refresh_ctx': refresh_ctx,
+        'document_content_partial': 'documents/academic_dashboard.html',
         'show_library_button': False,
         'show_upload_button': False,
     }
 
     if request.headers.get('HX-Request'):
-        return render(request, 'documents/partials/documents_navigation_partial.html', context)
+        if request.GET.get('partial') == 'ctx_body':
+            return render(request, 'documents/academic_workspace/ctx_body.html', context)
+        return render(request, f'documents/academic_workspace/sections/{section}.html', context)
     return render(request, 'documents/academic_dashboard.html', context)
 
 
@@ -622,8 +682,9 @@ def upload_timetable_view(request):
             'academic_summary': StudentAcademicEnrollmentService.get_student_academic_summary(user),
             'selected_programme': programme,
             'selected_level_obj': academic_level,
+            'week_grid': _workspace_week_grid(timetable, StudentAcademicEnrollmentService.get_student_academic_summary(user)),
         }
-        return render(request, 'documents/partials/timetable_panel.html', context)
+        return render(request, 'documents/academic_workspace/sections/timetable.html', context)
 
     return JsonResponse({
         'success': True,
@@ -640,7 +701,7 @@ def upload_timetable_view(request):
 @require_GET
 def timetable_status_api(request, timetable_id: int):
     """
-    Polling endpoint used by the HTMX "Processing..." skeleton in timetable_panel.html.
+    Polling endpoint used by the dashboard timetable section (academic_workspace)
 
     Returns the current timetable status.  When status is ACTIVE the full
     schedule_data is included so the client can update the panel without a
@@ -665,13 +726,15 @@ def timetable_status_api(request, timetable_id: int):
 
     # If HTMX request and timetable is now active, return a fully rendered panel
     if request.headers.get('HX-Request') and timetable.status == TimetableStatus.ACTIVE:
+        summary = StudentAcademicEnrollmentService.get_student_academic_summary(request.user)
         context = {
             'active_timetable': timetable,
-            'academic_summary': StudentAcademicEnrollmentService.get_student_academic_summary(request.user),
+            'academic_summary': summary,
             'selected_programme': timetable.programme,
             'selected_level_obj': timetable.academic_level,
+            'week_grid': _workspace_week_grid(timetable, summary),
         }
-        return render(request, 'documents/partials/timetable_panel.html', context)
+        return render(request, 'documents/academic_workspace/sections/timetable.html', context)
 
     return JsonResponse(payload)
 
@@ -742,13 +805,15 @@ def timetable_slot_mutation_view(request, timetable_id: int):
         return JsonResponse({'success': False, 'error': str(exc)}, status=400)
 
     if request.headers.get('HX-Request'):
+        summary = StudentAcademicEnrollmentService.get_student_academic_summary(user)
         context = {
             'active_timetable': updated_tt,
-            'academic_summary': StudentAcademicEnrollmentService.get_student_academic_summary(user),
+            'academic_summary': summary,
             'selected_programme': updated_tt.programme,
             'selected_level_obj': updated_tt.academic_level,
+            'week_grid': _workspace_week_grid(updated_tt, summary),
         }
-        return render(request, 'documents/partials/timetable_panel.html', context)
+        return render(request, 'documents/academic_workspace/sections/timetable.html', context)
 
     return JsonResponse({
         'success': True,

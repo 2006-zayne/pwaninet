@@ -1,0 +1,25 @@
+{% comment %}
+  Context rail: 48px header with Units/Cohort tabs + minimal icon-only close.
+  Flat, borderless sections below (no boxed cards). On mobile this same rail
+  becomes the bottom sheet (CSS transforms it — one DOM node, all HTMX targets
+  keep working). Body swaps via #ctx-body (year/semester OOB + partial=ctx_body).
+{% endcomment %}
+<div class="vdw-ctx" id="vdwCtx">
+  <div class="vdw-ctx-header">
+    <div class="vdw-ctx-tabs" role="tablist">
+      <button type="button" class="vdw-ctx-tab active" data-ctx-tab="units" onclick="vdwSetCtxTab('units')">
+        <i class="bi bi-collection-play"></i> Units
+      </button>
+      <button type="button" class="vdw-ctx-tab" data-ctx-tab="cohort" onclick="vdwSetCtxTab('cohort')">
+        <i class="bi bi-people"></i> Cohort
+      </button>
+    </div>
+    <button type="button" class="vdw-icon-btn" onclick="vdwCloseCtx()" title="Close panel" aria-label="Close panel">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+  <div class="vdw-ctx-body" id="ctx-body">
+    {% include 'documents/academic_workspace/ctx_body.html' %}
+  </div>
+</div>
+<div class="vdw-sheet-backdrop" id="vdwSheetBackdrop" onclick="vdwCloseCtx()"></div>

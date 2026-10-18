@@ -1,0 +1,40 @@
+{% load static %}{% comment %}
+  Floating liquid-glass topbar for the VASTO Student Dashboard (Pwanimate style).
+  Desktop: brand only + subtle actions. Mobile: compact brand ("DASHBOARD"),
+  context-sheet toggle and theme quick toggle.
+{% endcomment %}
+<nav class="vdw-topbar">
+  <a href="/" class="vdw-brand-external">
+    <span class="vdw-brand">
+      <img src="{% static 'images/vasto-transparent.png' %}" alt="vasto">
+      <span class="vdw-brand-word-long">Vasto Student Dashboard</span>
+      <span class="vdw-brand-word-short">Dashboard</span>
+    </span>
+  </a>
+
+  <div class="vdw-topbar-actions">
+    {# Desktop quick actions #}
+    <span class="vdw-top-fn">
+      <button type="button" class="vdw-icon-btn" onclick="setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark')" title="Toggle theme">
+        <i class="bi bi-circle-half"></i>
+      </button>
+    </span>
+
+    {# Mobile controls #}
+    <button type="button" class="vdw-icon-btn vdw-mob-ctl" id="vdwMobCtxBtn" title="Units &amp; Cohort" onclick="vdwToggleCtx()">
+      <i class="bi bi-collection"></i>
+    </button>
+    <button type="button" class="vdw-icon-btn vdw-mob-ctl" id="vdwMobThemeBtn" title="Theme" onclick="vdwThemeCycle()">
+      <i class="bi bi-circle-half"></i>
+    </button>
+
+    {# Avatar — real student profile photo (global app pattern) #}
+    <a href="{% url 'users:profile' request.user.username %}" class="vdw-avatar-link" data-bypass-htmx="true" hx-boost="false" title="My profile">
+      {% if request.user.profile_pic %}
+        <img src="{{ request.user.profile_pic.url }}" class="vdw-avatar" alt="Profile">
+      {% else %}
+        <span class="vdw-avatar vdw-avatar-fallback"><i class="bi bi-person-fill"></i></span>
+      {% endif %}
+    </a>
+  </div>
+</nav>

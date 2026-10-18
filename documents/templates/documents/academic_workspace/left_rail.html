@@ -1,0 +1,97 @@
+{% comment %}
+  Dashboard left rail — the dashboard's own tools (Timetable default) plus
+  Pwanimate rail mechanics: back-to-vasto pill, collapse toggle, theme tri-toggle,
+  quick actions row, and a 56px collapsed strip. All section navigation is HTMX
+  (targets #dash-main) with URL push — no full page reloads.
+{% endcomment %}
+
+{% url 'documents:academic:dashboard' as dash_url %}
+{% with qs_base=dash_url %}
+
+<div class="vdw-rail" id="vdwRail">
+  <div class="vdw-rail-head">
+    <div class="vdw-rail-head-row">
+      <a href="/" class="vdw-back-vasto" data-bypass-htmx="true" hx-boost="false" title="Back to vasto">
+        <i class="bi bi-arrow-left"></i> vasto
+      </a>
+      <button type="button" class="vdw-collapse-btn" onclick="vdwToggleLeft()" title="Collapse rail">
+        <i class="bi bi-chevron-left"></i>
+      </button>
+    </div>
+    <div class="vdw-theme-group" role="group" aria-label="Theme">
+      <button type="button" class="vdw-theme-btn" data-vdw-theme="light" onclick="setTheme('light');vdwSyncThemeBtns();" title="Light">
+        <i class="bi bi-sun"></i>
+      </button>
+      <button type="button" class="vdw-theme-btn" data-vdw-theme="dark" onclick="setTheme('dark');vdwSyncThemeBtns();" title="Dark">
+        <i class="bi bi-moon"></i>
+      </button>
+      <button type="button" class="vdw-theme-btn" data-vdw-theme="system" onclick="setTheme('system');vdwSyncThemeBtns();" title="System">
+        <i class="bi bi-circle-half"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="vdw-rail-actions">
+    <button type="button" class="vdw-action-primary" onclick="vdwOpenAddSlot()" title="Add timetable slot">
+      <i class="bi bi-plus-lg"></i> Add Slot
+    </button>
+    <button type="button" class="vdw-action-outline" onclick="vdwOpenUpload()" title="Upload timetable image">
+      <i class="bi bi-camera"></i>
+    </button>
+  </div>
+
+  <div class="vdw-rail-label">Dashboard</div>
+  <nav class="vdw-nav">
+    <button type="button" class="vdw-nav-link{% if active_section == 'timetable' %} active{% endif %}" data-vdw-nav="timetable"
+            hx-get="{{ dash_url }}?section=timetable{% if selected_year_num %}&year={{ selected_year_num }}{% endif %}{% if selected_sem_num %}&semester={{ selected_sem_num }}{% endif %}"
+            hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">
+      <i class="bi bi-calendar-week"></i> <span>Timetable</span>
+    </button>
+    <button type="button" class="vdw-nav-link{% if active_section == 'overall' %} active{% endif %}" data-vdw-nav="overall"
+            hx-get="{{ dash_url }}?section=overall{% if selected_year_num %}&year={{ selected_year_num }}{% endif %}{% if selected_sem_num %}&semester={{ selected_sem_num }}{% endif %}"
+            hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">
+      <i class="bi bi-speedometer2"></i> <span>Overall</span>
+    </button>
+    <button type="button" class="vdw-nav-link{% if active_section == 'calendar' %} active{% endif %}" data-vdw-nav="calendar"
+            hx-get="{{ dash_url }}?section=calendar{% if selected_year_num %}&year={{ selected_year_num }}{% endif %}{% if selected_sem_num %}&semester={{ selected_sem_num }}{% endif %}"
+            hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">
+      <i class="bi bi-calendar4-event"></i> <span>Calendar</span>
+    </button>
+    <button type="button" class="vdw-nav-link{% if active_section == 'assignments' %} active{% endif %}" data-vdw-nav="assignments"
+            hx-get="{{ dash_url }}?section=assignments{% if selected_year_num %}&year={{ selected_year_num }}{% endif %}{% if selected_sem_num %}&semester={{ selected_sem_num }}{% endif %}"
+            hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">
+      <i class="bi bi-journal-check"></i> <span>Assignments</span>
+    </button>
+    <button type="button" class="vdw-nav-link{% if active_section == 'exams' %} active{% endif %}" data-vdw-nav="exams"
+            hx-get="{{ dash_url }}?section=exams{% if selected_year_num %}&year={{ selected_year_num }}{% endif %}{% if selected_sem_num %}&semester={{ selected_sem_num }}{% endif %}"
+            hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">
+      <i class="bi bi-file-earmark-text"></i> <span>Exams</span>
+    </button>
+  </nav>
+
+  <div class="vdw-rail-foot" style="padding:10px 14px;border-top:1px solid var(--border);font-size:.66rem;color:var(--text-secondary);flex-shrink:0;">
+    <i class="bi bi-mortarboard"></i> {{ academic_summary.programme_code|default:"vasto" }} · Year {{ academic_summary.academic_level_number|default:selected_year_num|default:"–" }}
+  </div>
+</div>
+
+{# ── Collapsed 56px strip (Spark style) ── #}
+<div class="vdw-rail-strip">
+  <button type="button" class="vdw-strip-btn" onclick="vdwToggleLeft()" title="Expand rail">
+    <i class="bi bi-chevron-right"></i>
+  </button>
+  <button type="button" class="vdw-strip-btn is-primary" onclick="vdwOpenAddSlot()" title="Add Slot">
+    <i class="bi bi-plus-lg"></i>
+  </button>
+  <button type="button" class="vdw-strip-btn" onclick="vdwOpenUpload()" title="Upload timetable">
+    <i class="bi bi-camera"></i>
+  </button>
+  <span class="vdw-strip-spacer"></span>
+  <a href="/" class="vdw-strip-btn" data-bypass-htmx="true" hx-boost="false" title="Back to vasto">
+    <i class="bi bi-box-arrow-left"></i>
+  </a>
+  <button type="button" class="vdw-strip-btn" data-vdw-strip-theme onclick="setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', false);vdwSyncThemeBtns();" title="Toggle dark mode">
+    <i class="bi bi-moon"></i>
+  </button>
+</div>
+
+{% endwith %}

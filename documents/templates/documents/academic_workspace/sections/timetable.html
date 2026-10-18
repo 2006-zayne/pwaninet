@@ -1,0 +1,280 @@
+{% load academic_workspace_extras %}{% comment %}
+  Centre section: WEEK TIMETABLE. States:
+    A. PROCESSING  — Spark AI extracting; HTMX polls academic:timetable_status
+                     every 4s (outerHTML swap replaces this same section root).
+    B. FAILED      — extraction failed; re-upload CTA.
+    C. ACTIVE      — the rows × columns week grid (desktop) + day-tabbed list
+                     (mobile), plus Add-Slot drawer and legend.
+    D. ACTIVE, zero slots / no timetable — empty state + upload CTA.
+  The section root carries data-vdw-section for nav sync and, while PROCESSING,
+  the polling hx-get attributes (removed on the ACTIVE swap, polling stops).
+{% endcomment %}
+
+{% url 'documents:academic:dashboard' as dash_url %}
+<div class="vdw-section on" data-vdw-section="timetable"
+     data-vdw-refresh-url="{{ dash_url }}?section=timetable{% if selected_year_num %}&year={{ selected_year_num }}{% endif %}{% if selected_sem_num %}&semester={{ selected_sem_num }}{% endif %}"
+     {% if active_timetable and active_timetable.status == 'PROCESSING' %}hx-get="{% url 'documents:academic:timetable_status' active_timetable.id %}" hx-trigger="load, every 4s" hx-swap="outerHTML"{% endif %}>
+
+  <div class="vdw-page-head">
+    <div>
+      <h1><i class="bi bi-calendar-week"></i> Timetable</h1>
+      <p class="vdw-page-sub">
+        {% if selected_programme %}{{ selected_programme.code|default:selected_programme.name }} · {% endif %}Year {{ selected_year_num|default:"–" }} · Semester {{ selected_sem_num|default:"–" }}
+      </p>
+    </div>
+    <button type="button" class="vdw-btn" onclick="toggleAddSlotDrawer()">
+      <i class="bi bi-plus-lg"></i> Add Slot
+    </button>
+  </div>
+
+  {# ═══ A. PROCESSING ═══ #}
+  {% if active_timetable and active_timetable.status == 'PROCESSING' %}
+    <div class="vdw-card">
+      <div class="vdw-empty" style="padding:46px 20px;">
+        <div class="vdw-empty-icon" style="color:var(--primary);">
+          <div class="spinner-border" role="status" style="width:30px;height:30px;">
+            <span class="visually-hidden">Loading…</span>
+          </div>
+        </div>
+        <h3>Spark AI is extracting your timetable…</h3>
+        <p>
+          Your upload (revision {% if active_timetable.revision_number %}#{{ active_timetable.revision_number }}{% endif %}) is being
+          processed — sessions, venues and free study blocks will appear here automatically.
+          This panel refreshes itself every few seconds.
+        </p>
+      </div>
+    </div>
+
+  {# ═══ B. FAILED ═══ #}
+  {% elif active_timetable and active_timetable.status == 'FAILED' %}
+    <div class="vdw-card">
+      <div class="vdw-empty">
+        <div class="vdw-empty-icon" style="color:#dc3545;background:rgba(220,53,69,.09);">
+          <i class="bi bi-x-octagon"></i>
+        </div>
+        <h3>Extraction failed</h3>
+        <p>
+          {% if active_timetable.error_message %}{{ active_timetable.error_message }}{% else %}
+          Spark AI could not read this timetable image. Try a clearer, well-lit screenshot of the full week.{% endif %}
+        </p>
+        <button type="button" class="vdw-btn vdw-btn-primary" style="margin-top:14px;" onclick="triggerTimetableUpload()">
+          <i class="bi bi-camera"></i> Upload a New Image
+        </button>
+      </div>
+    </div>
+
+  {# ═══ C. ACTIVE — the week grid ═══ #}
+  {% elif active_timetable and active_timetable.is_active and week_grid and week_grid.slot_count > 0 %}
+
+    <div class="vdw-card" id="tt-card">
+
+      <div class="vdw-drawer" id="timetable-add-slot-drawer" style="display:none;">
+        <form onsubmit="submitTimetableSlot(event)">
+          <div class="vdw-drawer-grid">
+            <div>
+              <label for="slotDay">Day</label>
+              <select id="slotDay" required>
+                <option value="Monday">Monday</option><option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option><option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option><option value="Saturday">Saturday</option>
+              </select>
+            </div>
+            <div><label for="slotStartTime">Start</label><input type="time" id="slotStartTime" value="08:00" required></div>
+            <div><label for="slotEndTime">End</label><input type="time" id="slotEndTime" value="10:00" required></div>
+            <div><label for="slotUnitCode">Unit code</label><input type="text" id="slotUnitCode" placeholder="CSC 221" required></div>
+            <div><label for="slotUnitName">Unit name</label><input type="text" id="slotUnitName" placeholder="Data Structures"></div>
+            <div><label for="slotVenue">Venue</label><input type="text" id="slotVenue" placeholder="Lab B"></div>
+            <div style="display:flex;gap:6px;">
+              <button type="submit" class="vdw-btn vdw-btn-primary" style="flex:1;"><i class="bi bi-check-lg"></i> Save</button>
+              <button type="button" class="vdw-btn" onclick="toggleAddSlotDrawer()"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="vdw-card-head">
+        <h2 class="vdw-card-title"><i class="bi bi-calendar3"></i> Weekly Timetable</h2>
+        <div class="vdw-tt-meta">
+          <span><b>{{ week_grid.slot_count }}</b> sessions</span>
+          <span><b>{{ week_grid.contact_total_hours }}</b> contact hrs</span>
+          {% if week_grid.free_total_hours %}<span><b>{{ week_grid.free_total_hours }}</b> free hrs</span>{% endif %}
+        </div>
+      </div>
+
+      {# ── Desktop: absolute-positioned week grid ── #}
+      <div class="vdw-grid-scroll">
+        <div class="vdw-week-grid">
+          <div class="vdw-grid-headrow">
+            <div class="vdw-gutter-head"></div>
+            {% for col in week_grid.columns %}
+              <div class="vdw-day-head{% if col.is_today %} today{% endif %}">
+                {{ col.short }}{% if col.is_today %}<span class="date-n">today</span>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <div class="vdw-grid-body" style="height: {{ week_grid.canvas_px }}px;">
+            <div class="vdw-gutter">
+              {% for g in week_grid.gutter_labels %}
+                <span class="vdw-time-label" style="top: {{ g.top }}px;">{{ g.time }}</span>
+              {% endfor %}
+            </div>
+            {% for col in week_grid.columns %}
+              <div class="vdw-day-col{% if col.is_today %} today{% endif %}">
+                {% if col.count == 0 %}<span class="vdw-no-sessions">—</span>{% endif %}
+                {% for slot in col.slots %}
+                  <div class="vdw-slot{% if slot.compact %} compact{% endif %}"
+                       style="top: {{ slot.top_px }}px; height: {{ slot.height_px }}px; --ubg: {{ slot.tint.ubg }}; --uac: {{ slot.tint.uac }}; --ubg-dark: {{ slot.tint.ubg_dark }}; --uac-dark: {{ slot.tint.uac_dark }};"
+                       title="{{ slot.unit_code }} · {{ slot.start_time }}–{{ slot.end_time }}{% if slot.unit_name %} · {{ slot.unit_name }}{% endif %}{% if slot.venue %} · {{ slot.venue }}{% endif %}">
+                    <div class="vdw-slot-code">
+                      <span>{{ slot.unit_code }}</span>
+                      <span class="vdw-slot-type">{{ slot.type_label }}</span>
+                    </div>
+                    {% if slot.unit_name %}<div class="vdw-slot-name">{{ slot.unit_name }}</div>{% endif %}
+                    {% if slot.venue %}<div class="vdw-slot-venue"><i class="bi bi-geo-alt"></i> {{ slot.venue }}</div>{% endif %}
+                    <button type="button" class="vdw-slot-delete" title="Delete slot"
+                            onclick="deleteTimetableSlot('{{ active_timetable.id }}', '{{ slot.id }}')">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+            {% if week_grid.now_px != None %}
+              <div class="vdw-now-line" style="top: {{ week_grid.now_px }}px;"><span class="vdw-now-dot"></span></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {# Mobile: the grid is fitted to viewport width via CSS; tapping opens the fullscreen overlay (academic_workspace.js) #}
+
+      <div class="vdw-card-foot">
+        <div class="vdw-legend">
+          {% for item in week_grid.legend %}
+            <span><i style="--ubg: {{ item.tint.ubg }}; --ubg-dark: {{ item.tint.ubg_dark }};"></i> {{ item.code }}</span>
+          {% endfor %}
+        </div>
+        <span><i class="bi bi-magic"></i> Extracted by Spark AI · rev {{ active_timetable.revision_number|default:1 }}</span>
+      </div>
+    </div>
+
+  {# ═══ D. ACTIVE with zero slots ═══ #}
+  {% elif active_timetable and active_timetable.is_active %}
+    <div class="vdw-card">
+      <div class="vdw-empty">
+        <div class="vdw-empty-icon"><i class="bi bi-inboxes"></i></div>
+        <h3>Timetable extracted — but no sessions were found</h3>
+        <p>Spark AI parsed the upload successfully but could not read any class rows. Add slots manually, or upload a clearer full-week image.</p>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;">
+          <button type="button" class="vdw-btn vdw-btn-primary" onclick="toggleAddSlotDrawer()"><i class="bi bi-plus-lg"></i> Add Slot</button>
+          <button type="button" class="vdw-btn" onclick="triggerTimetableUpload()"><i class="bi bi-camera"></i> Re-upload</button>
+        </div>
+      </div>
+    </div>
+
+  {# ═══ E. No timetable at all ═══ #}
+  {% else %}
+    <div class="vdw-card">
+      <div class="vdw-empty">
+        <div class="vdw-empty-icon" style="color:var(--primary);"><i class="bi bi-calendar3-range"></i></div>
+        <h3>No timetable yet{% if selected_programme %} for {{ selected_programme.code|default:selected_programme.name }}{% endif %} · Year {{ selected_year_num|default:"–" }} · Semester {{ selected_sem_num|default:"–" }}</h3>
+        <p>
+          Upload this cohort's timetable photo or screenshot — crop it in the built-in tool and
+          Spark AI will extract every session and compute your free study blocks automatically.
+          Or use the year pills in Units &amp; Cohort to view another cohort's published timetable.
+        </p>
+        <button type="button" class="vdw-btn vdw-btn-primary" style="margin-top:14px;" onclick="triggerTimetableUpload()">
+          <i class="bi bi-camera"></i> Upload &amp; Crop Timetable
+        </button>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% include 'documents/academic_workspace/_ctx_oob.html' %}
+
+{# Section-level actions. Redeclared on each swap so dynamic context stays fresh. #}
+<script>
+  function toggleAddSlotDrawer() {
+    var drawer = document.getElementById('timetable-add-slot-drawer');
+    if (!drawer) return;
+    drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function triggerTimetableUpload() {
+    var fileInput = document.getElementById('timetableImageFileInput');
+    if (fileInput) { fileInput.value = ''; fileInput.click(); }
+  }
+
+  function handleTimetableFileSelected(event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!window.TimetableCropper) {
+      alert('Cropper tool is initializing. Please try again in a moment.');
+      return;
+    }
+    window.TimetableCropper.open(file, {
+      programmeId: '{{ selected_programme.id }}',
+      yearNum: '{{ selected_year_num }}',
+      semNum: '{{ selected_sem_num }}',
+      onComplete: function(res) {
+        // Server returned {processing: true, timetable_id: N} — refresh the
+        // section (no full reload) so the PROCESSING state + polling appears.
+        vdwRefreshTimetableSection();
+      }
+    });
+  }
+
+  function vdwRefreshTimetableSection() {
+    if (window.vdwCloseTtOverlay) window.vdwCloseTtOverlay();
+    var root = document.querySelector('[data-vdw-refresh-url]');
+    var url = root ? root.getAttribute('data-vdw-refresh-url') : null;
+    if (url && window.htmx) {
+      htmx.ajax('GET', url, {target: '#dash-main', swap: 'innerHTML'});
+    } else {
+      window.location.reload();
+    }
+  }
+
+  function submitTimetableSlot(event) {
+    event.preventDefault();
+    if (!'{{ active_timetable.id }}' || !'{{ active_timetable.is_active }}') return;
+    var timetableId = '{{ active_timetable.id }}';
+    var day = document.getElementById('slotDay').value;
+    var startTime = document.getElementById('slotStartTime').value;
+    var endTime = document.getElementById('slotEndTime').value;
+    var unitCode = document.getElementById('slotUnitCode').value;
+    var unitName = document.getElementById('slotUnitName').value;
+    var venue = document.getElementById('slotVenue').value;
+
+    var match = document.cookie.match(/csrftoken=([^;]+)/);
+    fetch('/documents/academic/timetable/' + timetableId + '/slot/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': match ? match[1] : '', 'X-Requested-With': 'XMLHttpRequest'},
+      body: JSON.stringify({action: 'add', day: day, start_time: startTime, end_time: endTime,
+                            unit_code: unitCode, unit_name: unitName, venue: venue, session_type: 'Lecture'})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) { vdwRefreshTimetableSection(); }
+      else { alert(data.error || 'Failed to save slot.'); }
+    })
+    .catch(function() { alert('Network error saving timetable slot.'); });
+  }
+
+  function deleteTimetableSlot(timetableId, slotId) {
+    if (!confirm('Remove this slot from the cohort timetable?')) return;
+    var match = document.cookie.match(/csrftoken=([^;]+)/);
+    fetch('/documents/academic/timetable/' + timetableId + '/slot/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': match ? match[1] : '', 'X-Requested-With': 'XMLHttpRequest'},
+      body: JSON.stringify({action: 'delete', slot_id: slotId})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) { vdwRefreshTimetableSection(); }
+      else { alert(data.error || 'Failed to delete slot.'); }
+    })
+    .catch(function() { alert('Network error deleting timetable slot.'); });
+  }
+</script>

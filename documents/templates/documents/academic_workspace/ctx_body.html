@@ -1,0 +1,136 @@
+{% load academic_workspace_extras %}{% comment %}
+  Context-rail body — included three ways:
+    1. server-side inside context_rail.html (initial render),
+    2. as an hx-swap-oob fragment when year/semester changes (inner swaps #ctx-body),
+    3. target of "partial=ctx_body" (mobile/accessibility refetch).
+  Flat sections (no boxed cards), Pwanimate style. Units/Cohort tabs are
+  client-side (academic_workspace.js).
+{% endcomment %}
+
+{% url 'documents:academic:dashboard' as dash_url %}
+
+{# ── STATE: Units ────────────────────────────────────────────────────────── #}
+<div class="vdw-ctx-state on" data-ctx-state="units">
+
+  <div class="vdw-ctx-sec">
+    <p class="vdw-ctx-label">My Units</p>
+    {% with enrolled=academic_summary.enrolled_units %}
+      {% if enrolled %}
+        {% for unit in enrolled %}
+          <div class="vdw-unit-row">
+            <span class="vdw-unit-dot" style="--ubg: {{ unit.code|unit_tint_var:'ubg' }};"></span>
+            <div class="vdw-unit-main">
+              <div class="vdw-unit-name" title="{{ unit.name }}">{{ unit.name|default:unit.code }}</div>
+              <div class="vdw-unit-code">{{ unit.code }}{% if unit.credit_hours %} · {{ unit.credit_hours }} cr{% endif %}</div>
+            </div>
+            <div class="vdw-unit-acts">
+              {% if unit.doc_count %}<span class="vdw-unit-docn">{{ unit.doc_count }} docs</span>{% endif %}
+              <a href="/documents/?unit={{ unit.id }}" title="Open unit documents"><i class="bi bi-folder2-open"></i></a>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="vdw-unit-empty">No enrolled units yet — sync from <b>Cohort</b> tab below.</p>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <div class="vdw-ctx-sec">
+    <p class="vdw-ctx-label">This Semester · Year {{ selected_year_num|default:"–" }} Sem {{ selected_sem_num|default:"–" }}</p>
+    {% if context_units %}
+      {% for unit in context_units %}
+        <div class="vdw-unit-row">
+          <span class="vdw-unit-dot" style="--ubg: {{ unit.code|unit_tint_var:'ubg' }};"></span>
+          <div class="vdw-unit-main">
+            <div class="vdw-unit-name" title="{{ unit.name }}">{{ unit.name|default:unit.code }}</div>
+            <div class="vdw-unit-code">{{ unit.code }}</div>
+          </div>
+          <div class="vdw-unit-acts">
+            {% if unit.document_count %}<span class="vdw-unit-docn">{{ unit.document_count }} docs</span>{% endif %}
+            <a href="/documents/?unit={{ unit.id }}" title="Open unit documents"><i class="bi bi-folder2-open"></i></a>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="vdw-unit-empty">No curriculum units registered for this cohort context.</p>
+    {% endif %}
+  </div>
+
+  {% if week_grid and week_grid.free_blocks %}
+  <div class="vdw-ctx-sec">
+    <p class="vdw-ctx-label">Free Study Blocks · {{ week_grid.free_total_hours }}h</p>
+    {% for block in week_grid.free_blocks %}
+      <div class="vdw-free-row">
+        <span class="vdw-free-day">{{ block.day|slice:":3" }}</span>
+        <i class="bi bi-moon-stars" style="font-size:.72rem;color:var(--vdw-muted);"></i>
+        <span class="vdw-free-time">{{ block.start_time }}–{{ block.end_time }}</span>
+        <span class="vdw-free-dur">{{ block.duration_hours }}h free</span>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+{# ── STATE: Cohort (context bar + registry) ─────────────────────────────── #}
+<div class="vdw-ctx-state" data-ctx-state="cohort">
+
+  <div class="vdw-ctx-sec">
+    <p class="vdw-ctx-label">Cohort Context</p>
+    {% if selected_programme %}
+      <div style="font-size:.78rem;font-weight:700;color:var(--text-dark);margin-bottom:2px;" title="{{ selected_programme.name }}">
+        {{ selected_programme.code|default:selected_programme.name }}
+      </div>
+    {% endif %}
+
+    {# Year pills #}
+    <div class="vdw-year-tabs">
+      {% for tab in year_tabs %}
+        <a href="{{ dash_url }}?year={{ tab.year_number }}&semester={{ selected_sem_num|default:1 }}&section={{ active_section }}"
+           class="vdw-year-tab{% if tab.is_selected %} active{% endif %}"
+           hx-get="{{ dash_url }}?year={{ tab.year_number }}&semester={{ selected_sem_num|default:1 }}&section={{ active_section }}"
+           hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">
+          Y{{ tab.year_number }}{% if tab.is_student_current %}<span class="you">YOU</span>{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+
+    {# Semester switch #}
+    <div class="vdw-sem-switch">
+      <a href="{{ dash_url }}?year={{ selected_year_num|default:1 }}&semester=1&section={{ active_section }}"
+         class="vdw-sem-link{% if selected_sem_num != 2 %} active{% endif %}"
+         hx-get="{{ dash_url }}?year={{ selected_year_num|default:1 }}&semester=1&section={{ active_section }}"
+         hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">
+        Sem 1<span class="sc">{{ selected_sem1_count }} units</span>
+      </a>
+      <a href="{{ dash_url }}?year={{ selected_year_num|default:1 }}&semester=2&section={{ active_section }}"
+         class="vdw-sem-link{% if selected_sem_num == 2 %} active{% endif %}"
+         hx-get="{{ dash_url }}?year={{ selected_year_num|default:1 }}&semester=2&section={{ active_section }}"
+         hx-target="#dash-main" hx-swap="innerHTML" hx-push-url="true">
+        Sem 2<span class="sc">{{ selected_sem2_count }} units</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="vdw-ctx-sec">
+    <p class="vdw-ctx-label">Registry · Year {{ selected_year_num|default:"–" }} Sem {{ selected_sem_num|default:"–" }}</p>
+    {% if context_units %}
+      {% for unit in context_units %}
+        <div class="vdw-unit-row">
+          <span class="vdw-unit-dot" style="--ubg: {{ unit.code|unit_tint_var:'ubg' }};"></span>
+          <div class="vdw-unit-main">
+            <div class="vdw-unit-name" title="{{ unit.name }}">{{ unit.name|default:unit.code }}</div>
+            <div class="vdw-unit-code">{{ unit.code }}</div>
+          </div>
+          <div class="vdw-unit-acts">
+            {% if unit.document_count %}<span class="vdw-unit-docn">{{ unit.document_count }} docs</span>{% endif %}
+            <a href="/documents/?unit={{ unit.id }}" title="Open unit documents"><i class="bi bi-folder2-open"></i></a>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="vdw-unit-empty">No units registered for this cohort context.</p>
+    {% endif %}
+  </div>
+
+</div>

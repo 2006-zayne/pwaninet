@@ -1,0 +1,10 @@
+{% comment %}
+  Out-of-band fragment appended to section responses when the cohort context
+  (year/semester) changed: HTMX swaps the context-rail body (#ctx-body)
+  in the same round-trip as the centre section — no full page reload.
+{% endcomment %}
+{% if refresh_ctx %}
+<div id="ctx-body" hx-swap-oob="innerHTML">
+  {% include 'documents/academic_workspace/ctx_body.html' %}
+</div>
+{% endif %}

@@ -1,6 +1,64 @@
-{% extends 'documents/base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
-{% block repository_content %}
-    {% include 'documents/partials/academic_dashboard_content.html' %}
+{% comment %}
+  VASTO STUDENT DASHBOARD — full-page workspace (extends the global shell,
+  Spark-style). Overrides the global header/left-rail/context-rail blocks with
+  the dashboard's own floating topbar, tools rail and Units & Cohort context rail.
+  Centre sections swap via HTMX into #dash-main; cohort changes ride the same
+  response as an hx-swap-oob refresh of #ctx-body.
+{% endcomment %}
+
+{% block title %}Vasto Student Dashboard{% endblock %}
+{% block html_class %}vdw-active{% endblock %}
+{% block body_class %}vdw-active{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/documents/academic_workspace.css' %}?v=1.0.0">
+{% endblock %}
+
+{% block header %}
+{% include 'documents/academic_workspace/topbar.html' %}
+{% endblock %}
+
+{% block left_rail %}
+{% include 'documents/academic_workspace/left_rail.html' %}
+{% endblock %}
+
+{% block context_rail %}
+{% include 'documents/academic_workspace/context_rail.html' %}
+{% endblock %}
+
+{% block content %}
+<script>
+  document.body.classList.add('vdw-active');
+  try {
+    if (localStorage.getItem('vdw_left_collapsed') === '1') document.body.classList.add('vdw-left-collapsed');
+    if (localStorage.getItem('vdw_ctx_collapsed') === '1' && window.innerWidth >= 992) document.body.classList.add('vdw-ctx-collapsed');
+    document.body.dataset.vdwTtUrl = '{% url "documents:academic:dashboard" %}?section=timetable';
+  } catch (e) {}
+</script>
+
+{# Timetable upload plumbing — lives in the shell so it works from any section #}
+<input type="file" id="timetableImageFileInput" accept="image/*" style="display:none" onchange="handleTimetableFileSelected(event)">
+
+<div class="vdw-center" id="vdwCenter">
+  <div class="vdw-center-inner" id="dash-main">
+    {% include 'documents/academic_workspace/sections/'|add:active_section|add:'.html' %}
+  </div>
+</div>
+
+{% include 'documents/academic_workspace/ctx_reopen.html' %}
+{% include 'documents/academic_workspace/bottom_nav.html' %}
+{% include 'documents/academic_workspace/tt_overlay.html' %}
+{# Fullscreen timetable cropper (markup + css + window.TimetableCropper engine) #}
+{% include 'documents/partials/timetable_composer_overlay.html' %}
+{% endblock %}
+
+{% block mobile_bottom_nav %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'documents/js/academic_workspace.js' %}?v=1.0.0"></script>
 {% endblock %}
