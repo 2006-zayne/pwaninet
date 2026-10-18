@@ -65,6 +65,8 @@ class GeminiLLMProvider(BaseLLMProvider):
             )
 
         model = request.model or self.model_name
+        if model in {"gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.5-pro", "gemini-1.5-pro"}:
+            model = "gemini-3.8-flash"
         url = GEMINI_GENERATE_URL.format(model=model)
 
         # Build payload

@@ -123,7 +123,10 @@ class TimetableExtractionService:
         and construct the canonical schedule JSON.
         """
         api_key = getattr(settings, "PWANIMATE_GEMINI_API_KEY", "") or getattr(settings, "GEMINI_API_KEY", "")
-        model_name = getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-3.8-flash")
+        raw_model = getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-3.8-flash")
+        # Automatically normalize any deprecated model strings from old environment configs
+        deprecated_models = {"gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.5-pro", "gemini-1.5-pro"}
+        model_name = "gemini-3.8-flash" if (not raw_model or raw_model in deprecated_models) else raw_model
 
         if api_key and api_key.strip():
             try:
@@ -234,6 +237,19 @@ Rules:
                 return json.loads(clean_json)
             except (KeyError, IndexError, json.JSONDecodeError) as e:
                 logger.error(f"[TIMETABLE-EXTRACT] Failed to parse JSON response from Gemini: {e}")
+        elif resp.status_code == 404 and model_name != "gemini-3.8-flash":
+            logger.warning(
+                f"[TIMETABLE-EXTRACT] Gemini model '{model_name}' returned 404; automatically retrying with 'gemini-3.8-flash'..."
+            )
+            return cls._call_gemini_vision(
+                image_bytes=image_bytes,
+                mime_type=mime_type,
+                api_key=api_key,
+                model_name="gemini-3.8-flash",
+                programme_name=programme_name,
+                level_name=level_name,
+                institution_name=institution_name,
+            )
         else:
             logger.warning(f"[TIMETABLE-EXTRACT] Gemini API returned status={resp.status_code}: {resp.text[:200]}")
 
