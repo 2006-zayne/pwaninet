@@ -5543,29 +5543,42 @@
 
             if (event.key === ' ' || event.code === 'Space') {
                 event.preventDefault();
-                if (state.currentPlayingVideo) {
-                    const snapItem = state.currentPlayingVideo.closest('.reels-snap-item');
-                    if (state.currentPlayingVideo.paused) {
-                        playVideo(state.currentPlayingVideo, false);
+                // pauseVideo() nulls state.currentPlayingVideo, so after a
+                // Space-pause the resume path must resolve the video from the
+                // active snap item instead of the (now null) state pointer.
+                let targetVideo = state.currentPlayingVideo;
+                if (!targetVideo || targetVideo.paused) {
+                    const activeItem = getActiveSnapItem();
+                    if (activeItem) {
+                        const activeVid = activeItem.querySelector('video');
+                        if (activeVid) targetVideo = activeVid;
+                    }
+                }
+                if (targetVideo) {
+                    const snapItem = targetVideo.closest('.reels-snap-item');
+                    if (targetVideo.paused) {
+                        playVideo(targetVideo, false);
                         if (snapItem) triggerPlayHud(snapItem, true);
                     } else {
-                        pauseVideo(state.currentPlayingVideo);
+                        pauseVideo(targetVideo);
                         if (snapItem) triggerPlayHud(snapItem, false);
                     }
                 }
                 return;
             }
 
-            if (event.key.toLowerCase() === 'm') {
-                event.preventDefault();
-                toggleGlobalMute();
-                return;
-            }
+            if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+                if (event.key.toLowerCase() === 'm') {
+                    event.preventDefault();
+                    toggleGlobalMute();
+                    return;
+                }
 
-            if (event.key.toLowerCase() === 'c') {
-                event.preventDefault();
-                toggleDesktopCommentRail();
-                return;
+                if (event.key.toLowerCase() === 'c') {
+                    event.preventDefault();
+                    toggleDesktopCommentRail();
+                    return;
+                }
             }
         });
 

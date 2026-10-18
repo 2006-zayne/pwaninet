@@ -6,7 +6,7 @@
 
 'use strict';
 let CACHE_VERSION = '1.6.3';
-let CACHE_BUILD = '113';
+let CACHE_BUILD = '114';
 const SW_CACHE_REVISION = '15';
 let CACHE_NAME = `vasto-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 let OFFLINE_CACHE_NAME = `vasto-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
