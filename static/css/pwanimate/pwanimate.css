@@ -2519,6 +2519,15 @@ body.pwanimate-active .pwanimate-composer-wrapper {
     transition: padding-bottom 0.18s cubic-bezier(0.2, 0, 0, 1), transform 0.25s cubic-bezier(0.2, 0, 0, 1) !important;
 }
 
+/* Desktop flush dock (>=768px): the transparent wrapper must not expose its
+   bottom padding as a raised band under the composer island. Mobile keeps its
+   own clearance; native safe-area pinning (below) still overrides this. */
+@media (min-width: 768px) {
+    body.pwanimate-active .pwanimate-composer-wrapper {
+        padding-bottom: 0.35rem !important;
+    }
+}
+
 @media (max-width: 768px) {
     body.pwanimate-active .pwanimate-composer-wrapper {
         padding-top: 0.25rem !important;

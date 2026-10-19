@@ -677,7 +677,7 @@ body.is-native-app .navbar-top {
 }
 
 /* Adjust body padding to match navbar height in native app with safe area consideration */
-body.is-native-app:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
+body.is-native-app:not(.in-conversation-active):not(:has(.whatsapp-layout)):not(.pwanimate-active):not(:has(.pwanimate-workspace)) {
     padding-top: calc(var(--navbar-height, 56px) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
     /* Content clearance for the floating pill nav + safe area */
     padding-bottom: calc(76px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
@@ -1328,10 +1328,9 @@ body.modal-open .mobile-bottom-nav {
 
 /* Tablet / Intermediate Desktop (992px–1199px): Left Rail + Centered Feed + Right Rail */
 @media (min-width: 992px) {
-    body {
-        padding-bottom: 40px !important;
-    }
-
+    /* No desktop body padding-bottom reserve: on >=768px the floating pill
+       nav is display:none, so a reserve here rendered as a phantom solid
+       band above the footer. Spark/chat pages zero their own padding. */
     .app-shell-layout {
         display: grid;
         grid-template-columns: minmax(220px, 1fr) minmax(0, 800px) minmax(220px, 1fr);
