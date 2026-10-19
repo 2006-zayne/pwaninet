@@ -3,11 +3,11 @@ html[data-theme="light"],
 html[data-bs-theme="light"],
 [data-theme="light"],
 [data-bs-theme="light"] {
-  --lg-bg: #f2f2f7;
-  --lg-surface: rgba(255,255,255,0.72);
-  --lg-surface-strong: rgba(255,255,255,0.88);
+  --lg-bg: #ffffff;
+  --lg-surface: rgba(255, 255, 255, 0.965);
+  --lg-surface-strong: rgba(255, 255, 255, 0.984);
   --lg-text: #1c1c1e;
-  --lg-text-muted: #6e6e73;
+  --lg-text-muted: #b9b9bd;
   --lg-accent: #0071e3;
   --lg-accent-soft: rgba(0,113,227,0.12);
   --lg-separator: rgba(60,60,67,0.12);
@@ -57,12 +57,7 @@ body {
   font-size: 17px;
   line-height: 1.47;
   letter-spacing: -0.01em;
-  background:
-    radial-gradient(circle at top left, rgba(33, 33, 69, 0.221), transparent 28%),
-    linear-gradient(180deg, rgba(34, 37, 54, 0.24) 0%, rgba(100, 100, 102, 0.12) 100%),
-    var(--lg-bg);
   color: var(--lg-text);
-  transition: background-color 300ms cubic-bezier(0.22, 1, 0.36, 1), color 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 body, button, input, textarea, select {
@@ -89,7 +84,7 @@ button:focus-visible, .btn:focus-visible, .nav-chip:focus-visible, .dropdown-ite
 }
 
 .navbar-top {
-  background: rgba(255,255,255,0.28);
+  background: rgba(255, 255, 255, 0.265);
   backdrop-filter: var(--lg-glass-blur);
   -webkit-backdrop-filter: var(--lg-glass-blur);
   border-bottom: 1px solid rgba(255,255,255,0.22);
@@ -346,7 +341,7 @@ html.lg-nofilter .mobile-bottom-nav,
 html.lg-nofilter .lg-card,
 html.lg-nofilter .card,
 html.lg-nofilter .modal-content {
-  background: rgba(255,255,255,0.9);
+  background: rgba(255, 255, 255, 0.789);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
