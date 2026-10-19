@@ -7,7 +7,7 @@
 'use strict';
 let CACHE_VERSION = '1.6.3';
 let CACHE_BUILD = '115';
-const SW_CACHE_REVISION = '15';
+const SW_CACHE_REVISION = '16';
 let CACHE_NAME = `vasto-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 let OFFLINE_CACHE_NAME = `vasto-offline-v${CACHE_VERSION}-build${CACHE_BUILD}-sw${SW_CACHE_REVISION}`;
 
@@ -470,6 +470,29 @@ async function handleStaticAssetRequest(request) {
         }
     }
     
+    // For JS files, use network first (same policy as CSS) to ensure the
+    // latest scripts. Cache-first here shipped stale features that only
+    // lived in JS (e.g. reel keyboard shortcuts) and ?v= bumps get missed.
+    if (url.pathname.endsWith('.js')) {
+        try {
+            const networkResponse = await fetch(request);
+            if (networkResponse && (networkResponse.ok || networkResponse.status === 304)) {
+                if (networkResponse.ok) {
+                    const cache = await caches.open(CACHE_NAME);
+                    cache.put(request, networkResponse.clone());
+                }
+                return networkResponse;
+            }
+        } catch (error) {
+            console.log('Service Worker: Network failed for JS, trying cache');
+            const cachedResponse = await caches.match(request, { ignoreSearch: true });
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            return await getOfflineAsset(request);
+        }
+    }
+
     // Cache first for other static assets
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {

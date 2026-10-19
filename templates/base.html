@@ -324,7 +324,10 @@
                 max-width: 100% !important;
                 margin: 0 !important;
                 padding-top: 16px !important;
-                padding-bottom: 40px !important;
+                /* No bottom reserve on desktop — the transparent version footer
+                   provides its own padding, and a reserve here read as a solid
+                   band. */
+                padding-bottom: 0 !important;
                 gap: 0 !important;
             }
             .desktop-left-rail {
@@ -1329,11 +1332,11 @@
     <link rel="stylesheet" href="{% static 'css/postcard.css' %}?v={{ app_version }}-{{ app_build }}">
     <link rel="stylesheet" href="{% static 'css/people-modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/comments.css' %}">
-    <link rel="stylesheet" href="{% static 'css/media-picker.css' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2">
+    <link rel="stylesheet" href="{% static 'css/media-picker.css' %}?v={{ app_version }}-{{ app_build }}-20261019-rail1">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
     <link rel="stylesheet" href="{% static 'notifications/css/notifications.css' %}?v=4">
     <link rel="stylesheet" href="{% static 'css/downloads/offline_media_viewer.css' %}">
-    <link rel="stylesheet" id="pwanimate-css" href="{% static 'css/pwanimate/pwanimate.css' %}?v={{ pwanimate_version|default:'2.0.0' }}-20260929-3">
+    <link rel="stylesheet" id="pwanimate-css" href="{% static 'css/pwanimate/pwanimate.css' %}?v={{ pwanimate_version|default:'2.0.0' }}-20261019-1">
     <link rel="stylesheet" href="{% static 'css/liquid-glass.css' %}?v=2">
     {% block extra_css %}{% endblock %}
     <script src="{% static 'js/htmx.min.js' %}"></script>
@@ -1401,7 +1404,7 @@
     <script defer src="{% static 'js/lazy-load-images.js' %}"></script>
 
     <!-- Video Manager - replaces auto_video_play.js -->
-    <script defer src="{% static 'js/video-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
+    <script defer src="{% static 'js/video-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261019-rail1"></script>
     <script defer src="{% static 'js/liquid-glass.js' %}"></script>
 
     <!-- Global Audio Manager -->
@@ -1440,9 +1443,9 @@
     <script defer src="{% static 'js/whats-new-modal.js' %}"></script>
 
     <!-- Comment System - Phase 2 Threaded Comments -->
-    <script defer src="{% static 'js/comments/comment-api.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
-    <script defer src="{% static 'js/comments/comment-renderer.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
-    <script defer src="{% static 'js/comments/comment-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261005-paste2"></script>
+    <script defer src="{% static 'js/comments/comment-api.js' %}?v={{ app_version }}-{{ app_build }}-20261019-rail1"></script>
+    <script defer src="{% static 'js/comments/comment-renderer.js' %}?v={{ app_version }}-{{ app_build }}-20261019-rail1"></script>
+    <script defer src="{% static 'js/comments/comment-manager.js' %}?v={{ app_version }}-{{ app_build }}-20261019-rail1"></script>
     <script defer src="{% static 'js/media-picker/media-picker.js' %}?v={{ app_version }}-{{ app_build }}-20261008-direct2"></script>
 
     <script>
@@ -1544,14 +1547,17 @@
             font-family: var(--font-family, system-ui, -apple-system, 'Roboto', 'Inter', sans-serif);
             font-style: var(--font-style, normal);
             padding-top: var(--navbar-height);
-            padding-bottom: calc(85px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+            /* Bottom reserve for the floating pill nav is mobile-only (<=767px,
+               re-applied below) — on >=768px the pill is display:none, so an
+               unconditional reserve painted a phantom "solid footer" band. */
+            padding-bottom: 0;
             font-size: 1rem;
         }
 
         /* Native App & Standalone PWA Spacing Overrides */
-        body.is-native-app:not(.in-conversation-active):not(:has(.whatsapp-layout)),
-        body.is-standalone-pwa:not(.in-conversation-active):not(:has(.whatsapp-layout)),
-        .is-standalone-pwa body:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
+        body.is-native-app:not(.in-conversation-active):not(:has(.whatsapp-layout)):not(.pwanimate-active):not(:has(.pwanimate-workspace)),
+        body.is-standalone-pwa:not(.in-conversation-active):not(:has(.whatsapp-layout)):not(.pwanimate-active):not(:has(.pwanimate-workspace)),
+        .is-standalone-pwa body:not(.in-conversation-active):not(:has(.whatsapp-layout)):not(.pwanimate-active):not(:has(.pwanimate-workspace)) {
             padding-top: calc(var(--navbar-height) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
             padding-bottom: calc(76px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
         }
@@ -1566,7 +1572,7 @@
         }
 
         @media (display-mode: standalone) {
-            body:not(.in-conversation-active):not(:has(.whatsapp-layout)) {
+            body:not(.in-conversation-active):not(:has(.whatsapp-layout)):not(.pwanimate-active):not(:has(.pwanimate-workspace)) {
                 padding-top: calc(var(--navbar-height) + var(--vasto-safe-area-top, env(safe-area-inset-top, 0px))) !important;
                 padding-bottom: calc(76px + var(--vasto-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
             }
