@@ -173,15 +173,138 @@ The UI turns that into a lock badge + upgrade CTA. A free-tier user is never *de
 
 ## 9. Build sequence (ordered, each independently shippable)
 
-1. **Registry + models, no behaviour change.** `Tier`, `ModelOffering`, `Subscription`, `Payment`, `UsageCounter`; `manage.py seed_model_registry` (seeds tiers + offerings from the ladders). Tests: schema, seeding, ordering. *Nothing changes for users yet.*
-2. **Tier resolution + chain filtering.** Resolve the caller's tier; filter resolved chains by `min_tier`; **remove `gemini-pro-latest` from the global Auto chain**; add the CI check that a `FREE_ROUTE` offering is a genuinely free id (§4). *Effect: the $0 guarantee becomes structural.*
-3. **Entitlements + caps.** Daily counters (20 chats, 5 images) with the queue+notify degradation; `tiers/` API.
-4. **UI: locks + upgrade CTA.** Engine cards render lock state from the API; the upgrade sheet starts an STK push. *(Update the settings-UI pricing test deliberately here.)*
-5. **Daraja: STK + callback + activation.** Sandbox first, then live; idempotent callbacks; receipts; activation notification.
-6. **Teams**: seats, admin, shared collections, company receipts.
-7. **Margin reporting**: cost per tier per day (from `UsageRecord`) — the number that tells us when to adjust 300 KSh.
+This is the canonical order — the accounting stages from §10.7 are folded in, because the dashboard cannot be truthful before the counters exist.
 
-## 10. Open questions
+1. **Registry + models, no behaviour change.** `Tier`, `ModelOffering`, `Subscription`, `Payment`, `UsageRecord`, `UsageCounter`; `manage.py seed_model_registry` (seeds tiers + offerings from the ladders). Tests: schema, seeding, ordering. *Nothing changes for users yet.*
+2. **Tier resolution + chain filtering.** Resolve the caller's tier; filter resolved chains by `min_tier`; **remove `gemini-pro-latest` from the global Auto chain**; add the CI check that a `FREE_ROUTE` offering is a genuinely free id (§4). *Effect: the $0 guarantee becomes structural.*
+3. **Usage accounting.** `UsageService.record()` on every chat turn, writing `UsageRecord` + rolling `UsageCounter` (§10.2). *Effect: we finally keep the token numbers we already receive.*
+4. **Quota windows + entitlements.** `Tier.entitlements`, `QuotaService.check()`, the day/week/period windows, and the queue+notify degradation for over-cap actions (§10.3–10.4). *Effect: caps are real.*
+5. **Indicators.** The composer chip (`14/20 chats left today`) and the picker's frontier-allowance line, both derived from the same counters the enforcement uses (§10.5).
+6. **Usage dashboard.** The settings → Usage tab, the `/billing/usage/` API, the 14-day sparkline, the entitlement list and the upgrade CTA (§10.6). *Update the existing settings-UI test deliberately here — its intent was "don't fabricate numbers", and real accounting satisfies it.*
+7. **Daraja: STK + callback + activation.** Sandbox first, then live; idempotent callbacks; receipts; activation notification (§8).
+8. **Teams**: seats, admin, shared collections, company receipts.
+9. **Margin reporting**: cost per tier per day (from `UsageRecord.cost_usd_micros`) — the number that tells us when to adjust 300 KSh, and the early-warning for free-route extinction.
+
+## 10. Usage accounting, quota windows, and the Usage dashboard
+
+*(This section came out of a review question: "do we show the user their real quota and token usage?" — the honest answer was **no**, and this is the design that fixes it. It is deliberately buildable **before** payments exist.)*
+
+### 10.1 What exists today (the honest inventory)
+
+| Thing | State |
+|---|---|
+| Per-user usage/quota records | **none** — no models, no counters |
+| Token accounting | providers return `prompt_tokens / completion_tokens / thoughts_tokens / total_tokens`; the view **logs** them (`views.py:575-586`) and discards them |
+| Settings → Usage tab | renders a profile card, the conversation count, a *"Detailed Usage Metrics in Preparation"* placeholder and a static capability list. A test (`test_settings_ui.py`) asserts it shows **no fabricated tokens, prices or tiers** — the intent was "don't invent numbers" |
+| Provider cooldown tracker (`ai/gateway/quota_tracker.py`) | **global per provider/model**, not per user — it answers "is this provider throttled right now", not "how much has this student used" |
+| Free-tier daily caps (20 chats / 5 images) | designed (§3) but **not enforced anywhere** |
+
+**Conclusion:** there is nothing to display yet. To show real usage we must first *keep* what we already receive.
+
+### 10.2 Accounting model (record once, read fast)
+
+**`UsageRecord`** — one row per metered action (append-only, the source of truth):
+
+| Field | Notes |
+|---|---|
+| `user` | FK |
+| `created_at` | when it happened (drives the day/week/period windows) |
+| `kind` | `chat` · `image` · `tool` · `retrieval` |
+| `offering` | FK → `ModelOffering` (which model actually served it) |
+| `cost_class` | `FREE_ROUTE` / `PAID_FLASH` / `FRONTIER` / `VISION_EXTERNAL` (denormalised, so history survives catalogue edits) |
+| `prompt_tokens`, `completion_tokens`, `total_tokens` | real provider numbers, never estimated |
+| `images` | count for vision turns |
+| `cost_usd_micros` | our own cost estimate, computed at write time from the class price table (§2) |
+| `source` | `chat` / `study` / `api` |
+
+**`UsageCounter`** — a rollup for fast reads (`user`, `window_type` ∈ {day, week, period}, `window_start`, `chats`, `images`, `premium_turns`, `prompt_tokens`, `completion_tokens`, `cost_usd_micros`), unique on `(user, window_type, window_start)`. Updated in the same transaction as the record, so the dashboard never scans raw history.
+
+**Write path:** the orchestrator already knows the serving model and the token counts → one call to `UsageService.record(...)` after the turn completes (inside the existing `transaction.atomic()` that persists the assistant message). Failed turns are recorded with `kind='chat'` and zero tokens? **No** — failed turns record nothing (no tokens were spent beyond the provider's error), except retries, which *do* cost money and must be recorded (the retry path in `tasks/embeddings.py` is a different meter: ingestion, not chat).
+
+### 10.3 Quota windows — daily, weekly, period
+
+**Three windows, three different jobs** (the user's daily+weekly instinct is right; the third is needed for paid tiers):
+
+| Window | Bounds | Why |
+|---|---|---|
+| **Day** (rolling, resets 00:00 EAT) | daily cost + abuse | the number that actually protects the $0 budget, and the one a student understands ("today") |
+| **Week** (Mon 00:00 EAT) | sustained use | catches "at the cap every single day" — a daily cap alone permits 7× the intended monthly use |
+| **Period** (subscription length: 24 h / 30 d) | the paid allowance | the entitlement a customer bought; daily/weekly caps must not be so tight that a monthly subscriber feels starved |
+
+**Units — what is capped vs what is displayed:**
+
+- **Capped (actions):** chats, images, premium/frontier turns. These are the things a student recognises and the things that cost money.
+- **Displayed (not capped):** prompt/completion tokens. Tokens are a *by-product of context size* (our page-scoped attachment block alone is ~10k tokens), so capping tokens would punish students for using the features we built. Tokens are shown for **transparency and for our margin reporting** — not as a "score".
+
+**Entitlements per tier** (the cap values; the numbers in §3 are the starting point):
+
+| | Ember | Day Pass | Pro Monthly | Teams |
+|---|---|---|---|---|
+| chats/day | 20 | 60 | 200 | 500 (pooled) |
+| chats/week | 60 | 300 | 1,000 | 2,500 |
+| images/day | 5 | 20 | 60 | 200 |
+| frontier turns/day | 0 | 10 | 3 | 10 |
+| tokens | *unlimited, displayed* | same | same | same |
+
+*(A "chats/week" of 60 for Ember ≈ the daily cap × 3, not × 7: the weekly window is the real ceiling, the daily one is the smoothing.)*
+
+### 10.4 Enforcement (and the "never denied" rule)
+
+`QuotaService.check(user, kind)` runs **before dispatch** and returns one of:
+
+- `allowed` → proceed.
+- `queued` → over a cap but on a tier whose over-cap behaviour is queue+notify (Ember chats, all images) → the request enters the **existing queue + notify path** (the same mechanism the free vision tier uses) and the user is told when it lands. **Never a 402, never a silent drop.**
+- `upgrade_required` → the action is only available on a higher tier (frontier turns on Ember) → the UI shows the lock + CTA; the *request* is not silently downgraded, because a student asking for a premium answer should either get it or see the price.
+
+**Ordering of checks:** tier entitlement first (is this action permitted at all?), then daily, then weekly, then period. A request blocked by the daily cap but inside the weekly allowance is *queued*, not blocked.
+
+### 10.5 Indicator surfaces (the student sees it before it bites)
+
+1. **Chat composer** — a small, quiet chip next to the send button: `14/20 chats left today` (and `3 images left` when images are staged). It turns amber at ≤ 20% remaining and shows `Queued — your next answer lands in ~2 min` when the cap is hit. It is *derived from the same counters the dashboard uses*, so it can never disagree with the dashboard.
+2. **Settings → Usage dashboard** — the full picture (§10.6).
+3. **Engine picker** — premium chips show the frontier allowance remaining (`2/3 premium turns left today`).
+4. **Upgrade CTA** — appears at the moment a cap is reached, never before it.
+
+### 10.6 The Usage dashboard (settings → Usage)
+
+Replaces the "in preparation" placeholder with the real thing. Every number comes from `UsageCounter`/`UsageRecord`; **no estimates, no fabricated prices** (the existing settings-UI test is updated deliberately at that point — its intent was "don't invent numbers", and real accounting satisfies it):
+
+```
+┌ Ember · Free ─────────────────────────────┐
+│  Today          14/20 chats · 3/5 images    │  ← rings/bars, live
+│  This week      26/60 chats                 │
+│  Frontier       not included in your tier  │  ← or 2/3 turns left (paid)
+│  Resets in      4h 12m (daily) · Mon 00:00 (weekly)
+├ Real usage (last 14 days) ─────────────────┤
+│  ▁▂▃▅▂▁▁▃▄▂▁▃  chats per day             │  ← sparkline, real
+│  Prompts 412k · Answers 38k tokens this period
+│  23 chats · 2 images · 0 premium turns
+├ What your tier includes ───────────────────┤
+│  ✓ All four Spark engines  ✓ Local retrieval (unlimited)
+│  ✓ Campus documents  ✓ Peer discovery
+│  [ Upgrade to Day Pass — KSh 30 ]          │  ← only when it unlocks something
+└────────────────────────────────────────────┘
+```
+
+**API:** `GET /api/pwanimate/billing/usage/` →
+```json
+{"tier": {"code": "ember", "name": "Ember", "price_kes": 0},
+ "windows": {"day": {"chats": {"used": 14, "limit": 20, "resets_at": "..."},
+                     "images": {"used": 3, "limit": 5},
+                     "premium_turns": {"used": 0, "limit": 0}},
+              "week": {"chats": {"used": 26, "limit": 60}}},
+ "tokens": {"period": {"prompt": 412000, "completion": 38000}},
+ "series": [{"date": "2026-10-14", "chats": 12, "images": 0}, ...],
+ "entitlements": [{"key": "vision", "label": "Image analysis", "included": true, "limit": 5}]}
+```
+
+### 10.7 Build order
+
+The canonical sequence is §9 (accounting is stage 3, caps stage 4, indicators stage 5, dashboard stage 6) — all of it **independent of payments**, so the student-visible truth can ship before Daraja exists.
+
+**Truthfulness checklist (applies to every number we ship):** it is recorded, not estimated · it comes from the same counter the enforcement uses · the reset time is stated · a queued request says "queued" · a cap we don't enforce is never shown.
+
+## 11. Open questions
 
 - **Teams commercials**: who pays (student or institution), min seats, seat reassignment, VAT/invoicing for Kenyan institutions.
 - **Pro Lite (50 KSh)**: ship it as a 5th tier or use it to make Pro Monthly feel expensive?
