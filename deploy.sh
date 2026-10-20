@@ -132,6 +132,16 @@ echo "[3/7] Applying database migrations..."
 compose exec -T web python manage.py migrate --noinput || \
   compose run --rm web python manage.py migrate --noinput
 
+# 4b. Billing registry: idempotent, derived from the live engine ladders.
+# Keeps the tier catalogue, the model registry and the ladder in step, and
+# re-classifies anything the ladders have changed (e.g. a paid rung).
+echo "[3b/7] Seeding the tier catalogue and model registry..."
+compose exec -T web python manage.py seed_model_registry || \
+  compose run --rm web python manage.py seed_model_registry
+# The $0 guarantee: every rung registered, no free rung pointing at a paid model.
+compose exec -T web python manage.py check_model_registry || \
+  echo "[!] Registry check reported problems — see the output above."
+
 # 5. Collect Static Files
 echo "[4/7] Collecting static assets..."
 compose exec -T web python manage.py collectstatic --noinput || \
