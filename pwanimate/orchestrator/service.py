@@ -52,6 +52,33 @@ from pwanimate.tools.selector import LLMToolSelector
 
 logger = logging.getLogger(__name__)
 
+# The one user-facing sentence for "the vision route could not serve this
+# image". Said plainly rather than hidden: if Spark Vision is down, the
+# student should be told Spark Vision is down.
+SPARK_VISION_UNAVAILABLE_NOTICE = (
+    "Spark Vision is down and didn't respond, so I could not look at your image. "
+    "Please try again in a little while."
+)
+
+
+def _vision_fallback_instruction(system_instruction: Optional[str]) -> str:
+    """Tell the model exactly what to say when the image could not be read."""
+    return (
+        (system_instruction or "").rstrip()
+        + "\n\nImage fallback notice: "
+        + SPARK_VISION_UNAVAILABLE_NOTICE
+        + " Answer the user's text and available context only, and tell them this plainly."
+    )
+
+
+def _vision_unavailable_warning() -> Dict[str, str]:
+    """A user-facing warning attached to the response (the UI shows it)."""
+    return {
+        "code": "spark_vision_unavailable",
+        "title": "Spark Vision is down",
+        "message": SPARK_VISION_UNAVAILABLE_NOTICE,
+    }
+
 # Patterns that indicate purely conversational pleasantries without substantive search intent
 CONVERSATIONAL_PATTERNS = [
     r"^(hi|hello|hey|hiya|howdy)(\s+(there|Spark|friend))?[\s\.\!\?]*$",
@@ -1238,7 +1265,44 @@ class PwanimateOrchestrator:
             on_progress("devouring_context" if tool_result.success and tool_result.data else "thinking")
 
         t_gen = time.perf_counter()
-        llm_response = self._generate(llm_request, on_token)
+        llm_response = None
+        vision_text_fallback = False
+        has_image_attachments = any(
+            getattr(attachment, "attachment_type", "") == "image"
+            for attachment in (getattr(request, "attachments", None) or [])
+        )
+        try:
+            llm_response = self._generate(llm_request, on_token)
+        except AIGatewayError as vision_error:
+            if not has_image_attachments:
+                raise
+            # No image-capable model was available. The free tier is never
+            # denied service, so answer from the text context instead of
+            # failing the turn — and say plainly that the image was not read.
+            logger.warning(
+                "Pwanimate tool route could not serve the image; retrying text-only: %s",
+                type(vision_error).__name__,
+            )
+            vision_text_fallback = True
+            text_only_instruction = _vision_fallback_instruction(llm_request.system_instruction)
+            text_request = LLMRequest(
+                task=llm_request.task,
+                messages=llm_request.messages,
+                context=llm_request.context,
+                system_instruction=text_only_instruction,
+                provider=llm_request.provider,
+                model=llm_request.model,
+                temperature=llm_request.temperature,
+                max_tokens=llm_request.max_tokens,
+                attachments=[],
+                metadata=llm_request.metadata,
+            )
+            llm_response = self._generate(text_request, on_token)
+            llm_response.metadata.update({
+                "vision_route": "text_fallback",
+                "vision_text_fallback": True,
+                "vision_fallback_error": type(vision_error).__name__,
+            })
         gen_time_ms = round((time.perf_counter() - t_gen) * 1000.0, 2)
         total_time_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
 
@@ -1300,7 +1364,11 @@ class PwanimateOrchestrator:
             metadata=metadata,
             quota_info=quota_info,
             finish_reason=llm_response.finish_reason,
-            warnings=source_warnings,
+            warnings=(
+                list(source_warnings) + [_vision_unavailable_warning()]
+                if vision_text_fallback
+                else source_warnings
+            ),
         )
 
     def _run_rag(
@@ -1516,12 +1584,7 @@ class PwanimateOrchestrator:
                     ChatMessage(role=message.role, content=message.content)
                     for message in messages
                 ]
-                text_only_instruction = (
-                    (llm_request.system_instruction or "").rstrip()
-                    + "\n\nImage fallback notice: Image analysis is unavailable for this response. "
-                    "Do not claim to have seen or analyzed any attached image. Answer the user's text "
-                    "and available text context only, and clearly mention that the image was not analyzed."
-                )
+                text_only_instruction = _vision_fallback_instruction(llm_request.system_instruction)
                 text_request = LLMRequest(
                     task=llm_request.task,
                     messages=text_only_messages,
@@ -1614,7 +1677,11 @@ class PwanimateOrchestrator:
             metadata=metadata,
             quota_info=quota_info,
             finish_reason=llm_response.finish_reason,
-            warnings=source_warnings,
+            warnings=(
+                list(source_warnings) + [_vision_unavailable_warning()]
+                if vision_text_fallback
+                else source_warnings
+            ),
         )
 
     def _build_sources_summary(self, context_items: list) -> List[Dict[str, Any]]:

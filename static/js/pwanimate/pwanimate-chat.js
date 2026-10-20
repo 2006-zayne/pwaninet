@@ -6023,11 +6023,11 @@
 
             let fallbackHtml = '';
             if (fallbackInfo && fallbackInfo.vision_text_fallback) {
-                // Honest degradation notice — no provider/model identities.
+                // Said plainly: Spark Vision is down, please try later.
                 fallbackHtml = `
                     <div class="pwanimate-fallback-notice">
                         <i class="bi bi-eye-slash"></i>
-                        <span>Image vision processing was unavailable, so this answer uses your text only — the image wasn’t analyzed.</span>
+                        <span>Spark Vision is down and didn’t respond, so I couldn’t look at your image. Please try again in a little while.</span>
                     </div>
                 `;
             }
