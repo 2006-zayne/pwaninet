@@ -3668,12 +3668,12 @@
     {% block page_scripts %}{% endblock %}
 
     <!-- Resumable direct-to-R2 engine (plain scripts; expose window globals). -->
-    <script src="{% static 'js/upload/resumable_upload.js' %}"></script>
+    <script src="{% static 'js/upload/resumable_upload.js' %}?v=20261020-01"></script>
     <script src="{% static 'js/upload/native_upload.js' %}"></script>
 
     <script type="module">
         import { uploadManager } from '{% static "js/upload/upload_manager.js" %}?v=20261016-02';
-        import { uploadUI } from '{% static "js/upload/upload_ui.js" %}?v=20261016-02';
+        import { uploadUI } from '{% static "js/upload/upload_ui.js" %}?v=20261020-03';
         import { draftManager } from '{% static "js/upload/indexeddb_manager.js" %}?v=20261016-02';
         import { uploadEvents } from '{% static "js/upload/upload_events.js" %}?v=20261016-02';
 
