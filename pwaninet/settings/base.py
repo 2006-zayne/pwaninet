@@ -714,6 +714,18 @@ PWANIMATE_EMBEDDING_MODEL = os.environ.get('PWANIMATE_EMBEDDING_MODEL', 'gemini-
 PWANIMATE_EMBEDDING_DIMENSIONS = int(os.environ.get('PWANIMATE_EMBEDDING_DIMENSIONS', '768'))
 PWANIMATE_EMBEDDING_BATCH_SIZE = int(os.environ.get('PWANIMATE_EMBEDDING_BATCH_SIZE', '32'))
 
+# Self-hosted spark-vector embedding worker (docs/local-models-design.md §4-§5).
+# Set PWANIMATE_EMBEDDING_PROVIDER=selfhosted to cut docs + queries over to it.
+PWANIMATE_SELFHOSTED_EMBEDDINGS_URL = os.environ.get('PWANIMATE_SELFHOSTED_EMBEDDINGS_URL', 'http://spark_vector:8100/v1/embeddings')
+PWANIMATE_SELFHOSTED_EMBEDDINGS_MODEL = os.environ.get('PWANIMATE_SELFHOSTED_EMBEDDINGS_MODEL', 'multilingual-e5-base')
+PWANIMATE_SELFHOSTED_EMBEDDINGS_TIMEOUT = int(os.environ.get('PWANIMATE_SELFHOSTED_EMBEDDINGS_TIMEOUT', '10'))
+PWANIMATE_SELFHOSTED_EMBEDDINGS_TOKEN = os.environ.get('PWANIMATE_SELFHOSTED_EMBEDDINGS_TOKEN', '')
+# Sub-batch size per HTTP request. One big request would hold the worker's
+# single inference slot (and exceed its per-request token budget), starving
+# interactive chat queries — ingestion is split into small batches instead.
+# 4 chunks ≈ 1.7 s of inference: the worst-case wait an interactive query
+# can face while ingestion runs.
+PWANIMATE_SELFHOSTED_EMBEDDING_BATCH_SIZE = int(os.environ.get('PWANIMATE_SELFHOSTED_EMBEDDING_BATCH_SIZE', '4'))
 
 # Multi-Provider Embedding Configuration Placeholders
 PWANIMATE_JINA_API_KEY = os.environ.get('PWANIMATE_JINA_API_KEY', os.environ.get('JINA_API_KEY', ''))
