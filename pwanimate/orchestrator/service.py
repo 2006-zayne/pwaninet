@@ -226,6 +226,10 @@ def extract_attachment_text(
                             included_indices.add(chunk.chunk_index)
                         if remaining <= 200:
                             break
+                    # Close the page-scoped block explicitly: the supplementary
+                    # section below reuses the same "[page N]" labels, so the
+                    # model must be able to tell where the viewed page ends.
+                    lines.append("[END OF CURRENT PAGE CONTEXT]")
 
             # 2. For whole-book summary queries (or supplementary context), include opening + sampled/ranked chunks
             if remaining > 200:
@@ -256,7 +260,7 @@ def extract_attachment_text(
                     )
                     supplementary = sorted(ranked[:5], key=lambda chunk: chunk.chunk_index)
 
-                if supplementary and included_indices:
+                if supplementary:
                     lines.append("[ADDITIONAL DOCUMENT CONTEXT]")
                 for chunk in supplementary:
                     page = f"page {chunk.page_number}" if chunk.page_number else "page not specified"
