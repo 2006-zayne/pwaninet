@@ -110,7 +110,8 @@ GET  /healthz     → { "status", "model", "warm": bool, "queue_depth": n }
 **Resources & performance targets** (measured 2026-10-20 on the dev box — 4 vCPU, *busy*; prod box is 2 vCPU, see §12):
 - ~278M params, int8 ONNX ≈ ~300 MB weights; **measured RSS ≈ 800 MB** (fits the 7.7 GB prod box alongside the app's 2.0 GB).
 - **Measured throughput ≈ 500–600 tokens/s** (one ~230-token chunk ≈ 0.5–0.6 s; 4 chunks ≈ 2.1 s; 8 chunks ≈ 2.9 s).
-- **Corrected targets** (the original "batch of 32 < 2.5 s" was ~5× optimistic and is retired): single query **p50 < 80 ms / p95 < 200 ms** (measured p50 62 ms, p95 82 ms) and **batch of 4 < 2.5 s** (measured 2.08 s). A 32-chunk batch takes ~8–9 s, so the client **splits ingestion into sub-batches of 4** (§5).
+- **Corrected targets** (the original "batch of 32 < 2.5 s" was ~5× optimistic and is retired): single query **p50 < 80 ms, p95 < 200 ms** and **batch of 4 < 2.5 s**. A 32-chunk batch takes ~8–9 s at the dev-box rate, so the client **splits ingestion into sub-batches of 4** (§5).
+- **Measured on prod (2026-10-20, Azure `web-core-vm`, 2 vCPU, dedicated):** single query **p50 18.2 ms / p95 23.6 ms**, one ~150-token chunk 145 ms, **batch of 4 p50 612 ms** (~155 ms/item, ≈1,000 tokens/s), query-during-bulk 236 ms, 768 dims with L2 norm 1.000000. Comfortably inside the targets on 2 vCPU, so sub-batch 4 stands (no need to drop to 2–3).
 - Max 64 inputs per request *and* a **4096-token budget per request** (`SPARK_VECTOR_MAX_TOKENS_PER_REQUEST`): over-budget requests are refused with **413** instead of monopolising the slot.
 - Model weights **baked into the image at build time** — no download at boot. Asset source (implemented): `Xenova/multilingual-e5-base` ONNX int8 at pinned commit `1ec9243030a27d1a115d5c340572074c125b58b2`, `onnx/model_int8.onnx` sha256 `9ddfd8b4…3bc87da`, verified by `spark_vector/fetch_assets.py` during `docker build`; a `MANIFEST.json` records provenance. Bumping = deliberate commit + checksum change, never float to main.
 
@@ -240,8 +241,8 @@ The existing stamp + reconciliation machinery does the heavy lifting; this is an
 6. [x] Cutover runbook (§6) as an ops script/checklist + rollback notes.
 7. [ ] Health monitoring: Docker healthcheck + cron `/healthz` ping (choose notify channel).
 8. [ ] Confirm/fix pure-semantic degradation path (must fall back, not error to user).
-9. [ ] Load benchmark against §4 targets; tune. *(dev-box run 2026-10-20 PASS on the corrected targets: query p50 62 ms / p95 82 ms, batch-of-4 2.08 s, 768 dims, query-during-bulk 1.47 s; **prod-box (2 vCPU) run still pending** — see §12)*
-10. [ ] **Cut over embeddings.**
+9. [x] Load benchmark against §4 targets; tune. *(dev box 2026-10-20, then **prod box 2 vCPU: query p50 18.2 ms / p95 23.6 ms, batch-of-4 612 ms, query-during-bulk 236 ms, 768 dims — PASS** on the corrected targets; sub-batch 4 confirmed)*
+10. [x] **Cut over embeddings** (2026-10-20 on prod: worker built + warm, `.env` seeded, `deploy.sh` now owns build/start/health/benchmark/migrate, corpus of 127 chunks across 6 documents migrated popularity-first — "Corpus fully migrated to the target model"). Embedding API spend: **$0**.
 11. [ ] Provision the vision box (host per D9 — TBD at this point; if ARM: arm64 Docker base), private tunnel (Tailscale or Cloudflare Tunnel) + shared bearer token, **no public ports**.
 12. [ ] `spark_vision` service on the vision box: image-input chat endpoint, single inference slot + internal queue, VPS Celery `vision_queue` → outbound HTTPS call, notify-on-done via `notifications` app.
 13. [ ] VLM benchmark **on the vision box** (SmolVLM-500M / Qwen2-VL-2B / PaliGemma on OCR-math-whiteboard tasks) → pick or invoke the D3 escape hatch.
@@ -250,8 +251,8 @@ The existing stamp + reconciliation machinery does the heavy lifting; this is an
 
 ## 12. Open questions
 
-- **VPS specs confirmed** (2026-10-20, Azure `web-core-vm`): **2 vCPU, 7.7 GiB RAM (5.8 GiB available), 4 GiB swap**, app currently using 2.0 GiB. spark-vector measures ~800 MB RSS → fits with ~4.5 GiB headroom, and the §4 targets are written for 2 vCPU, so the prod benchmark is representative. Remaining: run `spark_vector/bench.py` on that box to confirm the corrected targets (and that one uvicorn worker suffices).
-- **Bulk ingestion window** — the corpus re-embed at ~500–600 tok/s takes hours; decide whether it runs off-hours, and whether the query-during-bulk worst case (≈2 s at batch 4) is acceptable at launch.
+- **VPS specs confirmed** (2026-10-20, Azure `web-core-vm`): **2 vCPU, 7.7 GiB RAM (5.8 GiB available), 4 GiB swap**, app currently using 2.0 GiB. spark-vector measures ~800 MB RSS → fits with ~4.5 GiB headroom, and the §4 targets are written for 2 vCPU. **Benchmarked on that box** (query p50 18.2 ms, batch-of-4 612 ms) and **the corpus is cut over** — no open items here.
+- **Bulk ingestion window** — *resolved for the current corpus*: prod holds 127 chunks (6 documents), so the migration finished in well under a minute at ~1,000 tok/s. For a much larger future corpus, decide whether ingestion runs off-hours; the query-during-bulk worst case measured on prod is 236 ms (batch of 4), which is invisible to students.
 - Exact latency numbers on the prod CPU (benchmark decides whether one uvicorn worker suffices).
 - Notify channel for health ping: log-only vs `notifications` app vs push.
 - VLM selection benchmark (build item 13) — decision deadline: before free-tier vision ships; fallback if no candidate passes = D3 escape hatch. **Must run on the vision box** (real serving hardware), not the dev machine.
@@ -260,4 +261,4 @@ The existing stamp + reconciliation machinery does the heavy lifting; this is an
 - **VPS specs pending** — user runs `nproc && free -h` on prod; decides whether spark-vector stays (expected) and how tight the embedding benchmark targets are. *(RESOLVED 2026-10-20 — see the confirmed-specs entry above.)*
 - Whether queue + notify for free vision needs a max-wait policy (e.g. drop with "try again" after N minutes) — interacts with billing doc's queue-priority design.
 - Whether `/v1/embeddings` later serves other indexers (posts/groups unified search) — out of scope now, but the surface allows it.
-- **`gemini-pro-latest` sits in the global Auto chain** (`PWANIMATE_LLM_FALLBACK_CHAIN`, base.py) — a frontier model every tier can currently reach via failover. Deliberately kept **out** of the Spark engine ladders; decide its tier lock (paid-only per D8 tiers) when writing the billing doc.
+- **`gemini-pro-latest` sits in the global Auto chain** (`PWANIMATE_LLM_FALLBACK_CHAIN`, base.py) — a frontier model every tier can currently reach via 
