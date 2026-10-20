@@ -139,7 +139,20 @@
                     reject(err);
                 }
             };
-            xhr.onerror = () => reject(new Error('Network error during part upload'));
+            xhr.onerror = () => {
+                // Almost always the bucket's CORS allow-list missing this
+                // origin (e.g. browsing via 0.0.0.0 instead of localhost).
+                const origin = (typeof location !== 'undefined' && location.origin) || 'this origin';
+                console.error(
+                    `[ResumableUpload] storage PUT was blocked. If the browser console shows a ` +
+                    `CORS error, add "${origin}" to the bucket's CORS allowed origins.`,
+                    { origin, url }
+                );
+                const err = new Error('The upload to storage was blocked by the browser');
+                err.corsSuspect = true;
+                err.origin = origin;
+                reject(err);
+            };
             xhr.onabort = () => reject(new Error('Part upload cancelled'));
             xhr.send(blob);
             putPart._active = putPart._active || new Map();
