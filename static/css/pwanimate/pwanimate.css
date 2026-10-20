@@ -5541,9 +5541,9 @@ body.pwanimate-active .pwanimate-settings-mobile,
 
 /* ==========================================================================
    Quota chip — the composer's daily usage indicator.
-   Industry practice: the ring shows what is LEFT (not what is spent), the
-   state is carried by an icon/label as well as colour (never colour alone),
-   and the detail lives in a dismissible popover that is keyboard reachable.
+   The ring shows how much of today's chat allowance is left; the number is
+   the tokens Spark has read for you today. State is carried by the label as
+   well as the colour, so it never depends on colour alone.
    ========================================================================== */
 
 .pwanimate-quota-chip-wrap {
@@ -5556,22 +5556,23 @@ body.pwanimate-active .pwanimate-settings-mobile,
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 4px 8px 4px 4px;
+    padding: 4px 9px 4px 4px;
     border: 1px solid transparent;
     border-radius: 999px;
     background: transparent;
-    color: var(--pwanimate-text-muted, #6b7280);
+    color: var(--pwanimate-muted, #64748b);
     font-size: 0.72rem;
     font-weight: 600;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
     cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .pwanimate-quota-chip:hover,
 .pwanimate-quota-chip:focus-visible {
-    background: var(--pwanimate-chip-bg, rgba(120, 130, 160, 0.12));
-    color: var(--pwanimate-text, #1f2937);
+    background: var(--pwanimate-hover-bg, #f1f5f9);
+    color: var(--pwanimate-asst-text, #0f172a);
 }
 
 .pwanimate-quota-chip:focus-visible {
@@ -5587,7 +5588,7 @@ body.pwanimate-active .pwanimate-settings-mobile,
 }
 
 .pwanimate-quota-track {
-    stroke: var(--pwanimate-quota-track, rgba(120, 130, 160, 0.28));
+    stroke: var(--pwanimate-border, #e2e8f0);
 }
 
 .pwanimate-quota-progress {
@@ -5596,9 +5597,9 @@ body.pwanimate-active .pwanimate-settings-mobile,
 }
 
 .pwanimate-quota-label {
-    min-width: 14px;
+    min-width: 22px;
     text-align: left;
-    font-variant-numeric: tabular-nums;
+    color: inherit;
 }
 
 .pwanimate-quota-chip.is-warning .pwanimate-quota-progress {
@@ -5627,15 +5628,20 @@ body.pwanimate-active .pwanimate-settings-mobile,
     bottom: calc(100% + 10px);
     right: 0;
     z-index: 60;
-    width: 286px;
+    width: 288px;
     padding: 12px 14px;
-    border: 1px solid var(--pwanimate-border, rgba(120, 130, 160, 0.28));
-    border-radius: 14px;
-    background: var(--pwanimate-card-bg, #ffffff);
-    color: var(--pwanimate-text, #1f2937);
+    border: 1px solid var(--pwanimate-border, #e2e8f0);
+    border-radius: 12px;
+    background: var(--pwanimate-sidebar-bg, #ffffff);
+    color: var(--pwanimate-asst-text, #0f172a);
     box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
     font-size: 0.78rem;
     text-align: left;
+}
+
+[data-theme="dark"] .pwanimate-quota-popover,
+[data-bs-theme="dark"] .pwanimate-quota-popover {
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .pwanimate-quota-popover[hidden] {
@@ -5670,7 +5676,7 @@ body.pwanimate-active .pwanimate-settings-mobile,
 }
 
 .pwanimate-quota-popover-rows dt {
-    color: var(--pwanimate-text-muted, #6b7280);
+    color: var(--pwanimate-muted, #64748b);
 }
 
 .pwanimate-quota-popover-rows dd {
@@ -5682,7 +5688,7 @@ body.pwanimate-active .pwanimate-settings-mobile,
 
 .pwanimate-quota-popover-note {
     margin: 0;
-    color: var(--pwanimate-text-muted, #6b7280);
+    color: var(--pwanimate-muted, #64748b);
     font-size: 0.72rem;
 }
 
@@ -5711,6 +5717,290 @@ body.pwanimate-active .pwanimate-settings-mobile,
 
 .pwanimate-quota-popover-cta[hidden] {
     display: none;
+}
+
+/* ==========================================================================
+   Subscription sheet — the full-screen upgrade view with the tier cards and
+   the M-Pesa payment step. Rendered at body level so it paints above the
+   settings modal and its backdrop.
+   ========================================================================== */
+
+.pwanimate-subscription-overlay {
+    position: fixed;
+    inset: 0;
+    /* Above the settings modal (10500) and its backdrop (10400) — this
+       project's Bootstrap scale runs to 10850, so the sheet sits just under
+       the toasts but over every modal. */
+    z-index: 10900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.5);
+    overflow-y: auto;
+}
+
+[data-theme="dark"] .pwanimate-subscription-overlay,
+[data-bs-theme="dark"] .pwanimate-subscription-overlay {
+    background: rgba(0, 0, 0, 0.62);
+}
+
+.pwanimate-subscription-overlay[hidden] {
+    display: none;
+}
+
+.pwanimate-subscription-sheet {
+    width: min(1000px, 100%);
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    padding: 22px;
+    border: 1px solid var(--pwanimate-border, #e2e8f0);
+    border-radius: 16px;
+    background: var(--pwanimate-sidebar-bg, #ffffff);
+    color: var(--pwanimate-asst-text, #0f172a);
+    box-shadow: 0 24px 64px rgba(15, 23, 42, 0.3);
+}
+
+[data-theme="dark"] .pwanimate-subscription-sheet,
+[data-bs-theme="dark"] .pwanimate-subscription-sheet {
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+.pwanimate-subscription-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.pwanimate-subscription-head h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.pwanimate-subscription-head p {
+    color: var(--pwanimate-muted, #64748b);
+    font-size: 0.8rem;
+    margin: 0;
+    max-width: 62ch;
+}
+
+.pwanimate-subscription-close {
+    flex: 0 0 auto;
+    border: 0;
+    background: transparent;
+    color: var(--pwanimate-muted, #64748b);
+    font-size: 1.05rem;
+    line-height: 1;
+    padding: 6px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.pwanimate-subscription-close:hover,
+.pwanimate-subscription-close:focus-visible {
+    background: var(--pwanimate-hover-bg, #f1f5f9);
+    color: var(--pwanimate-asst-text, #0f172a);
+}
+
+.pwanimate-subscription-close:focus-visible {
+    outline: 2px solid var(--primary, #2563eb);
+    outline-offset: 2px;
+}
+
+.pwanimate-subscription-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+    gap: 12px;
+}
+
+.pwanimate-subscription-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    border: 1px solid var(--pwanimate-border, #e2e8f0);
+    border-radius: 12px;
+    background: var(--pwanimate-card-bg, #ffffff);
+    color: inherit;
+}
+
+.pwanimate-subscription-card.is-current {
+    border-color: var(--primary, #2563eb);
+    box-shadow: 0 0 0 1px var(--primary, #2563eb) inset;
+}
+
+.pwanimate-subscription-current {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--primary, #2563eb);
+    color: #ffffff;
+    font-size: 0.64rem;
+    font-weight: 700;
+}
+
+.pwanimate-subscription-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0 0 6px;
+    color: var(--pwanimate-asst-text, #0f172a);
+}
+
+.pwanimate-subscription-price {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-bottom: 6px;
+}
+
+.pwanimate-subscription-amount {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--pwanimate-asst-text, #0f172a);
+}
+
+.pwanimate-subscription-period {
+    color: var(--pwanimate-muted, #64748b);
+    font-size: 0.76rem;
+}
+
+.pwanimate-subscription-description {
+    color: var(--pwanimate-muted, #64748b);
+    font-size: 0.76rem;
+    margin: 0 0 10px;
+    min-height: 2.4em;
+}
+
+.pwanimate-subscription-includes {
+    list-style: none;
+    margin: 0 0 14px;
+    padding: 0;
+    font-size: 0.76rem;
+    flex: 1;
+    color: var(--pwanimate-asst-text, #0f172a);
+}
+
+.pwanimate-subscription-includes li {
+    margin-bottom: 5px;
+}
+
+.pwanimate-subscription-includes i {
+    color: var(--primary, #2563eb);
+    margin-right: 5px;
+}
+
+.pwanimate-subscription-includes .text-muted {
+    color: var(--pwanimate-muted, #64748b) !important;
+}
+
+.pwanimate-subscription-cta {
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.pwanimate-subscription-payment {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid var(--pwanimate-border, #e2e8f0);
+    border-radius: 12px;
+    background: var(--pwanimate-card-bg, #ffffff);
+    max-width: 440px;
+}
+
+.pwanimate-subscription-payment[hidden] {
+    display: none;
+}
+
+.pwanimate-subscription-payment h5 {
+    font-size: 0.95rem;
+}
+
+.pwanimate-subscription-payment .form-label {
+    color: var(--pwanimate-asst-text, #0f172a);
+}
+
+.pwanimate-subscription-payment .form-control {
+    background: var(--pwanimate-bg, #f8fafc);
+    border-color: var(--pwanimate-border, #e2e8f0);
+    color: var(--pwanimate-asst-text, #0f172a);
+}
+
+.pwanimate-subscription-payment .form-control:focus {
+    border-color: var(--primary, #2563eb);
+    box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.15);
+}
+
+.pwanimate-subscription-status {
+    font-size: 0.78rem;
+    color: var(--pwanimate-muted, #64748b);
+}
+
+.pwanimate-subscription-status.is-error {
+    color: #b91c1c;
+}
+
+.pwanimate-subscription-status.is-success {
+    color: #047857;
+}
+
+/* Mobile: the sheet takes the whole screen, cards stack, payment stays usable */
+@media (max-width: 767px) {
+    .pwanimate-subscription-overlay {
+        padding: 0;
+        align-items: stretch;
+    }
+
+    .pwanimate-subscription-sheet {
+        width: 100%;
+        max-height: 100dvh;
+        height: 100dvh;
+        border-radius: 0;
+        border: 0;
+        padding: 16px 14px calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .pwanimate-subscription-head {
+        margin-bottom: 14px;
+    }
+
+    .pwanimate-subscription-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .pwanimate-subscription-description {
+        min-height: 0;
+    }
+
+    .pwanimate-subscription-payment {
+        max-width: none;
+        position: sticky;
+        bottom: 0;
+    }
+
+    .pwanimate-quota-popover {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: 88px;
+        top: auto;
+        width: auto;
+    }
+}
+
+/* Narrow phones: the ring alone carries the indicator, the numbers live in
+   the popover — the composer row has no room for a label. */
+@media (max-width: 480px) {
+    .pwanimate-quota-label {
+        display: none;
+    }
+
+    .pwanimate-quota-chip {
+        padding: 4px;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

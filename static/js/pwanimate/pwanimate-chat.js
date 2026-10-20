@@ -197,6 +197,7 @@
             this.updateSelectedModelUI();
             this.updateSendButtonState();
             this.initQuotaChip();
+            this.initSubscriptionOverlay();
             if (this.input && this.input.value) {
                 this.resizeTextarea();
             }
@@ -280,15 +281,19 @@
                 this.quotaArc.setAttribute('stroke-dasharray', `${circumference}`);
                 this.quotaArc.setAttribute('stroke-dashoffset', `${circumference * (1 - ratio)}`);
             }
-            // Show what is LEFT: a depleting meter should read as remaining.
-            if (this.quotaLabel) this.quotaLabel.textContent = String(remaining);
+            // The ring is the chat allowance (the thing that can run out);
+            // the number is the tokens Spark has read for you today.
+            const tokens = state.tokens || {};
+            if (this.quotaLabel) {
+                this.quotaLabel.textContent = this.formatQuotaTokens(tokens.total || 0);
+            }
             this.quotaChip.classList.toggle('is-warning', ratio > 0 && ratio <= 0.2);
             this.quotaChip.classList.toggle('is-critical', remaining <= 0);
 
-            const tokens = state.tokens || {};
             this.quotaChip.setAttribute(
                 'aria-label',
-                `${remaining} of ${limit} chats left today. ${this.formatQuotaTokens(tokens.total || 0)} tokens used today.`
+                `${this.formatQuotaTokens(tokens.total || 0)} tokens today. ` +
+                `${remaining} of ${limit} chats left today.`
             );
             if (this.quotaPopover && !this.quotaPopover.hidden) this.renderQuotaPopover();
         }
@@ -335,8 +340,8 @@
             const tier = state.tier || {};
             const resetText = state.resets_at ? this.quotaResetText(state.resets_at) : '';
             const rows = [
-                ['Chats today', `${chats.used || 0} / ${chats.limit === null || chats.limit === undefined ? '—' : chats.limit}`],
-                ['Images today', `${images.used || 0} / ${images.limit === null || images.limit === undefined ? '—' : images.limit}`],
+                ['Chats left today', `${chats.remaining ?? '—'} of ${chats.limit ?? '—'}`],
+                ['Images left today', `${images.remaining ?? '—'} of ${images.limit ?? '—'}`],
                 ['Tokens today', this.formatQuotaTokens(tokens.total || 0)],
             ];
             this.quotaPopover.innerHTML = `
@@ -354,13 +359,250 @@
             if (link) {
                 link.addEventListener('click', () => {
                     this.closeQuotaPopover();
-                    const settingsButton = document.querySelector('[data-bs-target="#settingsModal"], #settingsBtn, .pwanimate-settings-btn');
-                    if (settingsButton) {
-                        settingsButton.click();
-                    } else {
-                        window.location.href = '/settings/';
-                    }
+                    this.openUsageDashboard();
                 });
+            }
+        }
+
+        /** Open the Spark settings modal directly on the Usage tab. */
+        openUsageDashboard() {
+            const modal = document.getElementById('pwanimateSettingsModal');
+            if (modal && window.bootstrap && window.bootstrap.Modal) {
+                window.bootstrap.Modal.getOrCreateInstance(modal).show();
+            }
+            if (typeof window.switchSparkSettingsTab === 'function') {
+                window.switchSparkSettingsTab('modal', 'usage');
+            }
+        }
+
+        // ------------------------------------------------- subscription overlay
+        initSubscriptionOverlay() {
+            this.subscriptionOverlay = document.getElementById('pwanimateSubscriptionOverlay');
+            if (!this.subscriptionOverlay) return;
+            this.paymentTier = null;
+            this.paymentReference = null;
+
+            // Lift it to the body so it always paints above the settings
+            // modal (and its backdrop) whatever the chat layout does.
+            if (this.subscriptionOverlay.parentElement !== document.body) {
+                document.body.appendChild(this.subscriptionOverlay);
+            }
+
+            document.addEventListener('click', (event) => {
+                const opener = event.target.closest('[data-open-subscription]');
+                if (opener) {
+                    event.preventDefault();
+                    this.openSubscriptionOverlay();
+                    return;
+                }
+                const closer = event.target.closest('[data-close-subscription]');
+                if (closer) {
+                    event.preventDefault();
+                    this.closeSubscriptionOverlay();
+                    return;
+                }
+                const subscribe = event.target.closest('[data-subscribe-tier]');
+                if (subscribe) {
+                    event.preventDefault();
+                    this.startSubscriptionPayment(
+                        subscribe.dataset.subscribeTier,
+                        subscribe.dataset.tierPrice
+                    );
+                    return;
+                }
+                if (event.target.closest('[data-cancel-payment]')) {
+                    event.preventDefault();
+                    this.closeSubscriptionOverlay();
+                    return;
+                }
+                if (event.target.closest('[data-submit-payment]')) {
+                    event.preventDefault();
+                    this.submitSubscriptionPayment();
+                    return;
+                }
+                if (event.target.closest('[data-demo-complete]')) {
+                    event.preventDefault();
+                    this.completeDemoPayment();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !this.subscriptionOverlay.hidden) {
+                    this.closeSubscriptionOverlay();
+                }
+            });
+        }
+
+        openSubscriptionOverlay() {
+            if (!this.subscriptionOverlay) return;
+            this.subscriptionOverlay.hidden = false;
+            this.loadTiers();
+        }
+
+        closeSubscriptionOverlay() {
+            if (!this.subscriptionOverlay) return;
+            this.subscriptionOverlay.hidden = true;
+            const payment = document.getElementById('pwanimateSubscriptionPayment');
+            if (payment) payment.hidden = true;
+        }
+
+        async loadTiers() {
+            const container = document.getElementById('pwanimateSubscriptionCards');
+            if (!container) return;
+            try {
+                const response = await fetch('/api/pwanimate/billing/tiers/', {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                const current = data.current_tier;
+                container.querySelectorAll('[data-tier-code]').forEach((card) => {
+                    const isCurrent = card.dataset.tierCode === current;
+                    card.classList.toggle('is-current', isCurrent);
+                    // The "Your plan" badge moves with the current tier.
+                    const badge = card.querySelector('.pwanimate-subscription-current');
+                    if (badge) badge.classList.toggle('d-none', !isCurrent);
+                    // ...and so does the button's label.
+                    const button = card.querySelector('[data-subscribe-tier]');
+                    if (!button) return;
+                    const price = Number(button.dataset.tierPrice || 0);
+                    button.disabled = isCurrent;
+                    button.classList.toggle('btn-outline-secondary', isCurrent);
+                    button.classList.toggle('btn-primary', !isCurrent);
+                    button.textContent = isCurrent
+                        ? 'Current plan'
+                        : (price > 0 ? 'Upgrade' : 'Included');
+                });
+            } catch (error) {
+                // The overlay stays usable with its server-rendered cards.
+            }
+        }
+
+        startSubscriptionPayment(tierCode, price) {
+            this.paymentTier = tierCode;
+            this.paymentReference = null;
+            const payment = document.getElementById('pwanimateSubscriptionPayment');
+            const summary = document.getElementById('pwanimatePaymentSummary');
+            const label = document.getElementById('pwanimatePaymentButtonLabel');
+            const status = document.getElementById('pwanimatePaymentStatus');
+            const demoButton = this.subscriptionOverlay.querySelector('[data-demo-complete]');
+            // Use the tier's display name ("Pro Monthly"), not its code.
+            const card = this.subscriptionOverlay.querySelector(`[data-tier-code="${tierCode}"]`);
+            const nameEl = card ? card.querySelector('.pwanimate-subscription-name') : null;
+            const tierName = nameEl ? nameEl.textContent.trim() : tierCode.replace(/_/g, ' ');
+            if (summary) {
+                summary.textContent = `You are upgrading to ${tierName} — KSh ${price}.`;
+            }
+            if (label) label.textContent = `Pay KSh ${price}`;
+            if (status) {
+                status.textContent = '';
+                status.classList.remove('is-error', 'is-success');
+            }
+            if (demoButton) demoButton.classList.add('d-none');
+            if (payment) payment.hidden = false;
+            const phone = document.getElementById('pwanimatePaymentPhone');
+            if (phone) phone.focus();
+        }
+
+        async submitSubscriptionPayment() {
+            const phone = document.getElementById('pwanimatePaymentPhone');
+            const status = document.getElementById('pwanimatePaymentStatus');
+            const demoButton = this.subscriptionOverlay.querySelector('[data-demo-complete]');
+            if (!this.paymentTier) return;
+            try {
+                const response = await fetch('/api/pwanimate/billing/mpesa/stk/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        tier_code: this.paymentTier,
+                        phone: phone ? phone.value : '',
+                    }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    if (status) {
+                        status.textContent = data.error || 'Could not start the payment.';
+                        status.classList.add('is-error');
+                    }
+                    return;
+                }
+                this.paymentReference = data.payment ? data.payment.reference : null;
+                if (status) {
+                    status.textContent = data.message || 'Check your phone for the M-Pesa prompt.';
+                    status.classList.remove('is-error');
+                }
+                if (demoButton) demoButton.classList.toggle('d-none', !data.demo);
+            } catch (error) {
+                if (status) {
+                    status.textContent = 'Could not reach the payment service. Try again.';
+                    status.classList.add('is-error');
+                }
+            }
+        }
+
+        async completeDemoPayment() {
+            const status = document.getElementById('pwanimatePaymentStatus');
+            if (!this.paymentReference) return;
+            try {
+                const response = await fetch('/api/pwanimate/billing/mpesa/demo-complete/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ reference: this.paymentReference }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.activated) {
+                    if (status) {
+                        status.textContent = data.error || 'The payment did not complete.';
+                        status.classList.add('is-error');
+                    }
+                    return;
+                }
+                if (status) {
+                    status.textContent = 'Payment complete — your plan is active.';
+                    status.classList.remove('is-error');
+                    status.classList.add('is-success');
+                }
+                // Refresh everything that depends on the tier.
+                if (this.loadQuota) this.loadQuota();
+                this.loadTiers();
+                this.refreshUsageTab();
+            } catch (error) {
+                if (status) {
+                    status.textContent = 'Could not complete the payment. Try again.';
+                    status.classList.add('is-error');
+                }
+            }
+        }
+
+        /** Re-render the Usage tab from the server so the numbers are fresh. */
+        async refreshUsageTab() {
+            const tab = document.getElementById('pwanimateUsageTab');
+            if (!tab) return;
+            try {
+                const response = await fetch('/pwanimate/settings/usage/', {
+                    headers: {
+                        'Accept': 'text/html',
+                        'HX-Request': 'true',
+                        'HX-Target': 'pwanimate-settings-modal-body',
+                    },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) return;
+                const html = await response.text();
+                tab.outerHTML = html;
+            } catch (error) {
+                // Keep the stale (but true) numbers rather than breaking the tab.
             }
         }
 

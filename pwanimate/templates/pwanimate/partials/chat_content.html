@@ -1172,6 +1172,8 @@
 
     <!-- Spark Dedicated Settings Modal -->
     {% include 'pwanimate/settings/partials/settings_modal.html' %}
+    {# Moved to <body> by the chat script: in the chat column it would paint under the settings modal's backdrop. #}
+    {% include 'pwanimate/settings/partials/subscription_overlay.html' %}
 </div>
 
 <script>

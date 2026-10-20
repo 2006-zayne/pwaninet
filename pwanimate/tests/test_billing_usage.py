@@ -227,6 +227,54 @@ class UsageSnapshotTests(BillingTestCase):
         self.assertIn("images", keys)
 
 
+class SubscriptionOverlayTests(TestCase):
+    """The full-screen upgrade sheet: tier cards + the M-Pesa payment step."""
+
+    def test_overlay_renders_the_tier_cards_and_the_payment_step(self):
+        from django.template.loader import render_to_string
+
+        catalogue = [
+            {
+                "code": "ember",
+                "name": "Ember",
+                "rank": 0,
+                "price_kes": 0.0,
+                "duration_days": 0,
+                "description": "Free tier",
+                "includes": [{"label": "Chat turns", "value": "20 per day"}],
+                "is_current": True,
+            },
+            {
+                "code": "pro_monthly",
+                "name": "Pro Monthly",
+                "rank": 2,
+                "price_kes": 300.0,
+                "duration_days": 30,
+                "description": "A month of Spark",
+                "includes": [{"label": "Premium model turns", "value": "3 per day"}],
+                "is_current": False,
+            },
+        ]
+        html = render_to_string(
+            "pwanimate/settings/partials/subscription_overlay.html",
+            {"tier_catalogue": catalogue},
+        )
+        # Both tiers are offered, with their real prices and entitlements.
+        self.assertIn("Ember", html)
+        self.assertIn("Pro Monthly", html)
+        self.assertIn("KSh 300", html)
+        self.assertIn("Premium model turns", html)
+        # The current plan is marked and not re-buyable.
+        self.assertIn("Your plan", html)
+        self.assertIn("Current plan", html)
+        # The payment step asks for a phone number (M-Pesa), not a card.
+        self.assertIn("pwanimatePaymentPhone", html)
+        self.assertNotIn("card number", html.lower())
+        # Accessibility: it is a labelled modal dialog.
+        self.assertIn('role="dialog"', html)
+        self.assertIn('aria-modal="true"', html)
+
+
 class BillingApiTests(BillingTestCase):
 
     def setUp(self):
