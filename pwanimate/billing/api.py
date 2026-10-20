@@ -72,7 +72,7 @@ class PwanimateBillingTiersView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from .models import Tier
+        from .models import CostClass, ModelOffering, Tier
 
         tiers = []
         for tier in Tier.objects.filter(is_active=True).order_by("rank"):
@@ -88,10 +88,33 @@ class PwanimateBillingTiersView(APIView):
                 }
             )
         current = TierService.resolve_tier(request.user)
+        current_rank = current.rank if current else 0
+
+        # The premium capability (frontier/paid class) the caller's tier may
+        # use, with the allowance it has left today. The UI renders a chip
+        # from this — it never hardcodes a model name.
+        premium = []
+        for offering in ModelOffering.objects.filter(
+            is_active=True, cost_class__in=[CostClass.FRONTIER, CostClass.PAID_FLASH]
+        ).select_related("min_tier"):
+            allowed = offering.min_tier is None or offering.min_tier.rank <= current_rank
+            decision = QuotaService.check(request.user, kind="premium_turn")
+            premium.append(
+                {
+                    "key": offering.key,
+                    "label": offering.display_name or offering.model_id,
+                    "capability": "frontier" if offering.cost_class == CostClass.FRONTIER else "premium",
+                    "allowed": allowed,
+                    "required_tier": offering.min_tier.code if offering.min_tier else None,
+                    "remaining_today": decision.remaining.get("day"),
+                    "state": decision.state,
+                }
+            )
         return Response(
             {
                 "tiers": tiers,
                 "current_tier": current.code if current else None,
+                "premium": premium,
             },
             status=status.HTTP_200_OK,
         )

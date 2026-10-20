@@ -943,6 +943,27 @@ class PwanimateOrchestrator:
         return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
     @staticmethod
+    def _request_metadata(request) -> Dict[str, Any]:
+        """
+        Gateway metadata for this turn: the engine's ordered chain (if any),
+        the caller's tier rank and the offering they explicitly asked for.
+
+        The tier rank is what lets the router withhold paid models from a
+        free-tier student's chain; the offering is the premium capability the
+        student selected.
+        """
+        meta: Dict[str, Any] = {}
+        try:
+            meta.update(request.engine_metadata())
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            meta.update(request.billing_metadata())
+        except Exception:  # noqa: BLE001 - billing must never break a turn
+            pass
+        return meta
+
+    @staticmethod
     def _record_usage(request, response):
         """
         Record this turn's real usage (model + provider token counts) into the
@@ -1039,7 +1060,7 @@ class PwanimateOrchestrator:
             model=request.model,
             temperature=request.temperature,
             max_tokens=effective_max_tokens,
-            metadata=request.engine_metadata(),
+            metadata=self._request_metadata(request),
         )
 
         t_gen = time.perf_counter()
@@ -1203,7 +1224,7 @@ class PwanimateOrchestrator:
             model=request.model,
             temperature=request.temperature,
             max_tokens=effective_max_tokens,
-            metadata=request.engine_metadata(),
+            metadata=self._request_metadata(request),
         )
 
         if (
@@ -1510,7 +1531,7 @@ class PwanimateOrchestrator:
                     model=request.model,
                     temperature=llm_request.temperature,
                     max_tokens=llm_request.max_tokens,
-                    metadata=request.engine_metadata(),
+                    metadata=self._request_metadata(request),
                     attachments=[],
                 )
                 llm_response = self.gateway.generate(text_request)

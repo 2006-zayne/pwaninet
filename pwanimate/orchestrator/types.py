@@ -39,6 +39,7 @@ class OrchestrationRequest:
     model: Optional[str] = None
     engine: Optional[str] = None
     fallback_chain: Optional[List[Dict[str, str]]] = None
+    offering: Optional[str] = None
     temperature: float = 0.2
     max_tokens: Optional[int] = None
     user_context: Optional[Any] = None
@@ -98,6 +99,28 @@ class OrchestrationRequest:
             meta["engine"] = self.engine
         if self.fallback_chain:
             meta["fallback_chain"] = list(self.fallback_chain)
+        return meta
+
+    def billing_metadata(self) -> Dict[str, Any]:
+        """
+        Tier + offering context for the request path.
+
+        `tier_rank` lets the router withhold candidates the caller's tier may
+        not reach (so a free student can never fall through to a paid model),
+        and `offering` names the registry entry the student explicitly asked
+        for (the premium capability chip).
+        """
+        meta: Dict[str, Any] = {}
+        try:
+            from pwanimate.billing.services import TierService
+
+            rank = TierService.rank_for(getattr(self, "user", None))
+            if rank is not None:
+                meta["tier_rank"] = rank
+        except Exception:  # noqa: BLE001 - never block a chat on billing
+            pass
+        if self.offering:
+            meta["offering"] = self.offering
         return meta
 
 

@@ -202,6 +202,47 @@ class PwanimateChatView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        # A named offering (the premium capability chip) is a registry entry,
+        # never a raw model name: the tier decides whether it is reachable.
+        # Locked offerings are refused with the upgrade path, not silently
+        # downgraded (D8: locks are enforced server-side).
+        offering_key = data.get("offering")
+        offering = None
+        if offering_key:
+            try:
+                from pwanimate.billing.services import (
+                    offering_allows_tier,
+                    offering_by_key,
+                    tier_rank_for_user,
+                )
+
+                offering = offering_by_key(str(offering_key))
+                if offering is None:
+                    return Response(
+                        {"error": f"Unknown offering '{offering_key}'."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                tier_rank = tier_rank_for_user(request.user)
+                if not offering_allows_tier(offering, offering.provider, offering.model_id, tier_rank):
+                    required_tier = offering.min_tier
+                    return Response(
+                        {
+                            "error": "model_locked",
+                            "offering": offering.key,
+                            "required_tier": required_tier.code if required_tier else None,
+                            "required_tier_name": required_tier.name if required_tier else None,
+                            "price_kes": float(required_tier.price_kes) if required_tier else None,
+                            "message": (
+                                f"'{offering.display_name or offering.model_id}' is available on the "
+                                f"{required_tier.name if required_tier else 'paid'} tier."
+                            ),
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            except ImportError:
+                # Billing not installed yet: ignore the offering rather than fail.
+                offering = None
+
         is_study_cmd, study_remainder = parse_study_command(message)
         study_session_id = data.get("study_session_id")
         requested_study_session = None
@@ -468,6 +509,7 @@ class PwanimateChatView(APIView):
                 model=model,
                 engine=engine["slug"] if engine else None,
                 fallback_chain=list(engine["fallback_chain"]) if engine else None,
+                offering=offering.key if offering else None,
                 attachments=active_attachments,
                 context_resources=context_resources,
                 local_time=data.get("local_time"),

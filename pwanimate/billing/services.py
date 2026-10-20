@@ -70,6 +70,86 @@ def next_week_start(now: datetime) -> datetime:
     return local_week_start(now) + timedelta(days=7)
 
 
+# ---------------------------------------------------------------- registry
+# The registry is read on every request (once per candidate), so it is cached
+# in memory for a short while — the catalogue changes only on deploy.
+_OFFERING_INDEX: Dict[str, Any] = {"at": None, "index": {}}
+_OFFERING_INDEX_TTL_SECONDS = 60.0
+
+
+def offering_index(now: Optional[float] = None) -> Dict[Tuple[str, str], ModelOffering]:
+    """(provider, model_id) -> offering, cached briefly."""
+    import time as _time
+
+    now = now if now is not None else _time.monotonic()
+    if _OFFERING_INDEX["index"] and (now - _OFFERING_INDEX["at"]) < _OFFERING_INDEX_TTL_SECONDS:
+        return _OFFERING_INDEX["index"]
+    index = {}
+    for offering in ModelOffering.objects.filter(is_active=True).select_related("min_tier"):
+        index[(offering.provider, offering.model_id)] = offering
+        index[(offering.provider, offering.model_id.lower())] = offering
+    _OFFERING_INDEX["index"] = index
+    _OFFERING_INDEX["at"] = now
+    return index
+
+
+def invalidate_offering_index() -> None:
+    _OFFERING_INDEX["index"] = {}
+    _OFFERING_INDEX["at"] = None
+
+
+def tier_rank_for_user(user, now: Optional[datetime] = None) -> Optional[int]:
+    """The caller's tier rank (0 = free). Convenience wrapper for request paths."""
+    return TierService.rank_for(user, now)
+
+
+def offering_by_key(key: str) -> Optional[ModelOffering]:
+    if not key:
+        return None
+    return ModelOffering.objects.filter(key=key, is_active=True).select_related("min_tier").first()
+
+
+def is_free_route(provider: str, model_id: str) -> bool:
+    """
+    Is this candidate recognisably served on a free allowance?
+
+    Only used for candidates that are NOT in the registry (a registered
+    offering carries its own cost class and min tier). An unregistered model
+    is treated as paid unless it is provably free:
+    - OpenRouter: only a ':free' id is free (a plain id would be billed).
+    - mock: the friendly-error rung, never a real model.
+    - Gemini / Groq: not provably free from the id alone — they must be
+      registered, so the registry stays the single source of truth.
+    """
+    if not provider or not model_id:
+        return False
+    provider = provider.lower()
+    if provider == "mock":
+        return True
+    if provider == "openrouter":
+        return model_id.lower().endswith(":free")
+    return False
+
+
+def offering_allows_tier(offering: Optional[ModelOffering], provider: str, model_id: str, tier_rank: Optional[int]) -> bool:
+    """
+    May this tier reach this candidate?
+
+    - A registered offering: yes if its min_tier is at or below the caller's rank.
+    - An unregistered candidate: allowed only if it is recognisably a free
+      route; anything else is treated as paid and withheld from the free tier
+      (fail-safe: an unpriced model must not become a free-tier leak).
+    """
+    if tier_rank is None:
+        return True  # no tier context (direct gateway use) -> do not filter
+    if offering is not None:
+        min_tier = offering.min_tier
+        if min_tier is None:
+            return True
+        return min_tier.rank <= tier_rank
+    return is_free_route(provider, model_id)
+
+
 # ---------------------------------------------------------------- tiers
 class TierService:
     """Resolves a user to their tier and their entitlement windows."""
@@ -80,6 +160,12 @@ class TierService:
         if tier:
             return tier
         return Tier.objects.filter(is_active=True).order_by("rank").first()
+
+    @classmethod
+    def rank_for(cls, user, now: Optional[datetime] = None) -> Optional[int]:
+        """The caller's tier rank (0 = the free tier)."""
+        tier = cls.resolve_tier(user, now)
+        return tier.rank if tier else None
 
     @staticmethod
     def active_subscription(user, now: Optional[datetime] = None) -> Optional[Subscription]:

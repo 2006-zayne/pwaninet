@@ -224,6 +224,24 @@ class LLMRouter:
                 provider="none",
             )
 
+        # Tier gate: a candidate the caller's tier may not reach is withheld
+        # from the chain, so a free-tier student can never fall through to a
+        # paid model (e.g. the frontier rung in the global Auto chain).
+        tier_rank = (request.metadata or {}).get("tier_rank")
+        if tier_rank is not None:
+            available = self._filter_by_tier(available, tier_rank)
+            if not available:
+                raise AIProviderConfigurationError(
+                    "No models are available for your tier right now.",
+                    provider="tier",
+                )
+
+        # An explicitly requested offering (the premium capability chip) is
+        # served first — but only if the caller's tier includes it.
+        offering_key = (request.metadata or {}).get("offering")
+        if offering_key:
+            available = self._prepend_offering(available, offering_key, tier_rank)
+
         # Dynamically prioritize un-throttled, healthy candidates based on live quota status
         if quota_tracker is not None and len(available) > 1:
             has_user_override = bool(request.provider or request.model)
@@ -242,3 +260,55 @@ class LLMRouter:
                     available = healthy + throttled
 
         return available
+
+    # ------------------------------------------------------------------ tier
+    @staticmethod
+    def _filter_by_tier(candidates: List[Dict[str, str]], tier_rank: int) -> List[Dict[str, str]]:
+        """
+        Withhold candidates the caller's tier may not reach.
+
+        The registry is the source of truth: a registered offering is allowed
+        when its min_tier is at or below the caller's rank. An unregistered
+        candidate is allowed only if it is recognisably a free route — an
+        unpriced model must never become a free-tier leak.
+        """
+        try:
+            from pwanimate.billing.services import offering_allows_tier, offering_index
+        except Exception:  # noqa: BLE001 - the registry must never break routing
+            return candidates
+
+        index = offering_index()
+        kept: List[Dict[str, str]] = []
+        for candidate in candidates:
+            provider = candidate.get("provider") or ""
+            model = candidate.get("model") or ""
+            offering = index.get((provider, model)) or index.get((provider, model.lower()))
+            if offering_allows_tier(offering, provider, model, tier_rank):
+                kept.append(candidate)
+        return kept
+
+    @staticmethod
+    def _prepend_offering(
+        candidates: List[Dict[str, str]], offering_key: str, tier_rank: Optional[int]
+    ) -> List[Dict[str, str]]:
+        """Put an explicitly requested offering first, if the tier allows it."""
+        try:
+            from pwanimate.billing.services import offering_allows_tier, offering_by_key
+        except Exception:  # noqa: BLE001
+            return candidates
+
+        offering = offering_by_key(offering_key)
+        if offering is None:
+            return candidates
+        if not offering_allows_tier(offering, offering.provider, offering.model_id, tier_rank):
+            return candidates
+        entry = {"provider": offering.provider, "model": offering.model_id}
+        rest = [
+            candidate
+            for candidate in candidates
+            if not (
+                candidate.get("provider") == entry["provider"]
+                and (candidate.get("model") or "") == entry["model"]
+            )
+        ]
+        return [entry] + rest
