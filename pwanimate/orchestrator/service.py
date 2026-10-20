@@ -918,6 +918,7 @@ class PwanimateOrchestrator:
             elif tool_route.tool_name == "group_announcements" and on_progress:
                 on_progress("searching_posts")
             response = self._run_tool(request, query, tool_route, t_start, on_progress=on_progress, on_token=on_token)
+            self._record_usage(request, response)
             return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
         # 4. Conversational turns can skip platform retrieval after tool choice.
@@ -926,6 +927,7 @@ class PwanimateOrchestrator:
         )
         if is_conversational:
             response = self._run_conversational(request, query, t_start, on_token=on_token)
+            self._record_usage(request, response)
             return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
         # 5. Standard / Attachment / Context RAG
@@ -937,7 +939,39 @@ class PwanimateOrchestrator:
             on_progress=on_progress,
             on_token=on_token,
         )
+        self._record_usage(request, response)
         return self._append_friend_post_updates(response, request.user, friend_post_updates)
+
+    @staticmethod
+    def _record_usage(request, response):
+        """
+        Record this turn's real usage (model + provider token counts) into the
+        billing ledger, so the quota the student sees is the quota we enforce.
+
+        Never fatal: accounting must not break a chat turn.
+        """
+        try:
+            from pwanimate.billing.models import UsageKind
+            from pwanimate.billing.services import UsageService
+
+            images = sum(
+                1
+                for attachment in (getattr(request, "attachments", None) or [])
+                if getattr(attachment, "attachment_type", "") == "image"
+            )
+            UsageService.record_turn(
+                user=getattr(request, "user", None),
+                provider=getattr(response, "provider", "") or "",
+                model_id=getattr(response, "model", "") or "",
+                prompt_tokens=int(getattr(response, "prompt_tokens", 0) or 0),
+                completion_tokens=int(getattr(response, "completion_tokens", 0) or 0),
+                total_tokens=int(getattr(response, "total_tokens", 0) or 0),
+                images=images,
+                kind=UsageKind.IMAGE if images else UsageKind.CHAT,
+                source="chat",
+            )
+        except Exception:  # noqa: BLE001 - accounting must never break a turn
+            logger.warning("[BILLING] usage recording failed", exc_info=True)
 
     @staticmethod
     def _append_friend_post_updates(response, user, updates):

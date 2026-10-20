@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'search',
     'recommendations',
     'pwanimate',
+    'pwanimate.billing',
     'admin_dashboard',
     'uploads',
 ]
