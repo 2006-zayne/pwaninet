@@ -198,6 +198,7 @@
             this.updateSendButtonState();
             this.initQuotaChip();
             this.initSubscriptionOverlay();
+            this.initVisionChoice();
             if (this.input && this.input.value) {
                 this.resizeTextarea();
             }
@@ -382,6 +383,49 @@
             if (typeof window.switchSparkSettingsTab === 'function') {
                 window.switchSparkSettingsTab('modal', 'usage');
             }
+        }
+
+        // ------------------------------------------------- vision image choice
+        /**
+         * One-time choice after a vision failure: keep the image in the
+         * conversation (so it can be reused) or drop it for good. The answer
+         * is recorded server-side, so the question is never asked twice.
+         */
+        initVisionChoice() {
+            document.addEventListener('click', async (event) => {
+                const button = event.target.closest('[data-vision-policy]');
+                if (!button) return;
+                const holder = button.closest('[data-vision-choice]');
+                const attachmentId = holder ? holder.dataset.visionChoice : null;
+                if (!attachmentId) return;
+                const policy = button.dataset.visionPolicy;
+                button.disabled = true;
+                try {
+                    const response = await fetch(
+                        `/api/pwanimate/attachments/${attachmentId}/vision-policy/`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRFToken': getCsrfToken(),
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ policy }),
+                        }
+                    );
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        button.disabled = false;
+                        return;
+                    }
+                    if (holder) {
+                        holder.innerHTML = `<i class="bi bi-check2"></i><span>${escapeHtml(data.message || 'Saved.')}</span>`;
+                    }
+                } catch (error) {
+                    button.disabled = false;
+                }
+            });
         }
 
         // ------------------------------------------------- subscription overlay
@@ -6032,13 +6076,22 @@
 
             let fallbackHtml = '';
             if (fallbackInfo && fallbackInfo.vision_text_fallback) {
-                // Said plainly: Spark Vision is down, please try later.
-                fallbackHtml = `
-                    <div class="pwanimate-fallback-notice">
-                        <i class="bi bi-eye-slash"></i>
-                        <span>Spark Vision is down and didn’t respond, so I couldn’t look at your image. Please try again in a little while.</span>
-                    </div>
-                `;
+                // No banner: the model reports the outage in its answer. The
+                // only extra is a one-time CHOICE (the image may be one the
+                // student wants to keep asking about) — shown while the
+                // decision is still open, never repeated.
+                const attachmentId = fallbackInfo.vision_attachment_id;
+                const policy = fallbackInfo.vision_policy || 'ask';
+                if (attachmentId && policy === 'ask') {
+                    fallbackHtml = `
+                        <div class="pwanimate-fallback-notice pwanimate-vision-choice" data-vision-choice="${escapeHtml(attachmentId)}">
+                            <i class="bi bi-eye-slash"></i>
+                            <span>Keep this image in the conversation?</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-vision-policy="keep">Keep it</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-vision-policy="drop">Drop it</button>
+                        </div>
+                    `;
+                }
             }
 
             row.innerHTML = `

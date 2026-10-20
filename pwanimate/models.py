@@ -506,6 +506,13 @@ class PwanimateAttachment(models.Model):
     # instead of once per question.
     vision_summary = models.TextField(blank=True, default="")
     vision_model = models.CharField(max_length=120, blank=True, default="")
+    # Set when the analysis failed. The image is then dropped from the
+    # context (never re-sent) and later turns just carry the note.
+    vision_error = models.TextField(blank=True, default="")
+    # What to do with an image whose analysis failed: 'ask' (the default —
+    # the student is offered the choice once), 'keep' (they want to reuse
+    # it, so it stays in the context), 'drop' (never send it again).
+    vision_context_policy = models.CharField(max_length=16, default="ask")
     created_at = models.DateTimeField(
         auto_now_add=True,
         db_index=True,

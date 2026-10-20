@@ -66,6 +66,49 @@ from documents.models import Document
 logger = logging.getLogger(__name__)
 
 
+class PwanimateAttachmentVisionPolicyView(APIView):
+    """
+    Record what the student wants to happen to an image whose analysis failed.
+
+    'keep' -> the image stays in the context so they can keep asking about
+    it; 'drop' -> it is never sent again. 'ask' is the untouched default
+    (the choice is still open).
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, attachment_id):
+        from pwanimate.models import PwanimateAttachment
+
+        policy = str((request.data or {}).get("policy") or "").strip().lower()
+        if policy not in {"keep", "drop"}:
+            return Response(
+                {"error": "policy must be 'keep' or 'drop'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        attachment = PwanimateAttachment.objects.filter(
+            id=attachment_id, user=request.user
+        ).first()
+        if attachment is None:
+            return Response(
+                {"error": "Attachment not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        attachment.vision_context_policy = policy
+        attachment.save(update_fields=["vision_context_policy"])
+        return Response(
+            {
+                "attachment_id": str(attachment.id),
+                "policy": policy,
+                "message": (
+                    "Kept — Spark will try the image again next time."
+                    if policy == "keep"
+                    else "Dropped — the image will not be sent again."
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class PwanimateChatView(APIView):
     """
     Primary conversational endpoint for Pwanimate.
@@ -604,6 +647,8 @@ class PwanimateChatView(APIView):
                 "provider_used": response.provider,
                 "vision_fallback": response.metadata.get("vision_route") == "fallback",
                 "vision_text_fallback": response.metadata.get("vision_text_fallback", False),
+                "vision_attachment_id": response.metadata.get("vision_attachment_id"),
+                "vision_policy": response.metadata.get("vision_policy", "ask"),
             }
             res_data["fallback_info"] = fallback_info
             res_data["quota_info"] = response.quota_info

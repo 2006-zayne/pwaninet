@@ -6009,3 +6009,17 @@ body.pwanimate-active .pwanimate-settings-mobile,
         transition: none;
     }
 }
+
+/* The one-time "keep or drop this image" choice under a failed vision turn. */
+.pwanimate-vision-choice {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.pwanimate-vision-choice .btn {
+    padding: 2px 10px;
+    font-size: 0.72rem;
+    border-radius: 8px;
+}

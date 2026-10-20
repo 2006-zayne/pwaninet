@@ -72,7 +72,9 @@ def _vision_fallback_instruction(system_instruction: Optional[str]) -> str:
 
 
 def _vision_unavailable_warning() -> Dict[str, str]:
-    """A user-facing warning attached to the response (the UI shows it)."""
+    """Kept for callers that want a machine-readable marker. The chat no
+    longer renders a banner for this: the model reports it in its answer
+    (once, and only when the question actually depends on the image)."""
     return {
         "code": "spark_vision_unavailable",
         "title": "Spark Vision is down",
@@ -416,6 +418,69 @@ class PwanimateOrchestrator:
                         f"{stored_summary}\n"
                         "  </content>\n"
                         "</attachment_context>"
+                    )
+                    continue
+
+                # The analysis failed earlier. The student decides what
+                # happens to the image: keep it in the context (so they can
+                # reuse it) or drop it. Until they choose, it is offered.
+                stored_error = (getattr(att, "vision_error", "") or "").strip()
+                if stored_error:
+                    policy = (getattr(att, "vision_context_policy", "") or "ask").strip().lower()
+                    if policy == "drop":
+                        doc_blocks.append(
+                            f'<attachment_context id="{att_id}" filename="{att_name}" '
+                            'type="image" analysed="failed">\n'
+                            f"  <title>{att_name}</title>\n"
+                            "  <content>\n"
+                            f"{stored_error} The student chose not to keep this image, so it is "
+                            "not available. Answer from the rest of the context, and only mention "
+                            "the image if the question depends on it.\n"
+                            "  </content>\n"
+                            "</attachment_context>"
+                        )
+                        continue
+                    if policy == "keep":
+                        # The student wants to reuse the image: send it again
+                        # so the vision route can pick it up.
+                        data_bytes = getattr(att, "data_bytes", None)
+                        if not data_bytes and hasattr(att, "file") and att.file:
+                            try:
+                                att.file.seek(0)
+                                data_bytes = att.file.read()
+                                att.file.seek(0)
+                            except Exception as e:
+                                logger.warning("Could not read bytes for image attachment %s: %s", att_id, e)
+                        image_attachments.append(
+                            AttachmentData(
+                                id=att_id,
+                                name=att_name,
+                                mime_type=att_mime,
+                                attachment_type="image",
+                                data_bytes=data_bytes,
+                                url=getattr(att, "url", f"/api/Spark/attachments/{att_id}/view/"),
+                            )
+                        )
+                        continue
+                    # 'ask': send it once more (the vision route may have
+                    # recovered) and let the student decide afterwards.
+                    data_bytes = getattr(att, "data_bytes", None)
+                    if not data_bytes and hasattr(att, "file") and att.file:
+                        try:
+                            att.file.seek(0)
+                            data_bytes = att.file.read()
+                            att.file.seek(0)
+                        except Exception as e:
+                            logger.warning("Could not read bytes for image attachment %s: %s", att_id, e)
+                    image_attachments.append(
+                        AttachmentData(
+                            id=att_id,
+                            name=att_name,
+                            mime_type=att_mime,
+                            attachment_type="image",
+                            data_bytes=data_bytes,
+                            url=getattr(att, "url", f"/api/Spark/attachments/{att_id}/view/"),
+                        )
                     )
                     continue
 
@@ -1009,6 +1074,38 @@ class PwanimateOrchestrator:
         return meta
 
     @staticmethod
+    def _first_image_id(attachments) -> Optional[str]:
+        for attachment in attachments or []:
+            if (getattr(attachment, "attachment_type", "") or "") == "image":
+                return str(getattr(attachment, "id", "") or "")
+        return None
+
+    @staticmethod
+    def _first_image_policy(attachments) -> str:
+        for attachment in attachments or []:
+            if (getattr(attachment, "attachment_type", "") or "") == "image":
+                return (getattr(attachment, "vision_context_policy", "") or "ask").strip().lower()
+        return "ask"
+
+    @staticmethod
+    def _remember_vision_failure(attachments) -> None:
+        """
+        Stop re-sending an image that could not be analysed.
+
+        The failure is recorded on the attachment, so the next turn carries a
+        short note instead of the image: no repeated vision call, no repeated
+        "Spark Vision is down" announcement.
+        """
+        for attachment in attachments or []:
+            if (getattr(attachment, "attachment_type", "") or "") != "image":
+                continue
+            try:
+                attachment.vision_error = SPARK_VISION_UNAVAILABLE_NOTICE
+                attachment.save(update_fields=["vision_error"])
+            except Exception:  # noqa: BLE001 - best effort, never break the turn
+                logger.debug("Could not record the vision failure on %s", attachment)
+
+    @staticmethod
     def _record_usage(request, response):
         """
         Record this turn's real usage (model + provider token counts) into the
@@ -1301,6 +1398,7 @@ class PwanimateOrchestrator:
                 "Pwanimate tool route could not serve the image; retrying text-only: %s",
                 type(vision_error).__name__,
             )
+            self._remember_vision_failure(getattr(request, "attachments", None))
             vision_text_fallback = True
             text_only_instruction = _vision_fallback_instruction(llm_request.system_instruction)
             text_request = LLMRequest(
@@ -1320,6 +1418,8 @@ class PwanimateOrchestrator:
                 "vision_route": "text_fallback",
                 "vision_text_fallback": True,
                 "vision_fallback_error": type(vision_error).__name__,
+                "vision_attachment_id": self._first_image_id(getattr(request, "attachments", None)),
+                "vision_policy": self._first_image_policy(getattr(request, "attachments", None)),
             })
         gen_time_ms = round((time.perf_counter() - t_gen) * 1000.0, 2)
         total_time_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
@@ -1382,11 +1482,9 @@ class PwanimateOrchestrator:
             metadata=metadata,
             quota_info=quota_info,
             finish_reason=llm_response.finish_reason,
-            warnings=(
-                list(source_warnings) + [_vision_unavailable_warning()]
-                if vision_text_fallback
-                else source_warnings
-            ),
+            # No banner: the model says it in the answer, once, and only
+            # when the question actually depends on the image.
+            warnings=source_warnings,
         )
 
     def _run_rag(
@@ -1597,6 +1695,7 @@ class PwanimateOrchestrator:
                     "Pwanimate vision route failed; retrying text-only through the normal model chain: %s",
                     type(vision_error).__name__,
                 )
+                self._remember_vision_failure(image_attachments)
                 vision_text_fallback = True
                 text_only_messages = [
                     ChatMessage(role=message.role, content=message.content)
@@ -1621,6 +1720,8 @@ class PwanimateOrchestrator:
                     "vision_route": "text_fallback",
                     "vision_text_fallback": True,
                     "vision_fallback_error": type(vision_error).__name__,
+                    "vision_attachment_id": self._first_image_id(image_attachments),
+                    "vision_policy": self._first_image_policy(image_attachments),
                     "fallback_used": True,
                     "original_provider": "gemini",
                     "original_model": getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.8-flash"),
@@ -1695,11 +1796,9 @@ class PwanimateOrchestrator:
             metadata=metadata,
             quota_info=quota_info,
             finish_reason=llm_response.finish_reason,
-            warnings=(
-                list(source_warnings) + [_vision_unavailable_warning()]
-                if vision_text_fallback
-                else source_warnings
-            ),
+            # No banner: the model says it in the answer, once, and only
+            # when the question actually depends on the image.
+            warnings=source_warnings,
         )
 
     def _build_sources_summary(self, context_items: list) -> List[Dict[str, Any]]:

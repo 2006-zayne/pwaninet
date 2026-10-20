@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from pwanimate.ai.gateway import AIGateway, ChatMessage, LLMRequest
 from pwanimate.ai.gateway.types import AttachmentData
+from pwanimate.orchestrator.service import SPARK_VISION_UNAVAILABLE_NOTICE
 from pwanimate.ingestion.chunker import chunk_document
 from pwanimate.ingestion.exceptions import EmptyDocumentError
 from pwanimate.ingestion.extractors.factory import extract_document
@@ -144,7 +145,12 @@ def process_pwanimate_attachment(attachment_id: str) -> Dict[str, Any]:
                 logger.warning("Image analysis failed for %s: %s", attachment.id, exc)
                 attachment.processing_status = "failed"
                 attachment.processing_error = f"Image analysis failed: {exc}"[:2000]
-                attachment.save(update_fields=["processing_status", "processing_error"])
+                # Remember the failure so the image is never re-sent: later
+                # turns carry the note instead of paying for another look.
+                attachment.vision_error = SPARK_VISION_UNAVAILABLE_NOTICE
+                attachment.save(update_fields=[
+                    "processing_status", "processing_error", "vision_error",
+                ])
                 return {"status": "failed", "attachment_id": str(attachment.id)}
             attachment.vision_summary = summary
             attachment.vision_model = f"{provider}:{model}"

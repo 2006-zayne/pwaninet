@@ -33,6 +33,8 @@ class VisionUnavailableMessageTests(SimpleTestCase):
         self.assertIn("tell them this plainly", instruction.lower())
 
     def test_warning_is_user_facing(self):
+        """The marker still exists for callers that want it, but the chat no
+        longer renders a banner: the model reports the outage in its answer."""
         warning = _vision_unavailable_warning()
         self.assertEqual(warning["code"], "spark_vision_unavailable")
         self.assertIn("Spark Vision", warning["title"])

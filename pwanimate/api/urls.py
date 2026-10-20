@@ -8,6 +8,7 @@ from pwanimate.api.views import (
     PwanimateAttachmentMediaView,
     PwanimateAttachmentStatusView,
     PwanimateAttachmentUploadView,
+    PwanimateAttachmentVisionPolicyView,
     PwanimateChatView,
     PwanimateCollectionListCreateView,
     PwanimateConversationDetailView,
@@ -63,6 +64,7 @@ urlpatterns = [
     path("context/documents/", PwanimateContextDocumentSearchView.as_view(), name="context_document_search"),
     path("attachments/upload/", PwanimateAttachmentUploadView.as_view(), name="attachment_upload"),
     path("attachments/<uuid:attachment_id>/status/", PwanimateAttachmentStatusView.as_view(), name="attachment_status"),
+    path("attachments/<uuid:attachment_id>/vision-policy/", PwanimateAttachmentVisionPolicyView.as_view(), name="attachment_vision_policy"),
     path("attachments/<uuid:attachment_id>/view/", PwanimateAttachmentMediaView.as_view(), name="attachment_view"),
     path("attachments/<uuid:attachment_id>/download/", PwanimateAttachmentDownloadView.as_view(), name="attachment_download"),
 ]
