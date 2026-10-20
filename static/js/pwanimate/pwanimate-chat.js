@@ -158,10 +158,16 @@
             this._studyContextSyncTimer = null;
 
             // Model selection & Quota modal state
-            this.selectedProvider = localStorage.getItem('pwanimate_selected_provider') || '';
-            this.selectedModel = localStorage.getItem('pwanimate_selected_model') || '';
-            this.selectedDisplay = localStorage.getItem('pwanimate_selected_display') || 'Auto';
-            this.selectedProviderLabel = localStorage.getItem('pwanimate_selected_provider_label') || '';
+            // Engines-only picker: raw provider/model selections are retired —
+            // migrate any stored legacy selection back to Auto.
+            ['pwanimate_selected_provider', 'pwanimate_selected_model', 'pwanimate_selected_display', 'pwanimate_selected_provider_label']
+                .forEach((key) => localStorage.removeItem(key));
+            this.selectedProvider = '';
+            this.selectedModel = '';
+            this.selectedDisplay = 'Auto';
+            this.selectedProviderLabel = '';
+            this.selectedEngine = localStorage.getItem('pwanimate_selected_engine') || '';
+            this.selectedEngineLabel = localStorage.getItem('pwanimate_selected_engine_label') || '';
             this.selectedModelLabel = workspace.querySelector('#pwanimate-selected-model-label');
             this.dropdownStatusDot = workspace.querySelector('#pwanimate-dropdown-status-dot');
             this.dropdownModelsList = workspace.querySelector('#pwanimate-dropdown-models-list');
@@ -187,7 +193,7 @@
             this.initMobileMenuSwipeNavigation();
             this.initContextDocumentPicker();
             this.initAttachmentHandlers();
-            this.updateQuotaStatus({ models: this.getDefaultModels() });
+            this.updateQuotaStatus({ engines: this.getDefaultEngines() });
             this.updateSelectedModelUI();
             this.updateSendButtonState();
             if (this.input && this.input.value) {
@@ -2460,15 +2466,13 @@
                     return;
                 }
 
-                // Model dropdown selection
+                // Spark engine dropdown selection (Auto item has no data-engine)
                 const opt = e.target.closest('.pwanimate-model-option');
                 if (opt) {
                     e.preventDefault();
-                    const provider = opt.dataset.provider || '';
-                    const model = opt.dataset.model || '';
+                    const engine = opt.dataset.engine || '';
                     const display = opt.dataset.display || 'Auto';
-                    const providerLabel = opt.dataset.providerLabel || '';
-                    this.selectModel(provider, model, display, providerLabel);
+                    this.selectEngine(engine, display);
                     return;
                 }
             };
@@ -2510,11 +2514,9 @@
                     const btn = e.target.closest('.pwanimate-modal-select-btn');
                     if (btn && !btn.classList.contains('disabled')) {
                         e.preventDefault();
-                        const provider = btn.dataset.provider || '';
-                        const model = btn.dataset.model || '';
+                        const engine = btn.dataset.engine || '';
                         const display = btn.dataset.display || 'Auto';
-                        const providerLabel = btn.dataset.providerLabel || '';
-                        this.selectModel(provider, model, display, providerLabel);
+                        this.selectEngine(engine, display);
 
                         // Dismiss modal
                         if (this.quotaModal) {
@@ -4960,11 +4962,8 @@
                 if (!this.conversationId) {
                     payload.create_conversation = true;
                 }
-                if (this.selectedProvider) {
-                    payload.provider = this.selectedProvider;
-                }
-                if (this.selectedModel) {
-                    payload.model = this.selectedModel;
+                if (this.selectedEngine) {
+                    payload.engine = this.selectedEngine;
                 }
                 if (snapshotAttachments.length > 0) {
                     payload.attachments = snapshotAttachments.map(a => a.id);
@@ -4989,14 +4988,51 @@
                 let data;
                 let responseOk = response.ok;
                 let responseStatus = response.status;
+                // Progressive token rendering: a live bubble fills as `chunk`
+                // events arrive; once the final `response` event lands it is
+                // replaced by the fully-rendered message row (identical to the
+                // non-streaming path).
+                let streamRow = null;
+                let streamRaw = '';
+                let streamRenderTimer = null;
+                const finalizeStreamBubble = () => {
+                    if (streamRenderTimer) {
+                        clearTimeout(streamRenderTimer);
+                        streamRenderTimer = null;
+                    }
+                    if (streamRow && streamRow.parentNode) {
+                        streamRow.remove();
+                    }
+                    streamRow = null;
+                };
+                const onChunk = (chunkText) => {
+                    if (!chunkText) return;
+                    if (!streamRow) {
+                        this.removeTypingIndicator();
+                        streamRow = this.createStreamingRow();
+                    }
+                    streamRaw += chunkText;
+                    if (!streamRenderTimer) {
+                        streamRenderTimer = setTimeout(() => {
+                            streamRenderTimer = null;
+                            const body = streamRow ? streamRow.querySelector('.pwanimate-markdown-body') : null;
+                            if (body) {
+                                body.innerHTML = this.renderMarkdownWithMathAndCode(streamRaw);
+                                body.dataset.raw = streamRaw;
+                                this.scrollToBottom();
+                            }
+                        }, 80);
+                    }
+                };
                 if ((response.headers.get('content-type') || '').includes('text/event-stream')) {
-                    const streamed = await this.readChatEventStream(response);
+                    const streamed = await this.readChatEventStream(response, onChunk);
                     data = streamed.data || {};
                     responseStatus = Number(streamed.status_code) || response.status;
                     responseOk = responseStatus >= 200 && responseStatus < 300;
                 } else {
                     data = await response.json();
                 }
+                finalizeStreamBubble();
 
                 // Handle conversation ID update even if there's an error, to prevent spawning new conversations
                 if (data.conversation_id && !this.conversationId) {
@@ -5078,7 +5114,7 @@
                 this.scrollToMessageStart(assistantRow);
                 this.refreshConversationsList();
                 this.updateQuotaStatus(data.quota_status);
-                this.updateActiveModelChip(data.quota_info);
+                this.updateActiveModelChip(data.quota_info, data.serving_engine);
 
             } catch (err) {
                 if (err.name === 'AbortError') {
@@ -5205,7 +5241,7 @@
             requestAnimationFrame(() => textEl.classList.add('status-changing'));
         }
 
-        async readChatEventStream(response) {
+        async readChatEventStream(response, onChunk = null) {
             if (!response.body || typeof response.body.getReader !== 'function') {
                 throw new Error('Live progress is not supported by this browser.');
             }
@@ -5234,6 +5270,10 @@
 
                 if (eventName === 'status') {
                     this.updateThinkingStatus(payload.stage);
+                } else if (eventName === 'chunk') {
+                    if (onChunk && typeof payload.text === 'string') {
+                        onChunk(payload.text);
+                    }
                 } else if (eventName === 'response') {
                     finalPayload = payload;
                 }
@@ -5453,6 +5493,26 @@
         }
 
 
+        createStreamingRow() {
+            // Lightweight assistant bubble used ONLY while chunks stream in;
+            // the final response event swaps it for the full message row.
+            const row = document.createElement('div');
+            row.className = 'pwanimate-message-row assistant pwanimate-streaming-row';
+            row.innerHTML = `
+                <div class="pwanimate-message-content">
+                    <div class="pwanimate-assistant-bubble">
+                        <div class="pwanimate-assistant-header">
+                            <img src="/static/images/pwanimate/pwanimate-transparent.png" class="pwanimate-assistant-avatar" alt="Spark">
+                            <span>Spark</span>
+                        </div>
+                        <div class="pwanimate-markdown-body" data-raw=""></div>
+                    </div>
+                </div>
+            `;
+            this.transcript.appendChild(row);
+            return row;
+        }
+
         appendAssistantMessage(answer, sources, citations, fallbackInfo, quotaInfo, people = [], messageId = null, peopleHtmlFromServer = '') {
             const row = document.createElement('div');
             row.className = 'pwanimate-message-row assistant';
@@ -5547,32 +5607,11 @@
 
             let fallbackHtml = '';
             if (fallbackInfo && fallbackInfo.vision_text_fallback) {
-                const used = escapeHtml(fallbackInfo.provider_used || 'an available text model');
+                // Honest degradation notice — no provider/model identities.
                 fallbackHtml = `
                     <div class="pwanimate-fallback-notice">
                         <i class="bi bi-eye-slash"></i>
-                        <span>Image vision models couldn’t process this request. I continued with your text using <strong>${used}</strong>; the image wasn’t analyzed.</span>
-                    </div>
-                `;
-            } else if (quotaInfo && quotaInfo.switched) {
-                const orig = escapeHtml(quotaInfo.primary_model || quotaInfo.primary_provider || 'primary model');
-                const active = escapeHtml(quotaInfo.active_model || quotaInfo.active_provider || 'alternate model');
-                fallbackHtml = `
-                    <div class="pwanimate-fallback-notice">
-                        <i class="bi bi-lightning-charge-fill"></i>
-                        <span>Free-tier limit reached for <strong>${orig}</strong>. Automatically switched to <strong>${active}</strong>.</span>
-                    </div>
-                `;
-            } else if (fallbackInfo && fallbackInfo.fallback_used) {
-                const orig = escapeHtml(fallbackInfo.original_provider || '');
-                const used = escapeHtml(fallbackInfo.provider_used || '');
-                const fallbackText = fallbackInfo.vision_fallback
-                    ? `Gemini vision was unavailable. Answered by <strong>${used}</strong>.`
-                    : `Answered by <strong>${used}</strong> (${orig} quota exceeded).`;
-                fallbackHtml = `
-                    <div class="pwanimate-fallback-notice">
-                        <i class="bi bi-arrow-repeat"></i>
-                        <span>${fallbackText}</span>
+                        <span>Image vision processing was unavailable, so this answer uses your text only — the image wasn’t analyzed.</span>
                     </div>
                 `;
             }
@@ -5931,50 +5970,44 @@
                 if (data.quota_status && Array.isArray(data.quota_status.models) && data.quota_status.models.length > 0) {
                     const primary = data.quota_status.models[0];
                     const active = data.quota_status.models.find((m) => !m.rate_limited) || primary;
+                    // Brand-level attribution: credit the engine whose primary
+                    // matches the active model — never show the model itself.
+                    const enginesList = data.quota_status.engines || [];
+                    const matched = enginesList.find((eng) =>
+                        eng.primary_provider === active.provider && eng.primary_model === active.model
+                    );
                     this.updateActiveModelChip({
                         active_model: active.model || active.provider,
                         primary_model: primary.model || primary.provider,
                         switched: (active.model !== primary.model || active.provider !== primary.provider),
-                    });
+                    }, matched ? matched.name : null);
                 }
             } catch (e) {
                 console.warn('[Spark] Failed to fetch quota status:', e);
             }
         }
 
-        getDefaultModels() {
+        getDefaultEngines() {
+            // Static mirror of the server engine registry — used only when
+            // the quota-status API is unreachable.
             return [
-                { provider: 'gemini', model: 'gemini-3.6-flash', display_name: 'Gemini 3.6 Flash', provider_label: 'Google', description: "Google's flagship multimodal reasoning model", is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'groq', model: 'openai/gpt-oss-120b', display_name: 'GPT-OSS 120B', provider_label: 'Groq', description: 'Ultra-fast 120B reasoning model on Groq LPU', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'openrouter', model: 'google/gemini-2.5-flash', display_name: 'Gemini 2.5 Flash', provider_label: 'OpenRouter', description: 'Multimodal Flash hosted on OpenRouter', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'groq', model: 'openai/gpt-oss-20b', display_name: 'GPT-OSS 20B', provider_label: 'Groq', description: 'Sub-second lightweight conversational model', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'gemini', model: 'gemini-3.5-flash', display_name: 'Gemini 3.5 Flash', provider_label: 'Google', description: 'High-speed balanced multimodal model', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'openrouter', model: 'nvidia/nemotron-3.5-lightning:free', display_name: 'Nemotron 3.5 Lightning', provider_label: 'OpenRouter', description: 'NVIDIA fast reasoning model (Free Tier)', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'groq', model: 'qwen/qwen3.8-27b', display_name: 'Qwen 3.8 27B', provider_label: 'Groq', description: 'High-throughput multilingual model', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'gemini', model: 'gemini-3.5-flash-lite', display_name: 'Gemini 3.5 Flash-Lite', provider_label: 'Google', description: 'Ultra-lightweight low-latency model', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'openrouter', model: 'nex-agi/nex-n2.5-pro:free', display_name: 'NeX N2.5 Pro', provider_label: 'OpenRouter', description: 'General conversational agent (Free Tier)', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'groq', model: 'groq/compound-mini', display_name: 'Groq Compound Mini', provider_label: 'Groq', description: 'Compound reasoning model on Groq', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'gemini', model: 'gemini-flash-latest', display_name: 'Gemini Flash Latest', provider_label: 'Google', description: 'Latest stable Gemini Flash channel', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
-                { provider: 'openrouter', model: 'liquid/lfm-2.5-2.6b:free', display_name: 'Liquid LFM 2.6B', provider_label: 'OpenRouter', description: 'Liquid neural architecture (Free Tier)', is_configured: true, rate_limited: false, cooldown_remaining: 0 },
+                { slug: 'speed', name: 'Spark Speed', icon: 'bi-lightning-charge', tagline: 'Rapid everyday Q&A and chat', description: "Fast, balanced answers for quick questions — Spark's everyday workhorse with automatic multi-provider failover.", powered_by: ['Google', 'Groq', 'OpenRouter'], is_configured: true, rate_limited: false, cooldown_remaining: 0, fallbacks_ready: 2 },
+                { slug: 'coda', name: 'Spark Coda', icon: 'bi-terminal', tagline: 'Code debugging and explanations', description: 'Reads, traces and fixes code — line-by-line debugging help for assignments and past papers.', powered_by: ['Groq', 'Google', 'OpenRouter'], is_configured: true, rate_limited: false, cooldown_remaining: 0, fallbacks_ready: 2 },
+                { slug: 'scholar', name: 'Spark Scholar', icon: 'bi-journal-richtext', tagline: 'Lecture slides, notes & quiz synthesis', description: 'Long-context reading of course documents — summaries, revision guides and quiz generation.', powered_by: ['Google', 'OpenRouter', 'Groq'], is_configured: true, rate_limited: false, cooldown_remaining: 0, fallbacks_ready: 2 },
+                { slug: 'vision', name: 'Spark Vision', icon: 'bi-eye', tagline: 'Images, OCR and whiteboard math', description: 'Reads uploaded images — timetables, circuit diagrams and handwritten working.', powered_by: ['Google', 'Groq'], is_configured: true, rate_limited: false, cooldown_remaining: 0, fallbacks_ready: 1 },
             ];
         }
 
-        selectModel(provider, model, display, providerLabel) {
-            this.selectedProvider = provider || '';
-            this.selectedModel = model || '';
-            this.selectedDisplay = display || 'Auto';
-            this.selectedProviderLabel = providerLabel || '';
+        selectEngine(engine, display) {
+            this.selectedEngine = engine || '';
+            this.selectedEngineLabel = this.selectedEngine ? (display || 'Spark') : '';
 
-            if (this.selectedModel) {
-                localStorage.setItem('pwanimate_selected_provider', this.selectedProvider);
-                localStorage.setItem('pwanimate_selected_model', this.selectedModel);
-                localStorage.setItem('pwanimate_selected_display', this.selectedDisplay);
-                localStorage.setItem('pwanimate_selected_provider_label', this.selectedProviderLabel);
+            if (this.selectedEngine) {
+                localStorage.setItem('pwanimate_selected_engine', this.selectedEngine);
+                localStorage.setItem('pwanimate_selected_engine_label', this.selectedEngineLabel);
             } else {
-                localStorage.removeItem('pwanimate_selected_provider');
-                localStorage.removeItem('pwanimate_selected_model');
-                localStorage.removeItem('pwanimate_selected_display');
-                localStorage.removeItem('pwanimate_selected_provider_label');
+                localStorage.removeItem('pwanimate_selected_engine');
+                localStorage.removeItem('pwanimate_selected_engine_label');
             }
 
             // Dismiss dropdown menu if open
@@ -5988,16 +6021,17 @@
             if (this.cachedQuotaStatus) {
                 this.updateQuotaStatus(this.cachedQuotaStatus);
             } else {
-                this.updateQuotaStatus({ models: this.getDefaultModels() });
+                this.updateQuotaStatus({ engines: this.getDefaultEngines() });
             }
         }
 
         updateSelectedModelUI() {
             if (this.selectedModelLabel) {
-                this.selectedModelLabel.textContent = this.selectedDisplay || 'Auto';
-                if (this.selectedModel) {
-                    this.selectedModelLabel.title = `Manual override: ${this.selectedDisplay} (${this.selectedProviderLabel || this.selectedProvider})`;
+                if (this.selectedEngine) {
+                    this.selectedModelLabel.textContent = this.selectedEngineLabel || 'Spark';
+                    this.selectedModelLabel.title = `Engine: ${this.selectedEngineLabel || this.selectedEngine}`;
                 } else {
+                    this.selectedModelLabel.textContent = 'Auto';
                     this.selectedModelLabel.title = 'Auto routing: Failover across available models';
                 }
             }
@@ -6009,36 +6043,83 @@
 
             this.dropdownStatusDot.classList.remove('healthy', 'rate-limited', 'cooldown');
 
-            if (!this.cachedQuotaStatus || !Array.isArray(this.cachedQuotaStatus.models)) {
+            const engines = (this.cachedQuotaStatus && Array.isArray(this.cachedQuotaStatus.engines))
+                ? this.cachedQuotaStatus.engines : [];
+            if (!engines.length) {
                 this.dropdownStatusDot.classList.add('healthy');
                 return;
             }
 
-            const models = this.cachedQuotaStatus.models;
-            if (this.selectedModel) {
-                const found = models.find((m) => m.model === this.selectedModel);
-                if (found) {
-                    if (!found.is_configured || (found.rate_limited && found.cooldown_remaining > 0)) {
+            if (this.selectedEngine) {
+                const found = engines.find((e) => e.slug === this.selectedEngine);
+                if (found && (!found.is_configured || found.rate_limited)) {
+                    if (!found.is_configured || found.cooldown_remaining > 0) {
                         this.dropdownStatusDot.classList.add('rate-limited');
-                    } else if (found.rate_limited) {
-                        this.dropdownStatusDot.classList.add('cooldown');
                     } else {
-                        this.dropdownStatusDot.classList.add('healthy');
+                        this.dropdownStatusDot.classList.add('cooldown');
                     }
                 } else {
                     this.dropdownStatusDot.classList.add('healthy');
                 }
-            } else {
-                const allRateLimited = models.length > 0 && models.every((m) => m.rate_limited);
-                const primary = models[0];
-                if (allRateLimited) {
-                    this.dropdownStatusDot.classList.add('rate-limited');
-                } else if (primary && primary.rate_limited) {
-                    this.dropdownStatusDot.classList.add('cooldown');
-                } else {
-                    this.dropdownStatusDot.classList.add('healthy');
-                }
+                return;
             }
+
+            const allRateLimited = engines.every((e) => e.rate_limited);
+            const primary = engines[0];
+            if (allRateLimited) {
+                this.dropdownStatusDot.classList.add('rate-limited');
+            } else if (primary && primary.rate_limited) {
+                this.dropdownStatusDot.classList.add('cooldown');
+            } else {
+                this.dropdownStatusDot.classList.add('healthy');
+            }
+        }
+
+        getEngineStatusPresentation(item) {
+            if (!item.is_configured) {
+                return {
+                    dotClass: 'rate-limited',
+                    statusText: 'Unavailable',
+                    badge: '<span class="pwanimate-status-badge rate-limited"><i class="bi bi-exclamation-octagon-fill"></i> Unavailable</span>',
+                };
+            }
+            // primary_status is server-computed: WHY the primary candidate is or
+            // isn't usable — a missing API key is not the same as a rate limit.
+            const primaryStatus = item.primary_status || (item.rate_limited ? 'rate_limited' : 'ready');
+            if (primaryStatus === 'ready') {
+                return {
+                    dotClass: 'healthy',
+                    statusText: 'Ready',
+                    badge: '<span class="pwanimate-status-badge healthy"><i class="bi bi-check-circle-fill"></i> Operational</span>',
+                };
+            }
+            if (item.cooldown_remaining > 0) {
+                // Live quota cooldown tracked from real 429s in this process.
+                return {
+                    dotClass: 'rate-limited',
+                    statusText: `Rate limited (${Math.ceil(item.cooldown_remaining)}s)`,
+                    badge: `<span class="pwanimate-status-badge rate-limited"><i class="bi bi-hourglass-split"></i> Rate Limited (${Math.ceil(item.cooldown_remaining)}s)</span>`,
+                };
+            }
+            if (primaryStatus === 'unconfigured') {
+                return {
+                    dotClass: 'cooldown',
+                    statusText: 'Backup active — primary provider not configured',
+                    badge: '<span class="pwanimate-status-badge cooldown"><i class="bi bi-plug-fill"></i> Primary Not Configured</span>',
+                };
+            }
+            if (item.fallbacks_ready > 0) {
+                return {
+                    dotClass: 'cooldown',
+                    statusText: 'Busy — backup routing active',
+                    badge: '<span class="pwanimate-status-badge cooldown"><i class="bi bi-arrow-repeat"></i> Backup Active</span>',
+                };
+            }
+            return {
+                dotClass: 'cooldown',
+                statusText: 'Recovering',
+                badge: '<span class="pwanimate-status-badge cooldown"><i class="bi bi-arrow-repeat"></i> Recovering</span>',
+            };
         }
 
         updateQuotaStatus(quotaStatus) {
@@ -6049,8 +6130,10 @@
                 this.quotaStatusEl.innerHTML = '';
             }
 
-            const models = Array.isArray(quotaStatus.models) ? quotaStatus.models : [];
-            const isAutoSelected = !this.selectedModel;
+            const engines = Array.isArray(quotaStatus.engines)
+                ? quotaStatus.engines
+                : this.getDefaultEngines();
+            const isAutoSelected = !this.selectedEngine;
 
             // 1. Update Auto item in dropdown menu
             const autoItem = this.workspace ? this.workspace.querySelector('.pwanimate-model-option[data-model=""]') : null;
@@ -6069,55 +6152,26 @@
                 }
             }
 
-            // 2. Populate dropdown models list
-            if (this.dropdownModelsList && models.length > 0) {
+            // 2. Populate dropdown with Spark engines
+            if (this.dropdownModelsList && engines.length > 0) {
                 let dropdownHtml = '';
-                let lastProvider = null;
-                for (const item of models) {
-                    const isSelected = (this.selectedModel === item.model);
-                    let dotClass = 'healthy';
-                    let statusDesc = 'Available';
-
-                    if (!item.is_configured) {
-                        dotClass = 'rate-limited';
-                        statusDesc = 'API key not configured';
-                    } else if (item.rate_limited) {
-                        if (item.cooldown_remaining > 0) {
-                            dotClass = 'rate-limited';
-                            statusDesc = `Rate limited (${Math.ceil(item.cooldown_remaining)}s cooldown)`;
-                        } else {
-                            dotClass = 'cooldown';
-                            statusDesc = 'Recovering';
-                        }
-                    } else {
-                        dotClass = 'healthy';
-                        statusDesc = 'Ready';
-                    }
-
-                    if (item.provider !== lastProvider) {
-                        lastProvider = item.provider;
-                        const pLabel = item.provider_label || item.provider.toUpperCase();
-                        dropdownHtml += `
-                            <li><h6 class="dropdown-header text-muted py-1 px-3 fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.06em; margin-top: 4px; opacity: 0.85;">${escapeHtml(pLabel)}</h6></li>
-                        `;
-                    }
+                for (const item of engines) {
+                    const isSelected = (this.selectedEngine === item.slug);
+                    const st = this.getEngineStatusPresentation(item);
 
                     dropdownHtml += `
                         <li>
                             <button class="dropdown-item d-flex align-items-center justify-content-between pwanimate-model-option ${isSelected ? 'active' : ''}"
-                                    data-provider="${escapeHtml(item.provider)}"
-                                    data-model="${escapeHtml(item.model)}"
-                                    data-display="${escapeHtml(item.display_name || item.model)}"
-                                    data-provider-label="${escapeHtml(item.provider_label || item.provider)}"
+                                    data-engine="${escapeHtml(item.slug)}"
+                                    data-display="${escapeHtml(item.name)}"
                                     type="button"
                                     ${!item.is_configured ? 'disabled' : ''}>
                                 <div class="pe-2">
                                     <div class="d-flex align-items-center gap-1">
-                                        <span class="pwanimate-model-status-dot ${dotClass}"></span>
-                                        <span class="fw-semibold small">${escapeHtml(item.display_name || item.model)}</span>
-                                        <span class="badge bg-secondary-subtle text-secondary" style="font-size: 0.65rem;">${escapeHtml(item.provider_label || item.provider)}</span>
+                                        <span class="pwanimate-model-status-dot ${st.dotClass}"></span>
+                                        <span class="fw-semibold small">${escapeHtml(item.name)}</span>
                                     </div>
-                                    <div class="text-muted" style="font-size: 0.72rem;">${escapeHtml(statusDesc)}</div>
+                                    <div class="text-muted" style="font-size: 0.72rem;">${escapeHtml(st.statusText)}</div>
                                 </div>
                                 ${isSelected ? '<i class="bi bi-check2 text-primary pwanimate-check-icon"></i>' : ''}
                             </button>
@@ -6167,68 +6221,37 @@
                     </div>
                 `;
 
-                // Individual model cards with provider section separators
-                let lastModalProvider = null;
-                for (const item of models) {
-                    const isSelected = (this.selectedModel === item.model);
-                    let dotClass = 'healthy';
-                    let statusBadgeHtml = '';
-
-                    if (!item.is_configured) {
-                        dotClass = 'rate-limited';
-                        statusBadgeHtml = `<span class="pwanimate-status-badge rate-limited"><i class="bi bi-exclamation-octagon-fill"></i> Unconfigured</span>`;
-                    } else if (item.rate_limited) {
-                        if (item.cooldown_remaining > 0) {
-                            dotClass = 'rate-limited';
-                            statusBadgeHtml = `<span class="pwanimate-status-badge rate-limited"><i class="bi bi-hourglass-split"></i> Rate Limited (${Math.ceil(item.cooldown_remaining)}s)</span>`;
-                        } else {
-                            dotClass = 'cooldown';
-                            statusBadgeHtml = `<span class="pwanimate-status-badge cooldown"><i class="bi bi-arrow-repeat"></i> Recovering</span>`;
-                        }
-                    } else {
-                        dotClass = 'healthy';
-                        statusBadgeHtml = `<span class="pwanimate-status-badge healthy"><i class="bi bi-check-circle-fill"></i> Operational</span>`;
-                    }
-
-                    if (item.provider !== lastModalProvider) {
-                        lastModalProvider = item.provider;
-                        const pLabel = item.provider_label || item.provider.toUpperCase();
-                        modalHtml += `
-                            <div class="d-flex align-items-center gap-2 mt-3 mb-1">
-                                <span class="fw-bold small text-uppercase text-muted" style="font-size: 0.75rem; letter-spacing: 0.05em;">${escapeHtml(pLabel)}</span>
-                                <hr class="flex-grow-1 m-0 opacity-25">
-                            </div>
-                        `;
-                    }
+                // Spark engine cards
+                for (const item of engines) {
+                    const isSelected = (this.selectedEngine === item.slug);
+                    const st = this.getEngineStatusPresentation(item);
 
                     modalHtml += `
                         <div class="pwanimate-quota-card ${isSelected ? 'selected' : ''}">
                             <div class="d-flex align-items-center justify-content-between mb-2">
                                 <div class="d-flex align-items-center gap-2">
-                                    <span class="pwanimate-model-status-dot ${dotClass}"></span>
-                                    <span class="fw-bold fs-6">${escapeHtml(item.display_name || item.model)}</span>
-                                    <span class="badge bg-secondary-subtle text-secondary" style="font-size: 0.7rem;">${escapeHtml(item.provider_label || item.provider)}</span>
+                                    <span class="pwanimate-model-status-dot ${st.dotClass}"></span>
+                                    <span class="fw-bold fs-6">${escapeHtml(item.name)}</span>
+                                    <span class="badge bg-secondary-subtle text-secondary" style="font-size: 0.7rem;">${escapeHtml((item.powered_by || []).join(' · '))}</span>
                                 </div>
-                                ${statusBadgeHtml}
+                                ${st.badge}
                             </div>
                             <p class="text-muted small mb-3">
-                                ${escapeHtml(item.description || item.model)}
+                                ${escapeHtml(item.description || item.tagline || '')}
                             </p>
                             <div class="d-flex align-items-center justify-content-between">
-                                <code class="text-muted" style="font-size: 0.75rem;">${escapeHtml(item.model)}</code>
+                                <span class="text-muted" style="font-size: 0.75rem;">${escapeHtml(item.tagline || '')}</span>
                                 ${isSelected ? `
                                     <button type="button" class="btn btn-sm btn-outline-primary active disabled" style="font-size: 0.8rem;">
                                         <i class="bi bi-check2 me-1"></i>Active
                                     </button>
                                 ` : `
                                     <button type="button" class="btn btn-sm btn-primary pwanimate-modal-select-btn"
-                                            data-provider="${escapeHtml(item.provider)}"
-                                            data-model="${escapeHtml(item.model)}"
-                                            data-display="${escapeHtml(item.display_name || item.model)}"
-                                            data-provider-label="${escapeHtml(item.provider_label || item.provider)}"
+                                            data-engine="${escapeHtml(item.slug)}"
+                                            data-display="${escapeHtml(item.name)}"
                                             ${!item.is_configured ? 'disabled' : ''}
                                             style="font-size: 0.8rem;">
-                                        Select Model
+                                        Select Engine
                                     </button>
                                 `}
                             </div>
@@ -6241,33 +6264,46 @@
             this.updateDropdownStatusDot();
         }
 
-        updateActiveModelChip(quotaInfo) {
+        updateActiveModelChip(quotaInfo, servingEngine = null) {
             const chip = document.getElementById('pwanimate-active-model-chip');
             const nameEl = document.getElementById('pwanimate-active-model-name');
+            // Brand-level attribution only: the chip and header credit an
+            // engine (Speed/Coda/Scholar/Vision) — raw provider/model names
+            // are never surfaced (Build ③ privacy rule).
+            const engineShortName = servingEngine
+                ? String(servingEngine).replace(/^Spark\s+/i, '')
+                : null;
             if (chip && nameEl && quotaInfo) {
-                const activeModel = quotaInfo.active_model || quotaInfo.active_provider || 'gemini';
-                nameEl.textContent = activeModel;
-
-                if (quotaInfo.switched) {
-                    chip.classList.add('switched');
-                    const orig = quotaInfo.primary_model || quotaInfo.primary_provider || '';
-                    chip.title = `Switched to ${activeModel} (${orig} free-tier limit reached)`;
+                if (this.selectedEngine) {
+                    nameEl.textContent = this.selectedEngineLabel || 'Spark';
+                    if (quotaInfo.switched) {
+                        chip.classList.add('switched');
+                        chip.title = `${this.selectedEngineLabel || 'Spark'} busy — backup routing active`;
+                    } else {
+                        chip.classList.remove('switched');
+                        chip.title = `${this.selectedEngineLabel || 'Spark'} ready`;
+                    }
                 } else {
-                    chip.classList.remove('switched');
-                    chip.title = `Active model: ${activeModel}`;
+                    nameEl.textContent = engineShortName || 'Spark';
+                    if (quotaInfo.switched) {
+                        chip.classList.add('switched');
+                        chip.title = 'Busy — backup routing active';
+                    } else {
+                        chip.classList.remove('switched');
+                        chip.title = 'Smart routing active';
+                    }
                 }
             }
 
-            if (!this.selectedModel && quotaInfo && this.selectedModelLabel) {
-                const activeModel = quotaInfo.active_model || quotaInfo.active_provider;
-                if (activeModel) {
-                    if (quotaInfo.switched) {
-                        this.selectedModelLabel.textContent = `Auto (${activeModel})`;
-                        this.selectedModelLabel.title = `Auto failover active: responding with ${activeModel}`;
-                    } else {
-                        this.selectedModelLabel.textContent = 'Auto';
-                        this.selectedModelLabel.title = `Auto routing: responding with ${activeModel}`;
-                    }
+            if (!this.selectedEngine && quotaInfo && this.selectedModelLabel) {
+                if (engineShortName) {
+                    this.selectedModelLabel.textContent = `Auto (${engineShortName})`;
+                    this.selectedModelLabel.title = quotaInfo.switched
+                        ? 'Auto routing: backup engine active'
+                        : 'Auto routing: engine selected automatically';
+                } else {
+                    this.selectedModelLabel.textContent = 'Auto';
+                    this.selectedModelLabel.title = 'Auto routing: engine selected automatically';
                 }
             }
         }

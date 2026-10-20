@@ -60,6 +60,7 @@ from pwanimate.services.study_session import (
     parse_study_command,
 )
 from pwanimate.ai.gateway.quota_tracker import get_quota_tracker
+from pwanimate.ai.engines import UnknownSparkEngineError, get_engine, get_engines_status, identify_engine
 from documents.models import Document
 
 logger = logging.getLogger(__name__)
@@ -103,10 +104,19 @@ class PwanimateChatView(APIView):
             }:
                 events.put(("status", {"stage": stage}))
 
+        def report_tokens(text):
+            """Visible LLM text deltas -> chunk events for progressive rendering."""
+            if text:
+                events.put(("chunk", {"text": text}))
+
         def perform_request():
             close_old_connections()
             try:
-                result = self._post_chat(request, progress_callback=report_progress)
+                result = self._post_chat(
+                    request,
+                    progress_callback=report_progress,
+                    token_callback=report_tokens,
+                )
                 events.put(("response", (result.status_code, result.data)))
             except Exception:
                 logger.exception("Pwanimate streamed chat request failed unexpectedly")
@@ -133,6 +143,10 @@ class PwanimateChatView(APIView):
                     yield f"event: status\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
                     continue
 
+                if event_type == "chunk":
+                    yield f"event: chunk\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
+                    continue
+
                 response_status, response_data = payload
                 encoded = JSONRenderer().render({
                     "status_code": response_status,
@@ -147,7 +161,7 @@ class PwanimateChatView(APIView):
         response["X-Content-Type-Options"] = "nosniff"
         return response
 
-    def _post_chat(self, request, progress_callback=None):
+    def _post_chat(self, request, progress_callback=None, token_callback=None):
         """
         Process a chat or RAG query.
 
@@ -157,6 +171,9 @@ class PwanimateChatView(APIView):
             history (list): Optional fallback client history if conversation_id is omitted.
             sources (list): Optional list of source strings ['document', 'post'].
             task (str): Optional task override ('rag', 'general').
+            engine (str): Optional Spark engine slug ('speed', 'coda', 'scholar').
+                When present it resolves to the engine's primary provider/model
+                and ordered fallback chain, overriding provider/model.
             provider (str): Optional provider override ('gemini', 'groq', 'openrouter', 'mock').
             model (str): Optional model override.
             attachments (list): Optional list of attachment UUIDs or objects.
@@ -171,6 +188,19 @@ class PwanimateChatView(APIView):
                 {"error": "Field 'message' is required and must be a non-empty string."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Resolve the Spark engine before any side effects (persisted turns,
+        # orchestrator work) so unknown/hidden engine slugs fail fast.
+        engine_slug = data.get("engine")
+        engine = None
+        if engine_slug:
+            try:
+                engine = get_engine(str(engine_slug))
+            except UnknownSparkEngineError:
+                return Response(
+                    {"error": f"Unknown engine '{engine_slug}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         is_study_cmd, study_remainder = parse_study_command(message)
         study_session_id = data.get("study_session_id")
@@ -419,6 +449,13 @@ class PwanimateChatView(APIView):
         task = data.get("task", "rag")
         provider = data.get("provider")
         model = data.get("model")
+        if engine is not None:
+            # Engine routing wins over legacy raw provider/model overrides:
+            # brand-level selection resolves to the engine's primary
+            # candidate, with its ordered chain carried alongside.
+            primary_candidate = engine["fallback_chain"][0]
+            provider = primary_candidate["provider"]
+            model = primary_candidate["model"]
 
         try:
             orchestration_req = OrchestrationRequest(
@@ -429,6 +466,8 @@ class PwanimateChatView(APIView):
                 sources=sources,
                 provider=provider,
                 model=model,
+                engine=engine["slug"] if engine else None,
+                fallback_chain=list(engine["fallback_chain"]) if engine else None,
                 attachments=active_attachments,
                 context_resources=context_resources,
                 local_time=data.get("local_time"),
@@ -437,11 +476,14 @@ class PwanimateChatView(APIView):
                 study_context=study_context,
             )
             orchestrator = self.get_orchestrator()
-            # External LLM generation occurs outside database transactions
-            if progress_callback:
-                response = orchestrator.run(orchestration_req, on_progress=progress_callback)
-            else:
-                response = orchestrator.run(orchestration_req)
+            # External LLM generation occurs outside database transactions.
+            # token_callback (when provided) receives visible text deltas as
+            # the LLM streams — the SSE layer turns them into chunk events.
+            response = orchestrator.run(
+                orchestration_req,
+                on_progress=progress_callback,
+                on_token=token_callback,
+            )
 
             # Persist assistant response turn with defensive fallback
             answer_text = (response.answer or "").strip()
@@ -462,6 +504,12 @@ class PwanimateChatView(APIView):
                     {"people": response.people},
                     request=request,
                 )
+            # Brand-level attribution: the client credits the serving engine,
+            # never the raw provider/model identity (Build ③ privacy rule).
+            quota_info = res_data.get("quota_info") or {}
+            res_data["serving_engine"] = identify_engine(
+                quota_info.get("active_provider"), quota_info.get("active_model")
+            )
             res_data["conversation_id"] = str(conversation.id)
             res_data["message_id"] = asst_msg.id
             res_data["user_message_id"] = user_msg.id
@@ -1498,8 +1546,12 @@ class PwanimateQuotaStatusView(APIView):
 
     def get(self, request):
         tracker = get_quota_tracker()
+        status_payload = tracker.get_status()
+        # Spark engines are the branded surface; provider models stay
+        # available under models[] for compatibility during the transition.
+        status_payload["engines"] = get_engines_status(tracker)
         return Response(
-            {"quota_status": tracker.get_status()},
+            {"quota_status": status_payload},
             status=status.HTTP_200_OK,
         )
 

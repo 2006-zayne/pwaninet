@@ -835,6 +835,7 @@ class PwanimateOrchestrator:
         self,
         request: OrchestrationRequest,
         on_progress: Optional[Callable[[str], None]] = None,
+        on_token: Optional[Callable[[str], None]] = None,
     ) -> OrchestrationResponse:
         """
         Execute an end-to-end orchestration turn.
@@ -912,7 +913,7 @@ class PwanimateOrchestrator:
                     on_progress("searching_documents")
             elif tool_route.tool_name == "group_announcements" and on_progress:
                 on_progress("searching_posts")
-            response = self._run_tool(request, query, tool_route, t_start, on_progress=on_progress)
+            response = self._run_tool(request, query, tool_route, t_start, on_progress=on_progress, on_token=on_token)
             return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
         # 4. Conversational turns can skip platform retrieval after tool choice.
@@ -920,7 +921,7 @@ class PwanimateOrchestrator:
             request.task == "general" or self.is_conversational_intent(query)
         )
         if is_conversational:
-            response = self._run_conversational(request, query, t_start)
+            response = self._run_conversational(request, query, t_start, on_token=on_token)
             return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
         # 5. Standard / Attachment / Context RAG
@@ -930,6 +931,7 @@ class PwanimateOrchestrator:
             t_start,
             source_override=retrieval_sources,
             on_progress=on_progress,
+            on_token=on_token,
         )
         return self._append_friend_post_updates(response, request.user, friend_post_updates)
 
@@ -958,11 +960,18 @@ class PwanimateOrchestrator:
         response.metadata["friend_post_updates_count"] = len(updates)
         return response
 
+    def _generate(self, llm_request: LLMRequest, on_token: Optional[Callable[[str], None]] = None):
+        """Single LLM call site: streams tokens when a callback is provided."""
+        if on_token is not None:
+            return self.gateway.generate_stream(llm_request, on_token)
+        return self.gateway.generate(llm_request)
+
     def _run_conversational(
         self,
         request: OrchestrationRequest,
         query: str,
         t_start: float,
+        on_token: Optional[Callable[[str], None]] = None,
     ) -> OrchestrationResponse:
         """Handle pure conversational dialogue turns without retrieval or tools."""
         messages = list(request.history) + [ChatMessage(role="user", content=query)]
@@ -992,10 +1001,11 @@ class PwanimateOrchestrator:
             model=request.model,
             temperature=request.temperature,
             max_tokens=effective_max_tokens,
+            metadata=request.engine_metadata(),
         )
 
         t_gen = time.perf_counter()
-        llm_response = self.gateway.generate(llm_request)
+        llm_response = self._generate(llm_request, on_token)
         gen_time_ms = round((time.perf_counter() - t_gen) * 1000.0, 2)
         total_time_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
 
@@ -1060,6 +1070,7 @@ class PwanimateOrchestrator:
         tool_route: ToolRoute,
         t_start: float,
         on_progress: Optional[Callable[[str], None]] = None,
+        on_token: Optional[Callable[[str], None]] = None,
     ) -> OrchestrationResponse:
         """Handle high-confidence deterministic domain tool execution."""
         t_tool = time.perf_counter()
@@ -1154,6 +1165,7 @@ class PwanimateOrchestrator:
             model=request.model,
             temperature=request.temperature,
             max_tokens=effective_max_tokens,
+            metadata=request.engine_metadata(),
         )
 
         if (
@@ -1167,7 +1179,7 @@ class PwanimateOrchestrator:
             on_progress("devouring_context" if tool_result.success and tool_result.data else "thinking")
 
         t_gen = time.perf_counter()
-        llm_response = self.gateway.generate(llm_request)
+        llm_response = self._generate(llm_request, on_token)
         gen_time_ms = round((time.perf_counter() - t_gen) * 1000.0, 2)
         total_time_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
 
@@ -1239,6 +1251,7 @@ class PwanimateOrchestrator:
         t_start: float,
         source_override: Optional[List[str]] = None,
         on_progress: Optional[Callable[[str], None]] = None,
+        on_token: Optional[Callable[[str], None]] = None,
     ) -> OrchestrationResponse:
         """Handle knowledge/retrieval-augmented dialogue turns."""
         # 0. Resolve any attachments active in the Right Context Rail (including open page numbers)
@@ -1420,7 +1433,10 @@ class PwanimateOrchestrator:
             temperature=request.temperature,
             max_tokens=effective_max_tokens,
             attachments=image_attachments,
-            metadata={"required_capability": "image"} if is_multimodal_turn else {},
+            metadata={
+                **request.engine_metadata(),
+                **({"required_capability": "image"} if is_multimodal_turn else {}),
+            },
         )
 
         if on_progress:
@@ -1456,7 +1472,7 @@ class PwanimateOrchestrator:
                     model=request.model,
                     temperature=llm_request.temperature,
                     max_tokens=llm_request.max_tokens,
-                    metadata={},
+                    metadata=request.engine_metadata(),
                     attachments=[],
                 )
                 llm_response = self.gateway.generate(text_request)
@@ -1470,7 +1486,10 @@ class PwanimateOrchestrator:
                     "original_model": getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.8-flash"),
                 })
         else:
-            llm_response = self.gateway.generate(llm_request)
+            # Text turns stream when the caller supplied a token callback.
+            # Multimodal turns stay non-streaming in v1 (vision→text fallback
+            # correctness first; the client degrades to final-render UX).
+            llm_response = self._generate(llm_request, on_token)
         if is_multimodal_turn:
             if not vision_text_fallback:
                 llm_response.metadata["vision_route"] = "fallback" if llm_response.provider != "gemini" else "primary"
