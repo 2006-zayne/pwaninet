@@ -34,7 +34,7 @@ def _load_engines() -> List[Dict[str, Any]]:
 
     gemini_model = getattr(settings, "PWANIMATE_GEMINI_MODEL", "gemini-3.8-flash")
     groq_model = getattr(settings, "PWANIMATE_GROQ_MODEL", "openai/gpt-oss-120b")
-    openrouter_model = getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "google/gemini-3.8-flash")
+    openrouter_model = getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
     vision_model = getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.8-flash")
 
     engines: List[Dict[str, Any]] = [

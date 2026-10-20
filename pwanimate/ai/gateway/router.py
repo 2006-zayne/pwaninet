@@ -144,7 +144,7 @@ class LLMRouter:
                     ])
                 elif p == "openrouter":
                     configured_chain.append(
-                        {"provider": "openrouter", "model": getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "google/gemini-3.8-flash")}
+                        {"provider": "openrouter", "model": getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")}
                     )
                 else:
                     configured_chain.append({"provider": p, "model": None})

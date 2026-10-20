@@ -124,7 +124,7 @@ class QuotaTracker:
                 {"provider": "gemini", "model": "gemini-3.8-flash"},
                 {"provider": "groq", "model": "openai/gpt-oss-120b"},
                 {"provider": "gemini", "model": "gemini-3.6-flash"},
-                {"provider": "openrouter", "model": "google/gemini-3.8-flash"},
+                {"provider": "openrouter", "model": "nvidia/nemotron-3-ultra-550b-a55b:free"},
             ],
         )
 
@@ -182,7 +182,7 @@ class QuotaTracker:
                 "description": "High-throughput multilingual model",
             },
             # OpenRouter
-            ("openrouter", "google/gemini-3.8-flash"): {
+            ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free"): {
                 "display_name": "Gemini 3.8 Flash",
                 "provider_label": "OpenRouter",
                 "description": "Multimodal Flash hosted on OpenRouter",

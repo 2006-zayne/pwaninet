@@ -747,7 +747,7 @@ PWANIMATE_VISION_FALLBACK_CHAIN = [
 ]
 PWANIMATE_ATTACHMENT_VISION_MAX_PAGES = int(os.environ.get('PWANIMATE_ATTACHMENT_VISION_MAX_PAGES', '20'))
 PWANIMATE_GROQ_MODEL = os.environ.get('PWANIMATE_GROQ_MODEL', 'openai/gpt-oss-120b')
-PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'google/gemini-3.8-flash')
+PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'nvidia/nemotron-3-ultra-550b-a55b:free')
 PWANIMATE_LLM_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_TIMEOUT', '30.0'))
 PWANIMATE_LLM_CONNECT_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_CONNECT_TIMEOUT', '2.0'))
 PWANIMATE_PROVIDER_FALLBACK_ORDER = os.environ.get(
@@ -761,7 +761,7 @@ PWANIMATE_LLM_FALLBACK_CHAIN = [
     {"provider": "gemini", "model": "gemini-3.8-flash"},
     {"provider": "groq", "model": "openai/gpt-oss-120b"},
     {"provider": "gemini", "model": "gemini-3.6-flash"},
-    {"provider": "openrouter", "model": "google/gemini-3.8-flash"},
+    {"provider": "openrouter", "model": "nvidia/nemotron-3-ultra-550b-a55b:free"},
     {"provider": "groq", "model": "openai/gpt-oss-20b"},
     {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
     {"provider": "openrouter", "model": "nvidia/nemotron-3.5-lightning:free"},

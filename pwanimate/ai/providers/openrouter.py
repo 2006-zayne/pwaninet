@@ -45,7 +45,7 @@ class OpenRouterLLMProvider(BaseLLMProvider):
         session: Optional[requests.Session] = None,
     ):
         self.api_key = api_key if api_key is not None else getattr(settings, "PWANIMATE_OPENROUTER_API_KEY", "")
-        self.model_name = model_name or getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "google/gemini-3.8-flash")
+        self.model_name = model_name or getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
         self.timeout = timeout if timeout is not None else getattr(settings, "PWANIMATE_LLM_TIMEOUT", 30.0)
         self.connect_timeout = (
             connect_timeout if connect_timeout is not None else getattr(settings, "PWANIMATE_LLM_CONNECT_TIMEOUT", 5.0)
