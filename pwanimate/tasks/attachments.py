@@ -87,13 +87,80 @@ def _transcribe_pdf_page(page, attachment: PwanimateAttachment, page_number: int
     return result.content.strip(), result.provider, result.model
 
 
+def _analyze_image(attachment: PwanimateAttachment) -> tuple[str, str, str]:
+    """
+    One vision pass over an uploaded image.
+
+    The result is stored on the attachment and reused by every later turn —
+    an image is analysed ONCE, not once per question.
+    """
+    from django.conf import settings
+
+    model = getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.8-flash")
+    result = AIGateway().generate(LLMRequest(
+        task="attachment_vision_analysis",
+        messages=[ChatMessage(
+            role="user",
+            content=(
+                "Describe this image for a study assistant. Transcribe any text, "
+                "equations, labels or tables faithfully. Explain any diagram, chart, "
+                "graph or code shown, and note the key ideas a student might ask about. "
+                "Be concrete and complete: this description is what later questions "
+                "will be answered from. If something is unreadable, say so plainly."
+            ),
+            attachments=[attachment],
+        )],
+        provider="gemini",
+        model=model,
+        temperature=0.1,
+        max_tokens=1600,
+        attachments=[attachment],
+        metadata={"required_capability": "image"},
+    ))
+    return result.content.strip(), result.provider, result.model
+
+
 @shared_task(name="pwanimate.tasks.attachments.process_pwanimate_attachment")
 def process_pwanimate_attachment(attachment_id: str) -> Dict[str, Any]:
-    """Extract, OCR when needed, chunk, and persist a private chat upload."""
+    """Extract, OCR when needed, analyse images once, chunk, and persist a private chat upload."""
     attachment = PwanimateAttachment.objects.filter(id=attachment_id).first()
     if attachment is None:
         return {"status": "missing", "attachment_id": str(attachment_id)}
     if attachment.attachment_type != "document":
+        # Images: one vision pass, stored for reuse. Later turns read the
+        # stored description instead of paying for the image again.
+        if attachment.attachment_type == "image" and (attachment.vision_summary or "").strip():
+            return {
+                "status": "ready",
+                "attachment_id": str(attachment.id),
+                "vision_summary": True,
+            }
+        if attachment.attachment_type == "image":
+            attachment.processing_status = "processing"
+            attachment.save(update_fields=["processing_status"])
+            try:
+                summary, provider, model = _analyze_image(attachment)
+            except Exception as exc:
+                logger.warning("Image analysis failed for %s: %s", attachment.id, exc)
+                attachment.processing_status = "failed"
+                attachment.processing_error = f"Image analysis failed: {exc}"[:2000]
+                attachment.save(update_fields=["processing_status", "processing_error"])
+                return {"status": "failed", "attachment_id": str(attachment.id)}
+            attachment.vision_summary = summary
+            attachment.vision_model = f"{provider}:{model}"
+            attachment.processing_status = "ready"
+            attachment.processing_error = ""
+            attachment.processed_at = timezone.now()
+            attachment.save(update_fields=[
+                "vision_summary", "vision_model", "processing_status",
+                "processing_error", "processed_at",
+            ])
+            return {
+                "status": "ready",
+                "attachment_id": str(attachment.id),
+                "vision_summary": True,
+                "vision_model": attachment.vision_model,
+            }
         attachment.processing_status = "not_required"
         attachment.save(update_fields=["processing_status"])
         return {"status": "not_required", "attachment_id": str(attachment.id)}

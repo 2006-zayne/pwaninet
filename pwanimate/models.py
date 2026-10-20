@@ -501,6 +501,11 @@ class PwanimateAttachment(models.Model):
     )
     processing_error = models.TextField(blank=True, default="")
     processed_at = models.DateTimeField(null=True, blank=True)
+    # The one-time vision analysis of an uploaded image. Captured once at
+    # upload and reused by every later turn, so a photo is analysed ONCE
+    # instead of once per question.
+    vision_summary = models.TextField(blank=True, default="")
+    vision_model = models.CharField(max_length=120, blank=True, default="")
     created_at = models.DateTimeField(
         auto_now_add=True,
         db_index=True,

@@ -401,6 +401,24 @@ class PwanimateOrchestrator:
             att_mime = getattr(att, "mime_type", "application/octet-stream")
 
             if att_type == "image":
+                # The image was analysed ONCE at upload. Later turns reuse
+                # that description as context instead of paying for (and
+                # waiting on) another vision pass on the same image.
+                stored_summary = (getattr(att, "vision_summary", "") or "").strip()
+                if stored_summary:
+                    doc_blocks.append(
+                        f'<attachment_context id="{att_id}" filename="{att_name}" '
+                        'type="image" analysed="once">\n'
+                        f"  <title>{att_name}</title>\n"
+                        "  <content>\n"
+                        "[IMAGE ANALYSIS — captured once when the image was uploaded; "
+                        "this description is the image's context]\n"
+                        f"{stored_summary}\n"
+                        "  </content>\n"
+                        "</attachment_context>"
+                    )
+                    continue
+
                 data_bytes = getattr(att, "data_bytes", None)
                 if not data_bytes and hasattr(att, "file") and att.file:
                     try:
