@@ -364,8 +364,17 @@
             }
         }
 
-        /** Open the Spark settings modal directly on the Usage tab. */
+        /** Open the Spark settings on the Usage tab — the right surface for the device. */
         openUsageDashboard() {
+            // The mobile settings are a PAGE, not a modal: the modal is the
+            // desktop surface. Same breakpoint the app uses for the mobile
+            // settings layout (max-width: 767.98px).
+            const isMobile = !!(window.matchMedia
+                && window.matchMedia('(max-width: 767.98px)').matches);
+            if (isMobile) {
+                window.location.href = '/pwanimate/settings/usage/';
+                return;
+            }
             const modal = document.getElementById('pwanimateSettingsModal');
             if (modal && window.bootstrap && window.bootstrap.Modal) {
                 window.bootstrap.Modal.getOrCreateInstance(modal).show();
