@@ -117,7 +117,9 @@ class LLMRouter:
                 [{"provider": "groq", "model": "qwen/qwen3.8-27b"}],
             )
         else:
-            configured_chain = getattr(
+            # Engine-selected requests carry their own ordered chain (Spark
+            # engine registry); everything else uses the global chain.
+            configured_chain = (request.metadata or {}).get("fallback_chain") or getattr(
                 settings,
                 "PWANIMATE_LLM_FALLBACK_CHAIN",
                 None,
@@ -142,7 +144,7 @@ class LLMRouter:
                     ])
                 elif p == "openrouter":
                     configured_chain.append(
-                        {"provider": "openrouter", "model": getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "google/gemini-flash-latest")}
+                        {"provider": "openrouter", "model": getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "google/gemini-3.8-flash")}
                     )
                 else:
                     configured_chain.append({"provider": p, "model": None})

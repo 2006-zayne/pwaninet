@@ -23,6 +23,10 @@ class OrchestrationRequest:
         sources: Optional explicit list of knowledge sources to query.
         provider: Optional explicit LLM provider override.
         model: Optional explicit LLM model override.
+        engine: Optional Spark engine slug ('speed', 'coda', 'scholar') that
+            resolved this request; drives branded status/telemetry.
+        fallback_chain: Ordered provider/model candidates from the engine
+            registry; carried into gateway metadata as the request-level chain.
         temperature: Sampling temperature (default 0.2 for academic grounding).
         max_tokens: Maximum tokens in generated response.
     """
@@ -33,6 +37,8 @@ class OrchestrationRequest:
     sources: Optional[List[SourceType | str]] = None
     provider: Optional[str] = None
     model: Optional[str] = None
+    engine: Optional[str] = None
+    fallback_chain: Optional[List[Dict[str, str]]] = None
     temperature: float = 0.2
     max_tokens: Optional[int] = None
     user_context: Optional[Any] = None
@@ -79,6 +85,20 @@ class OrchestrationRequest:
             )
         if self.max_tokens is not None and self.max_tokens <= 0:
             raise OrchestratorValidationError(f"max_tokens must be positive, got {self.max_tokens}")
+
+    def engine_metadata(self) -> Dict[str, Any]:
+        """
+        Provider-neutral gateway metadata derived from engine selection.
+
+        Passed as LLMRequest.metadata so the router can honor the engine's
+        ordered fallback chain for this request (see LLMRouter.resolve_fallback_chain).
+        """
+        meta: Dict[str, Any] = {}
+        if self.engine:
+            meta["engine"] = self.engine
+        if self.fallback_chain:
+            meta["fallback_chain"] = list(self.fallback_chain)
+        return meta
 
 
 @dataclass

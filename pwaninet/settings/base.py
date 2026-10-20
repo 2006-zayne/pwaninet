@@ -714,6 +714,7 @@ PWANIMATE_EMBEDDING_MODEL = os.environ.get('PWANIMATE_EMBEDDING_MODEL', 'gemini-
 PWANIMATE_EMBEDDING_DIMENSIONS = int(os.environ.get('PWANIMATE_EMBEDDING_DIMENSIONS', '768'))
 PWANIMATE_EMBEDDING_BATCH_SIZE = int(os.environ.get('PWANIMATE_EMBEDDING_BATCH_SIZE', '32'))
 
+
 # Multi-Provider Embedding Configuration Placeholders
 PWANIMATE_JINA_API_KEY = os.environ.get('PWANIMATE_JINA_API_KEY', os.environ.get('JINA_API_KEY', ''))
 PWANIMATE_JINA_MODEL = os.environ.get('PWANIMATE_JINA_MODEL', 'jina-embeddings-v3')
@@ -734,7 +735,7 @@ PWANIMATE_VISION_FALLBACK_CHAIN = [
 ]
 PWANIMATE_ATTACHMENT_VISION_MAX_PAGES = int(os.environ.get('PWANIMATE_ATTACHMENT_VISION_MAX_PAGES', '20'))
 PWANIMATE_GROQ_MODEL = os.environ.get('PWANIMATE_GROQ_MODEL', 'openai/gpt-oss-120b')
-PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'google/gemini-flash-latest')
+PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'google/gemini-3.8-flash')
 PWANIMATE_LLM_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_TIMEOUT', '30.0'))
 PWANIMATE_LLM_CONNECT_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_CONNECT_TIMEOUT', '2.0'))
 PWANIMATE_PROVIDER_FALLBACK_ORDER = os.environ.get(
@@ -748,15 +749,14 @@ PWANIMATE_LLM_FALLBACK_CHAIN = [
     {"provider": "gemini", "model": "gemini-3.8-flash"},
     {"provider": "groq", "model": "openai/gpt-oss-120b"},
     {"provider": "gemini", "model": "gemini-3.6-flash"},
-    {"provider": "openrouter", "model": "google/gemini-flash-latest"},
+    {"provider": "openrouter", "model": "google/gemini-3.8-flash"},
     {"provider": "groq", "model": "openai/gpt-oss-20b"},
     {"provider": "gemini", "model": "gemini-3.5-flash-lite"},
     {"provider": "openrouter", "model": "nvidia/nemotron-3.5-lightning:free"},
     {"provider": "groq", "model": "qwen/qwen3.8-27b"},
     {"provider": "gemini", "model": "gemini-flash-lite-latest"},
-    {"provider": "openrouter", "model": "nex-agi/nex-n2.5-pro:free"},
+    {"provider": "openrouter", "model": "nvidia/nemotron-3-super-120b-a12b:free"},
     {"provider": "gemini", "model": "gemini-flash-latest"},
-    {"provider": "groq", "model": "groq/compound-mini"},
     {"provider": "gemini", "model": "gemini-pro-latest"},
     {"provider": "openrouter", "model": "liquid/lfm-2.5-2.6b:free"},
     # Final fallback: mock provider returns a friendly error message

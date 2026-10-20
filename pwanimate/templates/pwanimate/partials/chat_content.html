@@ -811,12 +811,12 @@
                                     id="pwanimateModelDropdownBtn"
                                     data-bs-toggle="dropdown"
                                     aria-expanded="false"
-                                    title="{% trans 'Select AI Model' %}">
+                                    title="{% trans 'Select Spark Engine' %}">
                                 <span id="pwanimate-selected-model-label" class="fw-medium text-truncate" style="max-width: 140px;">Auto</span>
                                 <i class="bi bi-chevron-down ms-1" style="font-size: 0.7rem; opacity: 0.7;"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-start shadow pwanimate-model-menu" aria-labelledby="pwanimateModelDropdownBtn" id="pwanimate-model-dropdown-menu">
-                                <li><h6 class="dropdown-header text-uppercase fs-xs">{% trans "AI Model Selection" %}</h6></li>
+                                <li><h6 class="dropdown-header text-uppercase fs-xs">{% trans "Spark Engine Selection" %}</h6></li>
                                 <li>
                                     <button class="dropdown-item active d-flex align-items-center justify-content-between pwanimate-model-option"
                                             data-provider=""
@@ -956,7 +956,7 @@
                 <div class="modal-header">
                     <div class="d-flex align-items-center gap-2">
                         <i class="bi bi-cpu text-primary fs-5"></i>
-                        <h5 class="modal-title fw-bold" id="pwanimateQuotaModalLabel">{% trans "AI Models & Quotas" %}</h5>
+                        <h5 class="modal-title fw-bold" id="pwanimateQuotaModalLabel">{% trans "Spark Engines & Quotas" %}</h5>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" id="pwanimateRefreshQuotaBtn" title="{% trans 'Refresh quota status' %}">
@@ -968,14 +968,14 @@
                 </div>
                 <div class="modal-body p-3">
                     <p class="text-muted small mb-3">
-                        {% trans "Select an AI model to manually override default routing, or keep Auto for automatic zero-downtime failover between tiers." %}
+                        {% trans "Select a Spark engine to control how Spark handles your request, or keep Auto for automatic zero-downtime failover across engines." %}
                     </p>
 
                     <div id="pwanimate-modal-models-container" class="d-flex flex-column gap-2">
                         <!-- Populated dynamically by JS -->
                         <div class="text-center py-4 text-muted">
                             <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                            <span>{% trans "Loading models..." %}</span>
+                            <span>{% trans "Loading engines..." %}</span>
                         </div>
                     </div>
                 </div>
