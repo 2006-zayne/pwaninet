@@ -178,6 +178,13 @@ class LLMRouter:
                 unique_image_ids.add(getattr(attachment, "id", None) or id(attachment))
         image_count = len(unique_image_ids)
 
+        # Capability routing is INFERRED, not opt-in: if the turn carries an
+        # image, only image-capable models may serve it. Relying on the caller
+        # to set `required_capability` let the tool path hand an image to a
+        # text-only model (groq/gpt-oss-120b), which then refused the turn.
+        if image_count > 0:
+            required_capability = "image"
+
         # Deduplicate while preserving order & filter by availability and scope
         available: List[Dict[str, str]] = []
         seen = set()
