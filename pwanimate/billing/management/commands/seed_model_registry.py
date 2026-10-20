@@ -199,6 +199,13 @@ class Command(BaseCommand):
                 existing.output_price_per_m_usd = spec["output_price_per_m_usd"]
                 existing.display_name = spec["display_name"]
                 existing.is_active = True
+                # Keep the key deterministic across environments: a registry
+                # seeded from scratch and one re-classified in place must
+                # expose the same key to the client.
+                if existing.key != spec["key"] and not ModelOffering.objects.filter(
+                    key=spec["key"]
+                ).exists():
+                    existing.key = spec["key"]
                 existing.save()
                 self.stdout.write(
                     f"  [offering] re-classified {existing.key} -> {spec['cost_class']} "

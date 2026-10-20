@@ -196,6 +196,7 @@
             this.updateQuotaStatus({ engines: this.getDefaultEngines() });
             this.updateSelectedModelUI();
             this.updateSendButtonState();
+            this.initQuotaChip();
             if (this.input && this.input.value) {
                 this.resizeTextarea();
             }
@@ -203,6 +204,177 @@
             this.fetchQuotaStatus();
             this.updateTimestamps(); // apply relative time to any server-rendered timestamps
             this.startTimestampTicker();
+        }
+
+        // ------------------------------------------------------------ quota chip
+        // The composer's daily-usage indicator. It reads the same counters the
+        // quota check enforces, so the number shown is the number acted on.
+        initQuotaChip() {
+            this.quotaWrap = document.getElementById('pwanimateQuotaWrap');
+            this.quotaChip = document.getElementById('pwanimateQuotaChip');
+            this.quotaArc = document.getElementById('pwanimateQuotaArc');
+            this.quotaLabel = document.getElementById('pwanimateQuotaLabel');
+            this.quotaPopover = document.getElementById('pwanimateQuotaPopover');
+            if (!this.quotaWrap || !this.quotaChip) return;
+
+            this.quotaState = null;
+
+            // Hover/focus opens the detail; click toggles it (touch friendly).
+            this.quotaChip.addEventListener('mouseenter', () => this.openQuotaPopover());
+            this.quotaChip.addEventListener('mouseleave', () => this.scheduleQuotaClose());
+            this.quotaPopover.addEventListener('mouseenter', () => this.quotaCloseTimer && clearTimeout(this.quotaCloseTimer));
+            this.quotaPopover.addEventListener('mouseleave', () => this.scheduleQuotaClose());
+            this.quotaChip.addEventListener('focus', () => this.openQuotaPopover());
+            this.quotaChip.addEventListener('blur', () => this.scheduleQuotaClose());
+            this.quotaChip.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (this.quotaPopover.hidden) this.openQuotaPopover();
+                else this.closeQuotaPopover();
+            });
+            this.quotaPopover.addEventListener('click', (event) => event.stopPropagation());
+            document.addEventListener('click', () => this.closeQuotaPopover());
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') this.closeQuotaPopover();
+            });
+
+            this.loadQuota();
+            this.quotaTimer = setInterval(() => this.loadQuota(), 60000);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) this.loadQuota();
+            });
+        }
+
+        async loadQuota() {
+            try {
+                const response = await fetch('/api/pwanimate/billing/quota/', {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                this.quotaState = data.quota || null;
+                this.renderQuotaChip();
+            } catch (error) {
+                // The chip is an aid, never a dependency: a failure here must
+                // not disturb the chat.
+            }
+        }
+
+        renderQuotaChip() {
+            const state = this.quotaState;
+            if (!state || !this.quotaChip) return;
+            const chats = state.chats || {};
+            const limit = Number(chats.limit);
+            const used = Number(chats.used || 0);
+            if (!limit || limit <= 0) {
+                this.quotaWrap.hidden = true;
+                return;
+            }
+            this.quotaWrap.hidden = false;
+
+            const remaining = Math.max(0, limit - used);
+            const ratio = Math.min(1, Math.max(0, remaining / limit));
+            const circumference = 2 * Math.PI * 15;
+            if (this.quotaArc) {
+                this.quotaArc.setAttribute('stroke-dasharray', `${circumference}`);
+                this.quotaArc.setAttribute('stroke-dashoffset', `${circumference * (1 - ratio)}`);
+            }
+            // Show what is LEFT: a depleting meter should read as remaining.
+            if (this.quotaLabel) this.quotaLabel.textContent = String(remaining);
+            this.quotaChip.classList.toggle('is-warning', ratio > 0 && ratio <= 0.2);
+            this.quotaChip.classList.toggle('is-critical', remaining <= 0);
+
+            const tokens = state.tokens || {};
+            this.quotaChip.setAttribute(
+                'aria-label',
+                `${remaining} of ${limit} chats left today. ${this.formatQuotaTokens(tokens.total || 0)} tokens used today.`
+            );
+            if (this.quotaPopover && !this.quotaPopover.hidden) this.renderQuotaPopover();
+        }
+
+        formatQuotaTokens(value) {
+            const tokens = Number(value || 0);
+            if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`;
+            if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`;
+            return String(tokens);
+        }
+
+        scheduleQuotaClose() {
+            if (this.quotaCloseTimer) clearTimeout(this.quotaCloseTimer);
+            this.quotaCloseTimer = setTimeout(() => {
+                if (this.quotaPopover && this.quotaPopover.matches(':hover')) return;
+                this.closeQuotaPopover();
+            }, 140);
+        }
+
+        openQuotaPopover() {
+            if (!this.quotaPopover || !this.quotaState) return;
+            this.renderQuotaPopover();
+            this.quotaPopover.hidden = false;
+            this.quotaChip.setAttribute('aria-expanded', 'true');
+            // Flip below when there is no room above.
+            this.quotaPopover.classList.remove('is-below');
+            if (this.quotaPopover.getBoundingClientRect().top < 8) {
+                this.quotaPopover.classList.add('is-below');
+            }
+        }
+
+        closeQuotaPopover() {
+            if (!this.quotaPopover) return;
+            this.quotaPopover.hidden = true;
+            this.quotaChip.setAttribute('aria-expanded', 'false');
+        }
+
+        renderQuotaPopover() {
+            const state = this.quotaState;
+            if (!state || !this.quotaPopover) return;
+            const chats = state.chats || {};
+            const images = state.images || {};
+            const tokens = state.tokens || {};
+            const tier = state.tier || {};
+            const resetText = state.resets_at ? this.quotaResetText(state.resets_at) : '';
+            const rows = [
+                ['Chats today', `${chats.used || 0} / ${chats.limit === null || chats.limit === undefined ? '—' : chats.limit}`],
+                ['Images today', `${images.used || 0} / ${images.limit === null || images.limit === undefined ? '—' : images.limit}`],
+                ['Tokens today', this.formatQuotaTokens(tokens.total || 0)],
+            ];
+            this.quotaPopover.innerHTML = `
+                <div class="pwanimate-quota-popover-title" id="pwanimateQuotaPopoverTitle">
+                    <span>${escapeHtml(tier.name || 'Free')}</span>
+                    <span class="pwanimate-quota-popover-tier">${tier.is_free ? 'Free tier' : 'Paid tier'}</span>
+                </div>
+                <dl class="pwanimate-quota-popover-rows">
+                    ${rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join('')}
+                </dl>
+                <p class="pwanimate-quota-popover-note">${resetText ? `Daily allowance resets ${escapeHtml(resetText)}. ` : ''}Free routes are used whenever they are healthy — your allowance is never a hard block.</p>
+                <button type="button" class="pwanimate-quota-popover-cta" data-quota-usage-link>View full usage</button>
+            `;
+            const link = this.quotaPopover.querySelector('[data-quota-usage-link]');
+            if (link) {
+                link.addEventListener('click', () => {
+                    this.closeQuotaPopover();
+                    const settingsButton = document.querySelector('[data-bs-target="#settingsModal"], #settingsBtn, .pwanimate-settings-btn');
+                    if (settingsButton) {
+                        settingsButton.click();
+                    } else {
+                        window.location.href = '/settings/';
+                    }
+                });
+            }
+        }
+
+        quotaResetText(iso) {
+            try {
+                const diff = new Date(iso).getTime() - Date.now();
+                if (diff <= 0) return 'shortly';
+                const hours = Math.floor(diff / 3600000);
+                const minutes = Math.floor((diff % 3600000) / 60000);
+                if (hours >= 1) return `in ${hours}h ${minutes}m`;
+                return `in ${minutes}m`;
+            } catch (error) {
+                return '';
+            }
         }
 
         initInitialContextResources() {
@@ -5115,6 +5287,8 @@
                 this.refreshConversationsList();
                 this.updateQuotaStatus(data.quota_status);
                 this.updateActiveModelChip(data.quota_info, data.serving_engine);
+                // The usage counters moved — refresh the composer's quota chip.
+                if (this.loadQuota) this.loadQuota();
 
             } catch (err) {
                 if (err.name === 'AbortError') {

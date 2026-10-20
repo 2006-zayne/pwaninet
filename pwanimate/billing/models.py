@@ -160,6 +160,50 @@ class Subscription(models.Model):
         return self.ends_at is None or self.ends_at > now
 
 
+class Payment(models.Model):
+    """One payment attempt (M-Pesa Daraja STK push).
+
+    The amount is always taken from the tier, never from the client.
+    `reference` is the account reference we send to Daraja and the handle we
+    match the callback on — Daraja's basic callback is not signed, so this
+    pairing (plus the amount) is our verification.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PAID = "paid", "Paid"
+        FAILED = "failed", "Failed"
+        EXPIRED = "expired", "Expired"
+        CANCELLED = "cancelled", "Cancelled"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="billing_payments"
+    )
+    tier = models.ForeignKey(Tier, on_delete=models.PROTECT, related_name="payments")
+    provider = models.CharField(max_length=32, default="daraja")
+    amount_kes = models.DecimalField(max_digits=10, decimal_places=2)
+    phone = models.CharField(max_length=20, help_text="Normalised MSISDN, e.g. 254712345678")
+    reference = models.CharField(max_length=120, unique=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    merchant_request_id = models.CharField(max_length=80, blank=True, default="")
+    checkout_request_id = models.CharField(max_length=80, blank=True, default="")
+    transaction_code = models.CharField(max_length=80, blank=True, default="")
+    result_code = models.CharField(max_length=20, blank=True, default="")
+    result_desc = models.CharField(max_length=255, blank=True, default="")
+    is_demo = models.BooleanField(default=False, help_text="Simulated payment (no money moved).")
+    raw_callback = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "-created_at"])]
+
+    def __str__(self):
+        return f"{self.user} {self.tier.code} KSh {self.amount_kes} ({self.status})"
+
+
 class UsageRecord(models.Model):
     """One metered action — the append-only source of truth."""
 

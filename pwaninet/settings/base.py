@@ -728,6 +728,33 @@ PWANIMATE_SELFHOSTED_EMBEDDINGS_TOKEN = os.environ.get('PWANIMATE_SELFHOSTED_EMB
 # can face while ingestion runs.
 PWANIMATE_SELFHOSTED_EMBEDDING_BATCH_SIZE = int(os.environ.get('PWANIMATE_SELFHOSTED_EMBEDDING_BATCH_SIZE', '4'))
 
+# --- M-Pesa Daraja (payments) ---------------------------------------------
+# Sandbox by default: with no credentials configured the payment flow runs in
+# DEMO mode (no network, synthetic checkout id, simulated callback). Adding
+# the sandbox credentials and flipping DARAJA_ENV=production is the only
+# difference between the demo and the real thing.
+DARAJA_ENV = os.environ.get('DARAJA_ENV', 'sandbox').strip().lower()  # sandbox|production
+DARAJA_BASE_URL = os.environ.get(
+    'DARAJA_BASE_URL',
+    'https://sandbox.safaricom.co.ke/mpesa/' if DARAJA_ENV != 'production'
+    else 'https://api.safaricom.co.ke/mpesa/',
+).rstrip('/') + '/'
+DARAJA_CONSUMER_KEY = os.environ.get('DARAJA_CONSUMER_KEY', '')
+DARAJA_CONSUMER_SECRET = os.environ.get('DARAJA_CONSUMER_SECRET', '')
+DARAJA_SHORTCODE = os.environ.get('DARAJA_SHORTCODE', '')      # paybill or till number
+DARAJA_PASSKEY = os.environ.get('DARAJA_PASSKEY', '')          # used to build the request password
+DARAJA_INITIATOR = os.environ.get('DARAJA_INITIATOR', '')      # for the reconciliation APIs
+DARAJA_CREDENTIAL = os.environ.get('DARAJA_CREDENTIAL', '')    # initiator security credential
+DARAJA_CALLBACK_URL = os.environ.get(
+    'DARAJA_CALLBACK_URL', 'https://pwaninet.app/api/pwanimate/billing/mpesa/callback/'
+)
+DARAJA_TIMEOUT = int(os.environ.get('DARAJA_TIMEOUT', '30'))
+# Allow the demo endpoints only when no live credentials are configured.
+DARAJA_DEMO_ENABLED = os.environ.get(
+    'DARAJA_DEMO_ENABLED',
+    '1' if not (DARAJA_CONSUMER_KEY and DARAJA_CONSUMER_SECRET and DARAJA_SHORTCODE and DARAJA_PASSKEY) else '0',
+) == '1'
+
 # Multi-Provider Embedding Configuration Placeholders
 PWANIMATE_JINA_API_KEY = os.environ.get('PWANIMATE_JINA_API_KEY', os.environ.get('JINA_API_KEY', ''))
 PWANIMATE_JINA_MODEL = os.environ.get('PWANIMATE_JINA_MODEL', 'jina-embeddings-v3')

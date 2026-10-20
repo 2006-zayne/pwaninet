@@ -163,14 +163,57 @@ The UI turns that into a lock badge + upgrade CTA. A free-tier user is never *de
 
 ## 8. M-Pesa Daraja flow (STK push)
 
-1. Client posts `{phone, tier_code}` → server validates the tier, creates a `Payment` row (`status=pending`, `reference=<uuid>` as the Daraja account reference, amount from the tier price — **never from the client**).
-2. Server calls Daraja's STK-push endpoint (business paybill + LNM) with `Amount`, `AccountReference=<payment.reference>`, `TransactionDesc="<tier> (<days>d)"`, `PhoneNumber=<254…>`.
-3. Daraja pushes the STK prompt to the phone; the customer enters their PIN.
-4. Daraja calls back `/billing/mpesa/callback/` with `ResultCode` (0 = success) and the transaction code.
-5. Server: **idempotent** (unique constraint on the Daraja transaction code) → on success, create/extend the `Subscription` (`tier`, `starts_at`, `ends_at = starts_at + duration_days`), mark the payment `paid`, notify the user (the `notifications` app already exists ✓).
-6. On failure/timeout → `Payment.status = failed|expired`; the tier never activates.
+**Built (2026-10-20), sandbox-ready with a demo mode.** The flow below is implemented
+in `pwanimate/billing/daraja.py` (client), `pwanimate/billing/payments.py` (verification +
+activation) and `pwanimate/billing/api.py` (endpoints). With no credentials configured the
+client runs in **demo mode**: no network call, a synthetic checkout id, and a simulated
+callback that goes through the *real* verification path — so the demo cannot drift from
+production. Going live is only a matter of setting the credentials and flipping
+`DARAJA_ENV=production`.
 
-**Verification caveat (important):** Daraja's basic callback is **not cryptographically signed** — anyone who learns the URL can post a fake "success". Mitigations, in order of cost:
+### 8.1 What Daraja needs from us (the checklist)
+
+| # | Item | Where it comes from | Used for |
+|---|---|---|---|
+| 1 | **Registered business** with a KRA PIN, holding an M-Pesa **Paybill or Till** | Safaricom M-Pesa for Business | the shortcode we charge to |
+| 2 | **Consumer Key** | Daraja portal (sandbox, then live) | HTTP Basic auth on every call |
+| 3 | **Consumer Secret** | Daraja portal | HTTP Basic auth on every call |
+| 4 | **Business ShortCode** (the paybill/till number) | Daraja portal | `BusinessShortCode` / `PartyB` |
+| 5 | **Passkey** | Daraja portal | builds the request `Password` = base64(shortcode+passkey+timestamp) |
+| 6 | **Initiator username + Security Credential** | Daraja portal | only for the reconciliation APIs (`Transaction Status`), not for STK push itself |
+| 7 | **Approved STK-push access** for that shortcode | Daraja onboarding | we are calling `/stkpush/v1/processrequest` |
+| 8 | **Callback URL allow-listed** in the Daraja account | Daraja portal → "CallBackURL"/domain allowlist | `https://pwanimate.app/api/pwanimate/billing/mpesa/callback/` must be added to the account's allowlist, and the domain must resolve publicly (Cloudflare tunnel ✓) |
+| 9 | **Test MSISDNs** (sandbox) | Daraja sandbox docs | e.g. `2547XXXXXXXX` with any amount; the PIN prompt is simulated |
+| 10 | **Live shortcode + credentials** (production) | Daraja live portal | switching `DARAJA_ENV=production` |
+
+Nothing else is needed: no SDK, no webhook signature secret, no monthly fee — Daraja is
+fee-per-transaction (~1% + KSh 0.40).
+
+### 8.2 The flow
+
+1. Client posts `{phone, tier_code}` → server validates the tier, creates a `Payment`
+   (`status=pending`, `reference=SPARK-…`, **amount taken from the tier, never the client**),
+   and sends the STK push with `TransactionType=CustomerPayBillOnline` (the customer cannot
+   change the amount).
+2. Daraja pushes the STK prompt to the phone; the customer enters their PIN.
+3. Daraja calls back `/api/pwanimate/billing/mpesa/callback/` with `ResultCode` and the
+   transaction code.
+4. The server: **idempotent** (unique constraint on the Daraja transaction code) → on
+   success, create/extend the `Subscription` (`tier`, `starts_at`, `ends_at = starts_at +
+   duration_days`), mark the payment `paid`, notify the user (the `notifications` app already
+   exists ✓).
+5. On failure/timeout → `Payment.status = failed|expired`; the tier never activates.
+
+**Endpoints**
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `POST /api/pwanimate/billing/mpesa/stk/` | student | start a payment (`202` + checkout id + "check your phone") |
+| `POST /api/pwanimate/billing/mpesa/callback/` | public (verified) | the Daraja webhook |
+| `POST /api/pwanimate/billing/mpesa/demo-complete/` | student, demo only | simulate that webhook (demo mode) |
+| `GET /api/pwanimate/billing/subscription/` | student | current subscription + recent payments |
+
+### 8.3 Verification caveat (important) Daraja's basic callback is **not cryptographically signed** — anyone who learns the URL can post a fake "success". Mitigations, in order of cost:
 - Only accept a callback whose `AccountReference` matches an existing **pending** `Payment` row *and* whose `Amount` equals that row's amount (both server-side facts a forger cannot know).
 - Reconcile daily against Daraja's transaction-query API for the business paybill; quarantine mismatches.
 - Rotate the paybill credentials if a forgery ever lands.

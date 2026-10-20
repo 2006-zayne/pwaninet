@@ -848,6 +848,26 @@
                         </div>
                     </div>
                     <div class="pwanimate-composer-actions-end">
+                        <div class="pwanimate-quota-chip-wrap" id="pwanimateQuotaWrap" hidden>
+                            <button type="button"
+                                    id="pwanimateQuotaChip"
+                                    class="pwanimate-quota-chip"
+                                    aria-haspopup="dialog"
+                                    aria-expanded="false"
+                                    aria-controls="pwanimateQuotaPopover"
+                                    aria-label="{% trans 'Your usage today' %}">
+                                <svg class="pwanimate-quota-ring" viewBox="0 0 36 36" aria-hidden="true">
+                                    <circle class="pwanimate-quota-track" cx="18" cy="18" r="15" fill="none" stroke-width="3"></circle>
+                                    <circle class="pwanimate-quota-progress" id="pwanimateQuotaArc" cx="18" cy="18" r="15" fill="none" stroke-width="3" stroke-linecap="round"></circle>
+                                </svg>
+                                <span class="pwanimate-quota-label" id="pwanimateQuotaLabel">—</span>
+                            </button>
+                            <div class="pwanimate-quota-popover"
+                                 id="pwanimateQuotaPopover"
+                                 role="dialog"
+                                 aria-labelledby="pwanimateQuotaPopoverTitle"
+                                 hidden></div>
+                        </div>
                         <button type="button"
                                 class="pwanimate-attach-btn pwanimate-voice-btn"
                                 id="pwanimateVoiceBtn"

@@ -24,7 +24,11 @@ from pwanimate.api.views import (
     PwanimateVoiceTranscriptionView,
 )
 from pwanimate.billing.api import (
+    PwanimateBillingDarajaCallbackView,
+    PwanimateBillingDemoCompleteView,
     PwanimateBillingQuotaView,
+    PwanimateBillingStkView,
+    PwanimateBillingSubscriptionView,
     PwanimateBillingTiersView,
     PwanimateBillingUsageView,
 )
@@ -36,6 +40,10 @@ urlpatterns = [
     path("billing/quota/", PwanimateBillingQuotaView.as_view(), name="billing_quota"),
     path("billing/usage/", PwanimateBillingUsageView.as_view(), name="billing_usage"),
     path("billing/tiers/", PwanimateBillingTiersView.as_view(), name="billing_tiers"),
+    path("billing/subscription/", PwanimateBillingSubscriptionView.as_view(), name="billing_subscription"),
+    path("billing/mpesa/stk/", PwanimateBillingStkView.as_view(), name="billing_mpesa_stk"),
+    path("billing/mpesa/callback/", PwanimateBillingDarajaCallbackView.as_view(), name="billing_mpesa_callback"),
+    path("billing/mpesa/demo-complete/", PwanimateBillingDemoCompleteView.as_view(), name="billing_mpesa_demo"),
     path("messages/<int:message_id>/resources/", PwanimateGeneratedResourceView.as_view(), name="generated_resource"),
     path("conversations/", PwanimateConversationListView.as_view(), name="conversation_list"),
     path("conversations/<uuid:conversation_id>/", PwanimateConversationDetailView.as_view(), name="conversation_detail"),

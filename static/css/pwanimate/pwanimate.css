@@ -5538,3 +5538,184 @@ body.pwanimate-active .pwanimate-settings-mobile,
     font-weight: 600;
 }
 
+
+/* ==========================================================================
+   Quota chip — the composer's daily usage indicator.
+   Industry practice: the ring shows what is LEFT (not what is spent), the
+   state is carried by an icon/label as well as colour (never colour alone),
+   and the detail lives in a dismissible popover that is keyboard reachable.
+   ========================================================================== */
+
+.pwanimate-quota-chip-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.pwanimate-quota-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px 4px 4px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--pwanimate-text-muted, #6b7280);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.pwanimate-quota-chip:hover,
+.pwanimate-quota-chip:focus-visible {
+    background: var(--pwanimate-chip-bg, rgba(120, 130, 160, 0.12));
+    color: var(--pwanimate-text, #1f2937);
+}
+
+.pwanimate-quota-chip:focus-visible {
+    outline: 2px solid var(--primary, #2563eb);
+    outline-offset: 2px;
+}
+
+.pwanimate-quota-ring {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    transform: rotate(-90deg);
+}
+
+.pwanimate-quota-track {
+    stroke: var(--pwanimate-quota-track, rgba(120, 130, 160, 0.28));
+}
+
+.pwanimate-quota-progress {
+    stroke: var(--primary, #2563eb);
+    transition: stroke-dashoffset 0.35s ease, stroke 0.2s ease;
+}
+
+.pwanimate-quota-label {
+    min-width: 14px;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+
+.pwanimate-quota-chip.is-warning .pwanimate-quota-progress {
+    stroke: #f59e0b;
+}
+
+.pwanimate-quota-chip.is-warning .pwanimate-quota-label {
+    color: #b45309;
+}
+
+.pwanimate-quota-chip.is-critical .pwanimate-quota-progress {
+    stroke: #dc2626;
+}
+
+.pwanimate-quota-chip.is-critical .pwanimate-quota-label {
+    color: #b91c1c;
+}
+
+.pwanimate-quota-chip.is-hidden {
+    display: none;
+}
+
+/* Popover ---------------------------------------------------------------- */
+.pwanimate-quota-popover {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    z-index: 60;
+    width: 286px;
+    padding: 12px 14px;
+    border: 1px solid var(--pwanimate-border, rgba(120, 130, 160, 0.28));
+    border-radius: 14px;
+    background: var(--pwanimate-card-bg, #ffffff);
+    color: var(--pwanimate-text, #1f2937);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+    font-size: 0.78rem;
+    text-align: left;
+}
+
+.pwanimate-quota-popover[hidden] {
+    display: none;
+}
+
+.pwanimate-quota-popover.is-below {
+    bottom: auto;
+    top: calc(100% + 10px);
+}
+
+.pwanimate-quota-popover-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.pwanimate-quota-popover-tier {
+    font-weight: 600;
+    color: var(--primary, #2563eb);
+}
+
+.pwanimate-quota-popover-rows {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+    margin: 0 0 8px;
+}
+
+.pwanimate-quota-popover-rows dt {
+    color: var(--pwanimate-text-muted, #6b7280);
+}
+
+.pwanimate-quota-popover-rows dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    text-align: right;
+}
+
+.pwanimate-quota-popover-note {
+    margin: 0;
+    color: var(--pwanimate-text-muted, #6b7280);
+    font-size: 0.72rem;
+}
+
+.pwanimate-quota-popover-cta {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--primary, #2563eb);
+    color: #ffffff;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pwanimate-quota-popover-cta:hover {
+    filter: brightness(1.06);
+}
+
+.pwanimate-quota-popover-cta:focus-visible {
+    outline: 2px solid var(--primary, #2563eb);
+    outline-offset: 2px;
+}
+
+.pwanimate-quota-popover-cta[hidden] {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pwanimate-quota-progress,
+    .pwanimate-quota-chip {
+        transition: none;
+    }
+}
