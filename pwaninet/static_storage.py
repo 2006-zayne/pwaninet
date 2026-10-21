@@ -111,6 +111,17 @@ def static_fingerprint():
     return ""
 
 
+def invalidate_static_fingerprint():
+    """
+    Drop the cached fingerprint so it is recomputed on next use.
+
+    Static files only change through a deploy, which restarts the process
+    and clears the cache anyway. This exists for tests and for any future
+    "the assets changed under a running process" case.
+    """
+    _fingerprint.cache_clear()
+
+
 class StaticFingerprintMixin:
     """
     Append the static-tree fingerprint to every generated static URL.
