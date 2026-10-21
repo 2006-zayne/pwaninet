@@ -56,15 +56,28 @@ echo "[i] Disk before: ${used_before} used, ${disk_before} free"
 echo ""
 
 echo "[1/5] Docker build cache"
-docker builder prune -af 2>&1 | tail -2
+if $DRY_RUN; then
+  echo "[dry-run] would run: docker builder prune -af"
+  docker system df 2>/dev/null | grep -E '^Build Cache' || true
+else
+  docker builder prune -af 2>&1 | tail -2
+fi
 
 echo ""
 echo "[2/5] Dangling Docker images"
-docker image prune -f 2>&1 | tail -2
+if $DRY_RUN; then
+  echo "[dry-run] would run: docker image prune -f"
+else
+  docker image prune -f 2>&1 | tail -2
+fi
 
 echo ""
 echo "[3/5] Stopped containers"
-docker container prune -f 2>&1 | tail -2
+if $DRY_RUN; then
+  echo "[dry-run] would run: docker container prune -f"
+else
+  docker container prune -f 2>&1 | tail -2
+fi
 
 echo ""
 echo "[4/5] apt cache and journal"
