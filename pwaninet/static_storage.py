@@ -29,10 +29,11 @@ the static tree to every URL produced by ``{% static %}``. Change any
 stylesheet or script and the URL changes with it, so the browser, the
 service worker and Cloudflare all fetch the new file.
 
-The fingerprint is derived from ``(path, size, mtime)`` of every collected
-and source static file. ``collectstatic`` only rewrites a file when the
-source is newer, so unchanged assets keep their fingerprint and their cache
-entry across deploys.
+The fingerprint is derived from the *content* of every collected static file.
+Hashing content rather than modification times matters: ``collectstatic``
+rewrites app-provided files (admin, rest_framework) whenever the image is
+rebuilt, and a timestamp-based fingerprint would then change on every deploy
+even when no asset had actually changed.
 """
 
 import hashlib
@@ -42,8 +43,17 @@ from functools import lru_cache
 from django.contrib.staticfiles.storage import StaticFilesStorage
 
 
+def _hash_file(path):
+    """sha256 of a file, read in chunks so large fonts do not blow memory."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _walk(root):
-    """Yield ``(relative_path, size, mtime_ns)`` for every file under root."""
+    """Yield ``(relative_path, sha256)`` for every file under root."""
     if not root or not os.path.isdir(root):
         return
     for dirpath, dirnames, filenames in os.walk(root):
@@ -51,22 +61,23 @@ def _walk(root):
         for name in sorted(filenames):
             path = os.path.join(dirpath, name)
             try:
-                stat = os.stat(path)
+                content_hash = _hash_file(path)
             except OSError:
-                # File vanished mid-walk; skip it rather than failing the
-                # whole request.
+                # File vanished mid-walk or is unreadable; skip it rather
+                # than failing the whole request.
                 continue
-            yield os.path.relpath(path, root), stat.st_size, stat.st_mtime_ns
+            yield os.path.relpath(path, root), content_hash
 
 
 @lru_cache(maxsize=8)
-def _fingerprint(roots):
+def _fingerprint(root):
     digest = hashlib.sha256()
-    for root in roots:
-        digest.update(root.encode("utf-8", "replace"))
-        digest.update(b"\x00")
-        for relpath, size, mtime_ns in _walk(root):
-            digest.update(f"{relpath}:{size}:{mtime_ns}\n".encode("utf-8", "replace"))
+    count = 0
+    for relpath, content_hash in _walk(root):
+        digest.update(f"{relpath}:{content_hash}\n".encode("utf-8", "replace"))
+        count += 1
+    if not count:
+        return ""
     return digest.hexdigest()[:12]
 
 
@@ -74,8 +85,10 @@ def static_fingerprint():
     """
     Short digest of the deployed static tree.
 
-    Returns an empty string when settings are not ready yet, so callers can
-    fall back to an un-suffixed URL rather than raising during startup.
+    Prefers the collected tree (``STATIC_ROOT``), which is what is actually
+    served. Falls back to the source directories when nothing has been
+    collected yet -- for example in a management command that runs before
+    ``collectstatic``.
     """
     try:
         from django.conf import settings
@@ -85,18 +98,17 @@ def static_fingerprint():
     except Exception:
         return ""
 
-    roots = []
     if static_root:
-        roots.append(str(static_root))
-    roots.extend(str(path) for path in source_dirs)
+        fingerprint = _fingerprint(str(static_root))
+        if fingerprint:
+            return fingerprint
 
-    if not roots:
-        return ""
+    for path in source_dirs:
+        fingerprint = _fingerprint(str(path))
+        if fingerprint:
+            return fingerprint
 
-    try:
-        return _fingerprint(tuple(sorted(set(roots))))
-    except Exception:
-        return ""
+    return ""
 
 
 class StaticFingerprintMixin:
