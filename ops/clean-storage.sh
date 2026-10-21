@@ -27,6 +27,11 @@ Reclaims:
   - apt package cache
   - systemd journal entries beyond 50 MB
   - Database backups older than BACKUP_KEEP_DAYS (default 14)
+
+Note on the build cache: it is what makes the next deploy fast. With it,
+a code-only rebuild takes seconds; without it the image is rebuilt from
+scratch and the deploy takes several minutes. Prune it when disk space
+matters more than deploy speed.
 EOF
 }
 
