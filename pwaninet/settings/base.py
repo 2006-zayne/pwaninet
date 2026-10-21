@@ -609,8 +609,12 @@ if USE_S3:
             },
         },
         'staticfiles': {
-            # Static files stay local for WhiteNoise / Nginx unless USE_S3_STATIC=1
-            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage' if USE_S3_STATIC else 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            # Static files stay local for WhiteNoise / Nginx unless USE_S3_STATIC=1.
+            # The fingerprinted backends append a content-derived ?v= to every
+            # static URL. Without it the URLs only changed when the release
+            # record in the database was bumped, and Cloudflare's multi-year
+            # cache kept serving months-old CSS/JS. See pwaninet/static_storage.py.
+            'BACKEND': 'pwaninet.static_storage.FingerprintedS3StaticFilesStorage' if USE_S3_STATIC else 'pwaninet.static_storage.FingerprintedStaticFilesStorage',
             **({
                 'OPTIONS': {
                     'bucket_name':       AWS_STORAGE_BUCKET_NAME,
