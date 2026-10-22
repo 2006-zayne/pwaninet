@@ -4114,7 +4114,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
     <!-- Global WebSocket Connection for Real-time Notifications -->
     {% if request.user.is_authenticated %}
-    {% verbatim %}
     <script>
     // Global notification WebSocket connection
     let globalNotificationsSocket = null;
@@ -4715,7 +4714,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
     // Connect when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        // User is authenticated if we're in this script block (wrapped in {% if request.user.is_authenticated %})
+        // User is authenticated if we're in this script block (wrapped in an is_authenticated check)
 
         // Start polling as fallback initially
         startNotificationCountPolling();
@@ -4739,7 +4738,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
         }
     });
     </script>
-    {% endverbatim %}
     <!-- Push Notification Soft-Prompt Bottom Sheet (Web & PWA) -->
     {% include 'partials/push_notification_bottom_sheet.html' %}
     <script src="{% static 'js/notifications/push-subscription.js' %}"></script>
