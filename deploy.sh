@@ -120,9 +120,49 @@ fi
 # 3. Build container images on code updates (Docker layer cache makes code-only builds take ~1-2s).
 #    spark_vector bakes the pinned model at build time: the asset layer is cached,
 #    so only the application layer rebuilds after the first build.
+#
+#    The build is the only step that needs a lot of disk: a fresh image plus
+#    its build cache is several GB, and the old image stays on disk until the
+#    new container starts. On a 29 GB box that can run the filesystem out
+#    mid-export, which fails the deploy with "no space left on device" and
+#    leaves a half-written image behind. So the space is checked first, and
+#    the services are built one at a time to keep the peak down.
+MIN_BUILD_GB="${MIN_BUILD_GB:-8}"
+
+free_gb() {
+  df -BG --output=avail / | tail -1 | tr -dc '0-9'
+}
+
+ensure_build_space() {
+  local available
+  available="$(free_gb)"
+  if [ "${available:-0}" -ge "$MIN_BUILD_GB" ]; then
+    echo "[i] Disk: ${available}G available (need ${MIN_BUILD_GB}G)."
+    return 0
+  fi
+
+  echo "[!] Only ${available}G free; the build needs about ${MIN_BUILD_GB}G."
+  echo "[i] Reclaiming the Docker build cache and unused images..."
+  docker builder prune -af >/dev/null 2>&1 || true
+  docker image prune -af >/dev/null 2>&1 || true
+  sudo apt-get clean >/dev/null 2>&1 || true
+
+  available="$(free_gb)"
+  if [ "${available:-0}" -lt "$MIN_BUILD_GB" ]; then
+    echo "[!] ERROR: ${available}G free after cleanup; the build needs ${MIN_BUILD_GB}G."
+    echo "[!] Free space on the VM (old media, old backups) and try again."
+    exit 1
+  fi
+  echo "[i] Disk: ${available}G available after cleanup."
+}
+
 if [ "$OLD_HEAD" != "$NEW_HEAD" ] || [ "$FORCE_REBUILD" = true ]; then
   echo "[2/7] Code updates detected. Building fresh container images..."
-  compose build web celery_worker spark_vector
+  ensure_build_space
+  for service in web celery_worker spark_vector; do
+    echo "    building ${service}..."
+    compose build "$service"
+  done
 else
   echo "[2/7] No code changes detected. Rebuild skipped (use --force to override)."
 fi
