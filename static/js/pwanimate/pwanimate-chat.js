@@ -2586,6 +2586,28 @@
                         return;
                     }
 
+                    // Feedback on a Spark answer.
+                    //
+                    // This is the platform's only outcome signal: what was
+                    // served and what it cost is already recorded, but
+                    // nothing recorded whether the answer was right.
+                    const feedbackBtn = e.target.closest('.pwanimate-feedback-btn[data-feedback]');
+                    if (feedbackBtn) {
+                        e.preventDefault();
+                        const row = feedbackBtn.closest('.pwanimate-message-row');
+                        this.sendFeedback(row, true, '');
+                        return;
+                    }
+
+                    const feedbackReason = e.target.closest('.pwanimate-feedback-reason-item');
+                    if (feedbackReason) {
+                        e.preventDefault();
+                        const row = feedbackReason.closest('.pwanimate-message-row');
+                        const reason = feedbackReason.dataset.reason || '';
+                        this.sendFeedback(row, false, reason);
+                        return;
+                    }
+
                     // Copy action on user or assistant message
                     const copyBtn = e.target.closest('.pwanimate-action-btn.copy-btn');
                     if (copyBtn) {
@@ -5982,6 +6004,41 @@
             return row;
         }
 
+        // ------------------------------------------------- answer feedback
+        async sendFeedback(row, helpful, reason) {
+            if (!row) return;
+            const messageId = row.dataset.messageId;
+            if (!messageId) return;
+
+            const buttons = row.querySelectorAll('.pwanimate-feedback-btn');
+            buttons.forEach((btn) => btn.classList.add('disabled'));
+
+            try {
+                const response = await fetch(`/api/pwanimate/messages/${messageId}/feedback/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ helpful: helpful, reason: reason || '' }),
+                });
+                if (!response.ok) return;
+
+                // Mark the chosen verdict so the student can see it landed.
+                buttons.forEach((btn) => btn.classList.remove('feedback-active'));
+                const wanted = helpful ? '[data-feedback="helpful"]' : '.pwanimate-feedback-reason > .pwanimate-feedback-btn';
+                const chosen = row.querySelector(wanted);
+                if (chosen) chosen.classList.add('feedback-active');
+            } catch (error) {
+                // Feedback is a courtesy; never surface an error to a student.
+                console.warn('[Spark] Could not record feedback', error);
+            } finally {
+                buttons.forEach((btn) => btn.classList.remove('disabled'));
+            }
+        }
+
         appendAssistantMessage(answer, sources, citations, fallbackInfo, quotaInfo, people = [], messageId = null, peopleHtmlFromServer = '') {
             const row = document.createElement('div');
             row.className = 'pwanimate-message-row assistant';
@@ -6114,6 +6171,22 @@
                             <ul class="dropdown-menu dropdown-menu-end pwanimate-resource-export-menu">
                                 <li><button type="button" class="dropdown-item pwanimate-resource-download" data-format="pdf"><i class="bi bi-filetype-pdf me-2"></i>Download PDF</button></li>
                                 <li><button type="button" class="dropdown-item pwanimate-resource-download" data-format="docx"><i class="bi bi-filetype-docx me-2"></i>Download Word document</button></li>
+                            </ul>
+                        </div>
+                        <button type="button" class="btn pwanimate-action-btn pwanimate-feedback-btn" data-feedback="helpful" title="This helped" aria-label="This helped">
+                            <i class="bi bi-hand-thumbs-up"></i>
+                        </button>
+                        <div class="dropdown pwanimate-feedback-reason">
+                            <button type="button" class="btn pwanimate-action-btn pwanimate-feedback-btn" data-bs-toggle="dropdown" aria-expanded="false" title="This did not help" aria-label="This did not help">
+                                <i class="bi bi-hand-thumbs-down"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end pwanimate-feedback-reason-menu">
+                                <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="wrong_answer">The answer is wrong</button></li>
+                                <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="not_my_document">It ignored my document</button></li>
+                                <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="too_slow">It took too long</button></li>
+                                <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="wrong_language">Wrong language or register</button></li>
+                                <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="too_long">Too long or too short</button></li>
+                                <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="other">Something else</button></li>
                             </ul>
                         </div>
                         <button type="button" class="btn pwanimate-action-btn copy-btn" title="Copy answer" aria-label="Copy answer">

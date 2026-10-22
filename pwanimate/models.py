@@ -274,6 +274,33 @@ class PwanimateMessage(models.Model):
         default=list,
         blank=True,
     )
+    # Which model actually served this turn, and what it cost.
+    #
+    # `UsageRecord` holds the billing ledger, but the answer itself did not
+    # record who produced it, so answers could not be joined to models for
+    # evaluation. Without this there is no way to answer "is the new model
+    # better?" -- which is the question every fine-tune has to answer first.
+    provider = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    model_id = models.CharField(
+        max_length=160,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    task = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    prompt_tokens = models.PositiveIntegerField(default=0)
+    completion_tokens = models.PositiveIntegerField(default=0)
+    total_tokens = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(
         auto_now_add=True,
         db_index=True,
@@ -314,6 +341,67 @@ class PwanimateMessage(models.Model):
                 if isinstance(person, dict) and person.get("username"):
                     people_list.append(person)
         return people_list
+
+
+class PwanimateMessageFeedback(models.Model):
+    """
+    A student's verdict on one Spark answer.
+
+    This is the outcome signal. Right now the platform records what was
+    served and what it cost, but nothing records whether the answer was
+    *right* -- so there is no label to fine-tune on and no way to prove that
+    a new model is better than the one it replaces.
+
+    One row per student per answer. A student may change their mind; the
+    last verdict wins.
+    """
+
+    REASON_CHOICES = [
+        ("wrong_answer", "The answer is wrong"),
+        ("not_my_document", "It ignored my document"),
+        ("too_slow", "It took too long"),
+        ("wrong_language", "Wrong language or register"),
+        ("too_long", "Too long or too short"),
+        ("other", "Something else"),
+    ]
+
+    message = models.ForeignKey(
+        PwanimateMessage,
+        on_delete=models.CASCADE,
+        related_name="feedback",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pwanimate_feedback",
+    )
+    helpful = models.BooleanField()
+    reason = models.CharField(
+        max_length=32,
+        choices=REASON_CHOICES,
+        blank=True,
+        default="",
+    )
+    comment = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["message", "user"],
+                name="uniq_pwanimate_feedback_per_user_per_message",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["message"]),
+            models.Index(fields=["user", "created_at"]),
+        ]
+
+    def __str__(self):
+        verdict = "helpful" if self.helpful else "not helpful"
+        return f"{verdict} on message {self.message_id}"
 
 
 class PwanimateTone(models.TextChoices):

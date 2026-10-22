@@ -618,6 +618,27 @@ body:not(.pwanimate-left-collapsed) .pwanimate-left-rail-collapsed {
     background-color: var(--pwanimate-hover-bg);
 }
 
+/* Answer feedback: thumbs up / thumbs down.
+   The active state is the only feedback the student gets, so it has to be
+   unmistakable -- otherwise they will click twice wondering if it worked. */
+.pwanimate-feedback-btn.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.pwanimate-feedback-btn.feedback-active {
+    color: var(--pwanimate-user-bubble, #2563eb);
+    background-color: var(--pwanimate-hover-bg);
+}
+
+.pwanimate-feedback-reason-menu {
+    font-size: 0.82rem;
+}
+
+.pwanimate-feedback-reason-menu .dropdown-item {
+    padding: 0.4rem 0.9rem;
+}
+
 /* Assistant Bubble */
 .pwanimate-assistant-bubble {
     background-color: transparent;

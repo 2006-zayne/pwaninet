@@ -659,6 +659,16 @@ class PwanimateChatView(APIView):
                 content=answer_text,
                 citations=response.citations,
                 sources=response.sources,
+                provider=response.provider,
+                model_id=response.model,
+                task=str(
+                    response.metadata.get("task", "")
+                    or response.metadata.get("intent", "")
+                    or ""
+                ),
+                prompt_tokens=int(response.prompt_tokens or 0),
+                completion_tokens=int(response.completion_tokens or 0),
+                total_tokens=int(response.total_tokens or 0),
             )
 
             res_data = response.to_dict()
@@ -865,6 +875,80 @@ class PwanimateGeneratedResourceView(APIView):
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class PwanimateMessageFeedbackView(APIView):
+    """
+    Record (or change) the student's verdict on one Spark answer.
+
+    This is the outcome signal the platform was missing: what was served and
+    what it cost was already recorded, but nothing recorded whether the
+    answer was right.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, message_id):
+        from pwanimate.services.feedback import FeedbackService
+
+        feedback = FeedbackService.get_for_message(request.user, message_id)
+        return Response({"feedback": feedback})
+
+    def post(self, request, message_id):
+        from pwanimate.services.feedback import FeedbackError, FeedbackService
+
+        data = request.data or {}
+        if "helpful" not in data:
+            return Response(
+                {"error": "Say whether the answer helped."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        helpful = data.get("helpful")
+        if isinstance(helpful, str):
+            helpful = helpful.strip().lower() in {"true", "1", "yes", "helpful"}
+        helpful = bool(helpful)
+
+        try:
+            feedback = FeedbackService.record(
+                user=request.user,
+                message_id=message_id,
+                helpful=helpful,
+                reason=data.get("reason", ""),
+                comment=data.get("comment", ""),
+            )
+        except FeedbackError as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"feedback": feedback}, status=status.HTTP_201_CREATED)
+
+
+class PwanimateFeedbackSummaryView(APIView):
+    """
+    The aggregate verdict picture.
+
+    Staff-only: it exposes how students rated answers across models, which
+    is the query that decides whether a fine-tune is worth shipping.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from pwanimate.services.feedback import FeedbackService
+
+        days = request.query_params.get("days")
+        since = None
+        if days:
+            try:
+                since = timezone.now() - timedelta(days=int(days))
+            except (TypeError, ValueError):
+                since = None
+        return Response(FeedbackService.summary(since=since))
 
 
 class PwanimateAttachmentUploadView(APIView):
