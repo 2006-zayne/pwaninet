@@ -322,6 +322,12 @@ class GroqLLMProvider(BaseLLMProvider):
                             provider=self.provider_name,
                         )
                     mime_type = getattr(attachment, "mime_type", "image/jpeg") or "image/jpeg"
+                    # Strip EXIF and downscale before the image leaves the
+                    # building: it costs less and it does not hand a third
+                    # party the student's location.
+                    from pwanimate.ai.vision_images import prepare_image_for_vision
+
+                    image_bytes, mime_type = prepare_image_for_vision(image_bytes, mime_type)
                     image_data = base64.b64encode(image_bytes).decode("ascii")
                     content.append({
                         "type": "image_url",

@@ -17,7 +17,7 @@ from pwanimate.ai.gateway.types import LLMRequest
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_PROVIDERS = {"gemini", "groq", "openrouter", "mock"}
+SUPPORTED_PROVIDERS = {"gemini", "groq", "openrouter", "cloudflare", "mock"}
 
 
 class LLMRouter:
@@ -57,6 +57,9 @@ class LLMRouter:
         elif normalized_name == "openrouter":
             from pwanimate.ai.providers.openrouter import OpenRouterLLMProvider
             provider = OpenRouterLLMProvider()
+        elif normalized_name == "cloudflare":
+            from pwanimate.ai.providers.cloudflare import CloudflareLLMProvider
+            provider = CloudflareLLMProvider()
         elif normalized_name == "mock":
             from pwanimate.ai.providers.mock import MockLLMProvider
             provider = MockLLMProvider()
@@ -196,13 +199,11 @@ class LLMRouter:
                 continue
 
             if required_capability == "image":
-                model_id = (m_name or "").strip().lower()
-                supports_images = (
-                    p_name == "gemini" and model_id.startswith("gemini-")
-                ) or (
-                    p_name == "groq" and model_id == "qwen/qwen3.8-27b" and image_count <= 3
-                )
-                if not supports_images:
+                # Capability lives in a table, not in a literal here, so
+                # adding a vision provider is a data change.
+                from pwanimate.ai.capabilities import provider_supports_images
+
+                if not provider_supports_images(p_name, m_name, image_count):
                     continue
 
             # If router was given an explicit providers map (e.g. in tests with mock),

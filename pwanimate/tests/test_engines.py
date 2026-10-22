@@ -77,18 +77,34 @@ class SparkEngineRegistryTests(SimpleTestCase):
                 f"{slug} must interleave all three real providers",
             )
 
-    def test_vision_engine_visible_via_interim_route(self):
-        """Build③: vision is selectable now via the interim Gemini multimodal
-        route; the local spark_vision worker takes the chain head when it
-        ships (D3 endgame). Every rung must be image-capable."""
+    def test_vision_engine_leads_with_our_own_account(self):
+        """Spark Vision leads with Cloudflare Workers AI.
+
+        The free tier may only depend on capacity we control, and the
+        Workers AI allocation belongs to our account -- unlike a Gemini or
+        Groq free key, which a provider can revoke at any time. Every rung
+        must be image-capable."""
         slugs = [engine["slug"] for engine in list_engines()]
         self.assertIn("vision", slugs)
         vision = get_engine("vision")
         self.assertFalse(vision.get("hidden", False))
         chain = vision["fallback_chain"]
-        self.assertEqual(chain[0]["provider"], "gemini")
-        self.assertTrue(chain[0]["model"].startswith("gemini-"))
+        self.assertEqual(chain[0]["provider"], "cloudflare")
+        self.assertTrue(chain[0]["model"].startswith("@cf/"))
+        # The paid providers remain as backups behind it.
+        self.assertIn("gemini", [rung["provider"] for rung in chain])
         self.assertEqual(chain[-1], {"provider": "groq", "model": "qwen/qwen3.8-27b"})
+
+    def test_every_vision_rung_is_image_capable(self):
+        """A rung that cannot read an image would silently drop the turn."""
+        from pwanimate.ai.capabilities import provider_supports_images
+
+        vision = get_engine("vision")
+        for rung in vision["fallback_chain"]:
+            self.assertTrue(
+                provider_supports_images(rung["provider"], rung["model"], 1),
+                f"{rung['provider']}:{rung['model']} cannot read images",
+            )
 
     def test_get_engine_normalizes_and_rejects_bad_slugs(self):
         self.assertEqual(get_engine(" SPEED ")["slug"], "speed")
@@ -158,6 +174,8 @@ class EngineStatusRollupTests(SimpleTestCase):
         PWANIMATE_GEMINI_API_KEY="g-key",
         PWANIMATE_GROQ_API_KEY="",
         PWANIMATE_OPENROUTER_API_KEY="o-key",
+        PWANIMATE_CLOUDFLARE_API_TOKEN="cf-token",
+        PWANIMATE_CLOUDFLARE_ACCOUNT_ID="cf-account",
     )
     def test_status_rollup_with_healthy_primary(self):
         by_slug = {e["slug"]: e for e in get_engines_status(FakeQuotaTracker())}
@@ -178,12 +196,14 @@ class EngineStatusRollupTests(SimpleTestCase):
         self.assertEqual(coda["primary_status"], "unconfigured")
         self.assertEqual(coda["fallbacks_ready"], 2)
 
-        # Vision is visible (interim Gemini route): gemini key present →
-        # primary ready; groq unconfigured → no ready fallback rung.
+        # Vision leads with Cloudflare Workers AI: configured here → primary
+        # ready, and both the Cloudflare backup and Gemini are ready
+        # fallbacks. Groq is unconfigured in this test.
         vision = by_slug["vision"]
         self.assertTrue(vision["is_configured"])
         self.assertEqual(vision["primary_status"], "ready")
-        self.assertEqual(vision["fallbacks_ready"], 0)
+        self.assertEqual(vision["fallbacks_ready"], 2)
+        self.assertIn("Cloudflare", vision["powered_by"])
 
     @override_settings(
         PWANIMATE_GEMINI_API_KEY="g-key",

@@ -66,6 +66,39 @@ from documents.models import Document
 logger = logging.getLogger(__name__)
 
 
+def _quota_block_payload(decision) -> dict:
+    """
+    The body returned when a turn exceeds the student's tier allowance.
+
+    It carries the same numbers the quota chip renders, so the student sees
+    what they have left and when it resets rather than a bare "limit
+    reached".
+    """
+    from pwanimate.billing.services import STATE_UPGRADE_REQUIRED
+
+    if decision.entitlement_key == "images":
+        message = (
+            "You have used today's image analyses. "
+            "Upgrade for more image analyses, or come back tomorrow."
+        )
+    else:
+        message = (
+            "You have used today's messages on Spark. "
+            "Upgrade for more, or come back tomorrow."
+        )
+
+    payload = {
+        "error": message,
+        "quota": decision.as_dict(),
+        "upgrade_required": decision.state == STATE_UPGRADE_REQUIRED,
+    }
+    try:
+        payload["quota_status"] = get_quota_tracker().get_status()
+    except Exception:  # noqa: BLE001 - never fail the block on a status call
+        pass
+    return payload
+
+
 class PwanimateAttachmentVisionPolicyView(APIView):
     """
     Record what the student wants to happen to an image whose analysis failed.
@@ -370,9 +403,24 @@ class PwanimateChatView(APIView):
             if att.attachment_type == "document"
             and att.processing_status in {"pending", "processing"}
         ]
+        pending_images = [
+            att for att in all_known_attachments.values()
+            if att.attachment_type == "image"
+            and att.processing_status in {"pending", "processing"}
+        ]
         if pending_documents:
             return Response(
                 {"error": "Pwanimate is still reading the attached document. Try again when it shows Ready."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if pending_images:
+            # The image is being analysed right now. Sending it to a second
+            # model in this turn would analyse it twice and bill twice.
+            return Response(
+                {
+                    "error": "Spark is still reading that image. Try again in a moment once it shows Ready.",
+                    "attachment_id": str(pending_images[0].id),
+                },
                 status=status.HTTP_409_CONFLICT,
             )
         failed_documents = [
@@ -384,6 +432,37 @@ class PwanimateChatView(APIView):
                 {"error": "Pwanimate could not read one of these documents. Remove it and try a clearer or text-based copy."},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
+
+        # Enforce the tier allowance before any work is done.
+        #
+        # The quota numbers the student sees on the chip are read from the
+        # same counters this check reads, so the number shown is the number
+        # acted on. Until this existed the counters were written but never
+        # consulted, which made every daily cap decorative.
+        #
+        # Only images that will actually be sent are counted: an image that
+        # was already analysed at upload is represented by its stored
+        # description and costs nothing on this turn.
+        try:
+            from pwanimate.ai.vision_images import image_will_be_sent
+            from pwanimate.billing.services import QuotaService
+
+            images_to_send = sum(
+                1 for att in attachment_objs if image_will_be_sent(att)
+            )
+            decision = QuotaService.check_turn(
+                request.user, image_count=images_to_send
+            )
+            if decision is not None and not decision.allowed:
+                return Response(
+                    _quota_block_payload(decision),
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+        except ImportError:
+            # Billing not installed yet: never block a turn.
+            pass
+        except Exception:
+            logger.exception("Quota check failed; allowing the turn")
 
         context_resources = data.get("context_resources") or []
         if not isinstance(context_resources, list):
@@ -813,7 +892,10 @@ class PwanimateAttachmentUploadView(APIView):
                 uploaded_file=file_obj,
                 conversation_id=conversation_id,
             )
-            if attachment.attachment_type == "document":
+            # Documents are extracted and chunked; images get one vision
+            # pass. Both run off the request path so the upload returns
+            # immediately and the analysis is paid for exactly once.
+            if attachment.attachment_type in ("document", "image"):
                 from pwanimate.tasks.attachments import process_pwanimate_attachment
                 try:
                     process_pwanimate_attachment.delay(str(attachment.id))

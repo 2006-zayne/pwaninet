@@ -224,9 +224,17 @@ class UsageService:
         images: int = 0,
         kind: str = UsageKind.CHAT,
         source: str = "chat",
+        chats: int = 1,
         now: Optional[datetime] = None,
     ) -> Optional[UsageRecord]:
-        """Record one metered turn and roll it into every window counter."""
+        """
+        Record one metered turn and roll it into every window counter.
+
+        ``chats`` is 1 for a conversation turn and 0 for work that is metered
+        against a different entitlement -- an image analysis spends an image,
+        not a chat. It was hardcoded to 1 before, which meant every recorded
+        row also spent a chat whether or not it was one.
+        """
         if user is None or not getattr(user, "is_authenticated", False):
             return None
         now = _aware(now)
@@ -267,7 +275,7 @@ class UsageService:
                     user=user,
                     window_type=window_type,
                     window_start=window_start,
-                    chats=1,
+                    chats=int(chats),
                     images=int(images or 0),
                     premium_turns=premium,
                     prompt_tokens=int(prompt_tokens or 0),
@@ -275,6 +283,37 @@ class UsageService:
                     cost_usd_micros=cost_micros,
                 )
         return record
+
+    @classmethod
+    def record_image_analysis(
+        cls,
+        user,
+        provider: str = "",
+        model_id: str = "",
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        source: str = "vision_analysis",
+        now: Optional[datetime] = None,
+    ) -> Optional[UsageRecord]:
+        """
+        Record one image analysis.
+
+        An analysis spends an *image* from the student's allowance, not a
+        chat: the analysis happens at upload, on its own, and must not eat
+        into the conversation allowance.
+        """
+        return cls.record_turn(
+            user=user,
+            provider=provider,
+            model_id=model_id,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            images=1,
+            kind=UsageKind.IMAGE,
+            source=source,
+            chats=0,
+            now=now,
+        )
 
     @staticmethod
     def _windows(user, now: datetime) -> Dict[str, datetime]:
@@ -404,6 +443,39 @@ class QuotaService:
                     else None
                 )
         return decision
+
+    @classmethod
+    def check_turn(
+        cls,
+        user,
+        image_count: int = 0,
+        now: Optional[datetime] = None,
+    ) -> Optional[QuotaDecision]:
+        """
+        The gate for an incoming turn.
+
+        Returns the blocking :class:`QuotaDecision` when the turn may not
+        proceed, or ``None`` when it may. This is the check the request path
+        must call -- ``check()`` on its own only answers a question, it never
+        stops a request.
+
+        The chat allowance is checked first because every turn spends one.
+        The image allowance is only consulted when the turn actually carries
+        images, so a text-only turn is never blocked by the image cap.
+        """
+        if user is None or not getattr(user, "is_authenticated", False):
+            return None
+
+        chat = cls.check(user, kind=UsageKind.CHAT, now=now)
+        if not chat.allowed:
+            return chat
+
+        if image_count > 0:
+            image = cls.check(user, kind=UsageKind.IMAGE, now=now)
+            if not image.allowed:
+                return image
+
+        return None
 
     @classmethod
     def check_premium_turn(cls, user, offering: Optional[ModelOffering], now=None) -> QuotaDecision:

@@ -19,6 +19,7 @@ PROVIDER_LABELS = {
     "gemini": "Google",
     "groq": "Groq",
     "openrouter": "OpenRouter",
+    "cloudflare": "Cloudflare",
     "mock": "Dev",
 }
 
@@ -36,6 +37,12 @@ def _load_engines() -> List[Dict[str, Any]]:
     groq_model = getattr(settings, "PWANIMATE_GROQ_MODEL", "openai/gpt-oss-120b")
     openrouter_model = getattr(settings, "PWANIMATE_OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
     vision_model = getattr(settings, "PWANIMATE_VISION_MODEL", "gemini-3.8-flash")
+    cloudflare_vision_model = getattr(
+        settings, "PWANIMATE_CLOUDFLARE_VISION_MODEL", "@cf/meta/llama-3.2-11b-vision-instruct"
+    )
+    cloudflare_vision_backup_model = getattr(
+        settings, "PWANIMATE_CLOUDFLARE_VISION_BACKUP_MODEL", "@cf/meta/llama-4-scout-17b-16e-instruct"
+    )
 
     engines: List[Dict[str, Any]] = [
         {
@@ -116,12 +123,20 @@ def _load_engines() -> List[Dict[str, Any]]:
             "icon": "bi-eye",
             "tagline": "Images, OCR and whiteboard math",
             "description": "Reads uploaded images — timetables, circuit diagrams and handwritten working.",
-            # Interim route (2026-10-20): visible and served by Gemini's native
-            # multimodal API (free tier) with Groq Qwen as the image-capable
-            # backup. The self-hosted spark_vision worker (D3 endgame, build
-            # items 11+) takes the head of this chain when it ships.
+            # The image route.
+            #
+            # Cloudflare Workers AI leads because it is the only vision
+            # provider that belongs to *our* account: its free daily
+            # allocation cannot be revoked by a third party, which is what
+            # the free tier is allowed to depend on (D2). It costs a
+            # fraction of a cent per image.
+            #
+            # Gemini stays as the paid backup and Groq as the last resort
+            # (it accepts at most three images per turn).
             "hidden": False,
             "fallback_chain": [
+                {"provider": "cloudflare", "model": cloudflare_vision_model},
+                {"provider": "cloudflare", "model": cloudflare_vision_backup_model},
                 {"provider": "gemini", "model": vision_model},
                 {"provider": "groq", "model": "qwen/qwen3.8-27b"},
             ],
@@ -168,6 +183,13 @@ def _provider_configured(provider: str) -> bool:
     }
     if provider == "mock":
         return True
+    if provider == "cloudflare":
+        # Cloudflare is configured by an AI-scoped token plus the account id;
+        # there is no separate "model key".
+        return bool(
+            str(getattr(settings, "PWANIMATE_CLOUDFLARE_API_TOKEN", "") or "").strip()
+            and str(getattr(settings, "PWANIMATE_CLOUDFLARE_ACCOUNT_ID", "") or "").strip()
+        )
     setting_name = key_settings.get(provider)
     if not setting_name:
         return False

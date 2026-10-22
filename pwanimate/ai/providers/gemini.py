@@ -279,6 +279,12 @@ class GeminiLLMProvider(BaseLLMProvider):
                             logger.warning("Could not read file_path for image attachment: %s", e)
                     att_mime = getattr(att, "mime_type", "image/jpeg")
                     if att_type == "image" and att_bytes:
+                        # Strip EXIF and downscale before the image leaves
+                        # the building: it costs less and it does not hand a
+                        # third party the student's location.
+                        from pwanimate.ai.vision_images import prepare_image_for_vision
+
+                        att_bytes, att_mime = prepare_image_for_vision(att_bytes, att_mime)
                         b64_data = base64.b64encode(att_bytes).decode("utf-8")
                         parts.append({
                             "inlineData": {

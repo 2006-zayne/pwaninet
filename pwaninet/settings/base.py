@@ -775,9 +775,40 @@ PWANIMATE_DEFAULT_LLM_PROVIDER = os.environ.get('PWANIMATE_DEFAULT_LLM_PROVIDER'
 PWANIMATE_GEMINI_MODEL = os.environ.get('PWANIMATE_GEMINI_MODEL', 'gemini-3.8-flash')
 PWANIMATE_VISION_MODEL = os.environ.get('PWANIMATE_VISION_MODEL', 'gemini-3.8-flash')
 PWANIMATE_VISION_FALLBACK_CHAIN = [
+    {"provider": "cloudflare", "model": os.environ.get('PWANIMATE_CLOUDFLARE_VISION_MODEL', '@cf/meta/llama-3.2-11b-vision-instruct')},
     {"provider": "groq", "model": os.environ.get('PWANIMATE_GROQ_VISION_MODEL', 'qwen/qwen3.8-27b')},
 ]
 PWANIMATE_ATTACHMENT_VISION_MAX_PAGES = int(os.environ.get('PWANIMATE_ATTACHMENT_VISION_MAX_PAGES', '20'))
+# Account-wide daily cap on image analyses. The Workers AI free allocation
+# (10,000 neurons/day) is shared by every user, so the per-user tier cap is
+# not enough to protect it: 56 Ember students at 5 images/day would exhaust
+# it. 0 disables the budget. See pwanimate/billing/global_budget.py.
+PWANIMATE_GLOBAL_DAILY_IMAGE_BUDGET = int(os.environ.get('PWANIMATE_GLOBAL_DAILY_IMAGE_BUDGET', '200'))
+# Largest edge (px) of an image sent to a vision model. Larger inputs cost
+# more tokens (and therefore more neurons) for no extra OCR accuracy.
+PWANIMATE_VISION_MAX_IMAGE_EDGE = int(os.environ.get('PWANIMATE_VISION_MAX_IMAGE_EDGE', '1024'))
+# Maximum images in a single multimodal turn.
+PWANIMATE_VISION_MAX_IMAGES = int(os.environ.get('PWANIMATE_VISION_MAX_IMAGES', '10'))
+# Cloudflare Workers AI -- the vision inference tier.
+#
+# The token is AI-scoped: it can run inference but cannot read zone
+# settings. Workers AI bills at $0.011 / 1,000 neurons with a free daily
+# allocation of 10,000 neurons, which is the account-wide budget the
+# per-user image caps are sized against.
+PWANIMATE_CLOUDFLARE_VISION_MODEL = os.environ.get(
+    'PWANIMATE_CLOUDFLARE_VISION_MODEL', '@cf/meta/llama-3.2-11b-vision-instruct'
+)
+PWANIMATE_CLOUDFLARE_VISION_BACKUP_MODEL = os.environ.get(
+    'PWANIMATE_CLOUDFLARE_VISION_BACKUP_MODEL', '@cf/meta/llama-4-scout-17b-16e-instruct'
+)
+# Which (provider, model) pairs may receive images. Anything not listed is
+# treated as text-only. See pwanimate/ai/capabilities.py.
+PWANIMATE_VISION_CAPABLE_MODELS = {
+    'cloudflare': [
+        PWANIMATE_CLOUDFLARE_VISION_MODEL,
+        PWANIMATE_CLOUDFLARE_VISION_BACKUP_MODEL,
+    ],
+}
 PWANIMATE_GROQ_MODEL = os.environ.get('PWANIMATE_GROQ_MODEL', 'openai/gpt-oss-120b')
 PWANIMATE_OPENROUTER_MODEL = os.environ.get('PWANIMATE_OPENROUTER_MODEL', 'nvidia/nemotron-3-ultra-550b-a55b:free')
 PWANIMATE_LLM_TIMEOUT = float(os.environ.get('PWANIMATE_LLM_TIMEOUT', '30.0'))

@@ -484,6 +484,23 @@ class PwanimateOrchestrator:
                     )
                     continue
 
+                # Still being analysed by the upload task. Sending it here
+                # would analyse it a second time and bill it twice, so it is
+                # left out of the payload and the student is told.
+                if (getattr(att, "processing_status", "") or "") in {"pending", "processing"}:
+                    doc_blocks.append(
+                        f'<attachment_context id="{att_id}" filename="{att_name}" '
+                        'type="image" analysed="in_progress">\n'
+                        f"  <title>{att_name}</title>\n"
+                        "  <content>\n"
+                        "This image is still being read by Spark. Its contents are not "
+                        "available yet, so answer without it and say the image is still "
+                        "being processed if the question depends on it.\n"
+                        "  </content>\n"
+                        "</attachment_context>"
+                    )
+                    continue
+
                 data_bytes = getattr(att, "data_bytes", None)
                 if not data_bytes and hasattr(att, "file") and att.file:
                     try:
@@ -1114,13 +1131,18 @@ class PwanimateOrchestrator:
         Never fatal: accounting must not break a chat turn.
         """
         try:
+            from pwanimate.ai.vision_images import image_will_be_sent
             from pwanimate.billing.models import UsageKind
             from pwanimate.billing.services import UsageService
 
+            # Count the images that actually reached the provider. An image
+            # that was already analysed at upload is represented by its
+            # stored description, so it was not sent and must not be
+            # charged as an image.
             images = sum(
                 1
                 for attachment in (getattr(request, "attachments", None) or [])
-                if getattr(attachment, "attachment_type", "") == "image"
+                if image_will_be_sent(attachment)
             )
             UsageService.record_turn(
                 user=getattr(request, "user", None),
