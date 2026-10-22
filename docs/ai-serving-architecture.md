@@ -12,22 +12,35 @@ the same commit that changes the code.
 
 ---
 
-## 0. Read this first — three things that are true right now
+## 0. Read this first — what changed on 2026-10-22
 
-1. **Your daily caps are not enforced.** The tier numbers (20 chats/day,
-   5 images/day for Ember) are *recorded* on every turn but never *checked*.
-   `QuotaService.check()` is called only by read-only API endpoints. A user on
-   the free tier can use Spark without limit today. This is the single
-   highest-priority gap in the billing system, because your whole revenue
-   model assumes the caps bind.
-2. **Images are not analysed at upload.** The Celery vision task is only
-   queued for `attachment_type == "document"`. An uploaded image is analysed
-   lazily on the first chat turn that mentions it — and because
-   `vision_context_policy` defaults to `"ask"`, it can be analysed **twice**.
-   The "analyse once" invariant you believe in is not enforced by the code.
-3. **The vision capability filter is hardcoded.** `router.py:198-206` knows
-   exactly two vision providers. Adding a third provider without editing that
-   filter means it is silently dropped from every image request.
+Three things were true when this document was first written. All three are
+now fixed, and the fixes are pinned by tests in
+`pwanimate/tests/test_vision_serving.py`:
+
+1. ~~**Your daily caps are not enforced.**~~ **Fixed.** The chat path now
+   calls `QuotaService.check_turn()` before any work and returns 429 with
+   the same numbers the quota chip renders. The counters and the check read
+   the same place, so the number shown is the number acted on.
+2. ~~**Images are not analysed at upload.**~~ **Fixed.** Images now follow
+   the same `pending → processing → ready` lifecycle as documents: one
+   vision pass, off the request path, claimed atomically so two workers
+   cannot both pay for it. A turn arriving while an image is still being
+   read is refused with a clear message rather than analysed a second time.
+3. ~~**The vision capability filter is hardcoded.**~~ **Fixed.** Capability
+   lives in `pwanimate/ai/capabilities.py`, a table rather than a literal
+   in the router. A model that is not listed is treated as text-only, which
+   is the safe direction to be wrong in.
+
+Two more gaps were closed at the same time:
+
+* An **account-wide daily image budget** now exists
+  (`pwanimate/billing/global_budget.py`). The Workers AI allocation is
+  shared by every user, so the per-user cap is not enough to protect it.
+* Images are **downscaled and stripped of EXIF** before they leave the
+  building (`pwanimate/ai/vision_images.py`): it costs less, and a
+  student's photo should not carry its GPS coordinates to a third-party
+  inference provider.
 
 Everything below is accurate as of today. Where something is a recommendation
 rather than a fact, it is marked **[RECOMMENDATION]**.
@@ -172,7 +185,7 @@ provider should declare `{"image": true, "max_images": 5}` and the router
 should read it. The current shape means every new vision provider requires
 editing the router — a guaranteed mistake at 2am.
 
-### Provider reality check
+### 4.1 Provider reality check
 
 | Provider | Free route? | Vision? | Notes |
 |---|---|---|---|
@@ -305,22 +318,42 @@ cost instead of a per-turn cost, the interactive path never blocks for 10
 seconds, and the "analysed once" invariant becomes true. Everything else in
 this section follows from that one fix.
 
-### 5.5 Concrete change list (vision)
+### 5.5 What was built (2026-10-22)
+
+All six items are done:
 
 1. `pwanimate/ai/providers/cloudflare.py` — new `CloudflareLLMProvider`,
    vision-capable, reusing `PWANIMATE_CLOUDFLARE_API_TOKEN` /
-   `PWANIMATE_CLOUDFLARE_ACCOUNT_ID` (already in `.env`).
-2. `pwanimate/ai/gateway/router.py` — add `"cloudflare"` to
-   `SUPPORTED_PROVIDERS` and to the instantiation switch; move the image
-   capability rule into a capability table.
-3. `pwanimate/ai/engines.py` — head the `vision` ladder with
-   `{"provider": "cloudflare", "model": "@cf/meta/llama-3.2-11b-vision-instruct"}`,
-   then `llama-4-scout`, then the existing Gemini/Groq rungs as paid fallback.
-4. `pwanimate/tasks/attachments.py` — queue the vision task for images too.
-5. `billing` — add a global daily image budget and the tier→route split.
-6. Downscale images to ~1024 px and strip EXIF before sending. Half the
-   tokens, same OCR quality, and you are not shipping student photos' GPS
-   data to a third party.
+   `PWANIMATE_CLOUDFLARE_ACCOUNT_ID` (already in `.env`). It reports the
+   *neurons* an inference cost, which is what the account budget is
+   denominated in.
+2. `pwanimate/ai/capabilities.py` — the capability table. The router reads
+   it; nothing is hardcoded in the hot path.
+3. `pwanimate/ai/engines.py` — the vision ladder now leads with
+   `cloudflare/@cf/meta/llama-3.2-11b-vision-instruct`, then
+   `cloudflare/@cf/meta/llama-4-scout-17b-16e-instruct`, then Gemini and
+   Groq as the paid backups.
+4. `pwanimate/tasks/attachments.py` — the vision task is queued for images
+   too, and claims the attachment atomically.
+5. `pwanimate/billing/global_budget.py` — the account-wide daily image
+   budget, atomic, and failing **open** (a budget that cannot be read must
+   not take the product down with it).
+6. `pwanimate/ai/vision_images.py` — downscaling and EXIF stripping, applied
+   in every provider that sends an image.
+
+**One operator action remains.** Llama 3.2 Vision needs its licence
+accepted once, by a human, on your account:
+
+```sh
+curl -X POST \
+  "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run/@cf/meta/llama-3.2-11b-vision-instruct" \
+  -H "Authorization: Bearer $PWANIMATE_CLOUDFLARE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "agree"}'
+```
+
+It has been accepted on the account as of 2026-10-22. The provider will say
+so plainly if it is ever needed again.
 
 ---
 
@@ -673,22 +706,26 @@ from each step tells you what to build:
 
 ## 12. The gaps, ranked
 
-| # | Gap | Impact | Effort |
-|---|---|---|---|
-| 1 | Daily tier caps are recorded but **not enforced** | free tier is unlimited; revenue model is fictional | small |
-| 2 | Images are **not queued at upload**; analysed lazily, sometimes twice | latency + double cost + broken "once" invariant | small |
-| 3 | No feedback signal / no prompt persistence | blocks all fine-tuning work | medium |
-| 4 | Vision ladder is 2 rungs, both third-party quota-bound | free tier depends on someone else's key | medium |
-| 5 | Image capability filter is hardcoded | every new vision provider needs a router edit | small |
-| 6 | `QuotaService.check()` and the `queued` / `upgrade_required` states exist but are unused | dead code that looks like a feature | small |
-| 7 | Document uploads have no tier limit | unmetered cost | small |
-| 8 | `QuotaTracker` is in-memory and per-process | cooldowns differ per worker; no cross-instance awareness | medium |
-| 9 | `PwanimateMessage` does not record the serving model | cannot join answers to cost/model for evaluation | small |
-| 10 | No global image budget | nothing protects the shared free allocation | small |
-| 11 | `vision_context_policy == "ask"` can re-send an image | double vision cost, contradicting the invariant | small |
+Status as of 2026-10-22. Items 1, 2, 5, 6, 10 and 11 are **closed**; items
+3, 4, 7, 8 and 9 are still open.
 
-Items 1, 2, 5, 6, 10 and 11 are all small and all matter. They are the
-difference between "we have a billing system" and "the billing system works".
+| # | Gap | Impact | Effort | Status |
+|---|---|---|---|---|
+| 1 | Daily tier caps are recorded but **not enforced** | free tier is unlimited; revenue model is fictional | small | **closed** |
+| 2 | Images are **not queued at upload**; analysed lazily, sometimes twice | latency + double cost + broken "once" invariant | small | **closed** |
+| 3 | No feedback signal / no prompt persistence | blocks all fine-tuning work | medium | **open** |
+| 4 | Vision ladder depends on third-party quota | free tier depends on someone else's key | medium | **closed** (Cloudflare) |
+| 5 | Image capability filter is hardcoded | every new vision provider needs a router edit | small | **closed** (table) |
+| 6 | `QuotaService.check()` and the `queued` / `upgrade_required` states exist but are unused | dead code that looks like a feature | small | **closed** |
+| 7 | Document uploads have no tier limit | unmetered cost | small | **open** |
+| 8 | `QuotaTracker` is in-memory and per-process | cooldowns differ per worker; no cross-instance awareness | medium | **open** |
+| 9 | `PwanimateMessage` does not record the serving model | cannot join answers to cost/model for evaluation | small | **open** |
+| 10 | No global image budget | nothing protects the shared free allocation | small | **closed** |
+| 11 | `vision_context_policy == "ask"` can re-send an image | double vision cost, contradicting the invariant | small | **closed** |
+
+Item 3 is now the highest-value open item, and it is the prerequisite for
+everything in §8–§10. It is also the cheapest: a thumbs-up/down control and
+a task tag.
 
 ---
 
