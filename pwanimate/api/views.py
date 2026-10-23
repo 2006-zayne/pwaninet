@@ -11,6 +11,7 @@ import logging
 import queue
 import sys
 import threading
+import time
 import uuid
 import requests
 from django.db import close_old_connections, transaction
@@ -1861,7 +1862,7 @@ class PwanimateQuotaStatusView(APIView):
 
 
 class PwanimateVoiceTranscriptionView(APIView):
-    """Transcribe a complete client-recorded voice note with Groq Whisper."""
+    """Transcribe a complete client-recorded voice note using local faster-whisper."""
 
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -1875,9 +1876,12 @@ class PwanimateVoiceTranscriptionView(APIView):
         if audio.size <= 0 or audio.size > max_bytes:
             return Response({'error': 'Recording is empty or exceeds the upload limit.'}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
 
-        api_key = getattr(settings, 'PWANIMATE_GROQ_API_KEY', '')
-        if not api_key:
-            return Response({'error': 'Voice transcription is not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        # Use local faster-whisper instead of external API
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError:
+            logger.error('faster-whisper not installed')
+            return Response({'error': 'Voice transcription is not available on this server.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         language = (request.data.get('language') or '').strip().lower()
         if language not in {'en', 'sw'}:
@@ -1896,79 +1900,76 @@ class PwanimateVoiceTranscriptionView(APIView):
         if not extension:
             return Response({'error': 'This audio format is not supported.'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
-        audio.seek(0)
-        upstream = None
-        transient_statuses = {408, 429, 500, 502, 503, 504}
-        for attempt in range(2):
-            audio.seek(0)
-            try:
-                upstream = requests.post(
-                    'https://api.groq.com/openai/v1/audio/transcriptions',
-                    headers={'Authorization': f'Bearer {api_key}'},
-                    files={'file': (f'voice{extension}', audio, content_type)},
-                    data={
-                        'model': getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_MODEL', 'whisper-large-v3-turbo'),
-                        'language': language,
-                        'response_format': 'json',
-                        'temperature': '0',
-                    },
-                    timeout=(5, int(getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_TIMEOUT', 60))),
-                )
-            except requests.RequestException:
-                if attempt == 0:
-                    logger.warning('Pwanimate voice transcription upload failed; retrying once', exc_info=True)
-                    continue
-                logger.exception('Pwanimate voice transcription request failed after retry')
-                break
+        # Save uploaded audio to temporary file
+        import tempfile
+        import os
 
-            if upstream.status_code in transient_statuses and attempt == 0:
-                logger.warning(
-                    'Pwanimate voice transcription upstream returned transient status %s; retrying once',
-                    upstream.status_code,
-                )
-                upstream.close()
-                upstream = None
-                continue
-            break
-
-        if upstream is None:
-            return Response({'error': 'Transcription service could not be reached. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
-
-        if upstream.status_code != 200:
-            logger.warning('Pwanimate voice transcription failed with upstream status %s', upstream.status_code)
-            # Log the response content for debugging
-            try:
-                response_text = upstream.text[:500]  # Log first 500 chars
-                logger.warning('Pwanimate voice transcription upstream response: %s', response_text)
-            except Exception:
-                pass
-            return Response({'error': 'Transcription failed. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
-
-        # Check content type before parsing JSON
-        content_type = upstream.headers.get('content-type', '')
-        if 'application/json' not in content_type:
-            logger.warning('Pwanimate voice transcription returned non-JSON content type: %s', content_type)
-            # Log the response for debugging
-            try:
-                response_text = upstream.text[:500]
-                logger.warning('Pwanimate voice transcription upstream response: %s', response_text)
-            except Exception:
-                pass
-            return Response({'error': 'Transcription service returned an invalid response format.'}, status=status.HTTP_502_BAD_GATEWAY)
+        temp_dir = tempfile.gettempdir()
+        temp_audio_path = os.path.join(temp_dir, f'voice_{request.user.id}_{int(time.time())}{extension}')
 
         try:
-            transcript = str(upstream.json().get('text') or '').strip()
-            if not transcript:
-                logger.warning('Pwanimate voice transcription returned empty text')
-                return Response({'error': 'Transcription returned empty text.'}, status=status.HTTP_502_BAD_GATEWAY)
-        except (ValueError, AttributeError) as e:
-            logger.warning('Pwanimate voice transcription returned an invalid response: %s', str(e))
-            # Log the response for debugging
-            try:
-                response_text = upstream.text[:500]
-                logger.warning('Pwanimate voice transcription upstream response: %s', response_text)
-            except Exception:
-                pass
-            return Response({'error': 'Transcription returned an invalid response.'}, status=status.HTTP_502_BAD_GATEWAY)
+            # Save uploaded file
+            with open(temp_audio_path, 'wb') as f:
+                for chunk in audio.chunks():
+                    f.write(chunk)
 
-        return Response({'text': transcript}, status=status.HTTP_200_OK)
+            logger.info('Voice transcription: saved audio to %s (%d bytes)', temp_audio_path, os.path.getsize(temp_audio_path))
+
+            # Transcribe using faster-whisper
+            import time
+            start_time = time.time()
+
+            cpu_threads = min(2, max(1, (os.cpu_count() or 1) // 2))
+            model_size = getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_MODEL', 'tiny')
+            # Map Groq model names to faster-whisper model sizes
+            model_mapping = {
+                'whisper-large-v3-turbo': 'large-v3',
+                'whisper-large-v3': 'large-v3',
+                'whisper-large-v2': 'large-v2',
+                'whisper-medium': 'medium',
+                'whisper-small': 'small',
+                'whisper-base': 'base',
+                'whisper-tiny': 'tiny',
+            }
+            model_size = model_mapping.get(model_size, 'tiny')
+
+            logger.info('Initializing faster-whisper model %s on CPU (int8, %d threads)...', model_size, cpu_threads)
+            model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=cpu_threads)
+
+            # Transcribe with language hint if provided
+            language_code = language if language in {'en', 'sw'} else None
+            segments, info = model.transcribe(temp_audio_path, beam_size=1, language=language_code)
+
+            extracted_text_list = []
+            for segment in segments:
+                if segment.text and segment.text.strip():
+                    extracted_text_list.append(segment.text.strip())
+
+            transcript = " ".join(extracted_text_list).strip()
+
+            elapsed = time.time() - start_time
+            logger.info(
+                'Voice transcription completed in %.2fs: %d characters (language: %s, prob: %.2f)',
+                elapsed,
+                len(transcript),
+                getattr(info, 'language', 'unknown'),
+                getattr(info, 'language_probability', 0.0)
+            )
+
+            if not transcript:
+                return Response({'error': 'No speech was recognized. Please try again.'}, status=status.HTTP_200_OK)
+
+            return Response({'text': transcript}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.exception('Voice transcription failed: %s', str(e))
+            return Response({'error': 'Transcription failed. Please try again.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_audio_path):
+                try:
+                    os.remove(temp_audio_path)
+                    logger.info('Cleaned up temporary audio file: %s', temp_audio_path)
+                except Exception as e:
+                    logger.warning('Failed to clean up temporary file %s: %s', temp_audio_path, e)
