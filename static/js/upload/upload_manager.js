@@ -90,6 +90,9 @@ class UploadManager {
             return;
         }
 
+        const PREPARING_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes for preparation
+        let preparingTimeout = null;
+
         try {
             // Everything that can throw stays inside the try: an exception
             // escaping processUpload would never reach failUpload, and the
@@ -98,8 +101,18 @@ class UploadManager {
 
             progressTracker.start();
 
+            // Set up timeout for preparation phase
+            preparingTimeout = setTimeout(() => {
+                const error = new Error(`Upload ${uploadId} timed out during preparation (2 minutes)`);
+                console.error('[UploadManager] Preparation timeout:', error.message);
+                this.failUpload(uploadId, error);
+            }, PREPARING_TIMEOUT_MS);
+
             this.transitionState(uploadId, UploadState.PREPARING);
             await this.prepareUpload(uploadId);
+
+            clearTimeout(preparingTimeout);
+            preparingTimeout = null;
 
             this.transitionState(uploadId, UploadState.VALIDATING);
             uploadEvents.emit(UploadEventNames.VALIDATION_STARTED, { uploadId });
@@ -124,6 +137,7 @@ class UploadManager {
 
             this.waitForQueueTurn(uploadId);
         } catch (error) {
+            if (preparingTimeout) clearTimeout(preparingTimeout);
             this.failUpload(uploadId, error);
         }
     }
@@ -209,12 +223,31 @@ class UploadManager {
         const session = this.uploads.get(uploadId);
         if (!session) return;
 
+        const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes timeout
+        let isTimedOut = false;
+
+        const timeoutHandle = setTimeout(() => {
+            isTimedOut = true;
+            const error = new Error(`Upload ${uploadId} timed out waiting for queue turn (5 minutes)`);
+            console.error('[UploadManager] waitForQueueTurn timeout:', error.message);
+            this.failUpload(uploadId, error);
+        }, TIMEOUT_MS);
+
         const checkQueue = () => {
+            if (isTimedOut) return;
+
             const currentUpload = uploadQueue.getCurrentUpload();
             if (currentUpload && currentUpload.id === uploadId) {
+                clearTimeout(timeoutHandle);
                 this.performUpload(uploadId);
             } else if (this.uploads.has(uploadId)) {
                 setTimeout(checkQueue, 100);
+            } else {
+                // Session was removed while waiting - fail the upload
+                clearTimeout(timeoutHandle);
+                const error = new Error(`Upload session ${uploadId} was removed while waiting for queue turn`);
+                console.error('[UploadManager] waitForQueueTurn session removed:', error.message);
+                this.failUpload(uploadId, error);
             }
         };
 
@@ -384,16 +417,47 @@ class UploadManager {
         this.transitionState(uploadId, UploadState.FAILED, { error: error.message });
         uploadQueue.uploadFailed(uploadId, error);
 
+        const errorMsg = error.message || String(error);
+        const isRetryable = this.isRetryableError(errorMsg);
+
         uploadEvents.emit(UploadEventNames.UPLOAD_FAILED, {
             uploadId,
             session,
-            error: error.message,
-            canRetry: session.canRetry(),
+            error: errorMsg,
+            canRetry: session.canRetry() && isRetryable,
         });
         uploadEvents.emit(UploadEventNames.ERROR_OCCURRED, {
             uploadId,
-            error: error.message,
+            error: errorMsg,
         });
+
+        // Auto-retry for retryable errors if retries available
+        if (isRetryable && session.canRetry()) {
+            console.log(`[UploadManager] Auto-retrying upload ${uploadId} (attempt ${session.retryCount + 1}/${session.maxRetries})`);
+            setTimeout(() => {
+                this.retryUpload(uploadId);
+            }, 2000); // Wait 2 seconds before retry
+        }
+    }
+
+    /**
+     * Determine if an error is retryable
+     * @param {string} errorMsg - Error message
+     * @returns {boolean}
+     */
+    isRetryableError(errorMsg) {
+        const retryablePatterns = [
+            /timeout/i,
+            /network/i,
+            /connection/i,
+            /fetch/i,
+            /server.*error/i,
+            /5\d\d/i, // 5xx server errors
+            /ECONN/i,
+            /ETIMEDOUT/i,
+        ];
+
+        return retryablePatterns.some(pattern => pattern.test(errorMsg));
     }
 
     /**
