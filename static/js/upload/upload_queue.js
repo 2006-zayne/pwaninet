@@ -240,8 +240,15 @@ class UploadQueue {
         while (this.queue.length > 0 && !this.isPaused) {
             const item = this.queue[0];
 
-            // Skip if already completed or cancelled
-            if (item.state === UploadState.PUBLISHED || item.state === UploadState.CANCELLED) {
+            // Skip items that already reached a terminal state without ever
+            // becoming current: completed/cancelled ones, and failed ones --
+            // an upload can fail while it is still waiting its turn (its
+            // processUpload stages run immediately). Picking a FAILED item
+            // back up here would set it to UPLOADING and wait for a
+            // completion event that can never arrive, freezing the queue.
+            if (item.state === UploadState.PUBLISHED ||
+                item.state === UploadState.CANCELLED ||
+                item.state === UploadState.FAILED) {
                 this.queue.shift();
                 continue;
             }

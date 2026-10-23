@@ -9,7 +9,14 @@
 
 import { uploadEvents, UploadEventNames } from './upload_events.js?v=20261011-16';
 import { UploadState } from './upload_state_machine.js?v=20261011-16';
-import { uploadManager } from './upload_manager.js?v=20261011-16';
+
+// The manager singleton is reached via window (base.html exports it as
+// window.uploadManager), deliberately NOT imported here: this file is
+// loaded through the fingerprinted template URL, and an import of
+// upload_manager.js would go through a different module URL -- evaluating
+// a second copy of the class with its own empty session Map, which is how
+// the donut once ended up permanently stuck on "Preparing…".
+const getUploadManager = () => (typeof window !== 'undefined' ? window.uploadManager : null);
 
 class UploadBanner {
     constructor() {
@@ -191,7 +198,7 @@ class UploadBanner {
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
         // Safety net: if no uploads are active, dismiss immediately
-        if (!uploadManager.getActiveUpload()) {
+        if (!getUploadManager()?.getActiveUpload()) {
             setTimeout(() => this.hide(), 2000);
         }
     }
@@ -204,7 +211,7 @@ class UploadBanner {
         this.updateDonutProgress(100);
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (!uploadManager.getActiveUpload()) {
+        if (!getUploadManager()?.getActiveUpload()) {
             setTimeout(() => this.hide(), 1500);
         }
     }
@@ -215,7 +222,7 @@ class UploadBanner {
     handleUploadFailed(data) {
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (!uploadManager.getActiveUpload()) {
+        if (!getUploadManager()?.getActiveUpload()) {
             setTimeout(() => this.hide(), 3000);
         }
     }
@@ -226,7 +233,7 @@ class UploadBanner {
     handleUploadCancelled(data) {
         this.activeUploadCount = Math.max(0, (this.activeUploadCount || 1) - 1);
         this.updateCount();
-        if (!uploadManager.getActiveUpload()) {
+        if (!getUploadManager()?.getActiveUpload()) {
             this.hide();
         }
     }
@@ -462,7 +469,7 @@ class UploadBanner {
      * The banner always hides either way — ✕ must never stick.
      */
     cancelCurrentUpload() {
-        const currentUpload = uploadManager.getActiveUpload();
+        const currentUpload = getUploadManager()?.getActiveUpload() || null;
         if (!currentUpload) {
             this.hide();
             return;
@@ -473,7 +480,7 @@ class UploadBanner {
         );
         if (choice) {
             try {
-                uploadManager.cancelUpload(currentUpload.id);
+                getUploadManager()?.cancelUpload(currentUpload.id);
             } catch (_) {}
         }
         // Banner always hides: dismissed UI only, or cancelled upload.
