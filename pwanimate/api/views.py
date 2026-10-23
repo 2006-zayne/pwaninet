@@ -742,6 +742,11 @@ class PwanimateChatView(APIView):
             res_data["fallback_info"] = fallback_info
             res_data["quota_info"] = response.quota_info
             res_data["quota_status"] = get_quota_tracker().get_status()
+            # Actions Spark proposed. The student confirms them in the app;
+            # nothing has happened yet.
+            pending_actions = response.metadata.get("pending_actions") or []
+            if pending_actions:
+                res_data["pending_actions"] = pending_actions
 
             thoughts_tokens = response.metadata.get("thoughts_tokens")
             total_output_tokens = response.metadata.get("total_output_tokens")
@@ -875,6 +880,52 @@ class PwanimateGeneratedResourceView(APIView):
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class PwanimateActionView(APIView):
+    """
+    Approve, decline or undo an action Spark proposed.
+
+    Spark never acts on its own. It proposes; this endpoint is where the
+    student says yes, no, or "actually, take that back".
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """The student's outstanding proposals."""
+        from pwanimate.models import PendingAction
+        from pwanimate.services.actions import ActionService
+
+        actions = PendingAction.objects.filter(
+            user=request.user, status=PendingAction.STATUS_PENDING
+        ).order_by("-created_at")[:20]
+        return Response({
+            "actions": [ActionService.serialize(action) for action in actions]
+        })
+
+    def post(self, request, action_id):
+        from pwanimate.services.actions import ActionError, ActionService
+
+        decision = str((request.data or {}).get("decision") or "confirm").strip().lower()
+        try:
+            if decision == "confirm":
+                action = ActionService.confirm(request.user, action_id)
+            elif decision == "cancel":
+                action = ActionService.cancel(request.user, action_id)
+            elif decision == "undo":
+                action = ActionService.undo(request.user, action_id)
+            else:
+                return Response(
+                    {"error": "Unknown decision."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except ActionError as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"action": ActionService.serialize(action)})
 
 
 class PwanimateMessageFeedbackView(APIView):

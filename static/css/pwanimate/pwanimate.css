@@ -2801,6 +2801,61 @@ body.pwanimate-active.pwanimate-context-rail-open #pwanimateContextRailToggleBtn
     font-size: 0.8rem;
 }
 
+/* A proposed action. It is deliberately prominent and deliberately states
+   that nothing has happened yet: the student is being asked, not told. */
+.pwanimate-action-cards {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.pwanimate-action-card {
+    border: 1px solid var(--pwanimate-border);
+    border-left: 3px solid var(--pwanimate-user-bubble, #2563eb);
+    border-radius: 10px;
+    background: var(--pwanimate-card-bg, #fff);
+    padding: 0.7rem 0.85rem;
+}
+
+.pwanimate-action-card[data-action-status="confirmed"] {
+    border-left-color: #16a34a;
+}
+
+.pwanimate-action-card[data-action-status="cancelled"],
+.pwanimate-action-card[data-action-status="expired"] {
+    border-left-color: var(--pwanimate-border);
+    opacity: 0.75;
+}
+
+.pwanimate-action-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--pwanimate-muted);
+    margin-bottom: 0.35rem;
+}
+
+.pwanimate-action-card-header i {
+    color: var(--pwanimate-user-bubble, #2563eb);
+}
+
+.pwanimate-action-card-body {
+    font-size: 0.88rem;
+    color: var(--pwanimate-asst-text);
+    line-height: 1.45;
+}
+
+.pwanimate-action-card-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+}
+
 .pwanimate-active-model-chip {
     display: inline-flex;
     align-items: center;

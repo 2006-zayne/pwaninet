@@ -2586,6 +2586,17 @@
                         return;
                     }
 
+                    // A proposed action: the student approves or declines it.
+                    const actionConfirm = e.target.closest('.pwanimate-action-confirm');
+                    const actionCancel = e.target.closest('.pwanimate-action-cancel');
+                    if (actionConfirm || actionCancel) {
+                        e.preventDefault();
+                        const actionId = (actionConfirm || actionCancel).dataset.actionId;
+                        const decision = actionConfirm ? 'confirm' : 'cancel';
+                        this.decideAction(actionId, decision, actionConfirm || actionCancel);
+                        return;
+                    }
+
                     // Feedback on a Spark answer.
                     //
                     // This is the platform's only outcome signal: what was
@@ -5597,7 +5608,7 @@
                     fallback_used: data.fallback_info ? data.fallback_info.fallback_used : false
                 });
 
-                const assistantRow = this.appendAssistantMessage(data.answer, data.sources, data.citations, data.fallback_info, data.quota_info, data.people, data.message_id, data.people_html);
+                const assistantRow = this.appendAssistantMessage(data.answer, data.sources, data.citations, data.fallback_info, data.quota_info, data.people, data.message_id, data.people_html, data.pending_actions || []);
                 const disclaimer = this.transcript.querySelector('#pwanimate-chat-disclaimer');
                 if (disclaimer) disclaimer.classList.remove('d-none');
                 this.scrollToMessageStart(assistantRow);
@@ -6004,6 +6015,48 @@
             return row;
         }
 
+        // ------------------------------------------------- proposed actions
+        async decideAction(actionId, decision, button) {
+            if (!actionId) return;
+            if (button) button.disabled = true;
+
+            try {
+                const response = await fetch(`/api/pwanimate/actions/${actionId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ decision: decision }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    this.showSystemNotice(data.error || 'That action could not be completed.');
+                    if (button) button.disabled = false;
+                    return;
+                }
+
+                const action = data.action || {};
+                const card = button ? button.closest('.pwanimate-action-card') : null;
+                if (card) {
+                    card.dataset.actionStatus = action.status || '';
+                    const title = card.querySelector('.pwanimate-action-card-title');
+                    const buttons = card.querySelector('.pwanimate-action-card-buttons');
+                    if (buttons) buttons.remove();
+                    if (title) {
+                        title.textContent = action.status === 'confirmed'
+                            ? 'Done'
+                            : (action.status === 'cancelled' ? 'Cancelled' : 'Done');
+                    }
+                }
+            } catch (error) {
+                console.warn('[Spark] Could not complete the action', error);
+                if (button) button.disabled = false;
+            }
+        }
+
         // ------------------------------------------------- answer feedback
         async sendFeedback(row, helpful, reason) {
             if (!row) return;
@@ -6039,7 +6092,7 @@
             }
         }
 
-        appendAssistantMessage(answer, sources, citations, fallbackInfo, quotaInfo, people = [], messageId = null, peopleHtmlFromServer = '') {
+        appendAssistantMessage(answer, sources, citations, fallbackInfo, quotaInfo, people = [], messageId = null, peopleHtmlFromServer = '', pendingActions = []) {
             const row = document.createElement('div');
             row.className = 'pwanimate-message-row assistant';
             if (messageId) {
@@ -6131,6 +6184,34 @@
                 `;
             }
 
+            // Actions Spark proposed. Nothing has happened yet: the student
+            // approves here, and the card updates to say so.
+            let actionsHtml = '';
+            if (Array.isArray(pendingActions) && pendingActions.length > 0) {
+                const cards = pendingActions.map((action) => {
+                    const actionId = escapeHtml(action.id || '');
+                    const summary = escapeHtml(action.summary || '');
+                    const decided = action.status && action.status !== 'pending';
+                    const statusText = decided
+                        ? (action.status === 'confirmed' ? 'Done' : escapeHtml(action.status))
+                        : 'Needs your approval';
+                    return `
+                        <div class="pwanimate-action-card" data-action-id="${actionId}" data-action-status="${escapeHtml(action.status || 'pending')}">
+                            <div class="pwanimate-action-card-header">
+                                <i class="bi bi-send"></i>
+                                <span class="pwanimate-action-card-title">${statusText}</span>
+                            </div>
+                            <div class="pwanimate-action-card-body">${summary}</div>
+                            ${decided ? '' : `
+                                <div class="pwanimate-action-card-buttons">
+                                    <button type="button" class="btn btn-sm btn-primary pwanimate-action-confirm" data-action-id="${actionId}">Send</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pwanimate-action-cancel" data-action-id="${actionId}">Cancel</button>
+                                </div>`}
+                        </div>`;
+                }).join('');
+                actionsHtml = `<div class="pwanimate-action-cards">${cards}</div>`;
+            }
+
             let fallbackHtml = '';
             if (fallbackInfo && fallbackInfo.vision_text_fallback) {
                 // No banner: the model reports the outage in its answer. The
@@ -6162,6 +6243,7 @@
                         ${peopleHtml}
                         ${citationsHtml}
                         ${fallbackHtml}
+                        ${actionsHtml}
                     </div>
                     <div class="pwanimate-message-actions assistant-actions">
                         <div class="dropdown pwanimate-resource-export">

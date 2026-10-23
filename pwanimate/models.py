@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from django.utils import timezone
 from pgvector.django import VectorField
 
 
@@ -865,3 +866,94 @@ class PwanimateStudyCheckpoint(models.Model):
 
     def __str__(self):
         return f"Checkpoint for {self.session_id} (up_to_msg={self.up_to_message_id})"
+
+
+class PendingAction(models.Model):
+    """
+    An action Spark proposes and the student has not yet approved.
+
+    Every action Spark takes on the student's behalf goes through here
+    first. The tool layer only ever *proposes*; nothing is sent, followed or
+    posted until the student confirms. That is the difference between an
+    assistant and an agent that can embarrass you.
+
+    The five rules this design implements:
+
+    1. **Confirmation.** The tool creates a pending action and returns it.
+       Nothing else happens until the student confirms.
+    2. **Idempotency.** One action per (student, action, content). A retry
+       returns the existing action instead of sending twice.
+    3. **A real dry run.** The proposal carries the exact message that
+       would be sent, so the student sees the real thing.
+    4. **Rate limits.** Both the number of proposals and the number of
+       executed actions are capped per student per hour.
+    5. **Undo.** A confirmed action can be undone inside a short window --
+       a sent message is soft-deleted, a follow is released.
+    """
+
+    ACTION_SEND_MESSAGE = "send_message"
+    ACTION_FOLLOW_USER = "follow_user"
+    ACTION_CHOICES = [
+        (ACTION_SEND_MESSAGE, "Send a message"),
+        (ACTION_FOLLOW_USER, "Follow a user"),
+    ]
+
+    STATUS_PENDING = "pending"
+    STATUS_CONFIRMED = "confirmed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_EXPIRED = "expired"
+    STATUS_FAILED = "failed"
+    STATUS_UNDONE = "undone"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_CONFIRMED, "Confirmed"),
+        (STATUS_CANCELLED, "Cancelled"),
+        (STATUS_EXPIRED, "Expired"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_UNDONE, "Undone"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pending_actions",
+    )
+    conversation = models.ForeignKey(
+        "PwanimateConversation",
+        on_delete=models.CASCADE,
+        related_name="pending_actions",
+        null=True,
+        blank=True,
+    )
+    action_type = models.CharField(max_length=32, choices=ACTION_CHOICES, db_index=True)
+    params = models.JSONField(default=dict, blank=True)
+    # What the student is being asked to approve, in plain words.
+    summary = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    idempotency_key = models.CharField(max_length=64, unique=True)
+    result = models.JSONField(default=dict, blank=True)
+    error = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    undone_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["user", "action_type", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.action_type} for user {self.user_id} ({self.status})"
+
+    @property
+    def is_actionable(self) -> bool:
+        return self.status == self.STATUS_PENDING and self.expires_at > timezone.now()

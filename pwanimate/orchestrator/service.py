@@ -1362,6 +1362,14 @@ class PwanimateOrchestrator:
 
         sources_summary = self._build_sources_summary(context_pkg.items)
 
+        # Write actions propose; the student confirms. The proposal travels
+        # back to the client so it can render a confirm/cancel card.
+        pending_actions: List[Dict[str, Any]] = []
+        if tool_result.success and isinstance(tool_result.data, dict):
+            action_data = tool_result.data.get("action")
+            if isinstance(action_data, dict):
+                pending_actions.append(action_data)
+
         messages = list(request.history) + [ChatMessage(role="user", content=query)]
 
         source_warnings = self._collect_source_warnings(request)
@@ -1484,6 +1492,7 @@ class PwanimateOrchestrator:
             "total_output_tokens": total_output_tokens,
             "max_output_tokens": max_output_tokens,
             "study_mode": bool(request.study_mode),
+            "pending_actions": pending_actions,
         }
         if source_warnings:
             metadata["warnings"] = source_warnings
