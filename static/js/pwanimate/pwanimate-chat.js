@@ -3231,12 +3231,23 @@
                     body: formData,
                     signal: controller.signal,
                 });
+
+                // Check content type before parsing JSON
+                const contentType = response.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    // Server returned HTML or non-JSON response (likely an error page)
+                    const text = await response.text();
+                    console.error('[Voice Transcription] Non-JSON response:', text.substring(0, 200));
+                    throw new Error('Server returned an invalid response. Please try again.');
+                }
+
                 const payload = await response.json();
                 if (!response.ok) throw new Error(payload.error || 'Transcription failed. Please try again.');
                 this.voiceFinalTranscript = (payload.text || '').trim();
                 if (!this.voiceFinalTranscript) this.voiceErrorMessage = 'No speech was recognized. Please try again.';
             } catch (error) {
                 if (this.voiceCancelled) return;
+                console.error('[Voice Transcription] Error:', error);
                 this.voiceErrorMessage = error.message || 'Transcription failed. Please try again.';
             } finally {
                 if (this.voiceTranscriptionAbortController === controller) this.voiceTranscriptionAbortController = null;

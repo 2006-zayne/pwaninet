@@ -1936,12 +1936,39 @@ class PwanimateVoiceTranscriptionView(APIView):
 
         if upstream.status_code != 200:
             logger.warning('Pwanimate voice transcription failed with upstream status %s', upstream.status_code)
+            # Log the response content for debugging
+            try:
+                response_text = upstream.text[:500]  # Log first 500 chars
+                logger.warning('Pwanimate voice transcription upstream response: %s', response_text)
+            except Exception:
+                pass
             return Response({'error': 'Transcription failed. Please try again.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        # Check content type before parsing JSON
+        content_type = upstream.headers.get('content-type', '')
+        if 'application/json' not in content_type:
+            logger.warning('Pwanimate voice transcription returned non-JSON content type: %s', content_type)
+            # Log the response for debugging
+            try:
+                response_text = upstream.text[:500]
+                logger.warning('Pwanimate voice transcription upstream response: %s', response_text)
+            except Exception:
+                pass
+            return Response({'error': 'Transcription service returned an invalid response format.'}, status=status.HTTP_502_BAD_GATEWAY)
 
         try:
             transcript = str(upstream.json().get('text') or '').strip()
-        except (ValueError, AttributeError):
-            logger.warning('Pwanimate voice transcription returned an invalid response')
+            if not transcript:
+                logger.warning('Pwanimate voice transcription returned empty text')
+                return Response({'error': 'Transcription returned empty text.'}, status=status.HTTP_502_BAD_GATEWAY)
+        except (ValueError, AttributeError) as e:
+            logger.warning('Pwanimate voice transcription returned an invalid response: %s', str(e))
+            # Log the response for debugging
+            try:
+                response_text = upstream.text[:500]
+                logger.warning('Pwanimate voice transcription upstream response: %s', response_text)
+            except Exception:
+                pass
             return Response({'error': 'Transcription returned an invalid response.'}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response({'text': transcript}, status=status.HTTP_200_OK)
