@@ -110,10 +110,10 @@
             this.voiceAudioContext = null;
             this.voiceAnalyser = null;
             this.voiceAnimationFrame = null;
-            // Spark voice output (reads replies aloud via the Web Speech API)
-            this.speakBtn = workspace.querySelector('#pwanimateSpeakBtn');
-            this.speakEnabled = localStorage.getItem('pwanimate_speak_replies') === '1';
+            // Spark voice output (reads a reply aloud via the Web Speech API)
             this.speaking = false;
+            this.speakingBtn = null;
+            this.speakUtterance = null;
             this.sidebarList = document.getElementById('pwanimate-sidebar-list');
             this.mobileList = document.getElementById('pwanimate-mobile-list');
             this.quotaStatusEl = document.getElementById('pwanimate-quota-status');
@@ -2643,6 +2643,19 @@
                         return;
                     }
 
+                    // Read an assistant reply aloud (per-message speaker)
+                    const speakBtn = e.target.closest('.pwanimate-action-btn.pwanimate-speak-btn');
+                    if (speakBtn) {
+                        e.preventDefault();
+                        const row = speakBtn.closest('.pwanimate-message-row.assistant');
+                        if (row) {
+                            const mdBody = row.querySelector('.pwanimate-markdown-body');
+                            const raw = mdBody ? (mdBody.getAttribute('data-raw') || mdBody.innerText) : '';
+                            this.speakResponse(raw, speakBtn);
+                        }
+                        return;
+                    }
+
                     // Edit action on user message
                     const editBtn = e.target.closest('.pwanimate-action-btn.edit-btn');
                     if (editBtn) {
@@ -3078,70 +3091,39 @@
         }
 
         initSpeakReplies() {
-            this.updateSpeakButton();
-
-            // Voices load asynchronously; refresh the list when it changes.
+            // Kick off async system-voice loading so the first read finds a
+            // matching voice right away. Playback itself is per-message and
+            // starts from a click (a user gesture, which iOS/Safari require).
             if (typeof window.speechSynthesis !== 'undefined') {
-                try {
-                    window.speechSynthesis.getVoices();
-                    window.speechSynthesis.addEventListener('voiceschanged', () => this.updateSpeakButton());
-                } catch (error) { /* no-op */ }
+                try { window.speechSynthesis.getVoices(); } catch (error) { /* no-op */ }
             }
-
-            if (this.speakBtn) {
-                this.speakBtn.addEventListener('click', () => {
-                    this.speakEnabled = !this.speakEnabled;
-                    if (this.speakEnabled) {
-                        // iOS/Safari only unlock speech synthesis on a user
-                        // gesture, so prime it here with an inaudible utterance.
-                        try {
-                            const unlock = new SpeechSynthesisUtterance(' ');
-                            unlock.volume = 0;
-                            window.speechSynthesis.speak(unlock);
-                        } catch (error) { /* no-op */ }
-                        localStorage.setItem('pwanimate_speak_replies', '1');
-                    } else {
-                        localStorage.removeItem('pwanimate_speak_replies');
-                        this.stopSpeaking();
-                    }
-                    this.updateSpeakButton();
-                });
-            }
-
             window.addEventListener('beforeunload', () => this.stopSpeaking());
         }
 
-        updateSpeakButton() {
-            if (!this.speakBtn) return;
-            const supported = typeof window.speechSynthesis !== 'undefined'
-                && typeof window.SpeechSynthesisUtterance !== 'undefined';
-            if (!supported) {
-                this.speakBtn.disabled = true;
-                this.speakBtn.title = 'Voice output is not supported in this browser.';
-                this.speakBtn.setAttribute('aria-label', this.speakBtn.title);
-                return;
-            }
-
-            this.speakBtn.classList.toggle('is-active', this.speakEnabled);
-            this.speakBtn.setAttribute('aria-pressed', String(this.speakEnabled));
-            const label = this.speakEnabled
-                ? 'Stop Spark reading replies aloud'
-                : 'Make Spark read replies aloud';
-            this.speakBtn.title = label;
-            this.speakBtn.setAttribute('aria-label', label);
-
-            const icon = this.speakBtn.querySelector('i');
+        // Reflect playback state on a single per-message speaker button.
+        setSpeakBtnState(btn, active) {
+            if (!btn) return;
+            const icon = btn.querySelector('i');
+            btn.classList.toggle('is-speaking', active);
+            btn.setAttribute('aria-pressed', String(active));
+            const label = active ? 'Stop reading aloud' : 'Read this reply aloud';
+            btn.title = label;
+            btn.setAttribute('aria-label', label);
             if (icon) {
-                icon.classList.toggle('bi-volume-up-fill', this.speakEnabled);
-                icon.classList.toggle('bi-volume-mute-fill', !this.speakEnabled);
+                icon.classList.toggle('bi-volume-up-fill', !active);
+                icon.classList.toggle('bi-stop-circle-fill', active);
             }
         }
 
         stopSpeaking() {
+            const btn = this.speakingBtn;
             this.speaking = false;
+            this.speakingBtn = null;
+            this.speakUtterance = null;
             if (typeof window.speechSynthesis !== 'undefined') {
                 try { window.speechSynthesis.cancel(); } catch (error) { /* no-op */ }
             }
+            if (btn) this.setSpeakBtnState(btn, false);
         }
 
         // Flatten markdown to something natural to read aloud.
@@ -3171,15 +3153,22 @@
             return text.replace(/\s+/g, ' ').trim();
         }
 
-        speakResponse(markdown) {
-            if (!this.speakEnabled) return;
+        speakResponse(markdown, btn) {
             if (typeof window.speechSynthesis === 'undefined'
                 || typeof window.SpeechSynthesisUtterance === 'undefined') return;
+
+            // Tapping the active button again stops playback.
+            if (this.speaking && this.speakingBtn === btn) {
+                this.stopSpeaking();
+                return;
+            }
 
             const text = this.textForSpeech(markdown);
             if (!text) return;
 
-            // A new reply preempts whatever is still being read.
+            // Clear any other reply still marked active, then preempt it:
+            // a new read cancels whatever is currently playing.
+            if (this.speakingBtn && this.speakingBtn !== btn) this.setSpeakBtnState(this.speakingBtn, false);
             window.speechSynthesis.cancel();
 
             const pageLang = document.documentElement.lang === 'sw' ? 'sw' : 'en';
@@ -3196,11 +3185,21 @@
                 if (match) utterance.voice = match;
             } catch (error) { /* keep default voice */ }
 
-            utterance.onstart = () => { this.speaking = true; };
-            utterance.onend = () => { this.speaking = false; };
-            utterance.onerror = () => { this.speaking = false; };
+            const finish = () => {
+                // Ignore stale end/error events from a superseded utterance.
+                if (this.speakUtterance !== utterance) return;
+                this.speaking = false;
+                this.speakingBtn = null;
+                this.speakUtterance = null;
+                this.setSpeakBtnState(btn, false);
+            };
+            utterance.onend = finish;
+            utterance.onerror = finish;
 
             this.speaking = true;
+            this.speakingBtn = btn;
+            this.speakUtterance = utterance;
+            this.setSpeakBtnState(btn, true);
             window.speechSynthesis.speak(utterance);
         }
 
@@ -6416,6 +6415,9 @@
                                 <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="other">Something else</button></li>
                             </ul>
                         </div>
+                        <button type="button" class="btn pwanimate-action-btn pwanimate-speak-btn" title="Read this reply aloud" aria-label="Read this reply aloud" aria-pressed="false">
+                            <i class="bi bi-volume-up-fill" aria-hidden="true"></i>
+                        </button>
                         <button type="button" class="btn pwanimate-action-btn copy-btn" title="Copy answer" aria-label="Copy answer">
                             <i class="bi bi-clipboard"></i>
                         </button>
@@ -6432,7 +6434,6 @@
             if (window.htmx && typeof window.htmx.process === 'function') {
                 window.htmx.process(row);
             }
-            if (this.speakEnabled) this.speakResponse(answer);
             return row;
         }
 
