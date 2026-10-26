@@ -379,6 +379,7 @@ CELERY_IMPORTS = (
     # Keep Pwanimate's task package explicit so workers register attachment
     # processing as well as the existing ingestion and reconciliation tasks.
     'pwanimate.tasks',
+    'pwanimate.tasks.conversation_memory',
     'messaging.tasks',
 )
 
