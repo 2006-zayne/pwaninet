@@ -8,6 +8,7 @@ RAG interactions, conversation listings, and detail/deletion.
 import asyncio
 import json
 import logging
+import os
 import queue
 import sys
 import threading
@@ -1861,6 +1862,62 @@ class PwanimateQuotaStatusView(APIView):
         )
 
 
+# Whisper models are heavy (hundreds of MB to multi-GB) and slow to load on
+# CPU. Building one per request re-downloads it whenever it is missing from the
+# HuggingFace cache and blocks long enough to trip the upstream proxy timeout
+# (Cloudflare/nginx), which returns a non-JSON error page to the client. Load
+# the model once per process and reuse it across requests instead.
+_WHISPER_MODEL_LOCK = threading.Lock()
+_whisper_model = None
+_whisper_model_size = None
+
+# Map configured (Groq-style) model names to faster-whisper model sizes.
+_WHISPER_MODEL_MAPPING = {
+    'whisper-large-v3-turbo': 'large-v3',
+    'whisper-large-v3': 'large-v3',
+    'whisper-large-v2': 'large-v2',
+    'whisper-medium': 'medium',
+    'whisper-small': 'small',
+    'whisper-base': 'base',
+    'whisper-tiny': 'tiny',
+}
+
+
+def _resolve_whisper_model_size():
+    """Resolve the configured speech-to-text setting to a faster-whisper size."""
+    configured = (getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_MODEL', 'tiny') or 'tiny').strip().lower()
+    if configured in _WHISPER_MODEL_MAPPING:
+        return _WHISPER_MODEL_MAPPING[configured]
+    # Already a raw faster-whisper size (e.g. "base", "small").
+    if configured in _WHISPER_MODEL_MAPPING.values():
+        return configured
+    logger.warning('Unknown PWANIMATE_SPEECH_TO_TEXT_MODEL %r; falling back to "tiny".', configured)
+    return 'tiny'
+
+
+def get_whisper_model():
+    """Return a process-wide cached faster-whisper model (thread-safe)."""
+    global _whisper_model, _whisper_model_size
+    from pwaninet.compat import patch_av_metadata_errors
+
+    patch_av_metadata_errors()
+    model_size = _resolve_whisper_model_size()
+    with _WHISPER_MODEL_LOCK:
+        if _whisper_model is not None and _whisper_model_size == model_size:
+            return _whisper_model
+        from faster_whisper import WhisperModel
+
+        cpu_threads = min(2, max(1, (os.cpu_count() or 1) // 2))
+        logger.info(
+            'Loading faster-whisper model %s on CPU (int8, %d threads)...',
+            model_size,
+            cpu_threads,
+        )
+        _whisper_model = WhisperModel(model_size, device='cpu', compute_type='int8', cpu_threads=cpu_threads)
+        _whisper_model_size = model_size
+        return _whisper_model
+
+
 class PwanimateVoiceTranscriptionView(APIView):
     """Transcribe a complete client-recorded voice note using local faster-whisper."""
 
@@ -1902,7 +1959,6 @@ class PwanimateVoiceTranscriptionView(APIView):
 
         # Save uploaded audio to temporary file
         import tempfile
-        import os
 
         temp_dir = tempfile.gettempdir()
         temp_audio_path = os.path.join(temp_dir, f'voice_{request.user.id}_{int(time.time())}{extension}')
@@ -1915,26 +1971,17 @@ class PwanimateVoiceTranscriptionView(APIView):
 
             logger.info('Voice transcription: saved audio to %s (%d bytes)', temp_audio_path, os.path.getsize(temp_audio_path))
 
-            # Transcribe using faster-whisper
-            import time
+            # Reuse a process-wide cached model instead of loading per request.
             start_time = time.time()
 
-            cpu_threads = min(2, max(1, (os.cpu_count() or 1) // 2))
-            model_size = getattr(settings, 'PWANIMATE_SPEECH_TO_TEXT_MODEL', 'tiny')
-            # Map Groq model names to faster-whisper model sizes
-            model_mapping = {
-                'whisper-large-v3-turbo': 'large-v3',
-                'whisper-large-v3': 'large-v3',
-                'whisper-large-v2': 'large-v2',
-                'whisper-medium': 'medium',
-                'whisper-small': 'small',
-                'whisper-base': 'base',
-                'whisper-tiny': 'tiny',
-            }
-            model_size = model_mapping.get(model_size, 'tiny')
-
-            logger.info('Initializing faster-whisper model %s on CPU (int8, %d threads)...', model_size, cpu_threads)
-            model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=cpu_threads)
+            try:
+                model = get_whisper_model()
+            except Exception:
+                logger.exception('faster-whisper model could not be loaded')
+                return Response(
+                    {'error': 'Voice transcription is warming up. Please try again in a moment.'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
 
             # Transcribe with language hint if provided
             language_code = language if language in {'en', 'sw'} else None
