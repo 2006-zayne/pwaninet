@@ -6,6 +6,7 @@ RAG interactions, conversation listings, and detail/deletion.
 """
 
 import asyncio
+from io import BytesIO
 import json
 import logging
 import os
@@ -27,7 +28,7 @@ from django.template.loader import render_to_string
 from rest_framework import permissions, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
-from rest_framework.renderers import JSONRenderer
+from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.views import APIView
 
 from pwanimate.ai.exceptions import (
@@ -55,17 +56,36 @@ from pwanimate.orchestrator import (
 )
 from django.core.exceptions import PermissionDenied, ValidationError
 from pwanimate.services.conversation import ConversationService
+from pwanimate.services.conversation_memory import ConversationMemoryService
 from pwanimate.services.attachment import AttachmentService
 from pwanimate.services.study_session import (
     StudyCollectionService,
     StudySessionService,
     parse_study_command,
 )
+from pwanimate.services.tts import (
+    TTSConfigurationError,
+    TTSProviderError,
+    synthesize,
+)
 from pwanimate.ai.gateway.quota_tracker import get_quota_tracker
 from pwanimate.ai.engines import UnknownSparkEngineError, get_engine, get_engines_status, identify_engine
 from documents.models import Document
 
 logger = logging.getLogger(__name__)
+
+
+class AudioMP3Renderer(BaseRenderer):
+    """Allow DRF content negotiation for the binary Spark audio response."""
+
+    media_type = "audio/mpeg"
+    format = "mp3"
+    render_style = "binary"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        if isinstance(data, (bytes, bytearray)):
+            return bytes(data)
+        return JSONRenderer().render(data, accepted_media_type, renderer_context)
 
 
 def _quota_block_payload(decision) -> dict:
@@ -610,6 +630,12 @@ class PwanimateChatView(APIView):
             if not server_history and not conversation_id and data.get("history"):
                 history = data.get("history", [])
 
+        conversation_memory = ConversationMemoryService.search(
+            request.user,
+            clean_query,
+            exclude_conversation_id=conversation.id,
+        )
+
         sources = data.get("sources")
         task = data.get("task", "rag")
         provider = data.get("provider")
@@ -640,6 +666,8 @@ class PwanimateChatView(APIView):
                 timezone_name=data.get("timezone"),
                 study_mode=study_mode_active,
                 study_context=study_context,
+                conversation_memory=conversation_memory,
+                request_id=request.headers.get("X-Request-ID") or str(uuid.uuid4()),
             )
             orchestrator = self.get_orchestrator()
             # External LLM generation occurs outside database transactions.
@@ -650,6 +678,12 @@ class PwanimateChatView(APIView):
                 on_progress=progress_callback,
                 on_token=token_callback,
             )
+            response.metadata = response.metadata or {}
+            response.metadata.setdefault("prompt_version", "2026-10-26.1")
+            response.metadata.setdefault("context_version", "2.1")
+            response.metadata.setdefault("memory_count", len(conversation_memory))
+            response.metadata.setdefault("memory_trace", conversation_memory)
+            response.metadata.setdefault("retrieval_trace", response.sources or [])
 
             # Persist assistant response turn with defensive fallback
             answer_text = (response.answer or "").strip()
@@ -672,6 +706,31 @@ class PwanimateChatView(APIView):
                 completion_tokens=int(response.completion_tokens or 0),
                 total_tokens=int(response.total_tokens or 0),
             )
+            try:
+                from pwanimate.models import PwanimateTurnTrace
+
+                trace_metadata = response.metadata or {}
+                PwanimateTurnTrace.objects.create(
+                    user=request.user,
+                    conversation=conversation,
+                    user_message=user_msg,
+                    assistant_message=asst_msg,
+                    request_id=orchestration_req.request_id or "",
+                    prompt_version=str(trace_metadata.get("prompt_version") or "2026-10-26.1"),
+                    context_version=str(trace_metadata.get("context_version") or "2.1"),
+                    retrieval_trace=trace_metadata.get("retrieval_trace") or [],
+                    memory_trace=trace_metadata.get("memory_trace") or conversation_memory,
+                    metadata={
+                        "intent": trace_metadata.get("intent"),
+                        "retrieved_count": trace_metadata.get("retrieved_count", 0),
+                        "context_items_count": trace_metadata.get("context_items_count", 0),
+                        "total_time_ms": response.total_time_ms,
+                        "retrieval_time_ms": response.retrieval_time_ms,
+                        "generation_time_ms": response.generation_time_ms,
+                    },
+                )
+            except Exception:
+                logger.exception("Could not persist Pwanimate turn trace")
 
             res_data = response.to_dict()
             if response.people:
@@ -1916,6 +1975,40 @@ def get_whisper_model():
         _whisper_model = WhisperModel(model_size, device='cpu', compute_type='int8', cpu_threads=cpu_threads)
         _whisper_model_size = model_size
         return _whisper_model
+
+
+class PwanimateSpeechSynthesisView(APIView):
+    """Generate a private audio response for an authenticated Spark user."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [JSONParser, FormParser]
+    renderer_classes = [AudioMP3Renderer]
+
+    def post(self, request):
+        text = str((request.data or {}).get("text") or "").strip()
+        voice_id = str((request.data or {}).get("voice_id") or "warm_female").strip()
+        if not text:
+            return Response({"error": "Text is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            audio = synthesize(text, voice_id=voice_id)
+        except TTSConfigurationError:
+            logger.error("Spark TTS is not configured.")
+            return Response(
+                {"error": "Spark speech is not configured yet."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except TTSProviderError as exc:
+            logger.warning("Spark TTS request failed: %s", exc)
+            return Response(
+                {"error": "Spark could not generate speech right now."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        response = FileResponse(BytesIO(audio), content_type="audio/mpeg")
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 class PwanimateVoiceTranscriptionView(APIView):

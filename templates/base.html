@@ -2890,20 +2890,20 @@
                     <div class="modal-body p-3 pt-2" id="globalShareModalBody">
                         <input type="hidden" name="post_id" id="globalSharePostId" value="">
 
-                        <!-- Live Search Friends & Groups -->
+                        <!-- Search recent conversations or profile targets -->
                         <div class="position-relative mb-3">
                             <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" style="font-size: 13px;"></i>
                             <input type="text"
                                    id="globalShareSearchInput"
                                    class="form-control rounded-pill ps-5 bg-light border-0"
-                                   placeholder="{% trans 'Search friends or groups...' %}"
+                                   placeholder="{% trans 'Search recent conversations...' %}"
                                    style="font-size: 13px; height: 38px;">
                         </div>
 
-                        <!-- Top Section: In-Site Friends & Groups Horizontal Tray (TikTok Style) -->
+                        <!-- Top Section: Recent conversations are the primary in-site share target -->
                         <div class="share-tray-section mb-3">
                             <div class="d-flex align-items-center justify-content-between px-1 mb-2">
-                                <span class="small fw-semibold text-muted text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">{% trans "Send on vasto" %}</span>
+                                <span class="small fw-semibold text-muted text-uppercase" id="globalShareTrayLabel" style="font-size: 11px; letter-spacing: 0.5px;">{% trans "Recent conversations" %}</span>
                                 <span id="globalShareTargetStatus" class="small text-primary fw-medium" style="font-size: 11px;"></span>
                             </div>
                             <div class="share-tray-carousel-wrapper position-relative">
@@ -2932,6 +2932,19 @@
                                     <i class="bi bi-chevron-left" style="font-size: 11px;"></i>
                                 </button>
                                 <div class="d-flex gap-3 overflow-x-auto pb-2 px-1" id="globalShareActionChips" style="scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                                    <!-- 0. Share to messages -->
+                                    <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareMessagesBtn" title="{% trans 'Share to messages' %}" aria-label="{% trans 'Share to messages' %}">
+                                        <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-chat-dots fs-5 text-dark"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">{% trans "Messages" %}</span>
+                                    </button>
+                                    <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareProfilesBtn" title="{% trans 'Share to profiles' %}" aria-label="{% trans 'Share to profiles' %}">
+                                        <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
+                                            <i class="bi bi-person-plus fs-5 text-dark"></i>
+                                        </div>
+                                        <span class="share-action-label small text-muted">{% trans "Profiles" %}</span>
+                                    </button>
                                     <!-- 0. Repost Action Chip -->
                                     <button type="button" class="share-action-chip border-0 bg-transparent text-center p-0 flex-shrink-0" id="globalShareRepostBtn" title="{% trans 'Repost' %}" aria-label="{% trans 'Repost' %}">
                                         <div class="share-action-icon rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-1">
@@ -5890,6 +5903,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
         var sentTargets = new Set();
         var searchDebounceTimer = null;
         var activeShareMode = 'post';
+        var shareTargetMode = 'conversations';
+        var cachedConversations = null;
 
         function renderShareTargets(query) {
             var tray = document.getElementById('globalShareTargetsTray');
@@ -5938,6 +5953,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
         function loadTargets() {
             var tray = document.getElementById('globalShareTargetsTray');
+            shareTargetMode = 'profiles';
             if (cachedTargets) {
                 var searchInput = document.getElementById('globalShareSearchInput');
                 renderShareTargets(searchInput ? searchInput.value : '');
@@ -5981,6 +5997,125 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 }
             });
         }
+
+        function loadMessageConversations() {
+            var tray = document.getElementById('globalShareTargetsTray');
+            if (!tray) return;
+            shareTargetMode = 'conversations';
+            var trayLabel = document.getElementById('globalShareTrayLabel');
+            var searchInput = document.getElementById('globalShareSearchInput');
+            if (trayLabel) trayLabel.textContent = 'Recent conversations';
+            if (searchInput) searchInput.placeholder = 'Search recent conversations...';
+            if (cachedConversations) {
+                renderMessageConversations(searchInput ? searchInput.value : '');
+                return;
+            }
+            tray.innerHTML = '<div class="text-center py-3 text-muted small w-100"><div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>Loading conversations...</div>';
+            fetch('/messaging/v1/conversations/?ordering=-last_message_at', {
+                headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
+            })
+            .then(function (res) {
+                if (!res.ok) throw new Error('Unable to load conversations');
+                return res.json();
+            })
+            .then(function (data) {
+                cachedConversations = Array.isArray(data) ? data : (data.results || []);
+                renderMessageConversations(searchInput ? searchInput.value : '');
+            })
+            .catch(function (err) {
+                console.error('[Share Conversations Fetch Error]', err);
+                tray.innerHTML = '<div class="text-center py-3 text-danger small w-100">Unable to load conversations.</div>';
+            });
+        }
+
+        function renderMessageConversations(query) {
+            var tray = document.getElementById('globalShareTargetsTray');
+            if (!tray) return;
+            var normalizedQuery = (query || '').trim().toLowerCase();
+            var conversations = (cachedConversations || []).filter(function (conversation) {
+                var members = conversation.members || [];
+                var name = conversation.name || members.map(function (member) {
+                    return member.user ? (member.user.first_name || member.user.username) : '';
+                }).filter(Boolean).join(', ') || ('Conversation #' + conversation.id);
+                conversation._shareName = name;
+                return !normalizedQuery || name.toLowerCase().indexOf(normalizedQuery) !== -1;
+            });
+                if (!conversations.length) {
+                    tray.innerHTML = '<div class="text-center py-3 text-muted small w-100">' +
+                        (normalizedQuery ? 'No matching conversations found.' : 'Start a conversation before sharing a post.') +
+                        '</div>';
+                    return;
+                }
+                tray.innerHTML = conversations.map(function (conversation) {
+                    var name = conversation._shareName;
+                    return '<button type="button" class="btn btn-light text-start rounded-3 p-2 flex-shrink-0 share-message-conversation-btn" data-conversation-id="' +
+                        escapeHtml(conversation.id) + '" style="min-width: 180px; max-width: 230px;">' +
+                        '<i class="bi bi-chat-dots text-primary me-2"></i><span class="small fw-semibold">' +
+                        escapeHtml(name) + '</span></button>';
+                }).join('');
+        }
+
+        document.addEventListener('click', function (e) {
+            var messagesBtn = e.target.closest('#globalShareMessagesBtn');
+            var profilesBtn = e.target.closest('#globalShareProfilesBtn');
+            if (messagesBtn || profilesBtn) {
+                if (!window.isAuthenticated) {
+                    if (typeof window.showGuestAuthPrompt === 'function') {
+                        window.showGuestAuthPrompt({title: 'Sign in to share to messages', subtitle: 'Sign in to send this post in a conversation.', icon: 'bi-chat-dots'});
+                    }
+                    return;
+                }
+                if (messagesBtn) {
+                    loadTargets();
+                } else {
+                    shareTargetMode = 'profiles';
+                    var trayLabel = document.getElementById('globalShareTrayLabel');
+                    var searchInput = document.getElementById('globalShareSearchInput');
+                    if (trayLabel) trayLabel.textContent = 'Share to profiles and groups';
+                    if (searchInput) {
+                        searchInput.value = '';
+                        searchInput.placeholder = 'Search friends or groups...';
+                    }
+                    loadMessageConversations();
+                }
+                var statusEl = document.getElementById('globalShareTargetStatus');
+                if (statusEl) statusEl.textContent = messagesBtn ? 'Choose a conversation' : 'Choose a profile or group';
+                return;
+            }
+
+            var conversationBtn = e.target.closest('.share-message-conversation-btn');
+            if (!conversationBtn || !activePostId) return;
+            conversationBtn.disabled = true;
+            conversationBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+            fetch('/messaging/api/share-post/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    conversation_id: conversationBtn.dataset.conversationId,
+                    post_share_id: activePostId
+                })
+            })
+            .then(function (res) {
+                return res.json().then(function (data) {
+                    if (!res.ok) throw new Error(data.error || 'Unable to share post');
+                    return data;
+                });
+            })
+            .then(function () {
+                showFeedback('Post shared to messages!', 'success');
+                conversationBtn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i> Sent';
+            })
+            .catch(function (err) {
+                console.error('[Share Post Message Error]', err);
+                conversationBtn.disabled = false;
+                conversationBtn.innerHTML = '<i class="bi bi-chat-dots text-primary me-2"></i> Try again';
+                showFeedback(err.message || 'Unable to share post', 'danger');
+            });
+        });
 
         // ── 1-Tap Send on vasto Handler ──
         document.addEventListener('click', function (e) {
@@ -6098,7 +6233,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 clearTimeout(searchDebounceTimer);
                 var val = e.target.value;
                 searchDebounceTimer = setTimeout(function () {
-                    renderShareTargets(val);
+                    if (shareTargetMode === 'conversations') {
+                        renderMessageConversations(val);
+                    } else {
+                        renderShareTargets(val);
+                    }
                 }, 120);
             }
         });
@@ -6381,7 +6520,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
                 if (traySection) traySection.classList.remove('d-none');
                 if (trayDivider) trayDivider.classList.remove('d-none');
                 sentTargets = new Set();
-                loadTargets();
+                loadMessageConversations();
             }
 
             // Setup Repost Action Chip

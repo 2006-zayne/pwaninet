@@ -49,6 +49,8 @@ class OrchestrationRequest:
     timezone_name: Optional[str] = None
     study_mode: bool = False
     study_context: Optional[Any] = None
+    conversation_memory: List[Dict[str, Any]] = field(default_factory=list)
+    request_id: Optional[str] = None
 
     def __post_init__(self):
         if not isinstance(self.query, str) or not self.query.strip():

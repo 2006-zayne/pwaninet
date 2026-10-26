@@ -344,6 +344,87 @@ class PwanimateMessage(models.Model):
         return people_list
 
 
+class PwanimateMessageEmbedding(models.Model):
+    """Search vector for one persisted conversation message."""
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+
+    message = models.OneToOneField(
+        PwanimateMessage,
+        on_delete=models.CASCADE,
+        related_name="embedding_record",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pwanimate_message_embeddings",
+        db_index=True,
+    )
+    embedding = VectorField(dimensions=768, null=True, blank=True)
+    embedding_model = models.CharField(max_length=100, blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+        db_index=True,
+    )
+    error = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["user", "embedding_model"]),
+        ]
+
+
+class PwanimateTurnTrace(models.Model):
+    """Durable, privacy-scoped trace for replaying and evaluating one turn."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pwanimate_turn_traces",
+        db_index=True,
+    )
+    conversation = models.ForeignKey(
+        PwanimateConversation,
+        on_delete=models.CASCADE,
+        related_name="turn_traces",
+    )
+    user_message = models.ForeignKey(
+        PwanimateMessage,
+        on_delete=models.CASCADE,
+        related_name="user_turn_traces",
+    )
+    assistant_message = models.ForeignKey(
+        PwanimateMessage,
+        on_delete=models.CASCADE,
+        related_name="assistant_turn_traces",
+        null=True,
+        blank=True,
+    )
+    request_id = models.CharField(max_length=128, db_index=True)
+    prompt_version = models.CharField(max_length=64, blank=True, default="")
+    context_version = models.CharField(max_length=64, blank=True, default="")
+    retrieval_trace = models.JSONField(default=list, blank=True)
+    memory_trace = models.JSONField(default=list, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["conversation", "created_at"]),
+        ]
+
+
 class PwanimateMessageFeedback(models.Model):
     """
     A student's verdict on one Spark answer.
@@ -420,6 +501,20 @@ class PwanimateResponseStyle(models.TextChoices):
     DETAILED = "detailed", "Detailed"
 
 
+class PwanimateVoiceStyle(models.TextChoices):
+    """Voice presentation styles available for Spark speech."""
+
+    WARM = "warm", "Warm Guide"
+    ACADEMIC = "academic", "Focused Academic"
+
+
+class PwanimateVoiceGender(models.TextChoices):
+    """Voice gender preferences available for Spark speech."""
+
+    FEMALE = "female", "Female"
+    MALE = "male", "Male"
+
+
 class PwanimatePreferences(models.Model):
     """
     Dedicated AI assistant personalization preferences for an authenticated student.
@@ -459,6 +554,22 @@ class PwanimatePreferences(models.Model):
         default="",
         help_text="User-authored stylistic guidance for Pwanimate (maximum 500 characters)",
     )
+    voice_style = models.CharField(
+        max_length=20,
+        choices=PwanimateVoiceStyle.choices,
+        default=PwanimateVoiceStyle.WARM,
+        help_text="Preferred Spark speech style",
+    )
+    voice_gender = models.CharField(
+        max_length=20,
+        choices=PwanimateVoiceGender.choices,
+        default=PwanimateVoiceGender.FEMALE,
+        help_text="Preferred Spark speech voice gender",
+    )
+    auto_tts_enabled = models.BooleanField(
+        default=False,
+        help_text="Automatically read new Spark replies aloud",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -489,6 +600,11 @@ class PwanimatePreferences(models.Model):
                 raise ValidationError({"personal_instructions": "Personal instructions cannot exceed 500 characters."})
         else:
             self.personal_instructions = ""
+
+        if self.voice_style not in dict(PwanimateVoiceStyle.choices):
+            raise ValidationError({"voice_style": "Invalid voice style."})
+        if self.voice_gender not in dict(PwanimateVoiceGender.choices):
+            raise ValidationError({"voice_gender": "Invalid voice gender."})
 
     def save(self, *args, **kwargs):
         self.clean()

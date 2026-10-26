@@ -22,6 +22,8 @@ from pwanimate.models import (
     PwanimatePreferences,
     PwanimateResponseStyle,
     PwanimateTone,
+    PwanimateVoiceGender,
+    PwanimateVoiceStyle,
 )
 from pwanimate.services.preferences import PwanimatePreferenceService
 from pwanimate.version import get_version as get_pwanimate_version
@@ -141,6 +143,8 @@ def _get_settings_context(
         "preferences": prefs,
         "tone_choices": PwanimateTone.choices,
         "response_style_choices": PwanimateResponseStyle.choices,
+        "voice_style_choices": PwanimateVoiceStyle.choices,
+        "voice_gender_choices": PwanimateVoiceGender.choices,
         "conversations_count": conversations_count,
         "user_display": user_display,
         "student_username": request.user.get_username(),
@@ -472,6 +476,9 @@ class PwanimateSettingsPersonalizationView(View):
         tone = request.POST.get("tone")
         response_style = request.POST.get("response_style")
         personal_instructions = request.POST.get("personal_instructions")
+        voice_style = request.POST.get("voice_style")
+        voice_gender = request.POST.get("voice_gender")
+        auto_tts_enabled = request.POST.get("auto_tts_enabled") == "on"
 
         errors = {}
         success = False
@@ -482,6 +489,9 @@ class PwanimateSettingsPersonalizationView(View):
                 tone=tone,
                 response_style=response_style,
                 personal_instructions=personal_instructions,
+                voice_style=voice_style,
+                voice_gender=voice_gender,
+                auto_tts_enabled=auto_tts_enabled,
             )
             success = True
         except ValidationError as exc:
@@ -492,6 +502,9 @@ class PwanimateSettingsPersonalizationView(View):
                 tone=tone if tone in PwanimateTone.values else saved_prefs.tone,
                 response_style=response_style if response_style in PwanimateResponseStyle.values else saved_prefs.response_style,
                 personal_instructions=personal_instructions if personal_instructions is not None else saved_prefs.personal_instructions,
+                voice_style=voice_style if voice_style in PwanimateVoiceStyle.values else saved_prefs.voice_style,
+                voice_gender=voice_gender if voice_gender in PwanimateVoiceGender.values else saved_prefs.voice_gender,
+                auto_tts_enabled=auto_tts_enabled,
             )
             if hasattr(exc, "message_dict"):
                 errors = exc.message_dict

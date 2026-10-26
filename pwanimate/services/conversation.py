@@ -228,6 +228,7 @@ class ConversationService:
                     update_fields.append("title")
 
             conversation.save(update_fields=update_fields)
+            transaction.on_commit(lambda: ConversationService.schedule_embedding(msg.id))
             return msg
 
     @staticmethod
@@ -267,4 +268,17 @@ class ConversationService:
                 total_tokens=int(total_tokens or 0),
             )
             conversation.save(update_fields=["updated_at"])
+            transaction.on_commit(lambda: ConversationService.schedule_embedding(msg.id))
             return msg
+
+    @staticmethod
+    def schedule_embedding(message_id: int) -> None:
+        """Queue semantic indexing without making message persistence depend on Celery."""
+        try:
+            from pwanimate.tasks.conversation_memory import embed_message
+
+            delay_fn = getattr(embed_message, "delay", None)
+            if callable(delay_fn):
+                delay_fn(message_id)
+        except Exception:
+            logger.warning("Could not schedule conversation message embedding", exc_info=True)

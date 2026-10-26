@@ -1088,6 +1088,10 @@ class PwanimateOrchestrator:
             meta.update(request.billing_metadata())
         except Exception:  # noqa: BLE001 - billing must never break a turn
             pass
+        if getattr(request, "request_id", None):
+            meta["request_id"] = request.request_id
+        meta["prompt_version"] = "2026-10-26.1"
+        meta["context_version"] = "2.1"
         return meta
 
     @staticmethod
@@ -1201,7 +1205,13 @@ class PwanimateOrchestrator:
 
         context_pkg = None
         if request.user_context:
-            context_pkg = ContextPackage(query=query, user_context=request.user_context)
+            context_pkg = ContextPackage(
+                query=query,
+                user_context=request.user_context,
+                conversation_memory=request.conversation_memory,
+            )
+        elif request.conversation_memory:
+            context_pkg = ContextPackage(query=query, conversation_memory=request.conversation_memory)
 
         source_warnings = self._collect_source_warnings(request)
         base_instruction = self._with_local_time(get_system_instruction("conversational"), request)
@@ -1264,6 +1274,10 @@ class PwanimateOrchestrator:
             "total_output_tokens": total_output_tokens,
             "max_output_tokens": max_output_tokens,
             "study_mode": bool(request.study_mode),
+            "prompt_version": "2026-10-26.1",
+            "context_version": "2.1",
+            "memory_count": len(request.conversation_memory),
+            "memory_trace": request.conversation_memory,
         }
         if source_warnings:
             metadata["warnings"] = source_warnings
@@ -1666,6 +1680,7 @@ class PwanimateOrchestrator:
             ),
         )
         context_pkg: ContextPackage = self.context_engine.build_context(context_req)
+        context_pkg.conversation_memory = list(request.conversation_memory)
         if attachment_context:
             context_pkg.attachment_context = attachment_context
 
@@ -1808,6 +1823,19 @@ class PwanimateOrchestrator:
             "total_output_tokens": total_output_tokens,
             "max_output_tokens": max_output_tokens,
             "study_mode": bool(request.study_mode),
+            "prompt_version": "2026-10-26.1",
+            "context_version": "2.1",
+            "memory_count": len(request.conversation_memory),
+            "memory_trace": request.conversation_memory,
+            "retrieval_trace": [
+                {
+                    "source": result.source.value if hasattr(result.source, "value") else str(result.source),
+                    "object_id": str(result.object_id),
+                    "score": round(float(result.score), 4),
+                    "citation": result.citation,
+                }
+                for result in retrieval_resp.results[:50]
+            ],
         }
         if source_warnings:
             metadata["warnings"] = source_warnings

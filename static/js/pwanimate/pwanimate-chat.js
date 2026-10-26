@@ -114,6 +114,11 @@
             this.speaking = false;
             this.speakingBtn = null;
             this.speakUtterance = null;
+            this.speechAudio = null;
+            this.speechRequestId = 0;
+            this.voiceStyle = workspace.dataset.sparkVoiceStyle || 'warm';
+            this.voiceGender = workspace.dataset.sparkVoiceGender || 'female';
+            this.autoTtsEnabled = workspace.dataset.sparkAutoTts === 'true';
             this.sidebarList = document.getElementById('pwanimate-sidebar-list');
             this.mobileList = document.getElementById('pwanimate-mobile-list');
             this.quotaStatusEl = document.getElementById('pwanimate-quota-status');
@@ -3117,9 +3122,15 @@
 
         stopSpeaking() {
             const btn = this.speakingBtn;
+            this.speechRequestId += 1;
             this.speaking = false;
             this.speakingBtn = null;
             this.speakUtterance = null;
+            if (this.speechAudio) {
+                this.speechAudio.pause();
+                this.speechAudio.removeAttribute('src');
+                this.speechAudio = null;
+            }
             if (typeof window.speechSynthesis !== 'undefined') {
                 try { window.speechSynthesis.cancel(); } catch (error) { /* no-op */ }
             }
@@ -3154,9 +3165,6 @@
         }
 
         speakResponse(markdown, btn) {
-            if (typeof window.speechSynthesis === 'undefined'
-                || typeof window.SpeechSynthesisUtterance === 'undefined') return;
-
             // Tapping the active button again stops playback.
             if (this.speaking && this.speakingBtn === btn) {
                 this.stopSpeaking();
@@ -3169,37 +3177,71 @@
             // Clear any other reply still marked active, then preempt it:
             // a new read cancels whatever is currently playing.
             if (this.speakingBtn && this.speakingBtn !== btn) this.setSpeakBtnState(this.speakingBtn, false);
-            window.speechSynthesis.cancel();
+            this.stopSpeaking();
 
+            const requestId = ++this.speechRequestId;
+            this.speaking = true;
+            this.speakingBtn = btn;
+            this.setSpeakBtnState(btn, true);
+            this.requestServerSpeech(text, btn, requestId);
+        }
+
+        async requestServerSpeech(text, btn, requestId) {
+            try {
+                const response = await fetch('/api/pwanimate/voice/synthesize/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'audio/mpeg'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        text,
+                        voice_id: `${this.voiceStyle}_${this.voiceGender}`
+                    })
+                });
+                if (response.ok && requestId === this.speechRequestId) {
+                    const audio = new Audio(URL.createObjectURL(await response.blob()));
+                    this.speechAudio = audio;
+                    audio.onended = () => {
+                        if (requestId === this.speechRequestId) this.stopSpeaking();
+                    };
+                    audio.onerror = () => {
+                        if (requestId === this.speechRequestId) this.stopSpeaking();
+                    };
+                    await audio.play();
+                    return;
+                }
+            } catch (error) {
+                // Fall back to the browser voice when Azure is unavailable.
+            }
+            if (requestId === this.speechRequestId) this.speakWithBrowserVoice(text, btn, requestId);
+        }
+
+        speakWithBrowserVoice(text, btn, requestId) {
+            if (typeof window.speechSynthesis === 'undefined'
+                || typeof window.SpeechSynthesisUtterance === 'undefined') {
+                this.stopSpeaking();
+                return;
+            }
             const pageLang = document.documentElement.lang === 'sw' ? 'sw' : 'en';
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = pageLang;
             utterance.rate = 1.0;
-
-            // Prefer a system voice matching the page language; otherwise keep
-            // the default voice (some platforms ship no sw voice at all).
             try {
                 const voices = window.speechSynthesis.getVoices() || [];
                 const match = voices.find(v => (v.lang || '').toLowerCase().replace('_', '-') === pageLang)
                     || voices.find(v => (v.lang || '').toLowerCase().startsWith(pageLang));
                 if (match) utterance.voice = match;
             } catch (error) { /* keep default voice */ }
-
             const finish = () => {
-                // Ignore stale end/error events from a superseded utterance.
-                if (this.speakUtterance !== utterance) return;
-                this.speaking = false;
-                this.speakingBtn = null;
-                this.speakUtterance = null;
-                this.setSpeakBtnState(btn, false);
+                if (this.speakUtterance !== utterance || requestId !== this.speechRequestId) return;
+                this.stopSpeaking();
             };
             utterance.onend = finish;
             utterance.onerror = finish;
-
-            this.speaking = true;
-            this.speakingBtn = btn;
             this.speakUtterance = utterance;
-            this.setSpeakBtnState(btn, true);
             window.speechSynthesis.speak(utterance);
         }
 
@@ -6433,6 +6475,10 @@
             this.enhanceWebSources(row);
             if (window.htmx && typeof window.htmx.process === 'function') {
                 window.htmx.process(row);
+            }
+            if (this.autoTtsEnabled) {
+                const speakBtn = row.querySelector('.pwanimate-speak-btn');
+                if (speakBtn) this.speakResponse(answer, speakBtn);
             }
             return row;
         }

@@ -6,7 +6,10 @@
      data-conversation-id="{{ active_conversation_id }}"
      data-initial-study-mode="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}true{% else %}false{% endif %}"
      data-study-mode="{% if initial_study_mode or active_study_session and active_study_session.status == 'active' %}true{% else %}false{% endif %}"
-     data-study-session-id="{{ active_study_session.id|default:'' }}">
+     data-study-session-id="{{ active_study_session.id|default:'' }}"
+     data-spark-voice-style="{{ preferences.voice_style|default:'warm' }}"
+     data-spark-voice-gender="{{ preferences.voice_gender|default:'female' }}"
+     data-spark-auto-tts="{{ preferences.auto_tts_enabled|yesno:'true,false' }}">
     {{ initial_context_resources|json_script:"pwanimate-initial-context-resources" }}
     {{ active_study_session|json_script:"pwanimate-active-study-session" }}
     {{ resumable_study_session|json_script:"pwanimate-resumable-study-session" }}
@@ -561,6 +564,38 @@
                                             <li><button type="button" class="dropdown-item pwanimate-resource-download" data-format="docx"><i class="bi bi-filetype-docx me-2"></i>{% trans "Download Word document" %}</button></li>
                                         </ul>
                                     </div>
+                                    <button type="button"
+                                            class="btn pwanimate-action-btn pwanimate-feedback-btn"
+                                            data-feedback="helpful"
+                                            title="{% trans 'This helped' %}"
+                                            aria-label="{% trans 'This helped' %}">
+                                        <i class="bi bi-hand-thumbs-up"></i>
+                                    </button>
+                                    <div class="dropdown pwanimate-feedback-reason">
+                                        <button type="button"
+                                                class="btn pwanimate-action-btn pwanimate-feedback-btn"
+                                                data-bs-toggle="dropdown"
+                                                aria-expanded="false"
+                                                title="{% trans 'This did not help' %}"
+                                                aria-label="{% trans 'This did not help' %}">
+                                            <i class="bi bi-hand-thumbs-down"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end pwanimate-feedback-reason-menu">
+                                            <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="wrong_answer">{% trans "The answer is wrong" %}</button></li>
+                                            <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="not_my_document">{% trans "It ignored my document" %}</button></li>
+                                            <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="too_slow">{% trans "It took too long" %}</button></li>
+                                            <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="wrong_language">{% trans "Wrong language or register" %}</button></li>
+                                            <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="too_long">{% trans "Too long or too short" %}</button></li>
+                                            <li><button type="button" class="dropdown-item pwanimate-feedback-reason-item" data-reason="other">{% trans "Something else" %}</button></li>
+                                        </ul>
+                                    </div>
+                                    <button type="button"
+                                            class="btn pwanimate-action-btn pwanimate-speak-btn"
+                                            title="{% trans 'Read this reply aloud' %}"
+                                            aria-label="{% trans 'Read this reply aloud' %}"
+                                            aria-pressed="false">
+                                        <i class="bi bi-volume-up-fill" aria-hidden="true"></i>
+                                    </button>
                                     <button type="button" class="btn pwanimate-action-btn copy-btn" title="{% trans 'Copy answer' %}" aria-label="{% trans 'Copy answer' %}">
                                         <i class="bi bi-clipboard"></i>
                                     </button>
